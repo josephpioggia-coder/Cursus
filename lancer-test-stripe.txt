@@ -1,0 +1,53 @@
+COMMENT LANCER LE TEST STRIPE — depuis ton chemin habituel
+=============================================================
+
+1. Ouvre une invite de commande (cmd) ou PowerShell
+
+2. Va dans ton dossier de travail habituel :
+
+   D:
+   cd "Dropbox\AA -Ecriture\Atelier d'écrivain\atelier-supabase\atelier-ecrivain"
+
+3. Active Node.js dans le PATH (comme d'habitude sur cette machine) :
+
+   set PATH=%PATH%;C:\Program Files\nodejs
+
+4. Crée un sous-dossier dédié au test (pour ne pas mélanger avec le code de Cursus) :
+
+   mkdir test-stripe
+   cd test-stripe
+
+5. Initialise un petit projet Node et installe Stripe :
+
+   npm init -y
+   npm install stripe
+
+6. Copie le fichier test-stripe-upgrade.mjs téléchargé dans ce dossier
+   (D:\Dropbox\AA -Ecriture\Atelier d'écrivain\atelier-supabase\atelier-ecrivain\test-stripe\)
+
+7. Ouvre test-stripe-upgrade.mjs et remplace la ligne :
+
+   const STRIPE_SECRET_KEY = "sk_test_VOTRE_CLE_ICI";
+
+   par ta vraie clé secrète de test (visible dans ton dashboard Stripe,
+   commence par sk_test_51TnxEoPCr5y81hQu...)
+
+8. Lance le test :
+
+   node test-stripe-upgrade.mjs
+
+=============================================================
+RÉCAPITULATIF DES COMMANDES (à copier-coller d'affilée) :
+=============================================================
+
+D:
+cd "Dropbox\AA -Ecriture\Atelier d'écrivain\atelier-supabase\atelier-ecrivain"
+set PATH=%PATH%;C:\Program Files\nodejs
+mkdir test-stripe
+cd test-stripe
+npm init -y
+npm install stripe
+
+(puis copier le fichier .mjs dans ce dossier, éditer la clé, et lancer :)
+
+node test-stripe-upgrade.mjs

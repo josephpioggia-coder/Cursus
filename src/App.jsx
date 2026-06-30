@@ -1,0 +1,1300 @@
+/**
+ * ATELIER D'ÉCRIVAIN — App.jsx (version Supabase)
+ *
+ * État global branché sur Supabase via src/lib/api.js
+ * Authentification via src/lib/auth.jsx
+ * Le localStorage n'est plus utilisé.
+ */
+
+import { useState, useEffect, useCallback } from "react";
+import { useAuth, PageConnexion } from "./lib/auth.jsx";
+import { projetsAPI, nœudsAPI } from "./lib/api.js";
+import { supabase } from "./lib/supabase.js";
+import Editeur from "./components/Editeur.jsx";
+import TableauDeBord from "./components/TableauDeBord.jsx";
+import Bibliotheque from "./components/Bibliotheque.jsx";
+import CarnetIdees from "./components/CarnetIdees.jsx";
+import CopiloteIA from "./components/CopiloteIA.jsx";
+import ImportDocx from "./components/ImportDocx.jsx";
+import Tarification from "./components/Tarification.jsx";
+import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
+
+// ─── Constantes ────────────────────────────────────────────────────────────────
+
+const GENRES = ["Roman", "Non-fiction", "Essai", "Méthode", "Biographie", "Autre"];
+const STATUTS = ["En cours", "En pause", "Terminé", "Idée"];
+const COULEURS = ["#7F77DD", "#1D9E75", "#D85A30", "#378ADD", "#D4537E", "#BA7517"];
+
+const STRUCTURE_TYPES = {
+  partie: { label: "Partie", enfant: "chapitre", icone: "📂" },
+  chapitre: { label: "Chapitre", enfant: "scene", icone: "📄" },
+  scene: { label: "Scène", enfant: null, icone: "✏️" },
+};
+
+// ─── Utilitaires ────────────────────────────────────────────────────────────────
+
+const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const dateAujourd = () => new Date().toLocaleDateString("fr-BE", {
+  day: "numeric", month: "long", year: "numeric",
+});
+
+// Calcule le total de mots d'un projet à travers toute son arborescence
+const compterMots = (texte = "") =>
+  texte.trim() === "" ? 0 : texte.trim().split(/\s+/).length;
+
+const totalMotsProjet = (nœuds = []) => {
+  let total = 0;
+  const parcourir = (liste) => {
+    for (const n of liste) {
+      total += compterMots(n.texte);
+      if (n.enfants?.length) parcourir(n.enfants);
+    }
+  };
+  parcourir(nœuds);
+  return total;
+};
+
+// Persistance locale (remplacée par Supabase en production)
+const sauvegarder = (projets) => {
+  localStorage.setItem("atelier-projets", JSON.stringify(projets));
+};
+const charger = () => {
+  try {
+    return JSON.parse(localStorage.getItem("atelier-projets")) || [];
+  } catch {
+    return [];
+  }
+};
+
+// ─── Données de démonstration ───────────────────────────────────────────────────
+
+const DEMO_PROJETS = [
+  {
+    id: genId(),
+    titre: "La Méthode 361°+i",
+    genre: "Méthode",
+    statut: "En cours",
+    couleur: "#7F77DD",
+    objectifMots: 60000,
+    dateCreation: "2025-03-12",
+    description: "Une approche systémique de l'intelligence relationnelle.",
+    structure: [
+      {
+        id: genId(), type: "partie", titre: "Fondements théoriques", ordre: 1, texte: "",
+        enfants: [
+          { id: genId(), type: "chapitre", titre: "L'origine du modèle", ordre: 1, texte: "Le modèle 361°+i est né d'une observation de terrain répétée sur plus de quinze ans de pratique...", enfants: [] },
+          { id: genId(), type: "chapitre", titre: "Les quatre dimensions", ordre: 2, texte: "", enfants: [] },
+        ],
+      },
+      {
+        id: genId(), type: "partie", titre: "Applications pratiques", ordre: 2, texte: "",
+        enfants: [
+          { id: genId(), type: "chapitre", titre: "En contexte organisationnel", ordre: 1, texte: "", enfants: [] },
+        ],
+      },
+    ],
+  },
+  {
+    id: genId(),
+    titre: "Les Silences du Fleuve",
+    genre: "Roman",
+    statut: "En cours",
+    couleur: "#1D9E75",
+    objectifMots: 90000,
+    dateCreation: "2025-09-01",
+    description: "Un roman sur la mémoire familiale et les secrets qui traversent les générations.",
+    structure: [
+      {
+        id: genId(), type: "partie", titre: "Livre I — L'exil", ordre: 1, texte: "",
+        enfants: [
+          {
+            id: genId(), type: "chapitre", titre: "Le départ", ordre: 1, texte: "Clara ne s'était jamais retournée. C'était sa règle depuis l'enfance.", enfants: [
+              { id: genId(), type: "scene", titre: "La gare de Lyon, 1987", ordre: 1, texte: "La salle des pas perdus résonnait encore de l'annonce du train pour Marseille.", enfants: [] },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+];
+
+// ─── Composant : Badge statut ────────────────────────────────────────────────────
+
+function BadgeStatut({ statut }) {
+  const styles = {
+    "En cours":  { bg: "#EEEDFE", color: "#534AB7" },
+    "En pause":  { bg: "#FAEEDA", color: "#854F0B" },
+    "Terminé":   { bg: "#EAF3DE", color: "#3B6D11" },
+    "Idée":      { bg: "#F1EFE8", color: "#5F5E5A" },
+  };
+  const s = styles[statut] || styles["Idée"];
+  return (
+    <span style={{
+      background: s.bg, color: s.color,
+      fontSize: 11, fontWeight: 500,
+      padding: "2px 8px", borderRadius: 20,
+    }}>
+      {statut}
+    </span>
+  );
+}
+
+// ─── Composant : Barre de progression ───────────────────────────────────────────
+
+function BarreProgression({ valeur, max, couleur }) {
+  const pct = Math.min(100, Math.round((valeur / (max || 1)) * 100));
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{
+        flex: 1, height: 4,
+        background: "var(--border)", borderRadius: 4, overflow: "hidden",
+      }}>
+        <div style={{
+          width: `${pct}%`, height: "100%",
+          background: couleur, borderRadius: 4,
+          transition: "width 0.4s ease",
+        }} />
+      </div>
+      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", minWidth: 28, textAlign: "right" }}>
+        {pct}%
+      </span>
+    </div>
+  );
+}
+
+// ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
+
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer }) {
+  const [ouvert, setOuvert] = useState(true);
+  const [enRenommage, setEnRenommage] = useState(false);
+  const [nomTemp, setNomTemp] = useState(nœud.titre);
+  const [survol, setSurvol] = useState(false);
+
+  const aDesEnfants = nœud.enfants?.length > 0;
+  const typeInfo = STRUCTURE_TYPES[nœud.type];
+  const peutAjouter = typeInfo.enfant !== null;
+
+  const validerRenommage = () => {
+    if (nomTemp.trim()) onRenommer(nœud.id, nomTemp.trim());
+    setEnRenommage(false);
+  };
+
+  return (
+    <div style={{ marginLeft: profondeur * 16 }}>
+      <div
+        onMouseEnter={() => setSurvol(true)}
+        onMouseLeave={() => setSurvol(false)}
+        onClick={() => onSélectionner(nœud.id)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "5px 8px", borderRadius: 6, cursor: "pointer",
+          background: sélectionné === nœud.id
+            ? `${projetCouleur}18`
+            : survol ? "var(--surface-hover)" : "transparent",
+          borderLeft: sélectionné === nœud.id
+            ? `2px solid ${projetCouleur}`
+            : "2px solid transparent",
+          transition: "all 0.15s",
+        }}
+      >
+        {/* Chevron */}
+        {aDesEnfants ? (
+          <span
+            onClick={(e) => { e.stopPropagation(); setOuvert(!ouvert); }}
+            style={{
+              fontSize: 10, color: "var(--texte-tertiaire)",
+              transform: ouvert ? "rotate(90deg)" : "rotate(0deg)",
+              transition: "transform 0.2s", userSelect: "none", width: 12,
+            }}
+          >▶</span>
+        ) : <span style={{ width: 12 }} />}
+
+        {/* Icône type */}
+        <span style={{ fontSize: 13 }}>{typeInfo.icone}</span>
+
+        {/* Titre ou champ renommage */}
+        {enRenommage ? (
+          <input
+            autoFocus
+            value={nomTemp}
+            onChange={(e) => setNomTemp(e.target.value)}
+            onBlur={validerRenommage}
+            onKeyDown={(e) => { if (e.key === "Enter") validerRenommage(); if (e.key === "Escape") setEnRenommage(false); }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1, border: "none", background: "transparent",
+              fontSize: 13, color: "var(--texte-primaire)", outline: "none",
+              fontFamily: "inherit",
+            }}
+          />
+        ) : (
+          <span style={{
+            flex: 1, fontSize: 13,
+            color: sélectionné === nœud.id ? projetCouleur : "var(--texte-secondaire)",
+            fontWeight: sélectionné === nœud.id ? 500 : 400,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            {nœud.titre}
+          </span>
+        )}
+
+        {/* Mots du nœud */}
+        {compterMots(nœud.texte) > 0 && (
+          <span style={{ fontSize: 10, color: "var(--texte-tertiaire)" }}>
+            {compterMots(nœud.texte).toLocaleString("fr-FR")}
+          </span>
+        )}
+
+        {/* Actions au survol */}
+        {survol && !enRenommage && (
+          <div style={{ display: "flex", gap: 2 }} onClick={(e) => e.stopPropagation()}>
+            {peutAjouter && (
+              <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={`Ajouter ${STRUCTURE_TYPES[typeInfo.enfant].label}`}>+</button>
+            )}
+            <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title="Renommer">✎</button>
+            <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title="Supprimer">✕</button>
+          </div>
+        )}
+      </div>
+
+      {/* Enfants récursifs */}
+      {ouvert && nœud.enfants?.map((enfant) => (
+        <NœudStructure
+          key={enfant.id}
+          nœud={enfant}
+          profondeur={profondeur + 1}
+          projetCouleur={projetCouleur}
+          sélectionné={sélectionné}
+          onSélectionner={onSélectionner}
+          onAjouter={onAjouter}
+          onRenommer={onRenommer}
+          onSupprimer={onSupprimer}
+        />
+      ))}
+    </div>
+  );
+}
+
+const btnIconStyle = {
+  background: "none", border: "none", cursor: "pointer",
+  fontSize: 12, color: "var(--texte-tertiaire)",
+  padding: "1px 4px", borderRadius: 4,
+  fontFamily: "inherit",
+};
+
+// ─── Composant : Carte projet (vue liste) ─────────────────────────────────────────
+
+function CarteProjet({ projet, onOuvrir, onSupprimer }) {
+  const [survol, setSurvol] = useState(false);
+  const mots = totalMotsProjet(projet.structure);
+
+  return (
+    <div
+      onMouseEnter={() => setSurvol(true)}
+      onMouseLeave={() => setSurvol(false)}
+      style={{
+        background: "var(--surface)",
+        border: `0.5px solid ${survol ? projet.couleur + "60" : "var(--border)"}`,
+        borderRadius: 12, padding: "1.25rem",
+        cursor: "pointer", transition: "all 0.2s",
+        transform: survol ? "translateY(-1px)" : "none",
+      }}
+      onClick={() => onOuvrir(projet.id)}
+    >
+      {/* En-tête */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 10, height: 10, borderRadius: "50%",
+            background: projet.couleur, flexShrink: 0,
+          }} />
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--texte-primaire)" }}>
+              {projet.titre}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", marginTop: 2 }}>
+              {projet.genre}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <BadgeStatut statut={projet.statut} />
+          {survol && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSupprimer(projet.id); }}
+              style={{ ...btnIconStyle, color: "#E24B4A", fontSize: 14 }}
+              title="Supprimer ce projet"
+            >✕</button>
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      {projet.description && (
+        <p style={{ fontSize: 13, color: "var(--texte-secondaire)", marginBottom: 12, lineHeight: 1.5 }}>
+          {projet.description}
+        </p>
+      )}
+
+      {/* Progression */}
+      <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
+        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
+          {mots.toLocaleString("fr-FR")} mots rédigés
+        </span>
+        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
+          Objectif : {projet.objectifMots.toLocaleString("fr-FR")}
+        </span>
+        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginLeft: "auto" }}>
+          {projet.structure?.length || 0} partie{projet.structure?.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Composant : Formulaire nouveau projet ────────────────────────────────────────
+
+function FormulaireProjet({ onCréer, onAnnuler }) {
+  const [form, setForm] = useState({
+    titre: "", genre: "Roman", statut: "En cours",
+    couleur: COULEURS[0], objectifMots: 80000, description: "",
+  });
+
+  const màj = (champ, val) => setForm((f) => ({ ...f, [champ]: val }));
+
+  const valider = () => {
+    if (!form.titre.trim()) return;
+    onCréer({
+      id: genId(),
+      ...form,
+      objectifMots: Number(form.objectifMots) || 80000,
+      dateCreation: new Date().toISOString().slice(0, 10),
+      structure: [],
+    });
+  };
+
+  return (
+    <div style={{
+      background: "var(--surface)",
+      border: "0.5px solid var(--border)",
+      borderRadius: 12, padding: "1.5rem",
+    }}>
+      <h3 style={{ fontSize: 16, fontWeight: 500, marginBottom: 20, color: "var(--texte-primaire)" }}>
+        Nouveau projet
+      </h3>
+
+      <div style={{ display: "grid", gap: 14 }}>
+        {/* Titre */}
+        <div>
+          <label style={labelStyle}>Titre du projet *</label>
+          <input
+            autoFocus
+            value={form.titre}
+            onChange={(e) => màj("titre", e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") valider(); }}
+            placeholder="Ex : La Méthode 361°+i"
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Genre + Statut */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label style={labelStyle}>Genre</label>
+            <select value={form.genre} onChange={(e) => màj("genre", e.target.value)} style={inputStyle}>
+              {GENRES.map((g) => <option key={g}>{g}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Statut</label>
+            <select value={form.statut} onChange={(e) => màj("statut", e.target.value)} style={inputStyle}>
+              {STATUTS.map((s) => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Objectif mots */}
+        <div>
+          <label style={labelStyle}>Objectif (nombre de mots)</label>
+          <input
+            type="number"
+            value={form.objectifMots}
+            onChange={(e) => màj("objectifMots", e.target.value)}
+            min={1000} max={500000} step={1000}
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label style={labelStyle}>Description courte</label>
+          <textarea
+            value={form.description}
+            onChange={(e) => màj("description", e.target.value)}
+            placeholder="En quelques mots, de quoi parle ce projet ?"
+            rows={2}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+          />
+        </div>
+
+        {/* Couleur */}
+        <div>
+          <label style={labelStyle}>Couleur du projet</label>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            {COULEURS.map((c) => (
+              <div
+                key={c}
+                onClick={() => màj("couleur", c)}
+                style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: c, cursor: "pointer",
+                  border: form.couleur === c ? `3px solid var(--texte-primaire)` : "3px solid transparent",
+                  transition: "border 0.15s",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button onClick={valider} style={btnPrimaryStyle(form.couleur)}>
+            Créer le projet
+          </button>
+          <button onClick={onAnnuler} style={btnSecondaryStyle}>
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Composant : Vue projet (structure du manuscrit) ─────────────────────────────
+
+function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
+  const [sélectionné, setSélectionné] = useState(null);
+  const mots = totalMotsProjet(projet.structure);
+
+  // Ajoute un nœud enfant à un nœud parent identifié par id
+  const ajouterNœud = useCallback((parentId, type) => {
+    const nouveau = {
+      id: genId(), type, ordre: 0,
+      titre: `${STRUCTURE_TYPES[type].label} sans titre`,
+      texte: "", enfants: [],
+    };
+
+    const insérer = (liste) =>
+      liste.map((n) => {
+        if (n.id === parentId) {
+          return { ...n, enfants: [...(n.enfants || []), { ...nouveau, ordre: (n.enfants?.length || 0) + 1 }] };
+        }
+        return { ...n, enfants: insérer(n.enfants || []) };
+      });
+
+    // Ajoute au niveau racine si parentId est l'id du projet
+    if (parentId === projet.id) {
+      const nouveauNœud = { ...nouveau, type: "partie", ordre: (projet.structure?.length || 0) + 1 };
+      onMàjStructure(projet.id, [...(projet.structure || []), nouveauNœud]);
+    } else {
+      onMàjStructure(projet.id, insérer(projet.structure || []));
+    }
+  }, [projet, onMàjStructure]);
+
+  const renommerNœud = useCallback((nœudId, nouveauTitre) => {
+    const renommer = (liste) =>
+      liste.map((n) =>
+        n.id === nœudId
+          ? { ...n, titre: nouveauTitre }
+          : { ...n, enfants: renommer(n.enfants || []) }
+      );
+    onMàjStructure(projet.id, renommer(projet.structure || []));
+  }, [projet, onMàjStructure]);
+
+  const supprimerNœud = useCallback((nœudId) => {
+    const supprimer = (liste) =>
+      liste
+        .filter((n) => n.id !== nœudId)
+        .map((n) => ({ ...n, enfants: supprimer(n.enfants || []) }));
+    onMàjStructure(projet.id, supprimer(projet.structure || []));
+    if (sélectionné === nœudId) setSélectionné(null);
+  }, [projet, onMàjStructure, sélectionné]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* En-tête projet */}
+      <div style={{
+        padding: "16px 20px",
+        borderBottom: "0.5px solid var(--border)",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <button onClick={onRetour} style={{ ...btnIconStyle, fontSize: 18 }} title="Retour aux projets">←</button>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: projet.couleur }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: "var(--texte-primaire)" }}>{projet.titre}</div>
+          <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
+            {mots.toLocaleString("fr-FR")} mots · {projet.genre} · <BadgeStatut statut={projet.statut} />
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: projet.couleur }}>
+            {Math.min(100, Math.round((mots / projet.objectifMots) * 100))}%
+          </div>
+          <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
+            / {projet.objectifMots.toLocaleString("fr-FR")} mots
+          </div>
+        </div>
+      </div>
+
+      {/* Barre de progression */}
+      <div style={{ padding: "8px 20px", borderBottom: "0.5px solid var(--border)" }}>
+        <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
+      </div>
+
+      {/* Structure */}
+      {/* Structure — liste scrollable */}
+      <div style={{ overflowY: "auto", padding: "12px 12px", maxHeight: sélectionné ? "40%" : "100%" }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          marginBottom: 8, padding: "0 8px",
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--texte-tertiaire)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            Structure du manuscrit
+          </span>
+          <button
+            onClick={() => ajouterNœud(projet.id, "partie")}
+            style={{
+              fontSize: 11, color: projet.couleur,
+              background: "none", border: "none", cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+            title="Ajouter une partie"
+          >
+            + Partie
+          </button>
+        </div>
+
+        {projet.structure?.length === 0 ? (
+          <div style={{
+            textAlign: "center", padding: "32px 16px",
+            color: "var(--texte-tertiaire)", fontSize: 13,
+          }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
+            <div style={{ marginBottom: 8 }}>Aucune structure pour l'instant.</div>
+            <button
+              onClick={() => ajouterNœud(projet.id, "partie")}
+              style={btnPrimaryStyle(projet.couleur)}
+            >
+              Ajouter la première partie
+            </button>
+          </div>
+        ) : (
+          projet.structure.map((nœud) => (
+            <NœudStructure
+              key={nœud.id}
+              nœud={nœud}
+              profondeur={0}
+              projetCouleur={projet.couleur}
+              sélectionné={sélectionné}
+              onSélectionner={setSélectionné}
+              onAjouter={ajouterNœud}
+              onRenommer={renommerNœud}
+              onSupprimer={supprimerNœud}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Panneau : aperçu du nœud sélectionné */}
+      {sélectionné && (
+        <PanneauNœud
+          nœudId={sélectionné}
+          structure={projet.structure}
+          couleur={projet.couleur}
+          onOuvrirÉditeur={(id) => onOuvrirÉditeur(projet.id, id)}
+          onMàjTexte={(id, texte) => {
+            const màj = (liste) =>
+              liste.map((n) =>
+                n.id === id ? { ...n, texte } : { ...n, enfants: màj(n.enfants || []) }
+              );
+            onMàjStructure(projet.id, màj(projet.structure));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Composant : Panneau du nœud sélectionné ─────────────────────────────────────
+
+function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉditeur }) {
+  const trouver = (liste, id) => {
+    for (const n of liste) {
+      if (n.id === id) return n;
+      const trouvé = trouver(n.enfants || [], id);
+      if (trouvé) return trouvé;
+    }
+    return null;
+  };
+
+  const nœud = trouver(structure, nœudId);
+  if (!nœud) return null;
+
+  const mots = compterMots(nœud.texte);
+  const aContenu = nœud.texte && nœud.texte.length > 0;
+
+  return (
+    <div style={{
+      borderTop: `2px solid ${couleur}30`,
+      display: "flex", flexDirection: "column",
+      flex: 1, minHeight: 0, overflow: "hidden",
+      background: `${couleur}04`,
+    }}>
+      {/* En-tête du panneau */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "10px 16px", borderBottom: `0.5px solid ${couleur}20`,
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: couleur }}>
+          {STRUCTURE_TYPES[nœud.type]?.icone} {nœud.titre}
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {mots > 0 && (
+            <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
+              {mots.toLocaleString("fr-FR")} mots
+            </span>
+          )}
+          <button
+            onClick={() => onOuvrirÉditeur(nœud.id)}
+            style={{
+              fontSize: 11, color: "#fff",
+              background: couleur, border: "none",
+              borderRadius: 6, padding: "5px 12px",
+              cursor: "pointer", fontFamily: "inherit", fontWeight: 500,
+            }}
+          >
+            ✍️ Ouvrir l'éditeur
+          </button>
+        </div>
+      </div>
+
+      {/* Aperçu du contenu */}
+      <div style={{
+        flex: 1, overflowY: "auto",
+        padding: "16px 20px",
+        fontFamily: "Georgia, 'Times New Roman', serif",
+        fontSize: 14, lineHeight: 1.8,
+        color: "var(--texte-primaire)",
+      }}>
+        {aContenu ? (
+          <div dangerouslySetInnerHTML={{ __html: nœud.texte }} />
+        ) : (
+          <div style={{
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            height: "100%", gap: 12, color: "var(--texte-tertiaire)",
+            textAlign: "center", padding: "24px",
+          }}>
+            <div style={{ fontSize: 28 }}>✍️</div>
+            <div style={{ fontSize: 13 }}>Ce chapitre est vide.</div>
+            <button
+              onClick={() => onOuvrirÉditeur(nœud.id)}
+              style={{
+                background: couleur, color: "#fff", border: "none",
+                borderRadius: 8, padding: "8px 16px", fontSize: 13,
+                fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              Commencer à écrire
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Styles réutilisables ─────────────────────────────────────────────────────────
+
+const labelStyle = {
+  display: "block", fontSize: 12, fontWeight: 500,
+  color: "var(--texte-secondaire)", marginBottom: 5,
+};
+
+const inputStyle = {
+  width: "100%", padding: "8px 10px",
+  border: "0.5px solid var(--border)", borderRadius: 8,
+  fontSize: 13, color: "var(--texte-primaire)",
+  background: "var(--surface)", fontFamily: "inherit",
+  outline: "none", boxSizing: "border-box",
+};
+
+const btnPrimaryStyle = (couleur) => ({
+  background: couleur, color: "#fff",
+  border: "none", borderRadius: 8,
+  padding: "8px 16px", fontSize: 13,
+  fontWeight: 500, cursor: "pointer",
+  fontFamily: "inherit",
+});
+
+const btnSecondaryStyle = {
+  background: "transparent",
+  border: "0.5px solid var(--border)",
+  borderRadius: 8, padding: "8px 16px",
+  fontSize: 13, color: "var(--texte-secondaire)",
+  cursor: "pointer", fontFamily: "inherit",
+};
+
+// ─── Composant principal : App ────────────────────────────────────────────────────
+
+export default function App() {
+  const { user, chargement: authChargement, déconnecter } = useAuth();
+
+  // Affiche la page de connexion si non authentifié
+  if (authChargement) return (
+    <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui", color: "#999", fontSize: 14 }}>
+      Chargement…
+    </div>
+  );
+  if (!user) return <PageConnexion />;
+
+  return <AppConnectée user={user} déconnecter={déconnecter} />;
+}
+
+// ─── Composant : App connectée (après auth) ───────────────────────────────────
+
+function AppConnectée({ user, déconnecter }) {
+  const [projets, setProjets]   = useState([]);
+  const [chargement, setChargement] = useState(true);
+  const [vue, setVue]           = useState("tableau");
+  const [projetActifId, setProjetActifId] = useState(null);
+  const [nœudActifId, setNœudActifId]     = useState(null);
+  const [importOuvert, setImportOuvert]   = useState(false);
+  const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
+  const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
+
+  // Champs considérés "essentiels" pour qu'un projet soit jugé suffisamment cadré.
+  // Tant qu'ils ne sont pas tous remplis, le rappel réapparaît à chaque ouverture.
+  const CHAMPS_ESSENTIELS = ["pourquoi", "type_recit", "tons_multiples", "pacte_ia"];
+
+  const intentionEstSuffisante = (intention) => {
+    if (!intention) return false;
+    return CHAMPS_ESSENTIELS.every((champ) => {
+      const v = intention[champ];
+      return Array.isArray(v) ? v.length > 0 : Boolean(v && v.trim?.());
+    });
+  };
+
+  // À chaque changement de projet actif (peu importe le chemin d'entrée),
+  // vérifie si le cap du projet est suffisamment rempli — sinon, rappel.
+  useEffect(() => {
+    if (!projetActifId || projetVenantDêtreCréé) return; // pas de double-rappel juste après création
+
+    const vérifier = async () => {
+      const { data } = await supabase
+        .from("intention_projet")
+        .select("*")
+        .eq("projet_id", projetActifId)
+        .maybeSingle();
+
+      if (!intentionEstSuffisante(data)) {
+        setRappelIntentionPour(projetActifId);
+      } else {
+        setRappelIntentionPour(null);
+      }
+    };
+    vérifier();
+  }, [projetActifId, projetVenantDêtreCréé]);
+
+  // Chargement initial des projets depuis Supabase
+  useEffect(() => {
+    const init = async () => {
+      setChargement(true);
+      const { data, error } = await projetsAPI.lister();
+      if (!error && data) {
+        // Chargement de la structure de chaque projet
+        const projetsAvecStructure = await Promise.all(
+          data.map(async (p) => {
+            const { data: noeuds } = await nœudsAPI.listerParProjet(p.id);
+            return { ...normaliserProjet(p), structure: construireArbre(noeuds || []) };
+          })
+        );
+        setProjets(projetsAvecStructure);
+      }
+      setChargement(false);
+    };
+    init();
+  }, []);
+
+  // Normalise les noms de colonnes Supabase → noms React (camelCase)
+  const normaliserProjet = (p) => ({
+    id:           p.id,
+    titre:        p.titre,
+    genre:        p.genre,
+    statut:       p.statut,
+    couleur:      p.couleur,
+    objectifMots: p.objectif_mots,
+    description:  p.description,
+    dateCreation: p.date_creation,
+    structure:    p.structure || [],
+  });
+
+  // Reconstruit l'arborescence à partir de la liste plate des nœuds
+  const construireArbre = (nœudsPlats) => {
+    const map = {};
+    nœudsPlats.forEach((n) => {
+      map[n.id] = { ...n, enfants: [] };
+    });
+    const racines = [];
+    nœudsPlats.forEach((n) => {
+      if (n.parent_id && map[n.parent_id]) {
+        map[n.parent_id].enfants.push(map[n.id]);
+      } else {
+        racines.push(map[n.id]);
+      }
+    });
+    racines.forEach((r) => trierEnfants(r));
+    return racines;
+  };
+
+  const trierEnfants = (nœud) => {
+    nœud.enfants?.sort((a, b) => a.ordre - b.ordre);
+    nœud.enfants?.forEach(trierEnfants);
+  };
+
+  const projetActif = projets.find((p) => p.id === projetActifId);
+
+  const trouverNœud = (structure = [], id) => {
+    for (const n of structure) {
+      if (n.id === id) return n;
+      const trouvé = trouverNœud(n.enfants || [], id);
+      if (trouvé) return trouvé;
+    }
+    return null;
+  };
+
+  const nœudActif = projetActif ? trouverNœud(projetActif.structure, nœudActifId) : null;
+
+  // ── Actions projets ──
+
+  const créerProjet = async (données) => {
+    const { data, error } = await projetsAPI.créer(données);
+    if (!error && data) {
+      const nouveau = { ...normaliserProjet(data), structure: [] };
+      setProjets((prev) => [nouveau, ...prev]);
+      setProjetActifId(nouveau.id);
+      setProjetVenantDêtreCréé(nouveau);
+      setVue("projet");
+    }
+  };
+
+  const ouvrirProjet = (id) => { setProjetActifId(id); setVue("projet"); };
+
+  const ouvrirÉditeur = (projetId, nœudId) => {
+    setProjetActifId(projetId);
+    setNœudActifId(nœudId);
+    setVue("editeur");
+  };
+
+  const supprimerProjet = async (id) => {
+    if (!window.confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
+    const { error } = await projetsAPI.supprimer(id);
+    if (!error) {
+      setProjets((prev) => prev.filter((p) => p.id !== id));
+      if (projetActifId === id) { setVue("liste"); setProjetActifId(null); }
+    }
+  };
+
+  // ── Actions nœuds ──
+
+  const màjStructure = useCallback(async (projetId, nouvelleStructure) => {
+    // Mise à jour optimiste de l'UI
+    setProjets((prev) =>
+      prev.map((p) => p.id === projetId ? { ...p, structure: nouvelleStructure } : p)
+    );
+    // Supabase : pas de sync bulk ici — chaque action (créer/renommer/supprimer)
+    // appelle directement nœudsAPI. màjStructure reste pour la compatibilité UI.
+  }, []);
+
+  const sauvegarderNœud = useCallback(async (nœudId, html) => {
+    // Mise à jour optimiste
+    setProjets((prev) =>
+      prev.map((p) => {
+        if (p.id !== projetActifId) return p;
+        const màj = (liste) =>
+          liste.map((n) =>
+            n.id === nœudId ? { ...n, texte: html } : { ...n, enfants: màj(n.enfants || []) }
+          );
+        return { ...p, structure: màj(p.structure) };
+      })
+    );
+    // Persiste en base
+    await nœudsAPI.sauvegarderTexte(nœudId, html);
+  }, [projetActifId]);
+
+  const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "220px 1fr",
+      gridTemplateRows: "48px 1fr",
+      height: "100vh",
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--surface": "#ffffff",
+      "--surface-hover": "#f5f5f5",
+      "--border": "#e5e5e5",
+      "--texte-primaire": "#1a1a1a",
+      "--texte-secondaire": "#555",
+      "--texte-tertiaire": "#999",
+      background: "#f8f8f8",
+    }}>
+      {/* ── Barre supérieure ── */}
+      <div style={{
+        gridColumn: "1 / -1",
+        display: "flex", alignItems: "center",
+        padding: "0 20px", gap: 16,
+        borderBottom: "0.5px solid var(--border)",
+        background: "var(--surface)",
+      }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>
+          Atelier
+        </span>
+        <div style={{ flex: 1 }} />
+        {chargement ? (
+          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>Chargement…</span>
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+            {totalMots.toLocaleString("fr-FR")} mots · {projets.length} projet{projets.length !== 1 ? "s" : ""}
+          </span>
+        )}
+        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>{user.email}</span>
+        <button onClick={déconnecter}
+          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          Déconnexion
+        </button>
+      </div>
+
+      {/* ── Sidebar ── */}
+      <div style={{
+        borderRight: "0.5px solid var(--border)",
+        background: "#fafafa",
+        display: "flex", flexDirection: "column",
+        overflowY: "auto",
+      }}>
+        {/* Navigation principale */}
+        <div style={{ padding: "16px 12px 8px" }}>
+          <div style={sectionLabelStyle}>Navigation</div>
+          {[
+            { id: "tableau",      label: "Tableau de bord",  icone: "⊞" },
+            { id: "editeur",      label: "Éditeur",          icone: "✍️" },
+            { id: "bibliotheque", label: "Bibliothèque",     icone: "📚" },
+            { id: "carnet",       label: "Carnet d'idées",   icone: "💡" },
+            { id: "tarification", label: "Tarification",     icone: "💳" },
+          ].map((item) => (
+            <div
+              key={item.id}
+              onClick={() => {
+                if (item.id === "editeur" && projetActif && nœudActif) {
+                  setVue("editeur");
+                } else if (item.id === "editeur" && projetActif) {
+                  setVue("projet");
+                } else if (item.id !== "editeur") {
+                  setVue(item.id);
+                  if (item.id !== "projet") setProjetActifId(null);
+                }
+              }}
+              style={navItemStyle(
+                (vue === item.id) ||
+                (item.id === "editeur" && (vue === "projet" || vue === "editeur"))
+              )}
+            >
+              <span style={{ fontSize: 14 }}>{item.icone}</span>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ height: 0.5, background: "var(--border)", margin: "4px 12px" }} />
+
+        {/* Projets actifs avec barres de progression */}
+        <div style={{ padding: "8px 12px", flex: 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <div style={sectionLabelStyle}>Projets actifs</div>
+            <button
+              onClick={() => setVue("nouveau")}
+              style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "0 4px" }}
+              title="Nouveau projet"
+            >+ Nouveau</button>
+          </div>
+          {projets.length === 0 && (
+            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", padding: "8px 4px" }}>
+              Aucun projet. Cliquez sur + Nouveau.
+            </div>
+          )}
+          {projets.map((p) => {
+            const mots = totalMotsProjet(p.structure);
+            const pct = Math.min(100, Math.round((mots / (p.objectifMots || 1)) * 100));
+            const actif = projetActifId === p.id;
+            return (
+              <div key={p.id} style={{ marginBottom: 8 }}>
+                <div
+                  onClick={() => { setProjetActifId(p.id); setVue("projet"); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "6px 8px", borderRadius: 8, cursor: "pointer",
+                    background: actif ? `${p.couleur}15` : "transparent",
+                    borderLeft: actif ? `2px solid ${p.couleur}` : "2px solid transparent",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.couleur, flexShrink: 0 }} />
+                  <span style={{
+                    fontSize: 12, flex: 1, fontWeight: actif ? 500 : 400,
+                    color: actif ? "var(--texte-primaire)" : "var(--texte-secondaire)",
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>{p.titre}</span>
+                  <span style={{ fontSize: 10, color: actif ? p.couleur : "var(--texte-tertiaire)", fontWeight: actif ? 500 : 400 }}>{pct}%</span>
+                </div>
+                <div style={{ margin: "3px 8px 0 30px", height: 3, background: "var(--border)", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ width: `${pct}%`, height: "100%", background: p.couleur, borderRadius: 4, transition: "width 0.4s" }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bibliothèque stats */}
+        <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid var(--border)" }}>
+          <div style={sectionLabelStyle}>Bibliothèque</div>
+          {[
+            { label: "En cours de lecture", icone: "📖", onClick: () => setVue("bibliotheque") },
+            { label: "Citations",           icone: "❝",  onClick: () => setVue("bibliotheque") },
+            { label: "Carnet d'idées",      icone: "💡", onClick: () => setVue("carnet") },
+          ].map((item) => (
+            <div key={item.label}
+              onClick={item.onClick}
+              style={{ ...navItemStyle(false), fontSize: 12, cursor: "pointer" }}
+            >
+              <span>{item.icone}</span>
+              <span>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Zone principale ── */}
+      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+
+        {/* Vue : tableau de bord */}
+        {vue === "tableau" && (
+          <TableauDeBord
+            projets={projets}
+            onOuvrirProjet={(id) => { setProjetActifId(id); setVue("projet"); }}
+          />
+        )}
+
+        {/* Vue : carnet d'idées */}
+        {vue === "carnet" && (
+          <CarnetIdees projets={projets} />
+        )}
+
+        {/* Vue : bibliothèque */}
+        {vue === "bibliotheque" && (
+          <Bibliotheque projets={projets} />
+        )}
+
+        {/* Vue : tarification */}
+        {vue === "tarification" && (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <Tarification />
+          </div>
+        )}
+
+        {/* Vue : liste des projets */}
+        {vue === "liste" && (
+          <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
+              <div>
+                <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>
+                  Mes projets
+                </h1>
+                <p style={{ fontSize: 13, color: "var(--texte-tertiaire)" }}>
+                  {dateAujourd()}
+                </p>
+              </div>
+              <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
+                + Nouveau projet
+              </button>
+            </div>
+            {projets.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--texte-tertiaire)" }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>Aucun projet pour l'instant</div>
+                <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
+                  Créer mon premier projet
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
+                {projets.map((p) => (
+                  <CarteProjet key={p.id} projet={p} onOuvrir={ouvrirProjet} onSupprimer={supprimerProjet} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Vue : nouveau projet */}
+        {vue === "nouveau" && (
+          <div style={{ padding: "28px 32px", maxWidth: 560, overflowY: "auto" }}>
+            <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 24 }}>
+              Nouveau projet
+            </h1>
+            <FormulaireProjet
+              onCréer={créerProjet}
+              onAnnuler={() => setVue(projets.length > 0 ? "tableau" : "liste")}
+            />
+          </div>
+        )}
+
+        {/* Vue : structure du projet (avec panneau éditeur+IA intégré) */}
+        {vue === "projet" && projetActif && (
+          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            {/* Barre d'actions projet */}
+            <div style={{
+              padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
+              display: "flex", alignItems: "center", justifyContent: "flex-end",
+              background: "#fafafa",
+            }}>
+              <button
+                onClick={() => setImportOuvert(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: projetActif.couleur, color: "#fff",
+                  border: "none", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                📄 Importer un fichier Word
+              </button>
+            </div>
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <VueProjet
+                projet={projetActif}
+                onMàjStructure={màjStructure}
+                onRetour={() => setVue("tableau")}
+                onOuvrirÉditeur={ouvrirÉditeur}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
+        {vue === "editeur" && projetActif && nœudActif && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", height: "100%", overflow: "hidden" }}>
+            {/* Éditeur central */}
+            <Editeur
+              nœud={nœudActif}
+              projetCouleur={projetActif.couleur}
+              projetTitre={projetActif.titre}
+              onSauvegarder={sauvegarderNœud}
+              onRetour={() => setVue("projet")}
+            />
+            {/* Panneau contextuel droit : Citations / IA / Idées */}
+            <div style={{
+              borderLeft: "0.5px solid #e5e5e5",
+              display: "flex", flexDirection: "column",
+              overflow: "hidden", background: "#fafafa",
+            }}>
+              <CopiloteIA
+                texteActif={nœudActif.texte || ""}
+                typeProjet={["Roman", "Biographie"].includes(projetActif.genre) ? "fiction" : "non-fiction"}
+                couleurProjet={projetActif.couleur}
+                projetTitre={projetActif.titre}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Fallback : si éditeur demandé sans nœud sélectionné */}
+        {vue === "editeur" && projetActif && !nœudActif && (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "var(--texte-tertiaire)" }}>
+            <div style={{ fontSize: 32 }}>📄</div>
+            <div style={{ fontSize: 14 }}>Sélectionnez un chapitre dans la structure pour commencer à écrire.</div>
+            <button onClick={() => setVue("projet")} style={btnPrimaryStyle(projetActif.couleur)}>
+              Voir la structure
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Modal import Word */}
+      {importOuvert && projetActif && (
+        <ImportDocx
+          projet={projetActif}
+          nœudsExistants={(() => {
+            const flat = [];
+            const aplatir = (noeuds) => noeuds.forEach(n => { flat.push(n); if (n.enfants?.length) aplatir(n.enfants); });
+            aplatir(projetActif.structure || []);
+            return flat;
+          })()}
+          onTerminé={() => {
+            setImportOuvert(false);
+            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
+              if (data) {
+                setProjets(prev => prev.map(p =>
+                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
+                ));
+              }
+            });
+          }}
+          onFermer={() => setImportOuvert(false)}
+        />
+      )}
+
+      {/* Modal questionnaire d'intention — affiché obligatoirement après création d'un projet */}
+      {projetVenantDêtreCréé && (
+        <QuestionnaireIntention
+          projetId={projetVenantDêtreCréé.id}
+          projetTitre={projetVenantDêtreCréé.titre}
+          onTerminé={() => setProjetVenantDêtreCréé(null)}
+        />
+      )}
+
+      {/* Rappel persistant — le cap du projet n'est pas suffisamment rempli.
+          Réapparaît à chaque ouverture du projet tant que les champs essentiels manquent. */}
+      {rappelIntentionPour && !projetVenantDêtreCréé && (
+        <QuestionnaireIntention
+          projetId={rappelIntentionPour}
+          projetTitre={projets.find((p) => p.id === rappelIntentionPour)?.titre || ""}
+          onTerminé={() => setRappelIntentionPour(null)}
+          onFermer={() => setRappelIntentionPour(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+const sectionLabelStyle = {
+  fontSize: 10, fontWeight: 500,
+  color: "var(--texte-tertiaire)",
+  letterSpacing: "0.07em", textTransform: "uppercase",
+  marginBottom: 6, padding: "0 4px",
+};
+
+const navItemStyle = (actif) => ({
+  display: "flex", alignItems: "center", gap: 8,
+  padding: "6px 8px", borderRadius: 8, cursor: "pointer",
+  fontSize: 13,
+  color: actif ? "var(--texte-primaire)" : "var(--texte-secondaire)",
+  fontWeight: actif ? 500 : 400,
+  background: actif ? "var(--surface)" : "transparent",
+  marginBottom: 2,
+});
