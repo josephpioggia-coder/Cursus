@@ -6,7 +6,7 @@
  * Le localStorage n'est plus utilisé.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
 import { projetsAPI, nœudsAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
@@ -66,58 +66,6 @@ const charger = () => {
     return [];
   }
 };
-
-// ─── Données de démonstration ───────────────────────────────────────────────────
-
-const DEMO_PROJETS = [
-  {
-    id: genId(),
-    titre: "La Méthode 361°+i",
-    genre: "Méthode",
-    statut: "En cours",
-    couleur: "#7F77DD",
-    objectifMots: 60000,
-    dateCreation: "2025-03-12",
-    description: "Une approche systémique de l'intelligence relationnelle.",
-    structure: [
-      {
-        id: genId(), type: "partie", titre: "Fondements théoriques", ordre: 1, texte: "",
-        enfants: [
-          { id: genId(), type: "chapitre", titre: "L'origine du modèle", ordre: 1, texte: "Le modèle 361°+i est né d'une observation de terrain répétée sur plus de quinze ans de pratique...", enfants: [] },
-          { id: genId(), type: "chapitre", titre: "Les quatre dimensions", ordre: 2, texte: "", enfants: [] },
-        ],
-      },
-      {
-        id: genId(), type: "partie", titre: "Applications pratiques", ordre: 2, texte: "",
-        enfants: [
-          { id: genId(), type: "chapitre", titre: "En contexte organisationnel", ordre: 1, texte: "", enfants: [] },
-        ],
-      },
-    ],
-  },
-  {
-    id: genId(),
-    titre: "Les Silences du Fleuve",
-    genre: "Roman",
-    statut: "En cours",
-    couleur: "#1D9E75",
-    objectifMots: 90000,
-    dateCreation: "2025-09-01",
-    description: "Un roman sur la mémoire familiale et les secrets qui traversent les générations.",
-    structure: [
-      {
-        id: genId(), type: "partie", titre: "Livre I — L'exil", ordre: 1, texte: "",
-        enfants: [
-          {
-            id: genId(), type: "chapitre", titre: "Le départ", ordre: 1, texte: "Clara ne s'était jamais retournée. C'était sa règle depuis l'enfance.", enfants: [
-              { id: genId(), type: "scene", titre: "La gare de Lyon, 1987", ordre: 1, texte: "La salle des pas perdus résonnait encore de l'annonce du train pour Marseille.", enfants: [] },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-];
 
 // ─── Composant : Badge statut ────────────────────────────────────────────────────
 
@@ -555,7 +503,6 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
         <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
       </div>
 
-      {/* Structure */}
       {/* Structure — liste scrollable */}
       <div style={{ overflowY: "auto", padding: "12px 12px", maxHeight: sélectionné ? "40%" : "100%" }}>
         <div style={{
@@ -777,6 +724,42 @@ function AppConnectée({ user, déconnecter }) {
   const [importOuvert, setImportOuvert]   = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
+
+  // ── Largeur redimensionnable du panneau Co-pilote IA ──
+  const [largeurPanneau, setLargeurPanneau] = useState(280);
+  const redimensionnementActif = useRef(false);
+  const positionDépart = useRef({ x: 0, largeur: 280 });
+
+  const démarrerRedimensionnement = useCallback((e) => {
+    e.preventDefault();
+    redimensionnementActif.current = true;
+    positionDépart.current = { x: e.clientX, largeur: largeurPanneau };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [largeurPanneau]);
+
+  useEffect(() => {
+    const surDéplacement = (e) => {
+      if (!redimensionnementActif.current) return;
+      // Glisser vers la gauche élargit le panneau (il est ancré à droite)
+      const delta = positionDépart.current.x - e.clientX;
+      const nouvelleLargeur = positionDépart.current.largeur + delta;
+      setLargeurPanneau(Math.min(560, Math.max(220, nouvelleLargeur)));
+    };
+    const surRelâchement = () => {
+      if (redimensionnementActif.current) {
+        redimensionnementActif.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+    window.addEventListener("mousemove", surDéplacement);
+    window.addEventListener("mouseup", surRelâchement);
+    return () => {
+      window.removeEventListener("mousemove", surDéplacement);
+      window.removeEventListener("mouseup", surRelâchement);
+    };
+  }, []);
 
   // Champs considérés "essentiels" pour qu'un projet soit jugé suffisamment cadré.
   // Tant qu'ils ne sont pas tous remplis, le rappel réapparaît à chaque ouverture.
@@ -1198,7 +1181,7 @@ function AppConnectée({ user, déconnecter }) {
 
         {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
         {vue === "editeur" && projetActif && nœudActif && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", height: "100%", overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `1fr ${largeurPanneau}px`, height: "100%", overflow: "hidden" }}>
             {/* Éditeur central */}
             <Editeur
               nœud={nœudActif}
@@ -1209,10 +1192,20 @@ function AppConnectée({ user, déconnecter }) {
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}
             <div style={{
+              position: "relative",
               borderLeft: "0.5px solid #e5e5e5",
               display: "flex", flexDirection: "column",
               overflow: "hidden", background: "#fafafa",
             }}>
+              {/* Poignée de redimensionnement */}
+              <div
+                onMouseDown={démarrerRedimensionnement}
+                title="Glisser pour redimensionner le panneau"
+                style={{
+                  position: "absolute", left: -4, top: 0, bottom: 0, width: 8,
+                  cursor: "col-resize", zIndex: 20,
+                }}
+              />
               <CopiloteIA
                 texteActif={nœudActif.texte || ""}
                 typeProjet={["Roman", "Biographie"].includes(projetActif.genre) ? "fiction" : "non-fiction"}
@@ -1298,3 +1291,4 @@ const navItemStyle = (actif) => ({
   background: actif ? "var(--surface)" : "transparent",
   marginBottom: 2,
 });
+
