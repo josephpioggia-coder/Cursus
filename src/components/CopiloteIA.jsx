@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "../lib/supabase.js";
 
 const extraireTexte = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
@@ -18,12 +19,19 @@ const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function appelClaude(system, user, signal, maxTokens = 1000) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
+  if (!token) {
+    throw new Error("Session expirée. Reconnectez-vous.");
+  }
+
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
     signal,
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+      "Authorization": `Bearer ${token}`,
       "apikey": SUPABASE_ANON_KEY,
     },
     body: JSON.stringify({
