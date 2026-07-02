@@ -761,35 +761,27 @@ function AppConnectée({ user, déconnecter }) {
     };
   }, []);
 
-  // Champs considérés "essentiels" pour qu'un projet soit jugé suffisamment cadré.
-  // Tant qu'ils ne sont pas tous remplis, le rappel réapparaît à chaque ouverture.
-  const CHAMPS_ESSENTIELS = ["pourquoi", "type_recit", "tons_multiples", "pacte_ia"];
-
-  const intentionEstSuffisante = (intention) => {
-    if (!intention) return false;
-    return CHAMPS_ESSENTIELS.every((champ) => {
-      const v = intention[champ];
-      return Array.isArray(v) ? v.length > 0 : Boolean(v && v.trim?.());
-    });
-  };
-
-  // À chaque changement de projet actif (peu importe le chemin d'entrée),
-  // vérifie si le cap du projet est suffisamment rempli — sinon, rappel.
+  // Les 6 questions d'OBLIGATION (protection de tiers, risques juridiques) — cf. audit
+  // du 01/07. Elles ne sont jamais silençables : tant qu'elles ne sont pas toutes
+  // répondues, le rappel réapparaît à chaque ouverture du projet.
   useEffect(() => {
     if (!projetActifId || projetVenantDêtreCréé) return; // pas de double-rappel juste après création
 
     const vérifier = async () => {
-      const { data } = await supabase
-        .from("intention_projet")
-        .select("*")
-        .eq("projet_id", projetActifId)
-        .maybeSingle();
+      const { data: obligations } = await supabase
+        .from("banque_questions")
+        .select("id")
+        .eq("nature_intervention", "Obligation");
 
-      if (!intentionEstSuffisante(data)) {
-        setRappelIntentionPour(projetActifId);
-      } else {
-        setRappelIntentionPour(null);
-      }
+      const { data: réponses } = await supabase
+        .from("reponses_questionnaire")
+        .select("question_id")
+        .eq("projet_id", projetActifId);
+
+      const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
+      const toutesRépondues = (obligations || []).every((q) => idsRépondus.has(q.id));
+
+      setRappelIntentionPour(toutesRépondues ? null : projetActifId);
     };
     vérifier();
   }, [projetActifId, projetVenantDêtreCréé]);
