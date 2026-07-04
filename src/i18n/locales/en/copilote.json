@@ -1,0 +1,41 @@
+{
+  "titre": "Co-pilote IA",
+  "onglets": {
+    "suggestions": "Suggestions",
+    "personnages": "Personnages",
+    "references": "Références",
+    "coherence": "Cohérence"
+  },
+  "modeAuto": {
+    "label": "Auto",
+    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez « Analyser maintenant » pour forcer une analyse immédiate."
+  },
+  "bouton": {
+    "analyser": "↻ Analyser maintenant",
+    "forcerAnalyse": "↻ Forcer une analyse maintenant",
+    "enCours": "Analyse en cours…"
+  },
+  "erreur": {
+    "motsInsuffisants": "Écrivez au moins 20 mots pour activer l'analyse.",
+    "sessionExpiree": "Session expirée. Reconnectez-vous.",
+    "generique": "Le co-pilote n'a pas pu traiter ce passage."
+  },
+  "videEtat": {
+    "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
+    "personnages": "Extraction et analyse de cohérence des personnages.",
+    "references": "Références académiques APA pour étayer votre argumentation.",
+    "coherence": "Détection d'incohérences et faiblesses structurelles."
+  },
+  "personnages": {
+    "aucun": "Aucun personnage détecté."
+  },
+  "references": {
+    "aucune": "Aucune référence suggérée.",
+    "pageSuggeree": "Page suggérée : {{page}}",
+    "copier": "📋 Copier APA",
+    "copie": "✓ Copié !"
+  },
+  "coherence": {
+    "aucunProbleme": "✓ Aucun problème détecté."
+  }
+}
