@@ -1,12 +1,21 @@
 /**
- * ATELIER D'ÉCRIVAIN — App.jsx (version Supabase)
+ * CURSUS — App.jsx (version Supabase)
  *
  * État global branché sur Supabase via src/lib/api.js
  * Authentification via src/lib/auth.jsx
  * Le localStorage n'est plus utilisé.
+ *
+ * Version i18n (chantier 04/07/2026) :
+ * - Tous les textes d'interface statiques passent par t('common.xxx') / useTranslation
+ * - GENRES et STATUTS restent en français (valeurs canoniques internes,
+ *   voir note de fin de fichier)
+ * - langueProjet propagée depuis projetActif.langue vers CopiloteIA et
+ *   QuestionnaireIntention (colonne `langue` sur `projets`, défaut 'fr' —
+ *   à confirmer que la migration existe déjà, sinon fallback sur 'fr' suffit)
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
 import { projetsAPI, nœudsAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
@@ -20,26 +29,25 @@ import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
-
+// Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
 const GENRES = ["Roman", "Non-fiction", "Essai", "Méthode", "Biographie", "Autre"];
 const STATUTS = ["En cours", "En pause", "Terminé", "Idée"];
 const COULEURS = ["#7F77DD", "#1D9E75", "#D85A30", "#378ADD", "#D4537E", "#BA7517"];
 
-const STRUCTURE_TYPES = {
-  partie: { label: "Partie", enfant: "chapitre", icone: "📂" },
-  chapitre: { label: "Chapitre", enfant: "scene", icone: "📄" },
-  scene: { label: "Scène", enfant: null, icone: "✏️" },
+const STRUCTURE_TYPES_META = {
+  partie: { enfant: "chapitre", icone: "📂" },
+  chapitre: { enfant: "scene", icone: "📄" },
+  scene: { enfant: null, icone: "✏️" },
 };
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-const dateAujourd = () => new Date().toLocaleDateString("fr-BE", {
+const dateAujourd = (langue = "fr") => new Date().toLocaleDateString(langue === "en" ? "en-GB" : "fr-BE", {
   day: "numeric", month: "long", year: "numeric",
 });
 
-// Calcule le total de mots d'un projet à travers toute son arborescence
 const compterMots = (texte = "") =>
   texte.trim() === "" ? 0 : texte.trim().split(/\s+/).length;
 
@@ -55,19 +63,9 @@ const totalMotsProjet = (nœuds = []) => {
   return total;
 };
 
-// Persistance locale (remplacée par Supabase en production)
-const sauvegarder = (projets) => {
-  localStorage.setItem("atelier-projets", JSON.stringify(projets));
-};
-const charger = () => {
-  try {
-    return JSON.parse(localStorage.getItem("atelier-projets")) || [];
-  } catch {
-    return [];
-  }
-};
-
 // ─── Composant : Badge statut ────────────────────────────────────────────────────
+// Le libellé affiché (statut) reste la valeur canonique française pour l'instant
+// (voir note de fin de fichier) ; seul le style est géré ici.
 
 function BadgeStatut({ statut }) {
   const styles = {
@@ -114,14 +112,17 @@ function BarreProgression({ valeur, max, couleur }) {
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
 function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer }) {
+  const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
   const [nomTemp, setNomTemp] = useState(nœud.titre);
   const [survol, setSurvol] = useState(false);
 
   const aDesEnfants = nœud.enfants?.length > 0;
-  const typeInfo = STRUCTURE_TYPES[nœud.type];
+  const typeInfo = STRUCTURE_TYPES_META[nœud.type];
   const peutAjouter = typeInfo.enfant !== null;
+  const labelType = t(`structureTypes.${nœud.type}`);
+  const labelEnfant = typeInfo.enfant ? t(`structureTypes.${typeInfo.enfant}`) : "";
 
   const validerRenommage = () => {
     if (nomTemp.trim()) onRenommer(nœud.id, nomTemp.trim());
@@ -198,10 +199,10 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
         {survol && !enRenommage && (
           <div style={{ display: "flex", gap: 2 }} onClick={(e) => e.stopPropagation()}>
             {peutAjouter && (
-              <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={`Ajouter ${STRUCTURE_TYPES[typeInfo.enfant].label}`}>+</button>
+              <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
-            <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title="Renommer">✎</button>
-            <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title="Supprimer">✕</button>
+            <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title={t("actions.renommer")}>✎</button>
+            <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title={t("actions.supprimer")}>✕</button>
           </div>
         )}
       </div>
@@ -234,6 +235,7 @@ const btnIconStyle = {
 // ─── Composant : Carte projet (vue liste) ─────────────────────────────────────────
 
 function CarteProjet({ projet, onOuvrir, onSupprimer }) {
+  const { t } = useTranslation("common");
   const [survol, setSurvol] = useState(false);
   const mots = totalMotsProjet(projet.structure);
 
@@ -272,7 +274,7 @@ function CarteProjet({ projet, onOuvrir, onSupprimer }) {
             <button
               onClick={(e) => { e.stopPropagation(); onSupprimer(projet.id); }}
               style={{ ...btnIconStyle, color: "#E24B4A", fontSize: 14 }}
-              title="Supprimer ce projet"
+              title={t("carteProjet.supprimerTitre")}
             >✕</button>
           )}
         </div>
@@ -291,13 +293,13 @@ function CarteProjet({ projet, onOuvrir, onSupprimer }) {
       {/* Stats */}
       <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
         <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-          {mots.toLocaleString("fr-FR")} mots rédigés
+          {t("carteProjet.motsRediges", { count: mots })}
         </span>
         <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-          Objectif : {projet.objectifMots.toLocaleString("fr-FR")}
+          {t("carteProjet.objectif", { count: projet.objectifMots })}
         </span>
         <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginLeft: "auto" }}>
-          {projet.structure?.length || 0} partie{projet.structure?.length !== 1 ? "s" : ""}
+          {t("parties", { count: projet.structure?.length || 0 })}
         </span>
       </div>
     </div>
@@ -307,6 +309,7 @@ function CarteProjet({ projet, onOuvrir, onSupprimer }) {
 // ─── Composant : Formulaire nouveau projet ────────────────────────────────────────
 
 function FormulaireProjet({ onCréer, onAnnuler }) {
+  const { t } = useTranslation("common");
   const [form, setForm] = useState({
     titre: "", genre: "Roman", statut: "En cours",
     couleur: COULEURS[0], objectifMots: 80000, description: "",
@@ -332,19 +335,19 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
       borderRadius: 12, padding: "1.5rem",
     }}>
       <h3 style={{ fontSize: 16, fontWeight: 500, marginBottom: 20, color: "var(--texte-primaire)" }}>
-        Nouveau projet
+        {t("formulaireProjet.titre")}
       </h3>
 
       <div style={{ display: "grid", gap: 14 }}>
         {/* Titre */}
         <div>
-          <label style={labelStyle}>Titre du projet *</label>
+          <label style={labelStyle}>{t("formulaireProjet.titreChamp")}</label>
           <input
             autoFocus
             value={form.titre}
             onChange={(e) => màj("titre", e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") valider(); }}
-            placeholder="Ex : La Méthode 361°+i"
+            placeholder={t("formulaireProjet.titrePlaceholder")}
             style={inputStyle}
           />
         </div>
@@ -352,13 +355,13 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
         {/* Genre + Statut */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={labelStyle}>Genre</label>
+            <label style={labelStyle}>{t("formulaireProjet.genre")}</label>
             <select value={form.genre} onChange={(e) => màj("genre", e.target.value)} style={inputStyle}>
               {GENRES.map((g) => <option key={g}>{g}</option>)}
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Statut</label>
+            <label style={labelStyle}>{t("formulaireProjet.statut")}</label>
             <select value={form.statut} onChange={(e) => màj("statut", e.target.value)} style={inputStyle}>
               {STATUTS.map((s) => <option key={s}>{s}</option>)}
             </select>
@@ -367,7 +370,7 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 
         {/* Objectif mots */}
         <div>
-          <label style={labelStyle}>Objectif (nombre de mots)</label>
+          <label style={labelStyle}>{t("formulaireProjet.objectifMots")}</label>
           <input
             type="number"
             value={form.objectifMots}
@@ -379,11 +382,11 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 
         {/* Description */}
         <div>
-          <label style={labelStyle}>Description courte</label>
+          <label style={labelStyle}>{t("formulaireProjet.description")}</label>
           <textarea
             value={form.description}
             onChange={(e) => màj("description", e.target.value)}
-            placeholder="En quelques mots, de quoi parle ce projet ?"
+            placeholder={t("formulaireProjet.descriptionPlaceholder")}
             rows={2}
             style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
           />
@@ -391,7 +394,7 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 
         {/* Couleur */}
         <div>
-          <label style={labelStyle}>Couleur du projet</label>
+          <label style={labelStyle}>{t("formulaireProjet.couleur")}</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
             {COULEURS.map((c) => (
               <div
@@ -411,10 +414,10 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
         {/* Actions */}
         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
           <button onClick={valider} style={btnPrimaryStyle(form.couleur)}>
-            Créer le projet
+            {t("formulaireProjet.creer")}
           </button>
           <button onClick={onAnnuler} style={btnSecondaryStyle}>
-            Annuler
+            {t("formulaireProjet.annuler")}
           </button>
         </div>
       </div>
@@ -425,14 +428,14 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 // ─── Composant : Vue projet (structure du manuscrit) ─────────────────────────────
 
 function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
+  const { t } = useTranslation("common");
   const [sélectionné, setSélectionné] = useState(null);
   const mots = totalMotsProjet(projet.structure);
 
-  // Ajoute un nœud enfant à un nœud parent identifié par id
   const ajouterNœud = useCallback((parentId, type) => {
     const nouveau = {
       id: genId(), type, ordre: 0,
-      titre: `${STRUCTURE_TYPES[type].label} sans titre`,
+      titre: `${t(`structureTypes.${type}`)} sans titre`,
       texte: "", enfants: [],
     };
 
@@ -444,14 +447,13 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
         return { ...n, enfants: insérer(n.enfants || []) };
       });
 
-    // Ajoute au niveau racine si parentId est l'id du projet
     if (parentId === projet.id) {
       const nouveauNœud = { ...nouveau, type: "partie", ordre: (projet.structure?.length || 0) + 1 };
       onMàjStructure(projet.id, [...(projet.structure || []), nouveauNœud]);
     } else {
       onMàjStructure(projet.id, insérer(projet.structure || []));
     }
-  }, [projet, onMàjStructure]);
+  }, [projet, onMàjStructure, t]);
 
   const renommerNœud = useCallback((nœudId, nouveauTitre) => {
     const renommer = (liste) =>
@@ -480,12 +482,12 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
         borderBottom: "0.5px solid var(--border)",
         display: "flex", alignItems: "center", gap: 12,
       }}>
-        <button onClick={onRetour} style={{ ...btnIconStyle, fontSize: 18 }} title="Retour aux projets">←</button>
+        <button onClick={onRetour} style={{ ...btnIconStyle, fontSize: 18 }} title={t("actions.retourAuxProjets")}>←</button>
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: projet.couleur }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 15, fontWeight: 500, color: "var(--texte-primaire)" }}>{projet.titre}</div>
           <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-            {mots.toLocaleString("fr-FR")} mots · {projet.genre} · <BadgeStatut statut={projet.statut} />
+            {t("mots", { count: mots })} · {projet.genre} · <BadgeStatut statut={projet.statut} />
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -493,7 +495,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
             {Math.min(100, Math.round((mots / projet.objectifMots) * 100))}%
           </div>
           <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-            / {projet.objectifMots.toLocaleString("fr-FR")} mots
+            / {projet.objectifMots.toLocaleString("fr-FR")} {t("mots", { count: projet.objectifMots }).replace(/^\S+\s/, "")}
           </div>
         </div>
       </div>
@@ -510,7 +512,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
           marginBottom: 8, padding: "0 8px",
         }}>
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--texte-tertiaire)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-            Structure du manuscrit
+            {t("vueProjet.structureManuscrit")}
           </span>
           <button
             onClick={() => ajouterNœud(projet.id, "partie")}
@@ -519,9 +521,9 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
               background: "none", border: "none", cursor: "pointer",
               fontFamily: "inherit",
             }}
-            title="Ajouter une partie"
+            title={t("vueProjet.ajouterPartieTitre")}
           >
-            + Partie
+            {t("vueProjet.ajouterPartie")}
           </button>
         </div>
 
@@ -531,12 +533,12 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
             color: "var(--texte-tertiaire)", fontSize: 13,
           }}>
             <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
-            <div style={{ marginBottom: 8 }}>Aucune structure pour l'instant.</div>
+            <div style={{ marginBottom: 8 }}>{t("vueProjet.aucuneStructure")}</div>
             <button
               onClick={() => ajouterNœud(projet.id, "partie")}
               style={btnPrimaryStyle(projet.couleur)}
             >
-              Ajouter la première partie
+              {t("vueProjet.ajouterPremierePartie")}
             </button>
           </div>
         ) : (
@@ -579,6 +581,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
 // ─── Composant : Panneau du nœud sélectionné ─────────────────────────────────────
 
 function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉditeur }) {
+  const { t } = useTranslation("common");
   const trouver = (liste, id) => {
     for (const n of liste) {
       if (n.id === id) return n;
@@ -608,12 +611,12 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
         flexShrink: 0,
       }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: couleur }}>
-          {STRUCTURE_TYPES[nœud.type]?.icone} {nœud.titre}
+          {STRUCTURE_TYPES_META[nœud.type]?.icone} {nœud.titre}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {mots > 0 && (
             <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-              {mots.toLocaleString("fr-FR")} mots
+              {t("mots", { count: mots })}
             </span>
           )}
           <button
@@ -625,7 +628,7 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
               cursor: "pointer", fontFamily: "inherit", fontWeight: 500,
             }}
           >
-            ✍️ Ouvrir l'éditeur
+            {t("panneauNoeud.ouvrirEditeur")}
           </button>
         </div>
       </div>
@@ -648,7 +651,7 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
             textAlign: "center", padding: "24px",
           }}>
             <div style={{ fontSize: 28 }}>✍️</div>
-            <div style={{ fontSize: 13 }}>Ce chapitre est vide.</div>
+            <div style={{ fontSize: 13 }}>{t("panneauNoeud.chapitreVide")}</div>
             <button
               onClick={() => onOuvrirÉditeur(nœud.id)}
               style={{
@@ -657,7 +660,7 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
                 fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
               }}
             >
-              Commencer à écrire
+              {t("panneauNoeud.commencerAEcrire")}
             </button>
           </div>
         )}
@@ -700,12 +703,12 @@ const btnSecondaryStyle = {
 // ─── Composant principal : App ────────────────────────────────────────────────────
 
 export default function App() {
+  const { t } = useTranslation("common");
   const { user, chargement: authChargement, déconnecter } = useAuth();
 
-  // Affiche la page de connexion si non authentifié
   if (authChargement) return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui", color: "#999", fontSize: 14 }}>
-      Chargement…
+      {t("chargement")}
     </div>
   );
   if (!user) return <PageConnexion />;
@@ -716,6 +719,7 @@ export default function App() {
 // ─── Composant : App connectée (après auth) ───────────────────────────────────
 
 function AppConnectée({ user, déconnecter }) {
+  const { t, i18n } = useTranslation("common");
   const [projets, setProjets]   = useState([]);
   const [chargement, setChargement] = useState(true);
   const [vue, setVue]           = useState("tableau");
@@ -741,7 +745,6 @@ function AppConnectée({ user, déconnecter }) {
   useEffect(() => {
     const surDéplacement = (e) => {
       if (!redimensionnementActif.current) return;
-      // Glisser vers la gauche élargit le panneau (il est ancré à droite)
       const delta = positionDépart.current.x - e.clientX;
       const nouvelleLargeur = positionDépart.current.largeur + delta;
       setLargeurPanneau(Math.min(560, Math.max(220, nouvelleLargeur)));
@@ -761,17 +764,17 @@ function AppConnectée({ user, déconnecter }) {
     };
   }, []);
 
-  // Les 6 questions d'OBLIGATION (protection de tiers, risques juridiques) — cf. audit
-  // du 01/07. Elles ne sont jamais silençables : tant qu'elles ne sont pas toutes
-  // répondues, le rappel réapparaît à chaque ouverture du projet.
+  // L'ADN du projet (10 questions de niveau 1) — socle de démarrage, présenté
+  // comme rassurant, pas comme une contrainte juridique. Tant qu'il n'est pas
+  // complet, un rappel discret réapparaît à l'ouverture du projet.
   useEffect(() => {
-    if (!projetActifId || projetVenantDêtreCréé) return; // pas de double-rappel juste après création
+    if (!projetActifId || projetVenantDêtreCréé) return;
 
     const vérifier = async () => {
-      const { data: obligations } = await supabase
+      const { data: adn } = await supabase
         .from("banque_questions")
         .select("id")
-        .eq("nature_intervention", "Obligation");
+        .eq("niveau", 1);
 
       const { data: réponses } = await supabase
         .from("reponses_questionnaire")
@@ -779,9 +782,9 @@ function AppConnectée({ user, déconnecter }) {
         .eq("projet_id", projetActifId);
 
       const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
-      const toutesRépondues = (obligations || []).every((q) => idsRépondus.has(q.id));
+      const toutComplet = (adn || []).every((q) => idsRépondus.has(q.id));
 
-      setRappelIntentionPour(toutesRépondues ? null : projetActifId);
+      setRappelIntentionPour(toutComplet ? null : projetActifId);
     };
     vérifier();
   }, [projetActifId, projetVenantDêtreCréé]);
@@ -792,7 +795,6 @@ function AppConnectée({ user, déconnecter }) {
       setChargement(true);
       const { data, error } = await projetsAPI.lister();
       if (!error && data) {
-        // Chargement de la structure de chaque projet
         const projetsAvecStructure = await Promise.all(
           data.map(async (p) => {
             const { data: noeuds } = await nœudsAPI.listerParProjet(p.id);
@@ -816,10 +818,12 @@ function AppConnectée({ user, déconnecter }) {
     objectifMots: p.objectif_mots,
     description:  p.description,
     dateCreation: p.date_creation,
+    // langue : colonne à confirmer sur `projets` (chantier i18n) — fallback 'fr'
+    // tant que la migration n'est pas confirmée exécutée.
+    langue:       p.langue || "fr",
     structure:    p.structure || [],
   });
 
-  // Reconstruit l'arborescence à partir de la liste plate des nœuds
   const construireArbre = (nœudsPlats) => {
     const map = {};
     nœudsPlats.forEach((n) => {
@@ -843,6 +847,13 @@ function AppConnectée({ user, déconnecter }) {
   };
 
   const projetActif = projets.find((p) => p.id === projetActifId);
+
+  // Synchronise la langue de l'interface i18next sur la langue DU PROJET actif
+  // (règle du chantier : la langue est par projet, pas par compte).
+  useEffect(() => {
+    const langueCible = projetActif?.langue || "fr";
+    if (i18n.language !== langueCible) i18n.changeLanguage(langueCible);
+  }, [projetActif?.langue, i18n]);
 
   const trouverNœud = (structure = [], id) => {
     for (const n of structure) {
@@ -877,7 +888,7 @@ function AppConnectée({ user, déconnecter }) {
   };
 
   const supprimerProjet = async (id) => {
-    if (!window.confirm("Supprimer ce projet ? Cette action est irréversible.")) return;
+    if (!window.confirm(t("confirmations.supprimerProjet"))) return;
     const { error } = await projetsAPI.supprimer(id);
     if (!error) {
       setProjets((prev) => prev.filter((p) => p.id !== id));
@@ -888,16 +899,12 @@ function AppConnectée({ user, déconnecter }) {
   // ── Actions nœuds ──
 
   const màjStructure = useCallback(async (projetId, nouvelleStructure) => {
-    // Mise à jour optimiste de l'UI
     setProjets((prev) =>
       prev.map((p) => p.id === projetId ? { ...p, structure: nouvelleStructure } : p)
     );
-    // Supabase : pas de sync bulk ici — chaque action (créer/renommer/supprimer)
-    // appelle directement nœudsAPI. màjStructure reste pour la compatibilité UI.
   }, []);
 
   const sauvegarderNœud = useCallback(async (nœudId, html) => {
-    // Mise à jour optimiste
     setProjets((prev) =>
       prev.map((p) => {
         if (p.id !== projetActifId) return p;
@@ -908,7 +915,6 @@ function AppConnectée({ user, déconnecter }) {
         return { ...p, structure: màj(p.structure) };
       })
     );
-    // Persiste en base
     await nœudsAPI.sauvegarderTexte(nœudId, html);
   }, [projetActifId]);
 
@@ -938,20 +944,20 @@ function AppConnectée({ user, déconnecter }) {
         background: "var(--surface)",
       }}>
         <span style={{ fontSize: 15, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>
-          Atelier
+          {t("marque")}
         </span>
         <div style={{ flex: 1 }} />
         {chargement ? (
-          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>Chargement…</span>
+          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>{t("chargement")}</span>
         ) : (
           <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            {totalMots.toLocaleString("fr-FR")} mots · {projets.length} projet{projets.length !== 1 ? "s" : ""}
+            {t("mots", { count: totalMots })} · {t("projets", { count: projets.length })}
           </span>
         )}
         <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>{user.email}</span>
         <button onClick={déconnecter}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
-          Déconnexion
+          {t("deconnexion")}
         </button>
       </div>
 
@@ -964,13 +970,13 @@ function AppConnectée({ user, déconnecter }) {
       }}>
         {/* Navigation principale */}
         <div style={{ padding: "16px 12px 8px" }}>
-          <div style={sectionLabelStyle}>Navigation</div>
+          <div style={sectionLabelStyle}>{t("navigation.titre")}</div>
           {[
-            { id: "tableau",      label: "Tableau de bord",  icone: "⊞" },
-            { id: "editeur",      label: "Éditeur",          icone: "✍️" },
-            { id: "bibliotheque", label: "Bibliothèque",     icone: "📚" },
-            { id: "carnet",       label: "Carnet d'idées",   icone: "💡" },
-            { id: "tarification", label: "Tarification",     icone: "💳" },
+            { id: "tableau",      label: t("navigation.tableauDeBord"),  icone: "⊞" },
+            { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
+            { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
+            { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
+            { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
           ].map((item) => (
             <div
               key={item.id}
@@ -1000,16 +1006,16 @@ function AppConnectée({ user, déconnecter }) {
         {/* Projets actifs avec barres de progression */}
         <div style={{ padding: "8px 12px", flex: 1 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <div style={sectionLabelStyle}>Projets actifs</div>
+            <div style={sectionLabelStyle}>{t("sidebarProjets.titre")}</div>
             <button
               onClick={() => setVue("nouveau")}
               style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "0 4px" }}
-              title="Nouveau projet"
-            >+ Nouveau</button>
+              title={t("sidebarProjets.nouveauTitre")}
+            >{t("sidebarProjets.nouveau")}</button>
           </div>
           {projets.length === 0 && (
             <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", padding: "8px 4px" }}>
-              Aucun projet. Cliquez sur + Nouveau.
+              {t("sidebarProjets.aucun")}
             </div>
           )}
           {projets.map((p) => {
@@ -1046,11 +1052,11 @@ function AppConnectée({ user, déconnecter }) {
 
         {/* Bibliothèque stats */}
         <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid var(--border)" }}>
-          <div style={sectionLabelStyle}>Bibliothèque</div>
+          <div style={sectionLabelStyle}>{t("sidebarBibliotheque.titre")}</div>
           {[
-            { label: "En cours de lecture", icone: "📖", onClick: () => setVue("bibliotheque") },
-            { label: "Citations",           icone: "❝",  onClick: () => setVue("bibliotheque") },
-            { label: "Carnet d'idées",      icone: "💡", onClick: () => setVue("carnet") },
+            { label: t("sidebarBibliotheque.enCoursLecture"), icone: "📖", onClick: () => setVue("bibliotheque") },
+            { label: t("sidebarBibliotheque.citations"),      icone: "❝",  onClick: () => setVue("bibliotheque") },
+            { label: t("sidebarBibliotheque.carnetIdees"),    icone: "💡", onClick: () => setVue("carnet") },
           ].map((item) => (
             <div key={item.label}
               onClick={item.onClick}
@@ -1097,22 +1103,22 @@ function AppConnectée({ user, déconnecter }) {
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>
-                  Mes projets
+                  {t("vues.mesProjets")}
                 </h1>
                 <p style={{ fontSize: 13, color: "var(--texte-tertiaire)" }}>
-                  {dateAujourd()}
+                  {dateAujourd(i18n.language)}
                 </p>
               </div>
               <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
-                + Nouveau projet
+                {t("vues.nouveauProjetBtn")}
               </button>
             </div>
             {projets.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--texte-tertiaire)" }}>
                 <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
-                <div style={{ fontSize: 16, marginBottom: 8 }}>Aucun projet pour l'instant</div>
+                <div style={{ fontSize: 16, marginBottom: 8 }}>{t("vues.aucunProjetTitre")}</div>
                 <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
-                  Créer mon premier projet
+                  {t("vues.creerPremierProjet")}
                 </button>
               </div>
             ) : (
@@ -1129,7 +1135,7 @@ function AppConnectée({ user, déconnecter }) {
         {vue === "nouveau" && (
           <div style={{ padding: "28px 32px", maxWidth: 560, overflowY: "auto" }}>
             <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 24 }}>
-              Nouveau projet
+              {t("formulaireProjet.titre")}
             </h1>
             <FormulaireProjet
               onCréer={créerProjet}
@@ -1157,7 +1163,7 @@ function AppConnectée({ user, déconnecter }) {
                   fontFamily: "inherit",
                 }}
               >
-                📄 Importer un fichier Word
+                {t("vues.importerWord")}
               </button>
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
@@ -1203,6 +1209,7 @@ function AppConnectée({ user, déconnecter }) {
                 typeProjet={["Roman", "Biographie"].includes(projetActif.genre) ? "fiction" : "non-fiction"}
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
+                langueProjet={projetActif.langue || "fr"}
               />
             </div>
           </div>
@@ -1212,9 +1219,9 @@ function AppConnectée({ user, déconnecter }) {
         {vue === "editeur" && projetActif && !nœudActif && (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "var(--texte-tertiaire)" }}>
             <div style={{ fontSize: 32 }}>📄</div>
-            <div style={{ fontSize: 14 }}>Sélectionnez un chapitre dans la structure pour commencer à écrire.</div>
+            <div style={{ fontSize: 14 }}>{t("vues.selectionnerChapitre")}</div>
             <button onClick={() => setVue("projet")} style={btnPrimaryStyle(projetActif.couleur)}>
-              Voir la structure
+              {t("vues.voirStructure")}
             </button>
           </div>
         )}
@@ -1283,4 +1290,25 @@ const navItemStyle = (actif) => ({
   background: actif ? "var(--surface)" : "transparent",
   marginBottom: 2,
 });
+
+/**
+ * NOTE POUR JOSEPH — GENRES / STATUTS non traduits (rappel) :
+ *
+ * `GENRES` et `STATUTS` sont utilisés à deux endroits différents :
+ *   1. Comme libellés affichés dans les formulaires et badges
+ *   2. Comme valeurs de comparaison logique (ex. la ligne qui détermine
+ *      typeProjet="fiction" compare projetActif.genre à "Roman"/"Biographie")
+ *
+ * Les traduire changerait la valeur stockée en base (`projets.genre`,
+ * `projets.statut`) pour les nouveaux projets créés en anglais, cassant
+ * silencieusement toute logique qui compare cette valeur à une chaîne
+ * française codée en dur (comme la ligne CopiloteIA plus haut).
+ *
+ * Recommandation, au moment de basculer l'anglais en production :
+ *   - Introduire un code stable ("roman", "biographie"...) stocké en base
+ *   - Un mapping code → libellé traduit pour l'affichage uniquement
+ *   - Remplacer les comparaisons directes sur le libellé français par des
+ *     comparaisons sur le code stable
+ * Non urgent tant que l'interface reste 100% française.
+ */
 
