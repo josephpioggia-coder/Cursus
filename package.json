@@ -18,9 +18,12 @@
     "@tiptap/pm": "^2.2.4",
     "@tiptap/react": "^2.2.4",
     "@tiptap/starter-kit": "^2.2.4",
+    "i18next": "^24.0.0",
+    "i18next-browser-languagedetector": "^8.0.0",
     "mammoth": "^1.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^15.0.0",
     "stripe": "^22.3.0"
   },
   "devDependencies": {
