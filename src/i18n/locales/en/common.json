@@ -1,0 +1,102 @@
+{
+  "_note": "GENRES et STATUTS ne sont volontairement PAS ici : ce sont des valeurs canoniques utilisées comme identifiants internes (ex. typeProjet dérivé de projet.genre). Les traduire casserait cette logique — voir la note de fin de fichier dans App.jsx.",
+
+  "marque": "Atelier",
+  "chargement": "Chargement…",
+  "deconnexion": "Déconnexion",
+
+  "mots_one": "{{count}} mot",
+  "mots_other": "{{count}} mots",
+  "projets_one": "{{count}} projet",
+  "projets_other": "{{count}} projets",
+  "parties_one": "{{count}} partie",
+  "parties_other": "{{count}} parties",
+
+  "navigation": {
+    "titre": "Navigation",
+    "tableauDeBord": "Tableau de bord",
+    "editeur": "Éditeur",
+    "bibliotheque": "Bibliothèque",
+    "carnetIdees": "Carnet d'idées",
+    "tarification": "Tarification"
+  },
+
+  "sidebarProjets": {
+    "titre": "Projets actifs",
+    "nouveau": "+ Nouveau",
+    "nouveauTitre": "Nouveau projet",
+    "aucun": "Aucun projet. Cliquez sur + Nouveau."
+  },
+
+  "sidebarBibliotheque": {
+    "titre": "Bibliothèque",
+    "enCoursLecture": "En cours de lecture",
+    "citations": "Citations",
+    "carnetIdees": "Carnet d'idées"
+  },
+
+  "structureTypes": {
+    "partie": "Partie",
+    "chapitre": "Chapitre",
+    "scene": "Scène"
+  },
+
+  "actions": {
+    "ajouter": "Ajouter {{label}}",
+    "renommer": "Renommer",
+    "supprimer": "Supprimer",
+    "supprimerCeProjet": "Supprimer ce projet",
+    "retourAuxProjets": "Retour aux projets",
+    "retourALaStructure": "Retour à la structure",
+    "retour": "Retour"
+  },
+
+  "confirmations": {
+    "supprimerProjet": "Supprimer ce projet ? Cette action est irréversible."
+  },
+
+  "carteProjet": {
+    "motsRediges": "{{count}} mots rédigés",
+    "objectif": "Objectif : {{count}}",
+    "supprimerTitre": "Supprimer ce projet"
+  },
+
+  "formulaireProjet": {
+    "titre": "Nouveau projet",
+    "titreChamp": "Titre du projet *",
+    "titrePlaceholder": "Ex : La Méthode 361°+i",
+    "genre": "Genre",
+    "statut": "Statut",
+    "objectifMots": "Objectif (nombre de mots)",
+    "description": "Description courte",
+    "descriptionPlaceholder": "En quelques mots, de quoi parle ce projet ?",
+    "couleur": "Couleur du projet",
+    "creer": "Créer le projet",
+    "annuler": "Annuler"
+  },
+
+  "vueProjet": {
+    "structureManuscrit": "Structure du manuscrit",
+    "ajouterPartie": "+ Partie",
+    "ajouterPartieTitre": "Ajouter une partie",
+    "aucuneStructure": "Aucune structure pour l'instant.",
+    "ajouterPremierePartie": "Ajouter la première partie"
+  },
+
+  "panneauNoeud": {
+    "ouvrirEditeur": "✍️ Ouvrir l'éditeur",
+    "chapitreVide": "Ce chapitre est vide.",
+    "commencerAEcrire": "Commencer à écrire"
+  },
+
+  "vues": {
+    "mesProjets": "Mes projets",
+    "nouveauProjetBtn": "+ Nouveau projet",
+    "aucunProjetTitre": "Aucun projet pour l'instant",
+    "creerPremierProjet": "Créer mon premier projet",
+    "importerWord": "📄 Importer un fichier Word",
+    "selectionnerChapitre": "Sélectionnez un chapitre dans la structure pour commencer à écrire.",
+    "voirStructure": "Voir la structure",
+    "selectionnerChapitreOuScene": "Sélectionnez un chapitre ou une scène dans la structure pour commencer à écrire."
+  }
+}
