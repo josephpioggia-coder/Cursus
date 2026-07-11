@@ -12,6 +12,21 @@
  * - langueProjet propagée depuis projetActif.langue vers CopiloteIA et
  *   QuestionnaireIntention (colonne `langue` sur `projets`, défaut 'fr' —
  *   à confirmer que la migration existe déjà, sinon fallback sur 'fr' suffit)
+ *
+ * Correctifs session 11/07/2026 (audit client lambda) :
+ * 1. SCROLL DE L'APERÇU RÉPARÉ — ajout des verrous `minHeight: 0` sur toute
+ *    la chaîne flex (zone principale → wrapper projet → VueProjet → PanneauNœud).
+ *    Sans eux, flexbox refuse de rétrécir un bloc sous la taille de son contenu,
+ *    et un chapitre long pousse la page au lieu de défiler dans sa zone.
+ * 2. STRUCTURE REPLIABLE — quand un chapitre est sélectionné, un bouton
+ *    « Replier la structure » libère tout l'écran pour la lecture de l'aperçu.
+ * 3. NAVIGATION SÉQUENTIELLE — boutons ‹ › dans l'en-tête de l'aperçu pour
+ *    passer au chapitre précédent/suivant en ordre de lecture, sans repasser
+ *    par le sommaire.
+ * Nouvelles clés i18n utilisées avec libellé français par défaut (2e argument
+ * de t()) — à ajouter aux fichiers fr/en quand pratique :
+ *    vueProjet.replierStructure, vueProjet.deplierStructure,
+ *    panneauNoeud.precedent, panneauNoeud.suivant
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -426,11 +441,34 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 }
 
 // ─── Composant : Vue projet (structure du manuscrit) ─────────────────────────────
+// Correctifs 11/07 : verrous minHeight:0 sur la chaîne flex, structure repliable,
+// navigation séquentielle entre nœuds (‹ ›) transmise au PanneauNœud.
 
 function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
   const { t } = useTranslation("common");
   const [sélectionné, setSélectionné] = useState(null);
+  const [structureRepliée, setStructureRepliée] = useState(false);
   const mots = totalMotsProjet(projet.structure);
+
+  // Liste aplatie des nœuds en ordre de lecture (profondeur d'abord),
+  // pour la navigation précédent/suivant sans repasser par le sommaire.
+  const nœudsAplatis = (() => {
+    const flat = [];
+    const parcourir = (liste = []) => {
+      for (const n of liste) {
+        flat.push(n);
+        if (n.enfants?.length) parcourir(n.enfants);
+      }
+    };
+    parcourir(projet.structure);
+    return flat;
+  })();
+  const indexSélectionné = nœudsAplatis.findIndex((n) => n.id === sélectionné);
+  const nœudPrécédent = indexSélectionné > 0 ? nœudsAplatis[indexSélectionné - 1] : null;
+  const nœudSuivant =
+    indexSélectionné >= 0 && indexSélectionné < nœudsAplatis.length - 1
+      ? nœudsAplatis[indexSélectionné + 1]
+      : null;
 
   const ajouterNœud = useCallback((parentId, type) => {
     const nouveau = {
@@ -475,12 +513,13 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
   }, [projet, onMàjStructure, sélectionné]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* En-tête projet */}
       <div style={{
         padding: "16px 20px",
         borderBottom: "0.5px solid var(--border)",
         display: "flex", alignItems: "center", gap: 12,
+        flexShrink: 0,
       }}>
         <button onClick={onRetour} style={{ ...btnIconStyle, fontSize: 18 }} title={t("actions.retourAuxProjets")}>←</button>
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: projet.couleur }} />
@@ -501,60 +540,90 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
       </div>
 
       {/* Barre de progression */}
-      <div style={{ padding: "8px 20px", borderBottom: "0.5px solid var(--border)" }}>
+      <div style={{ padding: "8px 20px", borderBottom: "0.5px solid var(--border)", flexShrink: 0 }}>
         <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
       </div>
 
-      {/* Structure — liste scrollable */}
-      <div style={{ overflowY: "auto", padding: "12px 12px", maxHeight: sélectionné ? "40%" : "100%" }}>
+      {/* Structure — en-tête fixe + liste défilante dans sa propre zone.
+          Repliable quand un chapitre est sélectionné, pour rendre tout
+          l'espace à l'aperçu de lecture. */}
+      <div style={{
+        display: "flex", flexDirection: "column",
+        minHeight: 0,
+        flex: sélectionné ? "0 1 auto" : 1,
+        maxHeight: sélectionné ? (structureRepliée ? "none" : "40%") : "none",
+      }}>
         <div style={{
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          marginBottom: 8, padding: "0 8px",
+          padding: "12px 20px 8px", flexShrink: 0,
         }}>
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--texte-tertiaire)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
             {t("vueProjet.structureManuscrit")}
           </span>
-          <button
-            onClick={() => ajouterNœud(projet.id, "partie")}
-            style={{
-              fontSize: 11, color: projet.couleur,
-              background: "none", border: "none", cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-            title={t("vueProjet.ajouterPartieTitre")}
-          >
-            {t("vueProjet.ajouterPartie")}
-          </button>
-        </div>
-
-        {projet.structure?.length === 0 ? (
-          <div style={{
-            textAlign: "center", padding: "32px 16px",
-            color: "var(--texte-tertiaire)", fontSize: 13,
-          }}>
-            <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
-            <div style={{ marginBottom: 8 }}>{t("vueProjet.aucuneStructure")}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {sélectionné && (
+              <button
+                onClick={() => setStructureRepliée((r) => !r)}
+                style={{
+                  fontSize: 11, color: "var(--texte-secondaire)",
+                  background: "none", border: "none", cursor: "pointer",
+                  fontFamily: "inherit", padding: 0,
+                }}
+                title={structureRepliée
+                  ? t("vueProjet.deplierStructure", "Déplier la structure")
+                  : t("vueProjet.replierStructure", "Replier la structure")}
+              >
+                {structureRepliée
+                  ? `${t("vueProjet.deplierStructure", "Déplier la structure")} ▾`
+                  : `${t("vueProjet.replierStructure", "Replier la structure")} ▴`}
+              </button>
+            )}
             <button
               onClick={() => ajouterNœud(projet.id, "partie")}
-              style={btnPrimaryStyle(projet.couleur)}
+              style={{
+                fontSize: 11, color: projet.couleur,
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: "inherit", padding: 0,
+              }}
+              title={t("vueProjet.ajouterPartieTitre")}
             >
-              {t("vueProjet.ajouterPremierePartie")}
+              {t("vueProjet.ajouterPartie")}
             </button>
           </div>
-        ) : (
-          projet.structure.map((nœud) => (
-            <NœudStructure
-              key={nœud.id}
-              nœud={nœud}
-              profondeur={0}
-              projetCouleur={projet.couleur}
-              sélectionné={sélectionné}
-              onSélectionner={setSélectionné}
-              onAjouter={ajouterNœud}
-              onRenommer={renommerNœud}
-              onSupprimer={supprimerNœud}
-            />
-          ))
+        </div>
+
+        {!(sélectionné && structureRepliée) && (
+          <div style={{ overflowY: "auto", minHeight: 0, padding: "0 12px 12px" }}>
+            {projet.structure?.length === 0 ? (
+              <div style={{
+                textAlign: "center", padding: "32px 16px",
+                color: "var(--texte-tertiaire)", fontSize: 13,
+              }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
+                <div style={{ marginBottom: 8 }}>{t("vueProjet.aucuneStructure")}</div>
+                <button
+                  onClick={() => ajouterNœud(projet.id, "partie")}
+                  style={btnPrimaryStyle(projet.couleur)}
+                >
+                  {t("vueProjet.ajouterPremierePartie")}
+                </button>
+              </div>
+            ) : (
+              projet.structure.map((nœud) => (
+                <NœudStructure
+                  key={nœud.id}
+                  nœud={nœud}
+                  profondeur={0}
+                  projetCouleur={projet.couleur}
+                  sélectionné={sélectionné}
+                  onSélectionner={setSélectionné}
+                  onAjouter={ajouterNœud}
+                  onRenommer={renommerNœud}
+                  onSupprimer={supprimerNœud}
+                />
+              ))
+            )}
+          </div>
         )}
       </div>
 
@@ -564,6 +633,9 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
           nœudId={sélectionné}
           structure={projet.structure}
           couleur={projet.couleur}
+          nœudPrécédent={nœudPrécédent}
+          nœudSuivant={nœudSuivant}
+          onNaviguer={setSélectionné}
           onOuvrirÉditeur={(id) => onOuvrirÉditeur(projet.id, id)}
           onMàjTexte={(id, texte) => {
             const màj = (liste) =>
@@ -579,8 +651,10 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
 }
 
 // ─── Composant : Panneau du nœud sélectionné ─────────────────────────────────────
+// Correctifs 11/07 : navigation ‹ › entre nœuds en ordre de lecture,
+// aperçu défilant verrouillé par minHeight:0.
 
-function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉditeur }) {
+function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉditeur, nœudPrécédent, nœudSuivant, onNaviguer }) {
   const { t } = useTranslation("common");
   const trouver = (liste, id) => {
     for (const n of liste) {
@@ -597,6 +671,19 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
   const mots = compterMots(nœud.texte);
   const aContenu = nœud.texte && nœud.texte.length > 0;
 
+  const btnNavStyle = (actif) => ({
+    background: "var(--surface)",
+    border: `0.5px solid ${actif ? couleur + "50" : "var(--border)"}`,
+    borderRadius: 6,
+    width: 24, height: 24,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: actif ? "pointer" : "default",
+    color: actif ? couleur : "var(--texte-tertiaire)",
+    opacity: actif ? 1 : 0.4,
+    fontSize: 14, lineHeight: 1,
+    fontFamily: "inherit", padding: 0,
+  });
+
   return (
     <div style={{
       borderTop: `2px solid ${couleur}30`,
@@ -608,17 +695,40 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "10px 16px", borderBottom: `0.5px solid ${couleur}20`,
-        flexShrink: 0,
+        flexShrink: 0, gap: 12,
       }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: couleur }}>
+        <span style={{
+          fontSize: 12, fontWeight: 500, color: couleur,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          minWidth: 0, flex: 1,
+        }}>
           {STRUCTURE_TYPES_META[nœud.type]?.icone} {nœud.titre}
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           {mots > 0 && (
             <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
               {t("mots", { count: mots })}
             </span>
           )}
+          {/* Navigation séquentielle : précédent / suivant en ordre de lecture */}
+          <div style={{ display: "flex", gap: 4 }}>
+            <button
+              onClick={() => nœudPrécédent && onNaviguer(nœudPrécédent.id)}
+              disabled={!nœudPrécédent}
+              style={btnNavStyle(!!nœudPrécédent)}
+              title={nœudPrécédent
+                ? `${t("panneauNoeud.precedent", "Précédent")} — ${nœudPrécédent.titre}`
+                : t("panneauNoeud.precedent", "Précédent")}
+            >‹</button>
+            <button
+              onClick={() => nœudSuivant && onNaviguer(nœudSuivant.id)}
+              disabled={!nœudSuivant}
+              style={btnNavStyle(!!nœudSuivant)}
+              title={nœudSuivant
+                ? `${t("panneauNoeud.suivant", "Suivant")} — ${nœudSuivant.titre}`
+                : t("panneauNoeud.suivant", "Suivant")}
+            >›</button>
+          </div>
           <button
             onClick={() => onOuvrirÉditeur(nœud.id)}
             style={{
@@ -633,9 +743,9 @@ function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉdite
         </div>
       </div>
 
-      {/* Aperçu du contenu */}
+      {/* Aperçu du contenu — défile dans sa propre zone */}
       <div style={{
-        flex: 1, overflowY: "auto",
+        flex: 1, minHeight: 0, overflowY: "auto",
         padding: "16px 20px",
         fontFamily: "Georgia, 'Times New Roman', serif",
         fontSize: 14, lineHeight: 1.8,
@@ -1070,7 +1180,7 @@ function AppConnectée({ user, déconnecter }) {
       </div>
 
       {/* ── Zone principale ── */}
-      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
 
         {/* Vue : tableau de bord */}
         {vue === "tableau" && (
@@ -1146,12 +1256,13 @@ function AppConnectée({ user, déconnecter }) {
 
         {/* Vue : structure du projet (avec panneau éditeur+IA intégré) */}
         {vue === "projet" && projetActif && (
-          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
             {/* Barre d'actions projet */}
             <div style={{
               padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
               display: "flex", alignItems: "center", justifyContent: "flex-end",
               background: "#fafafa",
+              flexShrink: 0,
             }}>
               <button
                 onClick={() => setImportOuvert(true)}
@@ -1166,7 +1277,7 @@ function AppConnectée({ user, déconnecter }) {
                 {t("vues.importerWord")}
               </button>
             </div>
-            <div style={{ flex: 1, overflow: "hidden" }}>
+            <div style={{ flex: 1, overflow: "hidden", minHeight: 0 }}>
               <VueProjet
                 projet={projetActif}
                 onMàjStructure={màjStructure}
@@ -1194,6 +1305,7 @@ function AppConnectée({ user, déconnecter }) {
               borderLeft: "0.5px solid #e5e5e5",
               display: "flex", flexDirection: "column",
               overflow: "hidden", background: "#fafafa",
+              minHeight: 0,
             }}>
               {/* Poignée de redimensionnement */}
               <div
