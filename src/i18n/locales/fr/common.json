@@ -1,7 +1,7 @@
 {
   "_note": "GENRES et STATUTS ne sont volontairement PAS ici : ce sont des valeurs canoniques utilisées comme identifiants internes (ex. typeProjet dérivé de projet.genre). Les traduire casserait cette logique — voir la note de fin de fichier dans App.jsx.",
 
-  "marque": "Atelier",
+  "marque": "Cursus",
   "chargement": "Chargement…",
   "deconnexion": "Déconnexion",
 
