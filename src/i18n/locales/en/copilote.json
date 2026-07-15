@@ -18,7 +18,8 @@
   "erreur": {
     "motsInsuffisants": "Écrivez au moins 20 mots pour activer l'analyse.",
     "sessionExpiree": "Session expirée. Reconnectez-vous.",
-    "generique": "Le co-pilote n'a pas pu traiter ce passage."
+    "generique": "Le co-pilote n'a pas pu traiter ce passage.",
+    "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
   },
   "videEtat": {
     "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
