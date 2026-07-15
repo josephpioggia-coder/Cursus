@@ -1251,6 +1251,7 @@ function AppConnectée({ user, déconnecter }) {
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
                 langueProjet={projetActif.langue || "fr"}
+                projetId={projetActif.id}
               />
             </div>
           </div>
