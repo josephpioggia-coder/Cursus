@@ -461,7 +461,7 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
                 autoFocus
                 value={réponseCourante}
                 onChange={(e) => setRéponseCourante(e.target.value)}
-                placeholder={t("reponseLibrePlaceholder")}
+                placeholder={suggestions ? t("reponseLibrePlaceholder") : t("reponseLibrePlaceholderSansExemples")}
                 rows={4}
                 style={{
                   width: "100%", padding: "10px 12px", border: "0.5px solid #e5e5e5",
