@@ -1,40 +1,42 @@
 /**
- * CURSUS — Module : Co-pilote IA
- * Branché sur l'API Claude en temps réel.
- * 4 onglets : Suggestions / Personnages / Références APA / Cohérence
+ * CURSUS — QuestionnaireIntention.jsx
+ * (conceptuellement : "L'ADN du projet")
+ *
+ * Traite le NIVEAU 1 (10 questions + Q009b conditionnelle si "Roman").
+ * Les niveaux 2 et 3 émergent ailleurs, contextuellement — pas ici.
  *
  * Version i18n (chantier 04/07/2026) :
- * - Tous les textes d'interface passent par t('copilote.xxx')
- * - `langueProjet` est propagée à claude-prox pour que la réponse générée
- *   par l'IA soit dans la langue du projet, pas seulement l'UI autour d'elle
+ * - Tous les textes d'interface passent par t('adn.xxx')
+ * - CORRECTIF BUG : les exemples-amorces de Q021 étaient les thèmes du livre
+ *   personnel de Joseph ("La dette", "La transmission"...) et s'affichaient
+ *   pour TOUS les projets de TOUS les utilisateurs. Remplacés par des thèmes
+ *   génériques, désormais eux-mêmes traduisibles via adn.json.
+ * - Les choix fermés (Q009, Q009b) restent stockés en base avec leur valeur
+ *   FRANÇAISE canonique même en interface EN, le temps qu'une décision soit
+ *   prise sur un système de valeurs stables indépendantes de la langue
+ *   affichée (voir note en fin de fichier).
+ *
+ * Props :
+ *   projetId    : id du projet concerné
+ *   projetTitre : titre affiché dans l'en-tête
+ *   onTerminé   : appelé quand l'auteur valide le récapitulatif final
+ *   onFermer    : appelé quand l'auteur reporte / ferme sans terminer
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
-
-const extraireTexte = (html = "") =>
-  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
-
-const compterMots = (html = "") =>
-  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
-
-// ─── Appel API Claude ─────────────────────────────────────────────────────────
 
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-async function appelClaude(system, user, signal, maxTokens = 1000) {
+async function appelClaude(system, user) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-
-  if (!token) {
-    throw new Error("SESSION_EXPIREE");
-  }
+  if (!token) throw new Error("Session expirée.");
 
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
-    signal,
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,
@@ -42,335 +44,586 @@ async function appelClaude(system, user, signal, maxTokens = 1000) {
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
-      max_tokens: maxTokens,
+      max_tokens: 500,
       system,
       messages: [{ role: "user", content: user }],
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
-  if (data.error) throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return data.content?.[0]?.text || "";
 }
 
-// ─── Prompts ──────────────────────────────────────────────────────────────────
-// Ces prompts système restent en français : ce sont des instructions à Claude,
-// pas du texte d'interface. La langue de LA RÉPONSE générée (elle, visible par
-// l'utilisateur) est imposée via l'instruction de langue ajoutée dans analyser().
+const SEUIL_SYNTHESE = 500; // au-delà, une synthèse est générée pour le contexte co-pilote
 
-// Tente de parser du JSON ; si la réponse n'en est pas (par exemple un refus
-// poli du modèle sur un passage sensible), affiche ce texte tel quel plutôt
-// qu'une erreur technique cryptique de type "JSON.parse: unterminated string".
-function parserJSON(résultat) {
-  const nettoyé = résultat.replace(/```json|```/g, "").trim();
+// Génère une synthèse courte d'une réponse longue, à usage exclusif du contexte
+// envoyé au co-pilote IA (CopiloteIA.jsx) — la réponse complète, elle, reste
+// affichée telle quelle dans le récapitulatif et stockée intégralement.
+// Volontairement non bloquant : la navigation vers la question suivante ne
+// doit jamais attendre cet appel IA. En cas d'échec, chargerContexteADN()
+// (dans CopiloteIA.jsx) retombe sur une troncature simple à 500 caractères.
+async function générerEtEnregistrerSynthèse(projetId, questionId, question, valeur) {
   try {
-    return JSON.parse(nettoyé);
-  } catch {
-    throw new Error(nettoyé.slice(0, 300) || "__ERREUR_GENERIQUE__");
-  }
-}
+    const synthèse = await appelClaude(
+      "Tu résumes la réponse d'un auteur à une question de clarification de son projet de livre, pour un usage interne : cette synthèse guidera un assistant d'écriture IA, elle ne sera jamais montrée à l'auteur. Condense en 2 à 3 phrases maximum, en conservant les nuances et le vocabulaire propre à l'auteur autant que possible. Réponds uniquement avec la synthèse, sans préambule.",
+      `Question : ${question}\n\nRéponse de l'auteur :\n${valeur}`
+    );
+    if (!synthèse) return;
 
-const INSTRUCTION_LANGUE = {
-  fr: "Réponds en français.",
-  en: "Respond in English.",
-};
-
-const PROMPTS = {
-  suggestions: (type) => `Tu es co-pilote d'un écrivain professionnel travaillant sur un ${type === "fiction" ? "roman" : "essai ou ouvrage de non-fiction"}. Analyse le texte et génère exactement 3 suggestions concrètes. Réponds UNIQUEMENT en JSON valide :
-{"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`,
-
-  personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte. Réponds UNIQUEMENT en JSON valide :
-{"personnages":[{"nom":"...","rôle":"...","traits":["..."],"cohérence":"ok","note":"..."}]}`,
-
-  références: `Tu es assistant de recherche académique. Identifie les concepts qui méritent des références scientifiques ou historiques. Propose des références réelles en format APA 7e. Réponds UNIQUEMENT en JSON valide :
-{"références":[{"concept":"...","apa":"...","page":"...","pertinence":"..."}]}`,
-
-  cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
-{"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
-};
-
-function systemAvecLangue(promptBase, langueProjet, contexteADN) {
-  const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  const blocADN = contexteADN
-    ? `CONTEXTE DU PROJET — réponses de l'auteur au questionnaire d'intention (à respecter impérativement dans ton comportement, pas seulement à titre informatif) :\n${contexteADN}\n\n`
-    : "";
-  return `${blocADN}${promptBase}\n\n${instruction} (Les clés JSON restent telles quelles ; seules les valeurs textuelles sont dans cette langue.)`;
-}
-
-// Récupère les réponses au questionnaire ADN (niveau 1) pour un projet, et les
-// met en forme comme bloc de contexte à injecter dans chaque prompt système du
-// co-pilote. Sans ce contexte, le co-pilote ignorait totalement le rôle voulu
-// (Q9), le ton (Q5), les thèmes (Q6) et les lignes rouges (Q7) — corrigé le
-// 15/07/2026. Chaque réponse est plafonnée à 500 caractères pour éviter de
-// gonfler démesurément le prompt (et donc le quota de tokens de l'auteur) ;
-// à ajuster si ce plafond coupe des réponses importantes en pratique.
-async function chargerContexteADN(projetId) {
-  if (!projetId) return null;
-  try {
-    const { data: questions } = await supabase
-      .from("banque_questions")
-      .select("id, question")
-      .eq("niveau", 1);
-    const { data: réponses } = await supabase
+    await supabase
       .from("reponses_questionnaire")
-      .select("question_id, reponse")
-      .eq("projet_id", projetId);
-
-    if (!questions?.length || !réponses?.length) return null;
-
-    const réponseParId = {};
-    réponses.forEach((r) => { réponseParId[r.question_id] = r.reponse; });
-
-    const lignes = questions
-      .map((q) => {
-        const r = réponseParId[q.id];
-        if (!r?.valeur) return null;
-        const texte = r.synthese || (r.valeur.length > 500 ? r.valeur.slice(0, 500) + "…" : r.valeur);
-        return `- ${q.question} → ${texte}`;
-      })
-      .filter(Boolean);
-
-    return lignes.length ? lignes.join("\n") : null;
+      .update({ reponse: { valeur, synthese: synthèse.trim() } })
+      .eq("projet_id", projetId)
+      .eq("question_id", questionId);
   } catch {
-    return null; // le co-pilote continue de fonctionner même sans ce contexte
+    // Échec silencieux : la réponse complète reste enregistrée normalement,
+    // seule la synthèse manque. chargerContexteADN() gère ce cas.
   }
 }
 
-// ─── Composants d'affichage ───────────────────────────────────────────────────
+export default function QuestionnaireIntention({ projetId, projetTitre, onTerminé, onFermer }) {
+  const { t } = useTranslation("adn");
 
-function CarteSuggestion({ s, couleur }) {
-  const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷" };
+  // Choix fermés et suggestions désormais lus depuis adn.json (traduisibles),
+  // avec retour à un tableau vide si une question n'a pas d'entrée.
+  const CHOIX_PAR_QUESTION = t("choix", { returnObjects: true }) || {};
+  const SUGGESTIONS_PAR_QUESTION = t("suggestions", { returnObjects: true }) || {};
+
+  const [chargement, setChargement] = useState(true);
+  const [questions, setQuestions] = useState([]);
+  const [indexActuel, setIndexActuel] = useState(0);
+  const [réponseCourante, setRéponseCourante] = useState("");
+  const [enEnregistrement, setEnEnregistrement] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const [premièreOuverture, setPremièreOuverture] = useState(true);
+  const [questionQ009b, setQuestionQ009b] = useState(null);
+  const [réponsesMap, setRéponsesMap] = useState({});
+
+  const [étape, setÉtape] = useState("questions");
+  const [synthèse, setSynthèse] = useState(null);
+  const [chargementSynthèse, setChargementSynthèse] = useState(false);
+
+  useEffect(() => {
+    let annulé = false;
+
+    const charger = async () => {
+      setChargement(true);
+      setErreur(null);
+
+      try {
+        const { data: réponses, error: erreurRéponses } = await supabase
+          .from("reponses_questionnaire")
+          .select("question_id, reponse")
+          .eq("projet_id", projetId);
+
+        if (erreurRéponses) throw erreurRéponses;
+
+        const réponsesParId = {};
+        (réponses || []).forEach((r) => { réponsesParId[r.question_id] = r.reponse?.valeur ?? ""; });
+
+        const { data: adn, error: erreurBanque } = await supabase
+          .from("banque_questions")
+          .select("*")
+          .eq("niveau", 1)
+          .neq("id", "Q009b")
+          .order("id");
+
+        if (erreurBanque) throw erreurBanque;
+
+        const { data: q009b } = await supabase
+          .from("banque_questions")
+          .select("*")
+          .eq("id", "Q009b")
+          .maybeSingle();
+
+        let listeComplète = adn || [];
+        if (q009b && réponsesParId["Q009"] === "Roman") {
+          const posQ009 = listeComplète.findIndex((q) => q.id === "Q009");
+          listeComplète = [...listeComplète];
+          listeComplète.splice(posQ009 + 1, 0, q009b);
+        }
+
+        if (!annulé) {
+          setQuestions(listeComplète);
+          setQuestionQ009b(q009b || null);
+
+          const nbRépondues = Object.keys(réponsesParId).filter((id) =>
+            listeComplète.some((q) => q.id === id)
+          ).length;
+          setPremièreOuverture(nbRépondues === 0);
+
+          const premierIndexNonRépondu = listeComplète.findIndex((q) => !(q.id in réponsesParId));
+          if (premierIndexNonRépondu === -1) {
+            setÉtape("récapitulatif");
+            setIndexActuel(listeComplète.length - 1);
+          } else {
+            setIndexActuel(premierIndexNonRépondu);
+            setRéponseCourante(réponsesParId[listeComplète[premierIndexNonRépondu]?.id] || "");
+          }
+
+          setRéponsesMap(réponsesParId);
+        }
+      } catch (err) {
+        if (!annulé) setErreur(err.message || t("erreur.chargement"));
+      } finally {
+        if (!annulé) setChargement(false);
+      }
+    };
+
+    if (projetId) charger();
+    return () => { annulé = true; };
+  }, [projetId, t]);
+
+  const questionActuelle = questions[indexActuel] || null;
+  const dernièreQuestion = indexActuel >= questions.length - 1;
+
+  const allerÀ = (nouvelIndex) => {
+    setIndexActuel(nouvelIndex);
+    const q = questions[nouvelIndex];
+    setRéponseCourante((q && réponsesMap[q.id]) || "");
+    setÉtape("questions");
+  };
+
+  const précédent = () => {
+    if (indexActuel > 0) allerÀ(indexActuel - 1);
+  };
+
+  const enregistrerRéponse = async () => {
+    if (!questionActuelle || !réponseCourante.trim()) return;
+    await sauvegarderEtContinuer(réponseCourante.trim());
+  };
+
+  const enregistrerChoix = async (valeur) => {
+    await sauvegarderEtContinuer(valeur);
+  };
+
+  const sauvegarderEtContinuer = async (valeur) => {
+    setEnEnregistrement(true);
+    setErreur(null);
+
+    try {
+      const { error } = await supabase
+        .from("reponses_questionnaire")
+        .upsert({
+          projet_id: projetId,
+          question_id: questionActuelle.id,
+          reponse: { valeur },
+          statut: "repondu",
+        }, { onConflict: "projet_id,question_id" });
+
+      if (error) throw error;
+
+      // Lancée sans attendre : ne doit jamais retarder le passage à la question suivante.
+      if (valeur.length > SEUIL_SYNTHESE) {
+        générerEtEnregistrerSynthèse(projetId, questionActuelle.id, questionActuelle.question, valeur);
+      }
+
+      setRéponsesMap((prev) => ({ ...prev, [questionActuelle.id]: valeur }));
+
+      let questionsActualisées = questions;
+      if (questionActuelle.id === "Q009" && questionQ009b) {
+        questionsActualisées = questions.filter((q) => q.id !== "Q009b");
+        if (valeur === "Roman") {
+          const posQ009 = questionsActualisées.findIndex((q) => q.id === "Q009");
+          questionsActualisées.splice(posQ009 + 1, 0, questionQ009b);
+        }
+        setQuestions(questionsActualisées);
+      }
+
+      setRéponseCourante("");
+
+      const estLaDernière = indexActuel >= questionsActualisées.length - 1;
+      if (estLaDernière) {
+        setÉtape("récapitulatif");
+      } else {
+        const prochainIndex = indexActuel + 1;
+        setIndexActuel(prochainIndex);
+        setRéponseCourante(réponsesMap[questionsActualisées[prochainIndex]?.id] || "");
+      }
+    } catch (err) {
+      setErreur(err.message || t("erreur.enregistrement"));
+    } finally {
+      setEnEnregistrement(false);
+    }
+  };
+
+  const reporter = () => {
+    onFermer ? onFermer() : onTerminé?.();
+  };
+
+  useEffect(() => {
+    if (étape !== "récapitulatif" || synthèse || chargementSynthèse) return;
+
+    const générer = async () => {
+      setChargementSynthèse(true);
+      try {
+        const résumé = questions
+          .map((q) => `${q.question} → ${réponsesMap[q.id] || "(non renseigné)"}`)
+          .join("\n");
+
+        const texte = await appelClaude(
+          "Tu es le co-pilote d'écriture d'un auteur. À partir de ses réponses sur l'ADN de son projet, rédige une synthèse chaleureuse en 3 à 5 phrases, en français, qui explique concrètement comment tu vas l'accompagner sur ce livre précis — le ton que tu adopteras, ce que tu surveilleras, ce que tu éviteras de faire. Adresse-toi directement à l'auteur en \"vous\". Pas de markdown, pas de liste, un texte fluide.",
+          résumé
+        );
+        setSynthèse(texte || null);
+      } catch {
+        setSynthèse(null);
+      } finally {
+        setChargementSynthèse(false);
+      }
+    };
+
+    générer();
+  }, [étape, questions, synthèse, chargementSynthèse]);
+
+  if (chargement) {
+    return (
+      <Overlay>
+        <Carte>
+          <div style={{ textAlign: "center", padding: "32px 16px", color: "#999", fontSize: 13 }}>
+            {t("chargement")}
+          </div>
+        </Carte>
+      </Overlay>
+    );
+  }
+
+  if (erreur && étape === "questions") {
+    return (
+      <Overlay>
+        <Carte>
+          <EnTête projetTitre={projetTitre} onReporter={reporter} t={t} />
+          <div style={{ padding: "16px 24px", color: "#A32D2D", fontSize: 13 }}>{erreur}</div>
+          <PiedDePage onReporter={reporter} t={t} />
+        </Carte>
+      </Overlay>
+    );
+  }
+
+  if (questions.length === 0) return null;
+
+  if (étape === "récapitulatif") {
+    return (
+      <Overlay>
+        <Carte large>
+          <EnTête projetTitre={projetTitre} onReporter={reporter} sousTitre={t("titreRecapitulatif")} t={t} />
+
+          <div style={{ padding: "0 24px 16px" }}>
+            <div style={{
+              padding: "14px 16px", background: "#EEEDFE", borderRadius: 10,
+              fontSize: 13, color: "#4A4394", lineHeight: 1.6, minHeight: 40,
+            }}>
+              {chargementSynthèse
+                ? t("synthesePreparation")
+                : synthèse || t("syntheseParDefaut")}
+            </div>
+          </div>
+
+          <div style={{ padding: "0 24px 8px", display: "grid", gap: 8, maxHeight: "40vh", overflowY: "auto" }}>
+            {questions.map((q, i) => (
+              <div key={q.id} style={{
+                padding: "10px 12px", background: "#fafafa", borderRadius: 8,
+                border: "0.5px solid #eee", display: "flex", justifyContent: "space-between", gap: 12,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: "#999", marginBottom: 2 }}>{q.question}</div>
+                  <div style={{ fontSize: 13, color: "#1a1a1a" }}>
+                    {réponsesMap[q.id] || <span style={{ color: "#bbb" }}>{t("nonRenseigne")}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => allerÀ(i)}
+                  style={{
+                    flexShrink: 0, alignSelf: "center", fontSize: 11, color: "#7F77DD",
+                    background: "none", border: "none", cursor: "pointer",
+                    fontFamily: "inherit", textDecoration: "underline",
+                  }}
+                >
+                  {t("modifier")}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: "16px 24px 20px" }}>
+            <button
+              onClick={() => onTerminé?.()}
+              style={{
+                width: "100%", padding: "11px", background: "#7F77DD", color: "#fff",
+                border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              {t("commencerAEcrire")}
+            </button>
+          </div>
+        </Carte>
+      </Overlay>
+    );
+  }
+
+  const optionsChoixFermé = CHOIX_PAR_QUESTION[questionActuelle.id];
+  const suggestions = SUGGESTIONS_PAR_QUESTION[questionActuelle.id];
+
   return (
-    <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{icônes[s.type] || "→"} {s.type}</div>
-      <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
-      <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
+    <Overlay>
+      {/* Note responsive : largeur fixe encore présente dans <Carte> (problème
+          UI n°1 identifié le 04/07 — non traité dans ce chantier, à corriger
+          séparément). */}
+      <Carte>
+        <EnTête projetTitre={projetTitre} onReporter={reporter} sousTitre={t("titreDefaut")} t={t} />
+
+        {premièreOuverture && indexActuel === 0 && (
+          <div style={{
+            margin: "0 24px 16px", padding: "14px 16px",
+            background: "#EEEDFE", borderRadius: 10,
+            fontSize: 13, color: "#4A4394", lineHeight: 1.6,
+          }}>
+            {t("messageAccueil")}
+          </div>
+        )}
+
+        <div style={{ margin: "0 24px 16px", textAlign: "right" }}>
+          <button
+            onClick={reporter}
+            style={{
+              fontSize: 11, color: "#7F77DD", background: "#fff",
+              border: "0.5px solid #7F77DD30", borderRadius: 6,
+              padding: "4px 10px", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            {t("ecrireToutDeSuite")}
+          </button>
+        </div>
+
+        <div style={{ padding: "0 24px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ flex: 1, height: 4, background: "#eee", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{
+              width: `${(indexActuel / questions.length) * 100}%`,
+              height: "100%", background: "#7F77DD", borderRadius: 4, transition: "width 0.3s",
+            }} />
+          </div>
+          <span style={{ fontSize: 11, color: "#999", flexShrink: 0 }}>
+            {indexActuel + 1} / {questions.length}
+          </span>
+        </div>
+
+        <div style={{ padding: "8px 24px 20px" }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a", marginBottom: 6, lineHeight: 1.5 }}>
+            {questionActuelle.question}
+          </div>
+          {questionActuelle.objectif && (
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 14, lineHeight: 1.5 }}>
+              {questionActuelle.objectif}
+            </div>
+          )}
+
+          {optionsChoixFermé ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              {optionsChoixFermé.map((option) => {
+                const sélectionnée = réponseCourante === option;
+                return (
+                  <button
+                    key={option}
+                    onClick={() => option !== "Autre" && enregistrerChoix(option)}
+                    disabled={enEnregistrement}
+                    style={{
+                      padding: "10px 14px", textAlign: "left",
+                      background: sélectionnée ? "#EEEDFE" : "#fff",
+                      border: sélectionnée ? "0.5px solid #7F77DD" : "0.5px solid #e5e5e5",
+                      borderRadius: 8, fontSize: 13, color: "#1a1a1a",
+                      cursor: enEnregistrement || option === "Autre" ? "default" : "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <input
+                  type="text"
+                  value={réponseCourante}
+                  onChange={(e) => setRéponseCourante(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && réponseCourante.trim()) enregistrerChoix(réponseCourante.trim()); }}
+                  placeholder={t("autrePrecisez")}
+                  style={{
+                    flex: 1, padding: "9px 12px", border: "0.5px solid #e5e5e5",
+                    borderRadius: 8, fontSize: 13, color: "#1a1a1a", fontFamily: "inherit",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                />
+                <button
+                  onClick={() => réponseCourante.trim() && enregistrerChoix(réponseCourante.trim())}
+                  disabled={enEnregistrement || !réponseCourante.trim()}
+                  style={{
+                    padding: "9px 16px", background: "#7F77DD", color: "#fff",
+                    border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                    cursor: enEnregistrement || !réponseCourante.trim() ? "default" : "pointer",
+                    opacity: enEnregistrement || !réponseCourante.trim() ? 0.5 : 1,
+                    fontFamily: "inherit", whiteSpace: "nowrap",
+                  }}
+                >
+                  {t("valider")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {suggestions && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                  {suggestions.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setRéponseCourante(s)}
+                      style={{
+                        fontSize: 11.5, padding: "5px 10px", borderRadius: 20,
+                        background: "#f5f5f5", border: "0.5px solid #e5e5e5",
+                        color: "#666", cursor: "pointer", fontFamily: "inherit",
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <textarea
+                autoFocus
+                value={réponseCourante}
+                onChange={(e) => setRéponseCourante(e.target.value)}
+                placeholder={suggestions ? t("reponseLibrePlaceholder") : t("reponseLibrePlaceholderSansExemples")}
+                rows={4}
+                style={{
+                  width: "100%", padding: "10px 12px", border: "0.5px solid #e5e5e5",
+                  borderRadius: 8, fontSize: 13, color: "#1a1a1a", fontFamily: "inherit",
+                  outline: "none", boxSizing: "border-box", resize: "vertical",
+                }}
+              />
+
+              <button
+                onClick={enregistrerRéponse}
+                disabled={enEnregistrement || !réponseCourante.trim()}
+                style={{
+                  width: "100%", marginTop: 14, padding: "10px", background: "#7F77DD", color: "#fff",
+                  border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500,
+                  cursor: enEnregistrement || !réponseCourante.trim() ? "default" : "pointer",
+                  opacity: enEnregistrement || !réponseCourante.trim() ? 0.6 : 1,
+                  fontFamily: "inherit",
+                }}
+              >
+                {enEnregistrement ? t("enregistrement") : dernièreQuestion ? t("voirRecapitulatif") : t("suivant")}
+              </button>
+            </>
+          )}
+
+          {indexActuel > 0 && (
+            <button
+              onClick={précédent}
+              disabled={enEnregistrement}
+              style={{
+                marginTop: 10, fontSize: 12, color: "#999", background: "none",
+                border: "none", cursor: enEnregistrement ? "default" : "pointer", fontFamily: "inherit",
+              }}
+            >
+              {t("questionPrecedente")}
+            </button>
+          )}
+        </div>
+
+        <PiedDePage onReporter={reporter} t={t} />
+      </Carte>
+    </Overlay>
+  );
+}
+
+// ─── Sous-composants d'affichage ───────────────────────────────────────
+
+function Overlay({ children }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 100, padding: 20,
+    }}>
+      {children}
     </div>
   );
 }
 
-function CartePersonnage({ p }) {
-  const c = { ok: "#1D9E75", attention: "#BA7517", problème: "#E24B4A" }[p.cohérence] || "#888";
+function Carte({ children, large }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 13, fontWeight: 500 }}>{p.nom}</span>
-        <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: c + "20", color: c, fontWeight: 500 }}>{p.cohérence}</span>
+    <div style={{
+      background: "#fff", borderRadius: 16, width: large ? 540 : 460, maxWidth: "100%",
+      maxHeight: "85vh", overflowY: "auto",
+      boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function EnTête({ projetTitre, sousTitre, onReporter, t }) {
+  return (
+    <div style={{
+      padding: "20px 24px 12px", display: "flex",
+      alignItems: "flex-start", justifyContent: "space-between", gap: 12,
+    }}>
+      <div>
+        <div style={{ fontSize: 11, color: "#999", marginBottom: 2 }}>{projetTitre}</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a" }}>{sousTitre || t("titreDefaut")}</div>
       </div>
-      <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
-      {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
-      {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
-    </div>
-  );
-}
-
-function CarteRéférence({ r }) {
-  const { t } = useTranslation("copilote");
-  const [copié, setCopié] = useState(false);
-  return (
-    <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderLeft: "3px solid #378ADD", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#185FA5", textTransform: "uppercase", marginBottom: 4 }}>{r.concept}</div>
-      <div style={{ background: "#E6F1FB", borderRadius: 6, padding: "8px 10px", marginBottom: 6, fontSize: 12, color: "#0C447C", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{r.apa}</div>
-      {r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>{t("references.pageSuggeree", { page: r.page })}</div>}
-      <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>{r.pertinence}</div>
-      <button onClick={() => { navigator.clipboard?.writeText(r.apa); setCopié(true); setTimeout(() => setCopié(false), 2000); }}
-        style={{ fontSize: 11, color: copié ? "#1D9E75" : "#185FA5", background: copié ? "#E1F5EE" : "#E6F1FB", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
-        {copié ? t("references.copie") : t("references.copier")}
+      <button
+        onClick={onReporter}
+        title={t("fermerTitre")}
+        style={{
+          flexShrink: 0, width: 28, height: 28, borderRadius: "50%",
+          border: "none", background: "#f5f5f5", color: "#999",
+          fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+        }}
+      >
+        ✕
       </button>
     </div>
   );
 }
 
-function CarteCoherence({ p }) {
-  const s = { info: { c: "#378ADD", bg: "#E6F1FB" }, attention: { c: "#BA7517", bg: "#FAEEDA" }, important: { c: "#E24B4A", bg: "#FCEBEB" } }[p.sévérité] || { c: "#888", bg: "#f0f0f0" };
+function PiedDePage({ onReporter, t }) {
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, fontWeight: 500, marginRight: 6 }}>{p.sévérité}</span>
-      <span style={{ fontSize: 11, color: "#999" }}>{p.type}</span>
-      <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
-      {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
+    <div style={{ padding: "12px 24px 20px", borderTop: "0.5px solid #f0f0f0", textAlign: "center" }}>
+      <button
+        onClick={onReporter}
+        style={{
+          fontSize: 12, color: "#999", background: "none", border: "none",
+          cursor: "pointer", fontFamily: "inherit", textDecoration: "underline",
+        }}
+      >
+        {t("reporter")}
+      </button>
     </div>
   );
 }
 
-// ─── Composant principal ──────────────────────────────────────────────────────
-
-export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", langueProjet = "fr", projetId = null }) {
-  const { t } = useTranslation("copilote");
-  const [contexteADN, setContexteADN] = useState(null);
-
-  useEffect(() => {
-    let annulé = false;
-    chargerContexteADN(projetId).then((c) => { if (!annulé) setContexteADN(c); });
-    return () => { annulé = true; };
-  }, [projetId]);
-  const [onglet, setOnglet] = useState("suggestions");
-  const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null });
-  const [chargement, setChargement] = useState({});
-  const [erreur, setErreur] = useState({});
-  const [modeAuto, setModeAuto] = useState(false);
-  const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
-  const abortRef = useRef(null);
-  const intervalRef = useRef(null);
-
-  const messageErreur = useCallback((err) => {
-    if (err.message === "SESSION_EXPIREE") return t("erreur.sessionExpiree");
-    if (err.message === "__ERREUR_GENERIQUE__") return t("erreur.generique");
-    return err.message;
-  }, [t]);
-
-  const analyser = useCallback(async (ongletCible) => {
-    const texte = extraireTexte(texteActif);
-    if (compterMots(texteActif) < 20) {
-      setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
-      return;
-    }
-
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setChargement(c => ({ ...c, [ongletCible]: true }));
-    setErreur(e => ({ ...e, [ongletCible]: null }));
-
-    try {
-      let résultat = "";
-      const sig = abortRef.current.signal;
-
-      if (ongletCible === "suggestions") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
-        const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
-      } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
-        const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
-      } else if (ongletCible === "références") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références, langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
-        // Répare le JSON potentiellement tronqué
-        let jsonStr = résultat.replace(/```json|```/g, "").trim();
-        if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
-        try {
-          const p = JSON.parse(jsonStr);
-          setDonnées(d => ({ ...d, références: p.références || [] }));
-        } catch {
-          const match = jsonStr.match(/"références"\s*:\s*\[[\s\S]*\]/);
-          if (match) {
-            const partial = JSON.parse(`{${match[0]}}`);
-            setDonnées(d => ({ ...d, références: partial.références || [] }));
-          } else {
-            throw new Error("__ERREUR_GENERIQUE__");
-          }
-        }
-      } else if (ongletCible === "cohérence") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
-        const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, cohérence: p.points || [] }));
-      }
-
-      setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        setErreur(e => ({ ...e, [ongletCible]: messageErreur(err) }));
-      }
-    } finally {
-      setChargement(c => ({ ...c, [ongletCible]: false }));
-    }
-  }, [texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
-
-  useEffect(() => {
-    if (modeAuto) {
-      analyser(onglet);
-      intervalRef.current = setInterval(() => analyser(onglet), 600000);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [modeAuto, onglet, analyser]);
-
-  const onglets = [
-    { id: "suggestions", label: t("onglets.suggestions") },
-    { id: "personnages", label: t("onglets.personnages") },
-    { id: "références", label: t("onglets.references") },
-    { id: "cohérence", label: t("onglets.coherence") },
-  ];
-
-  const données_onglet = données[onglet];
-  const enChargement = chargement[onglet];
-  const erreurOnglet = erreur[onglet];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#fafafa" }}>
-
-      {/* En-tête */}
-      <div style={{ padding: "12px 14px", borderBottom: "0.5px solid #e5e5e5", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 14 }}>🤖</span>
-            <span style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>{t("titre")}</span>
-            {dernièreAnalyse && <span style={{ fontSize: 10, color: "#999" }}>· {dernièreAnalyse}</span>}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10, color: "#999" }}>{t("modeAuto.label")}</span>
-            <div onClick={() => setModeAuto(!modeAuto)}
-              style={{ width: 30, height: 16, borderRadius: 8, background: modeAuto ? couleurProjet : "#ddd", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
-              <div style={{ position: "absolute", top: 2, left: modeAuto ? 15 : 2, width: 12, height: 12, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
-            </div>
-          </div>
-        </div>
-
-        {modeAuto && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${couleurProjet}12`, border: `0.5px solid ${couleurProjet}30`, borderRadius: 6, padding: "5px 8px", marginBottom: 8, fontSize: 10.5, color: couleurProjet, lineHeight: 1.4 }}>
-            <span>🔄</span>
-            <span>{t("modeAuto.banniere")}</span>
-          </div>
-        )}
-
-        <div style={{ display: "flex" }}>
-          {onglets.map(o => (
-            <button key={o.id} onClick={() => setOnglet(o.id)}
-              style={{ flex: 1, padding: "6px 2px", border: "none", background: "transparent", fontFamily: "inherit", fontSize: 10, fontWeight: onglet === o.id ? 600 : 400, color: onglet === o.id ? couleurProjet : "#999", borderBottom: onglet === o.id ? `2px solid ${couleurProjet}` : "2px solid transparent", cursor: "pointer" }}>
-              {o.label}
-              {données[o.id] !== null && <span style={{ marginLeft: 2, opacity: 0.6 }}>({Array.isArray(données[o.id]) ? données[o.id].length : "✓"})</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Corps */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
-        <button onClick={() => analyser(onglet)} disabled={enChargement}
-          style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
-          {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
-        </button>
-
-        {enChargement && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#999", fontSize: 12, padding: "8px 0" }}>
-            <div style={{ width: 14, height: 14, border: `2px solid ${couleurProjet}30`, borderTopColor: couleurProjet, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            {t("bouton.enCours")}
-          </div>
-        )}
-
-        {erreurOnglet && !enChargement && (
-          <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 8 }}>
-            {erreurOnglet}
-          </div>
-        )}
-
-        {!enChargement && !erreurOnglet && données_onglet === null && (
-          <div style={{ textAlign: "center", padding: "20px 8px", color: "#bbb", fontSize: 12, lineHeight: 1.7 }}>
-            {onglet === "suggestions" && t("videEtat.suggestions")}
-            {onglet === "personnages" && t("videEtat.personnages")}
-            {onglet === "références" && t("videEtat.references")}
-            {onglet === "cohérence" && t("videEtat.coherence")}
-          </div>
-        )}
-
-        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} />)}
-        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} />))}
-        {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
-        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} />))}
-      </div>
-    </div>
-  );
-}
+/**
+ * NOTE POUR JOSEPH — décision à prendre :
+ *
+ * Les choix fermés (Q009 = "Roman"/"Essai"/"Conte"/"Autre") sont stockés
+ * dans `reponses_questionnaire.reponse.valeur` comme la CHAÎNE AFFICHÉE.
+ * Tant que l'interface n'existe qu'en français, ce n'est pas un problème.
+ * Mais dès que l'anglais sera actif, un projet en_US répondant "Novel"
+ * stockera "Novel", alors qu'un projet fr_FR stocke "Roman" — deux valeurs
+ * différentes pour le même sens, ce qui complique toute logique qui lirait
+ * cette valeur ailleurs (déclenchement de Q009b, filtres, stats globales).
+ *
+ * Deux options pour le jour où l'anglais sera activé :
+ *   A. Stocker un code stable indépendant de la langue (ex. "roman"), et
+ *      ne traduire que l'affichage — implique une petite migration des
+ *      réponses déjà enregistrées.
+ *   B. Accepter la divergence et faire en sorte que la logique de
+ *      déclenchement (Q009 → Q009b) compare sur un ensemble de valeurs
+ *      équivalentes par langue plutôt que sur une chaîne unique.
+ * Recommandation : A, mais seulement au moment de basculer l'anglais en
+ * production — inutile de le faire maintenant pour une UI encore 100% FR.
+ */
 
