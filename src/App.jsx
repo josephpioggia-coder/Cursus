@@ -27,6 +27,7 @@ import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
+import AideFAQ from "./components/AideFAQ.jsx";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -761,6 +762,7 @@ function AppConnectée({ user, déconnecter }) {
   const [importOuvert, setImportOuvert]   = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
+  const [aideOuverte, setAideOuverte]                     = useState(false);
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
@@ -991,6 +993,10 @@ function AppConnectée({ user, déconnecter }) {
           </span>
         )}
         <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>{user.email}</span>
+        <button onClick={() => setAideOuverte(true)}
+          style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          {t("aide.bouton")}
+        </button>
         <button onClick={déconnecter}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("deconnexion")}
@@ -1268,6 +1274,9 @@ function AppConnectée({ user, déconnecter }) {
           </div>
         )}
       </div>
+
+      {/* Centre d'aide — accessible depuis n'importe quel écran */}
+      {aideOuverte && <AideFAQ onFermer={() => setAideOuverte(false)} />}
 
       {/* Modal import Word */}
       {importOuvert && projetActif && (
