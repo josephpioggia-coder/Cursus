@@ -21,7 +21,9 @@
   "syntheseParDefaut": "Voici vos réponses. Vous pouvez commencer à écrire dès maintenant.",
   "erreur": {
     "chargement": "Erreur de chargement.",
-    "enregistrement": "Impossible d'enregistrer la réponse."
+    "enregistrement": "Impossible d'enregistrer la réponse.",
+    "reseau": "Un problème de connexion est survenu. Vos réponses précédentes sont enregistrées. Essayez de recharger la page.",
+    "recharger": "Recharger la page"
   },
   "choix": {
     "Q009": ["Roman", "Essai", "Conte", "Autre"],
