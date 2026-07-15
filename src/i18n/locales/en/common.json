@@ -5,6 +5,35 @@
   "chargement": "Chargement…",
   "deconnexion": "Déconnexion",
 
+  "aide": {
+    "bouton": "Aide",
+    "titre": "Centre d'aide",
+    "vide": "Aucune question pour l'instant.",
+    "pied": "Vous ne trouvez pas votre réponse ? Écrivez à bonjour@cursus.pro"
+  },
+  "faq": [
+    {
+      "question": "Comment revenir à une question précédente dans le questionnaire ADN ?",
+      "reponse": "Sous le bouton \"Suivant\", cliquez sur \"← Question précédente\". Vos réponses ne sont jamais perdues, même en revenant en arrière."
+    },
+    {
+      "question": "Le questionnaire affiche une erreur de connexion, que faire ?",
+      "reponse": "Vos réponses précédentes sont déjà enregistrées. Cliquez sur le bouton \"Recharger la page\" qui apparaît, ou faites Ctrl+Shift+R (Ctrl+F5 sur certains claviers)."
+    },
+    {
+      "question": "Puis-je reporter le questionnaire ADN à plus tard ?",
+      "reponse": "Oui. Cliquez sur \"Reporter à plus tard\" : vos réponses sont conservées, et le questionnaire reprendra exactement là où vous vous êtes arrêté la prochaine fois que vous ouvrirez ce projet."
+    },
+    {
+      "question": "Comment changer le genre ou la couleur de mon projet ?",
+      "reponse": "Ouvrez le formulaire du projet et modifiez le champ Genre. La couleur suit automatiquement le genre choisi, sauf si vous cliquez vous-même sur une autre pastille de couleur."
+    },
+    {
+      "question": "Le co-pilote IA affiche une erreur de session",
+      "reponse": "Votre session a probablement expiré. Déconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
+    }
+  ],
+
   "mots_one": "{{count}} mot",
   "mots_other": "{{count}} mots",
   "projets_one": "{{count}} projet",
@@ -100,3 +129,4 @@
     "selectionnerChapitreOuScene": "Sélectionnez un chapitre ou une scène dans la structure pour commencer à écrire."
   }
 }
+
