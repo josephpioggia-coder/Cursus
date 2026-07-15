@@ -1,10 +1,16 @@
 /**
- * ATELIER D'ÉCRIVAIN — Module 6 : Co-pilote IA
+ * CURSUS — Module : Co-pilote IA
  * Branché sur l'API Claude en temps réel.
  * 4 onglets : Suggestions / Personnages / Références APA / Cohérence
+ *
+ * Version i18n (chantier 04/07/2026) :
+ * - Tous les textes d'interface passent par t('copilote.xxx')
+ * - `langueProjet` est propagée à claude-prox pour que la réponse générée
+ *   par l'IA soit dans la langue du projet, pas seulement l'UI autour d'elle
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
 
 const extraireTexte = (html = "") =>
@@ -23,7 +29,7 @@ async function appelClaude(system, user, signal, maxTokens = 1000) {
   const token = session?.access_token;
 
   if (!token) {
-    throw new Error("Session expirée. Reconnectez-vous.");
+    throw new Error("SESSION_EXPIREE");
   }
 
   const response = await fetch(EDGE_FUNCTION_URL, {
@@ -48,6 +54,26 @@ async function appelClaude(system, user, signal, maxTokens = 1000) {
 }
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
+// Ces prompts système restent en français : ce sont des instructions à Claude,
+// pas du texte d'interface. La langue de LA RÉPONSE générée (elle, visible par
+// l'utilisateur) est imposée via l'instruction de langue ajoutée dans analyser().
+
+// Tente de parser du JSON ; si la réponse n'en est pas (par exemple un refus
+// poli du modèle sur un passage sensible), affiche ce texte tel quel plutôt
+// qu'une erreur technique cryptique de type "JSON.parse: unterminated string".
+function parserJSON(résultat) {
+  const nettoyé = résultat.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(nettoyé);
+  } catch {
+    throw new Error(nettoyé.slice(0, 300) || "__ERREUR_GENERIQUE__");
+  }
+}
+
+const INSTRUCTION_LANGUE = {
+  fr: "Réponds en français.",
+  en: "Respond in English.",
+};
 
 const PROMPTS = {
   suggestions: (type) => `Tu es co-pilote d'un écrivain professionnel travaillant sur un ${type === "fiction" ? "roman" : "essai ou ouvrage de non-fiction"}. Analyse le texte et génère exactement 3 suggestions concrètes. Réponds UNIQUEMENT en JSON valide :
@@ -62,6 +88,53 @@ const PROMPTS = {
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
 };
+
+function systemAvecLangue(promptBase, langueProjet, contexteADN) {
+  const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
+  const blocADN = contexteADN
+    ? `CONTEXTE DU PROJET — réponses de l'auteur au questionnaire d'intention (à respecter impérativement dans ton comportement, pas seulement à titre informatif) :\n${contexteADN}\n\n`
+    : "";
+  return `${blocADN}${promptBase}\n\n${instruction} (Les clés JSON restent telles quelles ; seules les valeurs textuelles sont dans cette langue.)`;
+}
+
+// Récupère les réponses au questionnaire ADN (niveau 1) pour un projet, et les
+// met en forme comme bloc de contexte à injecter dans chaque prompt système du
+// co-pilote. Sans ce contexte, le co-pilote ignorait totalement le rôle voulu
+// (Q9), le ton (Q5), les thèmes (Q6) et les lignes rouges (Q7) — corrigé le
+// 15/07/2026. Chaque réponse est plafonnée à 500 caractères pour éviter de
+// gonfler démesurément le prompt (et donc le quota de tokens de l'auteur) ;
+// à ajuster si ce plafond coupe des réponses importantes en pratique.
+async function chargerContexteADN(projetId) {
+  if (!projetId) return null;
+  try {
+    const { data: questions } = await supabase
+      .from("banque_questions")
+      .select("id, question")
+      .eq("niveau", 1);
+    const { data: réponses } = await supabase
+      .from("reponses_questionnaire")
+      .select("question_id, reponse")
+      .eq("projet_id", projetId);
+
+    if (!questions?.length || !réponses?.length) return null;
+
+    const réponseParId = {};
+    réponses.forEach((r) => { réponseParId[r.question_id] = r.reponse; });
+
+    const lignes = questions
+      .map((q) => {
+        const r = réponseParId[q.id];
+        if (!r?.valeur) return null;
+        const texte = r.synthese || (r.valeur.length > 500 ? r.valeur.slice(0, 500) + "…" : r.valeur);
+        return `- ${q.question} → ${texte}`;
+      })
+      .filter(Boolean);
+
+    return lignes.length ? lignes.join("\n") : null;
+  } catch {
+    return null; // le co-pilote continue de fonctionner même sans ce contexte
+  }
+}
 
 // ─── Composants d'affichage ───────────────────────────────────────────────────
 
@@ -92,16 +165,17 @@ function CartePersonnage({ p }) {
 }
 
 function CarteRéférence({ r }) {
+  const { t } = useTranslation("copilote");
   const [copié, setCopié] = useState(false);
   return (
     <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderLeft: "3px solid #378ADD", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#185FA5", textTransform: "uppercase", marginBottom: 4 }}>{r.concept}</div>
       <div style={{ background: "#E6F1FB", borderRadius: 6, padding: "8px 10px", marginBottom: 6, fontSize: 12, color: "#0C447C", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{r.apa}</div>
-      {r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>Page suggérée : {r.page}</div>}
+      {r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>{t("references.pageSuggeree", { page: r.page })}</div>}
       <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>{r.pertinence}</div>
       <button onClick={() => { navigator.clipboard?.writeText(r.apa); setCopié(true); setTimeout(() => setCopié(false), 2000); }}
         style={{ fontSize: 11, color: copié ? "#1D9E75" : "#185FA5", background: copié ? "#E1F5EE" : "#E6F1FB", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
-        {copié ? "✓ Copié !" : "📋 Copier APA"}
+        {copié ? t("references.copie") : t("references.copier")}
       </button>
     </div>
   );
@@ -121,7 +195,15 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "" }) {
+export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", langueProjet = "fr", projetId = null }) {
+  const { t } = useTranslation("copilote");
+  const [contexteADN, setContexteADN] = useState(null);
+
+  useEffect(() => {
+    let annulé = false;
+    chargerContexteADN(projetId).then((c) => { if (!annulé) setContexteADN(c); });
+    return () => { annulé = true; };
+  }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
   const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null });
   const [chargement, setChargement] = useState({});
@@ -131,10 +213,16 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   const abortRef = useRef(null);
   const intervalRef = useRef(null);
 
+  const messageErreur = useCallback((err) => {
+    if (err.message === "SESSION_EXPIREE") return t("erreur.sessionExpiree");
+    if (err.message === "__ERREUR_GENERIQUE__") return t("erreur.generique");
+    return err.message;
+  }, [t]);
+
   const analyser = useCallback(async (ongletCible) => {
     const texte = extraireTexte(texteActif);
     if (compterMots(texteActif) < 20) {
-      setErreur(e => ({ ...e, [ongletCible]: "Écrivez au moins 20 mots pour activer l'analyse." }));
+      setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
     }
 
@@ -148,15 +236,15 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
       const sig = abortRef.current.signal;
 
       if (ongletCible === "suggestions") {
-        résultat = await appelClaude(PROMPTS.suggestions(typeProjet), `Texte :\n\n${texte}`, sig);
-        const p = JSON.parse(résultat.replace(/```json|```/g, "").trim());
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
       } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(PROMPTS.personnages, `Texte :\n\n${texte}`, sig);
-        const p = JSON.parse(résultat.replace(/```json|```/g, "").trim());
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
       } else if (ongletCible === "références") {
-        résultat = await appelClaude(PROMPTS.références, `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.références, langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
@@ -164,28 +252,29 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
           const p = JSON.parse(jsonStr);
           setDonnées(d => ({ ...d, références: p.références || [] }));
         } catch {
-          // Essai de récupération partielle
           const match = jsonStr.match(/"références"\s*:\s*\[[\s\S]*\]/);
           if (match) {
             const partial = JSON.parse(`{${match[0]}}`);
             setDonnées(d => ({ ...d, références: partial.références || [] }));
+          } else {
+            throw new Error("__ERREUR_GENERIQUE__");
           }
         }
       } else if (ongletCible === "cohérence") {
-        résultat = await appelClaude(PROMPTS.cohérence(typeProjet), `Texte :\n\n${texte}`, sig);
-        const p = JSON.parse(résultat.replace(/```json|```/g, "").trim());
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, cohérence: p.points || [] }));
       }
 
-      setDernièreAnalyse(new Date().toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" }));
+      setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       if (err.name !== "AbortError") {
-        setErreur(e => ({ ...e, [ongletCible]: `Erreur : ${err.message}` }));
+        setErreur(e => ({ ...e, [ongletCible]: messageErreur(err) }));
       }
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [texteActif, typeProjet, projetTitre]);
+  }, [texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
 
   useEffect(() => {
     if (modeAuto) {
@@ -198,10 +287,10 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   }, [modeAuto, onglet, analyser]);
 
   const onglets = [
-    { id: "suggestions", label: "Suggestions" },
-    { id: "personnages", label: "Personnages" },
-    { id: "références", label: "Références" },
-    { id: "cohérence", label: "Cohérence" },
+    { id: "suggestions", label: t("onglets.suggestions") },
+    { id: "personnages", label: t("onglets.personnages") },
+    { id: "références", label: t("onglets.references") },
+    { id: "cohérence", label: t("onglets.coherence") },
   ];
 
   const données_onglet = données[onglet];
@@ -216,17 +305,24 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 14 }}>🤖</span>
-            <span style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>Co-pilote IA</span>
+            <span style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a" }}>{t("titre")}</span>
             {dernièreAnalyse && <span style={{ fontSize: 10, color: "#999" }}>· {dernièreAnalyse}</span>}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 10, color: "#999" }}>Auto</span>
+            <span style={{ fontSize: 10, color: "#999" }}>{t("modeAuto.label")}</span>
             <div onClick={() => setModeAuto(!modeAuto)}
               style={{ width: 30, height: 16, borderRadius: 8, background: modeAuto ? couleurProjet : "#ddd", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
               <div style={{ position: "absolute", top: 2, left: modeAuto ? 15 : 2, width: 12, height: 12, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
             </div>
           </div>
         </div>
+
+        {modeAuto && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${couleurProjet}12`, border: `0.5px solid ${couleurProjet}30`, borderRadius: 6, padding: "5px 8px", marginBottom: 8, fontSize: 10.5, color: couleurProjet, lineHeight: 1.4 }}>
+            <span>🔄</span>
+            <span>{t("modeAuto.banniere")}</span>
+          </div>
+        )}
 
         <div style={{ display: "flex" }}>
           {onglets.map(o => (
@@ -243,14 +339,14 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
       <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
         <button onClick={() => analyser(onglet)} disabled={enChargement}
           style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
-          {enChargement ? "Analyse en cours…" : "↻ Analyser maintenant"}
+          {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
         </button>
 
         {enChargement && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#999", fontSize: 12, padding: "8px 0" }}>
             <div style={{ width: 14, height: 14, border: `2px solid ${couleurProjet}30`, borderTopColor: couleurProjet, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-            Analyse en cours…
+            {t("bouton.enCours")}
           </div>
         )}
 
@@ -262,18 +358,19 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
 
         {!enChargement && !erreurOnglet && données_onglet === null && (
           <div style={{ textAlign: "center", padding: "20px 8px", color: "#bbb", fontSize: 12, lineHeight: 1.7 }}>
-            {onglet === "suggestions" && "Suggestions contextuelles basées sur votre texte en cours."}
-            {onglet === "personnages" && "Extraction et analyse de cohérence des personnages."}
-            {onglet === "références" && "Références académiques APA pour étayer votre argumentation."}
-            {onglet === "cohérence" && "Détection d'incohérences et faiblesses structurelles."}
+            {onglet === "suggestions" && t("videEtat.suggestions")}
+            {onglet === "personnages" && t("videEtat.personnages")}
+            {onglet === "références" && t("videEtat.references")}
+            {onglet === "cohérence" && t("videEtat.coherence")}
           </div>
         )}
 
         {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} />)}
-        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>Aucun personnage détecté.</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} />))}
-        {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>Aucune référence suggérée.</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
-        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>✓ Aucun problème détecté.</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} />))}
+        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} />))}
+        {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
+        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} />))}
       </div>
     </div>
   );
 }
+
