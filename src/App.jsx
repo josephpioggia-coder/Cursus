@@ -30,9 +30,28 @@ import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
-const GENRES = ["Roman", "Non-fiction", "Essai", "Méthode", "Biographie", "Autre"];
+// Genres + couleurs associées — proposition Joseph du 05/07/2026.
+// "Autre" ajouté par Claude (hors liste initiale) pour couvrir les cas
+// qui ne rentrent dans aucune des 10 catégories — gris neutre par défaut.
+// "Spiritualité" : deux couleurs proposées (blanc cassé / indigo) ; indigo
+// retenu car un blanc cassé serait quasi invisible en pastille/badge. À
+// confirmer avec Joseph si besoin.
+const GENRE_COULEURS = {
+  "Méthode":                        "#378ADD", // bleu — rigueur, structure, confiance
+  "Psychologie / Thérapie":         "#7A9B76", // vert sauge — croissance, équilibre, soin
+  "Philosophie":                    "#7F77DD", // violet — réflexion, profondeur
+  "Recherche / Sciences humaines":  "#3F4650", // gris anthracite — neutralité, sérieux
+  "Comparaison / Intégration":      "#D85A30", // orange — mise en relation, créativité
+  "Développement personnel":        "#BA7517", // ocre / jaune doré — évolution personnelle
+  "Spiritualité":                   "#4A4E9E", // indigo — intériorité, transcendance
+  "Roman / Témoignage":             "#8B2635", // bordeaux — émotion, vécu
+  "Guide pratique":                 "#0FA3A3", // turquoise — accessibilité, action
+  "Formation / Pédagogie":          "#5AAEDB", // bleu clair — apprentissage
+  "Autre":                          "#8A8A8A", // gris neutre — ajout Claude, hors liste initiale
+};
+const GENRES = Object.keys(GENRE_COULEURS);
 const STATUTS = ["En cours", "En pause", "Terminé", "Idée"];
-const COULEURS = ["#7F77DD", "#1D9E75", "#D85A30", "#378ADD", "#D4537E", "#BA7517"];
+const COULEURS = Object.values(GENRE_COULEURS);
 
 const STRUCTURE_TYPES_META = {
   partie: { enfant: "chapitre", icone: "📂" },
@@ -311,11 +330,25 @@ function CarteProjet({ projet, onOuvrir, onSupprimer }) {
 function FormulaireProjet({ onCréer, onAnnuler }) {
   const { t } = useTranslation("common");
   const [form, setForm] = useState({
-    titre: "", genre: "Roman", statut: "En cours",
-    couleur: COULEURS[0], objectifMots: 80000, description: "",
+    titre: "", genre: "Méthode", statut: "En cours",
+    couleur: GENRE_COULEURS["Méthode"], objectifMots: 80000, description: "",
   });
+  // Tant que l'auteur n'a pas choisi une couleur à la main, elle suit le genre
+  // sélectionné. Dès qu'il clique une pastille, la couleur devient indépendante.
+  const [couleurManuelle, setCouleurManuelle] = useState(false);
 
-  const màj = (champ, val) => setForm((f) => ({ ...f, [champ]: val }));
+  const màj = (champ, val) => {
+    if (champ === "genre" && !couleurManuelle) {
+      setForm((f) => ({ ...f, genre: val, couleur: GENRE_COULEURS[val] || f.couleur }));
+    } else {
+      setForm((f) => ({ ...f, [champ]: val }));
+    }
+  };
+
+  const choisirCouleur = (c) => {
+    setCouleurManuelle(true);
+    màj("couleur", c);
+  };
 
   const valider = () => {
     if (!form.titre.trim()) return;
@@ -399,7 +432,7 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
             {COULEURS.map((c) => (
               <div
                 key={c}
-                onClick={() => màj("couleur", c)}
+                onClick={() => choisirCouleur(c)}
                 style={{
                   width: 28, height: 28, borderRadius: "50%",
                   background: c, cursor: "pointer",
@@ -943,9 +976,12 @@ function AppConnectée({ user, déconnecter }) {
         borderBottom: "0.5px solid var(--border)",
         background: "var(--surface)",
       }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>
-          {t("marque")}
-        </span>
+        <img
+          src="/logo-cursus.png"
+          alt={t("marque")}
+          title={t("marque")}
+          style={{ height: 30, width: 30, borderRadius: 6, flexShrink: 0 }}
+        />
         <div style={{ flex: 1 }} />
         {chargement ? (
           <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>{t("chargement")}</span>
@@ -1009,7 +1045,12 @@ function AppConnectée({ user, déconnecter }) {
             <div style={sectionLabelStyle}>{t("sidebarProjets.titre")}</div>
             <button
               onClick={() => setVue("nouveau")}
-              style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "0 4px" }}
+              style={{
+                fontSize: 12, fontWeight: 600, color: "#fff",
+                background: "#7F77DD", border: "none", borderRadius: 8,
+                padding: "6px 14px", cursor: "pointer", fontFamily: "inherit",
+                boxShadow: "0 1px 4px rgba(127,119,221,0.4)",
+              }}
               title={t("sidebarProjets.nouveauTitre")}
             >{t("sidebarProjets.nouveau")}</button>
           </div>
@@ -1206,7 +1247,7 @@ function AppConnectée({ user, déconnecter }) {
               />
               <CopiloteIA
                 texteActif={nœudActif.texte || ""}
-                typeProjet={["Roman", "Biographie"].includes(projetActif.genre) ? "fiction" : "non-fiction"}
+                typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
                 langueProjet={projetActif.langue || "fr"}
@@ -1292,20 +1333,28 @@ const navItemStyle = (actif) => ({
 });
 
 /**
- * NOTE POUR JOSEPH — GENRES / STATUTS non traduits (rappel) :
+ * NOTE POUR JOSEPH — GENRES / STATUTS non traduits (rappel, mis à jour 05/07) :
  *
- * `GENRES` et `STATUTS` sont utilisés à deux endroits différents :
+ * `GENRES` (désormais les 10 catégories + couleurs associées, cf. GENRE_COULEURS)
+ * et `STATUTS` sont utilisés à deux endroits différents :
  *   1. Comme libellés affichés dans les formulaires et badges
  *   2. Comme valeurs de comparaison logique (ex. la ligne qui détermine
- *      typeProjet="fiction" compare projetActif.genre à "Roman"/"Biographie")
+ *      typeProjet="fiction" compare projetActif.genre à "Roman / Témoignage")
  *
  * Les traduire changerait la valeur stockée en base (`projets.genre`,
  * `projets.statut`) pour les nouveaux projets créés en anglais, cassant
  * silencieusement toute logique qui compare cette valeur à une chaîne
  * française codée en dur (comme la ligne CopiloteIA plus haut).
  *
+ * MIGRATION DE DONNÉES À PRÉVOIR : les projets déjà créés avec l'ancienne
+ * liste ("Roman", "Non-fiction", "Essai", "Biographie"...) ont une valeur
+ * `genre` qui ne correspond plus à aucune entrée du nouveau menu déroulant.
+ * Ça n'empêche pas l'affichage (le badge montre la valeur stockée telle
+ * quelle), mais rouvrir le formulaire d'un vieux projet affichera un genre
+ * vide ou incohérent tant qu'il n'aura pas été réassigné manuellement.
+ *
  * Recommandation, au moment de basculer l'anglais en production :
- *   - Introduire un code stable ("roman", "biographie"...) stocké en base
+ *   - Introduire un code stable ("methode", "psychologie"...) stocké en base
  *   - Un mapping code → libellé traduit pour l'affichage uniquement
  *   - Remplacer les comparaisons directes sur le libellé français par des
  *     comparaisons sur le code stable
