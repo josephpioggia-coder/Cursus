@@ -1240,6 +1240,7 @@ function AppConnectée({ user, déconnecter }) {
               position: "relative",
               borderLeft: "0.5px solid #e5e5e5",
               display: "flex", flexDirection: "column",
+              minHeight: 0,
               overflow: "hidden", background: "#fafafa",
             }}>
               {/* Poignée de redimensionnement */}
