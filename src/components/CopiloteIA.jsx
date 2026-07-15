@@ -13,8 +13,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
 
-const extraireTexte = (html = "") =>
-  html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
+const extraireTexte = (html = "") => {
+  const nettoyé = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return { texte: nettoyé.slice(0, 4000), tronqué: nettoyé.length > 4000 };
+};
 
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
@@ -210,6 +212,7 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   const [erreur, setErreur] = useState({});
   const [modeAuto, setModeAuto] = useState(false);
   const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
+  const [dernièreTroncature, setDernièreTroncature] = useState(false);
   const abortRef = useRef(null);
   const intervalRef = useRef(null);
 
@@ -220,7 +223,7 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   }, [t]);
 
   const analyser = useCallback(async (ongletCible) => {
-    const texte = extraireTexte(texteActif);
+    const { texte, tronqué } = extraireTexte(texteActif);
     if (compterMots(texteActif) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
@@ -230,6 +233,7 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
     abortRef.current = new AbortController();
     setChargement(c => ({ ...c, [ongletCible]: true }));
     setErreur(e => ({ ...e, [ongletCible]: null }));
+    setDernièreTroncature(tronqué);
 
     try {
       let résultat = "";
@@ -298,7 +302,7 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   const erreurOnglet = erreur[onglet];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "#fafafa" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", background: "#fafafa" }}>
 
       {/* En-tête */}
       <div style={{ padding: "12px 14px", borderBottom: "0.5px solid #e5e5e5", flexShrink: 0 }}>
@@ -336,11 +340,17 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
       </div>
 
       {/* Corps */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 12px" }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
         <button onClick={() => analyser(onglet)} disabled={enChargement}
           style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
           {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
         </button>
+
+        {dernièreTroncature && !enChargement && (
+          <div style={{ background: "#FAEEDA", borderRadius: 7, padding: "8px 10px", fontSize: 11.5, color: "#854F0B", marginBottom: 8, lineHeight: 1.5 }}>
+            ⚠️ {t("erreur.texteTronque")}
+          </div>
+        )}
 
         {enChargement && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#999", fontSize: 12, padding: "8px 0" }}>
