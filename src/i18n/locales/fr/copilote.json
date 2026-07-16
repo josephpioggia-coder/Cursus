@@ -1,42 +1,40 @@
 {
-  "titre": "Co-pilote IA",
-  "onglets": {
-    "suggestions": "Suggestions",
-    "personnages": "Personnages",
-    "references": "Références",
-    "coherence": "Cohérence"
-  },
-  "modeAuto": {
-    "label": "Auto",
-    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez « Analyser maintenant » pour forcer une analyse immédiate."
-  },
-  "bouton": {
-    "analyser": "↻ Analyser maintenant",
-    "forcerAnalyse": "↻ Forcer une analyse maintenant",
-    "enCours": "Analyse en cours…"
-  },
+  "titreDefaut": "L'ADN du projet",
+  "titreRecapitulatif": "Récapitulatif — l'ADN du projet",
+  "chargement": "Chargement…",
+  "messageAccueil": "Pour commencer, j'ai besoin de te connaître un peu. Dix réponses me suffisent. Ensuite tu peux écrire. Je ne t'interromprai que lorsque cela deviendra réellement utile.",
+  "reporter": "Reporter à plus tard",
+  "ecrireToutDeSuite": "Écrire tout de suite, j'y reviens plus tard",
+  "fermerTitre": "Fermer et y revenir plus tard",
+  "autrePrecisez": "Autre — précisez…",
+  "valider": "Valider",
+  "reponseLibrePlaceholder": "Votre réponse… (les exemples ci-dessus sont des amorces, à modifier librement)",
+  "reponseLibrePlaceholderSansExemples": "Votre réponse…",
+  "suivant": "Suivant",
+  "voirRecapitulatif": "Voir le récapitulatif",
+  "enregistrement": "Enregistrement…",
+  "questionPrecedente": "← Question précédente",
+  "nonRenseigne": "Non renseigné",
+  "modifier": "Modifier",
+  "commencerAEcrire": "Commencer à écrire",
+  "synthesePreparation": "Le co-pilote prépare sa synthèse…",
+  "syntheseParDefaut": "Voici vos réponses. Vous pouvez commencer à écrire dès maintenant.",
   "erreur": {
-    "motsInsuffisants": "Écrivez au moins 20 mots pour activer l'analyse.",
-    "sessionExpiree": "Session expirée. Reconnectez-vous.",
-    "generique": "Le co-pilote n'a pas pu traiter ce passage.",
-    "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
+    "chargement": "Erreur de chargement.",
+    "enregistrement": "Impossible d'enregistrer la réponse.",
+    "reseau": "Un problème de connexion est survenu. Vos réponses précédentes sont enregistrées. Essayez de recharger la page.",
+    "recharger": "Recharger la page"
   },
-  "videEtat": {
-    "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
-    "personnages": "Extraction et analyse de cohérence des personnages.",
-    "references": "Références académiques APA pour étayer votre argumentation.",
-    "coherence": "Détection d'incohérences et faiblesses structurelles."
+  "choix": {
+    "Q009": ["Roman", "Essai", "Conte", "Autre"],
+    "Q009b": ["Pure fiction", "Récit inspiré de faits réels", "Livre (auto)biographique"]
   },
-  "personnages": {
-    "aucun": "Aucun personnage détecté."
-  },
-  "references": {
-    "aucune": "Aucune référence suggérée.",
-    "pageSuggeree": "Page suggérée : {{page}}",
-    "copier": "📋 Copier APA",
-    "copie": "✓ Copié !"
-  },
-  "coherence": {
-    "aucunProbleme": "✓ Aucun problème détecté."
+  "suggestions": {
+    "Q010": ["Intime et confessionnel", "Analytique et distancié", "Direct, sans détour", "Poétique et suggestif", "Journalistique"],
+    "Q021": ["Le passage à l'âge adulte", "La perte et le deuil", "La quête d'identité", "La réconciliation", "Le dépassement d'une épreuve"],
+    "Q024": ["Oui, les détours font partie de ma méthode", "Non, je préfère rester linéaire", "Cela dépend des chapitres"],
+    "Q026": ["Correcteur discret", "Partenaire qui challenge mes idées", "Structurateur", "Un peu des trois selon les moments"],
+    "Q022": ["Un règlement de comptes", "Un livre de développement personnel générique", "Une thèse déguisée en récit"]
   }
 }
+
