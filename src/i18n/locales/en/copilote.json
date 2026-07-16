@@ -21,6 +21,10 @@
     "generique": "Le co-pilote n'a pas pu traiter ce passage.",
     "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
   },
+  "selection": {
+    "analyserSelection": "Sélection ({{count}} mots)",
+    "analyserTout": "Tout le chapitre"
+  },
   "videEtat": {
     "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
     "personnages": "Extraction et analyse de cohérence des personnages.",
@@ -40,3 +44,4 @@
     "aucunProbleme": "✓ Aucun problème détecté."
   }
 }
+
