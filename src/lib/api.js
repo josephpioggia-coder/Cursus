@@ -1,5 +1,5 @@
 /**
- * ATELIER D'ÉCRIVAIN — Couche API Supabase
+ * CURSUS — Couche API Supabase
  *
  * Ce fichier centralise TOUS les appels à la base de données.
  * Aucun composant React n'appelle Supabase directement.
