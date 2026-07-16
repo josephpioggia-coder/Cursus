@@ -23,7 +23,8 @@
   },
   "selection": {
     "analyserSelection": "Sélection ({{count}} mots)",
-    "analyserTout": "Tout le chapitre"
+    "analyserTout": "Tout le chapitre",
+    "selectionTropLongue": "Cette sélection fait {{total}} caractères — seuls les 4000 premiers seront analysés. Surlignez un passage plus court pour tout couvrir."
   },
   "videEtat": {
     "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
@@ -44,4 +45,3 @@
     "aucunProbleme": "✓ Aucun problème détecté."
   }
 }
-
