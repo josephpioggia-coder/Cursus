@@ -197,9 +197,23 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", langueProjet = "fr", projetId = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", langueProjet = "fr", projetId = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
+  // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
+  // S'active automatiquement dès qu'une sélection substantielle apparaît (pour
+  // que le comportement par défaut soit intuitif), mais reste modifiable par
+  // l'auteur. Ajouté le 16/07/2026, en réponse au constat que le texte était
+  // silencieusement tronqué à 4000 caractères pour les longs chapitres.
+  const [analyserSélection, setAnalyserSélection] = useState(false);
+
+  useEffect(() => {
+    if (texteSélectionné && texteSélectionné.trim().length > 20) {
+      setAnalyserSélection(true);
+    } else if (!texteSélectionné) {
+      setAnalyserSélection(false);
+    }
+  }, [texteSélectionné]);
 
   useEffect(() => {
     let annulé = false;
@@ -223,8 +237,9 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
   }, [t]);
 
   const analyser = useCallback(async (ongletCible) => {
-    const { texte, tronqué } = extraireTexte(texteActif);
-    if (compterMots(texteActif) < 20) {
+    const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
+    const { texte, tronqué } = extraireTexte(sourceTexte);
+    if (compterMots(sourceTexte) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
     }
@@ -278,7 +293,7 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
+  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
 
   useEffect(() => {
     if (modeAuto) {
@@ -341,6 +356,40 @@ export default function CopiloteIA({ texteActif = "", typeProjet = "non-fiction"
 
       {/* Corps */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
+        {texteSélectionné && texteSélectionné.trim().length > 20 && (
+          <div style={{
+            display: "flex", gap: 6, marginBottom: 8,
+            background: "#f5f5f5", borderRadius: 7, padding: 3,
+          }}>
+            <button
+              onClick={() => setAnalyserSélection(true)}
+              style={{
+                flex: 1, padding: "5px 6px", borderRadius: 5, border: "none",
+                background: analyserSélection ? "#fff" : "transparent",
+                color: analyserSélection ? couleurProjet : "#999",
+                fontWeight: analyserSélection ? 600 : 400,
+                fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
+                boxShadow: analyserSélection ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {t("selection.analyserSelection", { count: compterMots(texteSélectionné) })}
+            </button>
+            <button
+              onClick={() => setAnalyserSélection(false)}
+              style={{
+                flex: 1, padding: "5px 6px", borderRadius: 5, border: "none",
+                background: !analyserSélection ? "#fff" : "transparent",
+                color: !analyserSélection ? couleurProjet : "#999",
+                fontWeight: !analyserSélection ? 600 : 400,
+                fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
+                boxShadow: !analyserSélection ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {t("selection.analyserTout")}
+            </button>
+          </div>
+        )}
+
         <button onClick={() => analyser(onglet)} disabled={enChargement}
           style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
           {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
