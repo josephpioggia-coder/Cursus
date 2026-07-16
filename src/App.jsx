@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
 import { projetsAPI, nœudsAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
+import { journaliserErreur } from "./lib/journalErreurs.js";
 import Editeur from "./components/Editeur.jsx";
 import TableauDeBord from "./components/TableauDeBord.jsx";
 import Bibliotheque from "./components/Bibliotheque.jsx";
@@ -466,30 +467,71 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
   const [sélectionné, setSélectionné] = useState(null);
   const mots = totalMotsProjet(projet.structure);
 
-  const ajouterNœud = useCallback((parentId, type) => {
-    const nouveau = {
-      id: genId(), type, ordre: 0,
-      titre: `${t(`structureTypes.${type}`)} sans titre`,
-      texte: "", enfants: [],
-    };
+  // Trouve un nœud dans l'arbre local (pour calculer l'ordre du prochain enfant)
+  const trouverNœudLocal = (liste, id) => {
+    for (const n of liste) {
+      if (n.id === id) return n;
+      const trouvé = trouverNœudLocal(n.enfants || [], id);
+      if (trouvé) return trouvé;
+    }
+    return null;
+  };
 
-    const insérer = (liste) =>
-      liste.map((n) => {
-        if (n.id === parentId) {
-          return { ...n, enfants: [...(n.enfants || []), { ...nouveau, ordre: (n.enfants?.length || 0) + 1 }] };
-        }
-        return { ...n, enfants: insérer(n.enfants || []) };
-      });
+  // CORRECTIF 16/07/2026 — CRITIQUE : cette fonction ne faisait auparavant
+  // qu'une mise à jour locale (setProjets), sans jamais appeler nœudsAPI.créer().
+  // Résultat : les parties/chapitres créés dans l'interface n'existaient QUE
+  // dans le navigateur, avec un identifiant local inventé (genId()) — jamais
+  // transmis à Supabase. Le texte qu'on y écrivait ensuite tentait de se
+  // sauvegarder sur un identifiant que le serveur ne connaissait pas, échouant
+  // silencieusement. Toute perte de contenu constatée sur les projets créés
+  // avant ce correctif vient de là : le texte n'a jamais été réellement
+  // enregistré, il n'a pas été "effacé" après coup.
+  const ajouterNœud = useCallback(async (parentId, type) => {
+    const estRacine = parentId === projet.id;
+    const typeRéel = estRacine ? "partie" : type;
+    const parentRéel = trouverNœudLocal(projet.structure, parentId);
+    const ordre = estRacine
+      ? (projet.structure?.length || 0) + 1
+      : (parentRéel?.enfants?.length || 0) + 1;
 
-    if (parentId === projet.id) {
-      const nouveauNœud = { ...nouveau, type: "partie", ordre: (projet.structure?.length || 0) + 1 };
+    const { data, error } = await nœudsAPI.créer({
+      type: typeRéel,
+      titre: `${t(`structureTypes.${typeRéel}`)} sans titre`,
+      ordre,
+      parentId: estRacine ? null : parentId,
+      texte: "",
+    }, projet.id);
+
+    if (error || !data) {
+      journaliserErreur("VueProjet:ajouterNœud", error?.message || "Échec de création sans erreur explicite", projet.id);
+      window.alert(t("erreur.creationNoeud") || "Impossible de créer cet élément. Réessayez ou contactez le support.");
+      return;
+    }
+
+    const nouveauNœud = { id: data.id, type: data.type, titre: data.titre, texte: data.texte || "", enfants: [] };
+
+    if (estRacine) {
       onMàjStructure(projet.id, [...(projet.structure || []), nouveauNœud]);
     } else {
+      const insérer = (liste) =>
+        liste.map((n) => {
+          if (n.id === parentId) {
+            return { ...n, enfants: [...(n.enfants || []), nouveauNœud] };
+          }
+          return { ...n, enfants: insérer(n.enfants || []) };
+        });
       onMàjStructure(projet.id, insérer(projet.structure || []));
     }
   }, [projet, onMàjStructure, t]);
 
-  const renommerNœud = useCallback((nœudId, nouveauTitre) => {
+  // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
+  const renommerNœud = useCallback(async (nœudId, nouveauTitre) => {
+    const { error } = await nœudsAPI.renommer(nœudId, nouveauTitre);
+    if (error) {
+      journaliserErreur("VueProjet:renommerNœud", error.message, projet.id);
+      window.alert(t("erreur.renommageNoeud") || "Impossible de renommer cet élément.");
+      return;
+    }
     const renommer = (liste) =>
       liste.map((n) =>
         n.id === nœudId
@@ -497,16 +539,23 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
           : { ...n, enfants: renommer(n.enfants || []) }
       );
     onMàjStructure(projet.id, renommer(projet.structure || []));
-  }, [projet, onMàjStructure]);
+  }, [projet, onMàjStructure, t]);
 
-  const supprimerNœud = useCallback((nœudId) => {
+  // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
+  const supprimerNœud = useCallback(async (nœudId) => {
+    const { error } = await nœudsAPI.supprimer(nœudId);
+    if (error) {
+      journaliserErreur("VueProjet:supprimerNœud", error.message, projet.id);
+      window.alert(t("erreur.suppressionNoeud") || "Impossible de supprimer cet élément.");
+      return;
+    }
     const supprimer = (liste) =>
       liste
         .filter((n) => n.id !== nœudId)
         .map((n) => ({ ...n, enfants: supprimer(n.enfants || []) }));
     onMàjStructure(projet.id, supprimer(projet.structure || []));
     if (sélectionné === nœudId) setSélectionné(null);
-  }, [projet, onMàjStructure, sélectionné]);
+  }, [projet, onMàjStructure, sélectionné, t]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -959,7 +1008,7 @@ function AppConnectée({ user, déconnecter }) {
     <div style={{
       display: "grid",
       gridTemplateColumns: "220px 1fr",
-      gridTemplateRows: "48px 1fr",
+      gridTemplateRows: "48px minmax(0, 1fr)",
       height: "100vh",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       "--surface": "#ffffff",
@@ -1226,7 +1275,7 @@ function AppConnectée({ user, déconnecter }) {
 
         {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
         {vue === "editeur" && projetActif && nœudActif && (
-          <div style={{ display: "grid", gridTemplateColumns: `1fr ${largeurPanneau}px`, height: "100%", overflow: "hidden" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `minmax(0, 1fr) ${largeurPanneau}px`, height: "100%", overflow: "hidden" }}>
             {/* Éditeur central */}
             <Editeur
               nœud={nœudActif}
