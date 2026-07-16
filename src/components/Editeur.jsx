@@ -16,6 +16,13 @@
  *   - Sauvegarde automatique toutes les 30s + indicateur d'état
  *   - Historique de versions par session (snapshots horodatés)
  *   - Statistiques de session : mots, durée, rythme
+ *
+ * Correctif 16/07/2026 : ajout de minHeight:0 sur les conteneurs flex
+ * imbriqués (Zone centrale + Zone d'écriture) — sans ça, un texte long
+ * fait grandir l'éditeur au-delà de sa cellule de grille, et c'est toute
+ * la page qui se met à défiler au lieu du texte seul, entraînant le
+ * panneau Co-pilote IA avec elle (symptôme observé : les deux panneaux
+ * semblent défiler ensemble).
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -356,7 +363,17 @@ export default function Editeur({
   nœud,                    // { id, titre, type, texte } — nœud actif
   projetCouleur = "#7F77DD",
   projetTitre = "",
-  onSauvegarder,           // (nœudId, htmlContenu) => void
+  onSauvegarder,           // (nœudId, htmlContenu) => void — écrit en base, différé 2s
+  onTexteChange,           // (nœudId, htmlContenu) => void — état local uniquement,
+                           // immédiat, pour que le co-pilote IA voie le texte à jour
+                           // sans attendre la sauvegarde différée. Correctif 16/07/2026 :
+                           // avant, un texte tout juste collé pouvait déclencher à tort
+                           // "Écrivez au moins 20 mots" si on cliquait "Analyser" avant
+                           // la fin du délai de 2s de la sauvegarde.
+  onSelectionChange,       // (texteSélectionné: string) => void — transmet la sélection
+                           // de texte en cours dans l'éditeur, pour que le co-pilote IA
+                           // puisse analyser uniquement le passage surligné plutôt que
+                           // tout le chapitre. Ajouté le 16/07/2026.
   onRetour,                // () => void
 }) {
   const [modeFocus, setModeFocus] = useState(false);
@@ -414,9 +431,23 @@ export default function Editeur({
       }),
     ],
     content: nœud?.texte || "",
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      if (from === to) {
+        onSelectionChange?.("");
+      } else {
+        const texte = editor.state.doc.textBetween(from, to, " ");
+        onSelectionChange?.(texte);
+      }
+    },
     onUpdate: ({ editor }) => {
       const html = editor.getHTML();
       contenuRef.current = html;
+
+      // Transmission immédiate au parent (état local, pas d'écriture en base) —
+      // pour que le co-pilote IA voie toujours le texte réel de l'éditeur,
+      // sans attendre les 2s de la sauvegarde différée ci-dessous.
+      onTexteChange?.(nœud.id, html);
 
       // Mise à jour du compteur de mots de session
       const motsTotaux = compterMots(html);
@@ -457,6 +488,14 @@ export default function Editeur({
     return () => clearInterval(interval);
   }, [editor, nœud?.id, onSauvegarder]);
 
+  // Réinitialise la sélection transmise au co-pilote quand on change de
+  // chapitre — sinon une sélection faite dans un chapitre précédent resterait
+  // affichée comme active dans le nouveau, à tort.
+  useEffect(() => {
+    onSelectionChange?.("");
+    return () => onSelectionChange?.("");
+  }, [nœud?.id]);
+
   const motsChapitre = editor ? compterMots(editor.getHTML()) : 0;
 
   const restaurerVersion = useCallback((contenu) => {
@@ -472,7 +511,7 @@ export default function Editeur({
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", height: "100%",
+      display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
       background: modeFocus ? "#f7f6f1" : "#fff",
       transition: "background 0.4s",
     }}
@@ -484,6 +523,7 @@ export default function Editeur({
           padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5",
           display: "flex", alignItems: "center", gap: 10,
           background: "#fafafa",
+          flexShrink: 0,
         }}>
           <button onClick={onRetour}
             style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999", fontFamily: "inherit" }}
@@ -513,11 +553,11 @@ export default function Editeur({
       <BarreOutils editor={editor} modeFocus={modeFocus} onToggleFocus={() => setModeFocus(!modeFocus)} />
 
       {/* ── Zone centrale : éditeur + historique ── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
 
         {/* Zone d'écriture */}
         <div style={{
-          flex: 1, overflowY: "auto",
+          flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto",
           padding: modeFocus ? "60px 0" : "32px 0",
           display: "flex", justifyContent: "center",
         }}>
@@ -565,3 +605,4 @@ export default function Editeur({
     </div>
   );
 }
+
