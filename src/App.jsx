@@ -815,6 +815,7 @@ function AppConnectée({ user, déconnecter }) {
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
+  const [texteSélectionné, setTexteSélectionné] = useState("");
   const redimensionnementActif = useRef(false);
   const positionDépart = useRef({ x: 0, largeur: 280 });
 
@@ -987,6 +988,23 @@ function AppConnectée({ user, déconnecter }) {
       prev.map((p) => p.id === projetId ? { ...p, structure: nouvelleStructure } : p)
     );
   }, []);
+
+  // Met à jour uniquement l'état local (pas d'appel Supabase) — appelé à chaque
+  // frappe/collage dans l'éditeur, pour que le co-pilote IA (et tout ce qui lit
+  // nœudActif.texte) voie le texte réel immédiatement, sans attendre les 2s de
+  // la sauvegarde différée. Correctif 16/07/2026.
+  const màjTexteLocal = useCallback((nœudId, html) => {
+    setProjets((prev) =>
+      prev.map((p) => {
+        if (p.id !== projetActifId) return p;
+        const màj = (liste) =>
+          liste.map((n) =>
+            n.id === nœudId ? { ...n, texte: html } : { ...n, enfants: màj(n.enfants || []) }
+          );
+        return { ...p, structure: màj(p.structure) };
+      })
+    );
+  }, [projetActifId]);
 
   const sauvegarderNœud = useCallback(async (nœudId, html) => {
     setProjets((prev) =>
@@ -1282,6 +1300,8 @@ function AppConnectée({ user, déconnecter }) {
               projetCouleur={projetActif.couleur}
               projetTitre={projetActif.titre}
               onSauvegarder={sauvegarderNœud}
+              onTexteChange={màjTexteLocal}
+              onSelectionChange={setTexteSélectionné}
               onRetour={() => setVue("projet")}
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}
@@ -1303,6 +1323,7 @@ function AppConnectée({ user, déconnecter }) {
               />
               <CopiloteIA
                 texteActif={nœudActif.texte || ""}
+                texteSélectionné={texteSélectionné}
                 typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
@@ -1420,5 +1441,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
-
 
