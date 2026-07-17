@@ -74,6 +74,8 @@
     "ajouter": "Ajouter {{label}}",
     "renommer": "Renommer",
     "supprimer": "Supprimer",
+    "monter": "Monter",
+    "descendre": "Descendre",
     "supprimerCeProjet": "Supprimer ce projet",
     "retourAuxProjets": "Retour aux projets",
     "retourALaStructure": "Retour à la structure",
@@ -82,6 +84,12 @@
 
   "confirmations": {
     "supprimerProjet": "Supprimer ce projet ? Cette action est irréversible."
+  },
+  "erreur": {
+    "creationNoeud": "Impossible de créer cet élément. Vérifiez votre connexion et réessayez.",
+    "renommageNoeud": "Impossible de renommer cet élément. Vérifiez votre connexion et réessayez.",
+    "suppressionNoeud": "Impossible de supprimer cet élément. Vérifiez votre connexion et réessayez.",
+    "deplacementNoeud": "Impossible de déplacer cet élément. Vérifiez votre connexion et réessayez."
   },
 
   "carteProjet": {
