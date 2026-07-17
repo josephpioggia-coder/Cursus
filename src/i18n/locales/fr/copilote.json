@@ -3,45 +3,45 @@
   "onglets": {
     "suggestions": "Suggestions",
     "personnages": "Personnages",
-    "references": "Références",
-    "coherence": "Cohérence"
+    "references": "References",
+    "coherence": "Coherence"
   },
   "modeAuto": {
     "label": "Auto",
-    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez « Analyser maintenant » pour forcer une analyse immédiate."
+    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez le bouton Analyser maintenant pour forcer une analyse immediate."
   },
   "bouton": {
-    "analyser": "↻ Analyser maintenant",
-    "forcerAnalyse": "↻ Forcer une analyse maintenant",
-    "enCours": "Analyse en cours…"
+    "analyser": "Analyser maintenant",
+    "forcerAnalyse": "Forcer une analyse maintenant",
+    "enCours": "Analyse en cours..."
   },
   "erreur": {
-    "motsInsuffisants": "Écrivez au moins 20 mots pour activer l'analyse.",
-    "sessionExpiree": "Session expirée. Reconnectez-vous.",
+    "motsInsuffisants": "Ecrivez au moins 20 mots pour activer l'analyse.",
+    "sessionExpiree": "Session expiree. Reconnectez-vous.",
     "generique": "Le co-pilote n'a pas pu traiter ce passage.",
-    "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
+    "texteTronque": "Ce texte depasse 4000 caracteres : seul le debut a ete analyse. Le reste du chapitre n'a pas ete pris en compte."
   },
   "selection": {
-    "analyserSelection": "Sélection ({{count}} mots)",
+    "analyserSelection": "Selection ({{count}} mots)",
     "analyserTout": "Tout le chapitre",
-    "selectionTropLongue": "Cette sélection fait {{total}} caractères — seuls les 4000 premiers seront analysés. Surlignez un passage plus court pour tout couvrir."
+    "selectionTropLongue": "Cette selection fait {{total}} caracteres, seuls les 4000 premiers seront analyses. Surlignez un passage plus court pour tout couvrir."
   },
   "videEtat": {
-    "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
-    "personnages": "Extraction et analyse de cohérence des personnages.",
-    "references": "Références académiques APA pour étayer votre argumentation.",
-    "coherence": "Détection d'incohérences et faiblesses structurelles."
+    "suggestions": "Suggestions contextuelles basees sur votre texte en cours.",
+    "personnages": "Extraction et analyse de coherence des personnages.",
+    "references": "References academiques APA pour etayer votre argumentation.",
+    "coherence": "Detection d'incoherences et faiblesses structurelles."
   },
   "personnages": {
-    "aucun": "Aucun personnage détecté."
+    "aucun": "Aucun personnage detecte."
   },
   "references": {
-    "aucune": "Aucune référence suggérée.",
-    "pageSuggeree": "Page suggérée : {{page}}",
-    "copier": "📋 Copier APA",
-    "copie": "✓ Copié !"
+    "aucune": "Aucune reference suggeree.",
+    "pageSuggeree": "Page suggeree : {{page}}",
+    "copier": "Copier APA",
+    "copie": "Copie !"
   },
   "coherence": {
-    "aucunProbleme": "✓ Aucun problème détecté."
+    "aucunProbleme": "Aucun probleme detecte."
   }
 }
