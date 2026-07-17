@@ -70,12 +70,36 @@ async function appelClaude(system, user, signal, maxTokens = 1000) {
 // Tente de parser du JSON ; si la réponse n'en est pas (par exemple un refus
 // poli du modèle sur un passage sensible), affiche ce texte tel quel plutôt
 // qu'une erreur technique cryptique de type "JSON.parse: unterminated string".
+//
+// Filet de sécurité ajouté le 17/07/2026 : depuis que la troncature d'entrée
+// à 4000 caractères a été retirée, un très gros texte source peut produire
+// une réponse IA plus longue, parfois coupée par le plafond de tokens de
+// sortie — laissant un JSON "ouvert". réparerJSONTronqué() referme
+// proprement les structures encore ouvertes plutôt que d'échouer net.
+function réparerJSONTronqué(str) {
+  let s = str;
+  const nbGuillemets = (s.match(/(?<!\\)"/g) || []).length;
+  if (nbGuillemets % 2 !== 0) s += '"'; // referme une chaîne restée ouverte
+  const pile = [];
+  for (const ch of s) {
+    if (ch === "{" || ch === "[") pile.push(ch);
+    else if (ch === "}" && pile[pile.length - 1] === "{") pile.pop();
+    else if (ch === "]" && pile[pile.length - 1] === "[") pile.pop();
+  }
+  while (pile.length) s += pile.pop() === "{" ? "}" : "]";
+  return s;
+}
+
 function parserJSON(résultat) {
   const nettoyé = résultat.replace(/```json|```/g, "").trim();
   try {
     return JSON.parse(nettoyé);
   } catch {
-    throw new Error(nettoyé.slice(0, 300) || "__ERREUR_GENERIQUE__");
+    try {
+      return JSON.parse(réparerJSONTronqué(nettoyé));
+    } catch {
+      throw new Error(nettoyé.slice(0, 300) || "__ERREUR_GENERIQUE__");
+    }
   }
 }
 
@@ -271,15 +295,15 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const sig = abortRef.current.signal;
 
       if (ongletCible === "suggestions") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
       } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
       } else if (ongletCible === "références") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 4096);
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
@@ -296,7 +320,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           }
         }
       } else if (ongletCible === "cohérence") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, cohérence: p.points || [] }));
       }
@@ -331,6 +355,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const données_onglet = données[onglet];
   const enChargement = chargement[onglet];
   const erreurOnglet = erreur[onglet];
+
+  // Avertissement préventif, AVANT le clic — ajouté le 17/07/2026 à la demande
+  // de Joseph : depuis que la troncature automatique a été retirée, un texte
+  // trop volumineux peut produire une réponse IA qui dépasse le plafond de
+  // sortie (4096 tokens) et revient incomplète, même réparée. Plutôt que de
+  // laisser l'auteur le découvrir après coup, on le bloque en amont avec un
+  // message clair. Seuil de 8000 caractères choisi comme estimation prudente
+  // (heuristique, pas une limite technique dure) — à ajuster si l'expérience
+  // montre qu'il coupe des analyses qui se seraient bien passées, ou qu'il
+  // laisse encore passer des textes trop longs.
+  const SEUIL_AVERTISSEMENT = 8000;
+  const { texte: sourceActuelleNettoyée } = extraireTexte(
+    (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif
+  );
+  const texteTropVolumineux = sourceActuelleNettoyée.length > SEUIL_AVERTISSEMENT;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", background: "#fafafa" }}>
@@ -408,8 +447,17 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </>
         )}
 
-        <button onClick={() => analyser(onglet)} disabled={enChargement}
-          style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
+        {texteTropVolumineux && (
+          <div style={{
+            background: "#FAEEDA", borderRadius: 7, padding: "8px 10px",
+            fontSize: 11.5, color: "#854F0B", marginBottom: 8, lineHeight: 1.5,
+          }}>
+            ⚠️ {t("selection.texteTropVolumineux", { count: sourceActuelleNettoyée.length.toLocaleString("fr-FR") })}
+          </div>
+        )}
+
+        <button onClick={() => analyser(onglet)} disabled={enChargement || texteTropVolumineux}
+          style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: (enChargement || texteTropVolumineux) ? "default" : "pointer", fontFamily: "inherit", opacity: texteTropVolumineux ? 0.5 : 1 }}>
           {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
         </button>
 
