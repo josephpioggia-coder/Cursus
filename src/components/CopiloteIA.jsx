@@ -13,9 +13,16 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
 
+// Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
+// la seule limite est ce que l'auteur choisit lui-même — la sélection
+// surlignée, ou le chapitre entier. La fenêtre de contexte de Claude est
+// largement suffisante pour un chapitre complet ; le seul vrai coût est le
+// quota de tokens de l'auteur, qui augmente proportionnellement à la taille
+// du texte envoyé (voir vérification du 15/07 : 3% du quota mensuel utilisé
+// à ce stade, large marge).
 const extraireTexte = (html = "") => {
   const nettoyé = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  return { texte: nettoyé.slice(0, 4000), tronqué: nettoyé.length > 4000 };
+  return { texte: nettoyé, tronqué: false };
 };
 
 const compterMots = (html = "") =>
@@ -84,8 +91,19 @@ const PROMPTS = {
   personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte. Réponds UNIQUEMENT en JSON valide :
 {"personnages":[{"nom":"...","rôle":"...","traits":["..."],"cohérence":"ok","note":"..."}]}`,
 
-  références: `Tu es assistant de recherche académique. Identifie les concepts qui méritent des références scientifiques ou historiques. Propose des références réelles en format APA 7e. Réponds UNIQUEMENT en JSON valide :
-{"références":[{"concept":"...","apa":"...","page":"...","pertinence":"..."}]}`,
+  // Le biais linguistique des références est volontaire, pas un oubli :
+  // un texte rédigé en français doit normalement s'appuyer sur la littérature
+  // francophone en priorité (comme un texte anglais s'appuierait naturellement
+  // sur la littérature anglo-saxonne) — sans exclure les ouvrages étrangers
+  // majeurs quand aucun équivalent francophone sérieux n'existe. Ajouté le
+  // 17/07/2026, à la demande de Joseph.
+  références: (langueProjet) => {
+    const biais = langueProjet === "fr"
+      ? "Le texte analysé est rédigé en français : privilégie les publications francophones (auteurs de langue française, ou traductions françaises officielles d'ouvrages étrangers) chaque fois qu'une référence équivalente sérieuse existe. Ne cite un ouvrage non traduit en français que s'il n'existe aucun équivalent francophone valable sur ce concept précis — indique-le alors explicitement dans le champ \"pertinence\" (ex. \"aucun équivalent francophone identifié\")."
+      : "Privilégie la littérature scientifique de langue anglaise, norme académique dominante pour ce type d'ouvrage.";
+    return `Tu es assistant de recherche académique. Identifie les concepts qui méritent des références scientifiques ou historiques. ${biais} Propose des références réelles en format APA 7e — vérifie que l'édition citée (traducteur, éditeur, année) est exacte, pas approximative. Réponds UNIQUEMENT en JSON valide :
+{"références":[{"concept":"...","apa":"...","page":"...","pertinence":"..."}]}`;
+  },
 
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
@@ -226,7 +244,6 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [erreur, setErreur] = useState({});
   const [modeAuto, setModeAuto] = useState(false);
   const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
-  const [dernièreTroncature, setDernièreTroncature] = useState(false);
   const abortRef = useRef(null);
   const intervalRef = useRef(null);
 
@@ -238,7 +255,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
-    const { texte, tronqué } = extraireTexte(sourceTexte);
+    const { texte } = extraireTexte(sourceTexte);
     if (compterMots(sourceTexte) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
@@ -248,7 +265,6 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     abortRef.current = new AbortController();
     setChargement(c => ({ ...c, [ongletCible]: true }));
     setErreur(e => ({ ...e, [ongletCible]: null }));
-    setDernièreTroncature(tronqué);
 
     try {
       let résultat = "";
@@ -263,7 +279,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
       } else if (ongletCible === "références") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références, langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 2000);
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
@@ -389,18 +405,6 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                 {t("selection.analyserTout")}
               </button>
             </div>
-
-            {/* Avertissement AVANT l'analyse si la sélection active dépasse la
-                limite de 4000 caractères — pour ne pas croire que tout ce qui
-                est surligné sera pris en compte. Ajouté le 16/07/2026. */}
-            {analyserSélection && texteSélectionné.length > 4000 && (
-              <div style={{
-                background: "#FCEBEB", borderRadius: 7, padding: "6px 10px",
-                fontSize: 10.5, color: "#A32D2D", marginBottom: 8, lineHeight: 1.5,
-              }}>
-                ⚠️ {t("selection.selectionTropLongue", { total: texteSélectionné.length.toLocaleString("fr-FR") })}
-              </div>
-            )}
           </>
         )}
 
@@ -408,12 +412,6 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: enChargement ? "default" : "pointer", fontFamily: "inherit" }}>
           {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
         </button>
-
-        {dernièreTroncature && !enChargement && (
-          <div style={{ background: "#FAEEDA", borderRadius: 7, padding: "8px 10px", fontSize: 11.5, color: "#854F0B", marginBottom: 8, lineHeight: 1.5 }}>
-            ⚠️ {t("erreur.texteTronque")}
-          </div>
-        )}
 
         {enChargement && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#999", fontSize: 12, padding: "8px 0" }}>
