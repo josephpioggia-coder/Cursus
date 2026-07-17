@@ -132,7 +132,7 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
@@ -219,6 +219,12 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
         {/* Actions au survol */}
         {survol && !enRenommage && (
           <div style={{ display: "flex", gap: 2 }} onClick={(e) => e.stopPropagation()}>
+            {!estPremier && (
+              <button onClick={() => onDéplacer(nœud.id, "haut")} style={btnIconStyle} title={t("actions.monter")}>↑</button>
+            )}
+            {!estDernier && (
+              <button onClick={() => onDéplacer(nœud.id, "bas")} style={btnIconStyle} title={t("actions.descendre")}>↓</button>
+            )}
             {peutAjouter && (
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
@@ -229,7 +235,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
       </div>
 
       {/* Enfants récursifs */}
-      {ouvert && nœud.enfants?.map((enfant) => (
+      {ouvert && nœud.enfants?.map((enfant, index) => (
         <NœudStructure
           key={enfant.id}
           nœud={enfant}
@@ -240,6 +246,9 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           onAjouter={onAjouter}
           onRenommer={onRenommer}
           onSupprimer={onSupprimer}
+          onDéplacer={onDéplacer}
+          estPremier={index === 0}
+          estDernier={index === nœud.enfants.length - 1}
         />
       ))}
     </div>
@@ -557,6 +566,61 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
     if (sélectionné === nœudId) setSélectionné(null);
   }, [projet, onMàjStructure, sélectionné, t]);
 
+  // Échange l'ordre d'un nœud avec son frère adjacent (haut ou bas), au même
+  // niveau de la hiérarchie. Utilise nœudsAPI.réordonner(), déjà présente
+  // côté API mais jamais branchée à une interface jusqu'au 17/07/2026.
+  const déplacerNœud = useCallback(async (nœudId, direction) => {
+    // Trouve la liste des frères (même parent) contenant ce nœud, à
+    // n'importe quel niveau de l'arbre.
+    const trouverFratrieEtIndex = (liste) => {
+      const index = liste.findIndex((n) => n.id === nœudId);
+      if (index !== -1) return { fratrie: liste, index };
+      for (const n of liste) {
+        const trouvé = trouverFratrieEtIndex(n.enfants || []);
+        if (trouvé) return trouvé;
+      }
+      return null;
+    };
+
+    const résultat = trouverFratrieEtIndex(projet.structure || []);
+    if (!résultat) return;
+    const { fratrie, index } = résultat;
+    const indexCible = direction === "haut" ? index - 1 : index + 1;
+    if (indexCible < 0 || indexCible >= fratrie.length) return;
+
+    const nœudA = fratrie[index];
+    const nœudB = fratrie[indexCible];
+    const ordreA = nœudA.ordre ?? index;
+    const ordreB = nœudB.ordre ?? indexCible;
+
+    const { error } = await nœudsAPI.réordonner([
+      { id: nœudA.id, ordre: ordreB },
+      { id: nœudB.id, ordre: ordreA },
+    ]);
+    if (error) {
+      journaliserErreur("VueProjet:déplacerNœud", error.message, projet.id);
+      window.alert(t("erreur.deplacementNoeud") || "Impossible de déplacer cet élément.");
+      return;
+    }
+
+    // Reconstruit localement la structure avec les deux nœuds échangés et
+    // les ordres mis à jour, sans attendre un rechargement complet.
+    const échanger = (liste) => {
+      const idx = liste.findIndex((n) => n.id === nœudId);
+      if (idx !== -1) {
+        const idxCible = direction === "haut" ? idx - 1 : idx + 1;
+        const copie = [...liste];
+        [copie[idx], copie[idxCible]] = [
+          { ...copie[idxCible], ordre: ordreA },
+          { ...copie[idx], ordre: ordreB },
+        ];
+        return copie;
+      }
+      return liste.map((n) => ({ ...n, enfants: échanger(n.enfants || []) }));
+    };
+    onMàjStructure(projet.id, échanger(projet.structure || []));
+  }, [projet, onMàjStructure, t]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* En-tête projet */}
@@ -625,7 +689,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
             </button>
           </div>
         ) : (
-          projet.structure.map((nœud) => (
+          projet.structure.map((nœud, index) => (
             <NœudStructure
               key={nœud.id}
               nœud={nœud}
@@ -636,6 +700,9 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
               onAjouter={ajouterNœud}
               onRenommer={renommerNœud}
               onSupprimer={supprimerNœud}
+              onDéplacer={déplacerNœud}
+              estPremier={index === 0}
+              estDernier={index === projet.structure.length - 1}
             />
           ))
         )}
