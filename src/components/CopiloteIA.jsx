@@ -131,6 +131,14 @@ const PROMPTS = {
 
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
+
+  // Aide au démarrage — ajouté le 18/07/2026. Jusqu'ici, le co-pilote exigeait
+  // au moins 20 mots déjà écrits pour fonctionner, ce qui le rendait inutile
+  // précisément au moment où l'auteur en a le plus besoin : la page blanche.
+  // Ce prompt ne s'appuie sur aucun texte de l'éditeur — uniquement sur le
+  // contexte ADN du projet et le titre du chapitre/partie en cours.
+  demarrage: () => `Tu es le co-pilote d'un écrivain qui n'a pas encore commencé à écrire ce chapitre — la page est blanche ou presque. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus (réponses au questionnaire d'intention) et sur le titre du chapitre donné. Propose exactement 3 pistes concrètes et courtes pour amorcer précisément CE chapitre : une proposition de première phrase ou de scène d'ouverture, un angle d'attaque possible pour aborder le sujet du chapitre, et une question qui pourrait en structurer le déroulement. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
+{"suggestions":[{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`,
 };
 
 function systemAvecLangue(promptBase, langueProjet, contexteADN) {
@@ -183,7 +191,7 @@ async function chargerContexteADN(projetId) {
 // ─── Composants d'affichage ───────────────────────────────────────────────────
 
 function CarteSuggestion({ s, couleur }) {
-  const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷" };
+  const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷", ouverture: "✍️", angle: "🎯", question: "❓" };
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{icônes[s.type] || "→"} {s.type}</div>
@@ -239,7 +247,7 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", langueProjet = "fr", projetId = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", langueProjet = "fr", projetId = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
   // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
@@ -334,6 +342,32 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
   }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
+
+  // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
+  // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
+  const analyserDémarrage = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setChargement(c => ({ ...c, suggestions: true }));
+    setErreur(e => ({ ...e, suggestions: null }));
+    try {
+      const sig = abortRef.current.signal;
+      const résultat = await appelClaude(
+        systemAvecLangue(PROMPTS.demarrage(), langueProjet, contexteADN),
+        `Titre du chapitre ou de la partie à démarrer : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
+        sig, 2048
+      );
+      const p = parserJSON(résultat);
+      setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
+      setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        setErreur(e => ({ ...e, suggestions: messageErreur(err) }));
+      }
+    } finally {
+      setChargement(c => ({ ...c, suggestions: false }));
+    }
+  }, [titreNœud, projetTitre, langueProjet, contexteADN, messageErreur]);
 
   useEffect(() => {
     if (modeAuto) {
@@ -477,7 +511,31 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
         {!enChargement && !erreurOnglet && données_onglet === null && (
           <div style={{ textAlign: "center", padding: "20px 8px", color: "#bbb", fontSize: 12, lineHeight: 1.7 }}>
-            {onglet === "suggestions" && t("videEtat.suggestions")}
+            {onglet === "suggestions" && (
+              compterMots(texteActif) < 20 ? (
+                <div style={{ padding: "4px 4px 8px" }}>
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>🌱</div>
+                  <div style={{ marginBottom: 12 }}>{t("demarrage.description")}</div>
+                  <button
+                    onClick={analyserDémarrage}
+                    disabled={!contexteADN}
+                    style={{
+                      width: "100%", padding: "8px", background: contexteADN ? `${couleurProjet}15` : "#f0f0f0",
+                      color: contexteADN ? couleurProjet : "#bbb", border: `0.5px solid ${contexteADN ? couleurProjet + "30" : "#ddd"}`,
+                      borderRadius: 7, fontSize: 12, fontWeight: 500,
+                      cursor: contexteADN ? "pointer" : "default", fontFamily: "inherit",
+                    }}
+                  >
+                    {t("demarrage.bouton")}
+                  </button>
+                  {!contexteADN && (
+                    <div style={{ fontSize: 10.5, color: "#bbb", marginTop: 8, lineHeight: 1.5 }}>
+                      {t("demarrage.sansADN")}
+                    </div>
+                  )}
+                </div>
+              ) : t("videEtat.suggestions")
+            )}
             {onglet === "personnages" && t("videEtat.personnages")}
             {onglet === "références" && t("videEtat.references")}
             {onglet === "cohérence" && t("videEtat.coherence")}
