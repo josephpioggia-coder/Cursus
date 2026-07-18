@@ -132,7 +132,7 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
@@ -161,10 +161,15 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           padding: "5px 8px", borderRadius: 6, cursor: "pointer",
           background: sélectionné === nœud.id
             ? `${projetCouleur}18`
-            : survol ? "var(--surface-hover)" : "transparent",
+            : dernierNœudVisitéId === nœud.id
+              ? "var(--surface-hover)"
+              : survol ? "var(--surface-hover)" : "transparent",
           borderLeft: sélectionné === nœud.id
             ? `2px solid ${projetCouleur}`
-            : "2px solid transparent",
+            : dernierNœudVisitéId === nœud.id
+              ? "2px solid #ccc"
+              : "2px solid transparent",
+          opacity: dernierNœudVisitéId === nœud.id && sélectionné !== nœud.id ? 0.65 : 1,
           transition: "all 0.15s",
         }}
       >
@@ -250,6 +255,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           onDéplacer={onDéplacer}
           estPremier={index === 0}
           estDernier={index === nœud.enfants.length - 1}
+          dernierNœudVisitéId={dernierNœudVisitéId}
         />
       ))}
     </div>
@@ -472,7 +478,7 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 
 // ─── Composant : Vue projet (structure du manuscrit) ─────────────────────────────
 
-function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
+function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernierNœudVisitéId }) {
   const { t } = useTranslation("common");
   const [sélectionné, setSélectionné] = useState(null);
   const mots = totalMotsProjet(projet.structure);
@@ -730,6 +736,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
               onDéplacer={déplacerNœud}
               estPremier={index === 0}
               estDernier={index === projet.structure.length - 1}
+              dernierNœudVisitéId={dernierNœudVisitéId}
             />
           ))
         )}
@@ -1380,6 +1387,7 @@ function AppConnectée({ user, déconnecter }) {
                 onMàjStructure={màjStructure}
                 onRetour={() => setVue("tableau")}
                 onOuvrirÉditeur={ouvrirÉditeur}
+                dernierNœudVisitéId={nœudActifId}
               />
             </div>
           </div>
