@@ -145,6 +145,16 @@ export const nœudsAPI = {
     return { error };
   },
 
+  /** Change le parent d'un nœud (promotion/rattachement) — ajouté 18/07/2026.
+   *  nouveauParentId peut être null (le nœud devient une "partie" à la racine). */
+  async changerParent(nœudId, nouveauParentId) {
+    const { error } = await supabase
+      .from("noeuds")
+      .update({ parent_id: nouveauParentId })
+      .eq("id", nœudId);
+    return { error };
+  },
+
   /** Supprime un nœud (et ses enfants via CASCADE) */
   async supprimer(nœudId) {
     const { error } = await supabase
