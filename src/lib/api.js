@@ -136,6 +136,15 @@ export const nœudsAPI = {
     return { error };
   },
 
+  /** Change le type d'un nœud (partie / chapitre / scène) — ajouté 18/07/2026 */
+  async changerType(nœudId, type) {
+    const { error } = await supabase
+      .from("noeuds")
+      .update({ type })
+      .eq("id", nœudId);
+    return { error };
+  },
+
   /** Supprime un nœud (et ses enfants via CASCADE) */
   async supprimer(nœudId) {
     const { error } = await supabase
