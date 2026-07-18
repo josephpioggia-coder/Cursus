@@ -136,7 +136,7 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
@@ -237,6 +237,9 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
             {peutAjouter && (
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
+            {!estRacine && (
+              <button onClick={() => onPromouvoir(nœud.id)} style={btnIconStyle} title="Faire remonter d'un niveau (devient frère de son parent actuel)">⬆</button>
+            )}
             <select
               value={nœud.type}
               onChange={(e) => onChangerType(nœud.id, e.target.value)}
@@ -272,6 +275,8 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           estDernier={index === nœud.enfants.length - 1}
           dernierNœudVisitéId={dernierNœudVisitéId}
           onChangerType={onChangerType}
+          estRacine={false}
+          onPromouvoir={onPromouvoir}
         />
       ))}
     </div>
@@ -591,6 +596,58 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     onMàjStructure(projet.id, changer(projet.structure || []));
   }, [projet, onMàjStructure]);
 
+  // Fait sortir un nœud de son parent actuel pour qu'il devienne le frère de
+  // ce parent (remonte d'un niveau dans la hiérarchie). Ajouté 18/07/2026,
+  // en réponse au constat que ni le sélecteur de type ni les flèches
+  // monter/descendre ne permettaient ce changement de niveau réel.
+  const trouverContextePourPromotion = (liste, id, idParentCourant = null, idGrandParentCourant = null) => {
+    for (const n of liste) {
+      if (n.id === id) {
+        return { idParentActuel: idParentCourant, idNouveauParent: idGrandParentCourant };
+      }
+      if (n.enfants?.length) {
+        const résultat = trouverContextePourPromotion(n.enfants, id, n.id, idParentCourant);
+        if (résultat) return résultat;
+      }
+    }
+    return null;
+  };
+
+  const promouvoirNœud = useCallback(async (nœudId) => {
+    const contexte = trouverContextePourPromotion(projet.structure || [], nœudId);
+    if (!contexte || !contexte.idParentActuel) return; // déjà à la racine
+
+    const { error } = await nœudsAPI.changerParent(nœudId, contexte.idNouveauParent);
+    if (error) {
+      journaliserErreur("VueProjet:promouvoirNœud", error.message, projet.id);
+      window.alert("Impossible de déplacer cet élément vers un niveau supérieur.");
+      return;
+    }
+
+    let nœudExtrait = null;
+    const extraire = (liste) =>
+      liste
+        .filter((n) => {
+          if (n.id === nœudId) { nœudExtrait = n; return false; }
+          return true;
+        })
+        .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
+
+    const structureSansNœud = extraire(projet.structure || []);
+
+    const insérerAprèsAncienParent = (liste) => {
+      const idx = liste.findIndex((n) => n.id === contexte.idParentActuel);
+      if (idx !== -1) {
+        const copie = [...liste];
+        copie.splice(idx + 1, 0, nœudExtrait);
+        return copie;
+      }
+      return liste.map((n) => ({ ...n, enfants: insérerAprèsAncienParent(n.enfants || []) }));
+    };
+
+    onMàjStructure(projet.id, insérerAprèsAncienParent(structureSansNœud));
+  }, [projet, onMàjStructure]);
+
   // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
   // Trouve le titre d'un nœud dans l'arbre, pour l'afficher dans la
   // confirmation de suppression — pour que l'auteur sache précisément ce
@@ -772,6 +829,8 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               estDernier={index === projet.structure.length - 1}
               dernierNœudVisitéId={dernierNœudVisitéId}
               onChangerType={changerTypeNœud}
+              estRacine={true}
+              onPromouvoir={promouvoirNœud}
             />
           ))
         )}
