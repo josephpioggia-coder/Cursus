@@ -378,6 +378,7 @@ export default function Editeur({
 }) {
   const [modeFocus, setModeFocus] = useState(false);
   const [voirHistorique, setVoirHistorique] = useState(false);
+  const [texteCopié, setTexteCopié] = useState(false);
   const [historique, setHistorique] = useState([]);
   const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
   const [objectifJournalier, setObjectifJournalier] = useState(500);
@@ -534,6 +535,23 @@ export default function Editeur({
           <span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>{nœud.titre}</span>
           <div style={{ flex: 1 }} />
           <IndicateurSauvegarde état={statutSauvegarde} />
+          <button
+            onClick={() => {
+              const texte = editor?.getText() || "";
+              navigator.clipboard?.writeText(texte);
+              setTexteCopié(true);
+              setTimeout(() => setTexteCopié(false), 2000);
+            }}
+            style={{
+              fontSize: 12, color: texteCopié ? "#1D9E75" : "#999",
+              background: texteCopié ? "#E1F5EE" : "none",
+              border: "none", cursor: "pointer", borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit",
+            }}
+            title="Copier tout le texte du chapitre"
+          >
+            {texteCopié ? "✓ Copié !" : "📋 Copier tout"}
+          </button>
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
             style={{
