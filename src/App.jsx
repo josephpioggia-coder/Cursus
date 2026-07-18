@@ -136,7 +136,7 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
@@ -237,6 +237,17 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
             {peutAjouter && (
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
+            <select
+              value={nœud.type}
+              onChange={(e) => onChangerType(nœud.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              title="Changer de niveau"
+              style={{ fontSize: 10, border: "0.5px solid #ddd", borderRadius: 4, background: "#fff", color: "#777", padding: "1px 2px", fontFamily: "inherit", cursor: "pointer" }}
+            >
+              <option value="partie">📂 Partie</option>
+              <option value="chapitre">📄 Chapitre</option>
+              <option value="scene">✏️ Scène</option>
+            </select>
             <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title={t("actions.renommer")}>✎</button>
             <span style={{ width: 6 }} />
             <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title={t("actions.supprimer")}>✕</button>
@@ -260,6 +271,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           estPremier={index === 0}
           estDernier={index === nœud.enfants.length - 1}
           dernierNœudVisitéId={dernierNœudVisitéId}
+          onChangerType={onChangerType}
         />
       ))}
     </div>
@@ -561,6 +573,24 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     onMàjStructure(projet.id, renommer(projet.structure || []));
   }, [projet, onMàjStructure, t]);
 
+  // Change le niveau d'un nœud (partie / chapitre / scène) sans changer sa
+  // position dans l'arbre — ajouté 18/07/2026.
+  const changerTypeNœud = useCallback(async (nœudId, nouveauType) => {
+    const { error } = await nœudsAPI.changerType(nœudId, nouveauType);
+    if (error) {
+      journaliserErreur("VueProjet:changerTypeNœud", error.message, projet.id);
+      window.alert("Impossible de changer le niveau de cet élément.");
+      return;
+    }
+    const changer = (liste) =>
+      liste.map((n) =>
+        n.id === nœudId
+          ? { ...n, type: nouveauType }
+          : { ...n, enfants: changer(n.enfants || []) }
+      );
+    onMàjStructure(projet.id, changer(projet.structure || []));
+  }, [projet, onMàjStructure]);
+
   // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
   // Trouve le titre d'un nœud dans l'arbre, pour l'afficher dans la
   // confirmation de suppression — pour que l'auteur sache précisément ce
@@ -741,6 +771,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               estPremier={index === 0}
               estDernier={index === projet.structure.length - 1}
               dernierNœudVisitéId={dernierNœudVisitéId}
+              onChangerType={changerTypeNœud}
             />
           ))
         )}
