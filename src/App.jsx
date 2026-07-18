@@ -58,7 +58,11 @@ const COULEURS = Object.values(GENRE_COULEURS);
 const STRUCTURE_TYPES_META = {
   partie: { enfant: "chapitre", icone: "📂" },
   chapitre: { enfant: "scene", icone: "📄" },
-  scene: { enfant: null, icone: "✏️" },
+  // Une scène peut désormais contenir d'autres scènes (18/07/2026) — permet
+  // d'ajouter un niveau sous "Pour aller plus loin" ou "Repères de lecture",
+  // et autant de niveaux supplémentaires que nécessaire ensuite, sans avoir
+  // à inventer un nouveau type à chaque fois.
+  scene: { enfant: "scene", icone: "✏️" },
 };
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
