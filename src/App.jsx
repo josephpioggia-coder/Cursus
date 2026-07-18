@@ -229,6 +229,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
             <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title={t("actions.renommer")}>✎</button>
+            <span style={{ width: 6 }} />
             <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title={t("actions.supprimer")}>✕</button>
           </div>
         )}
@@ -551,7 +552,33 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur }) {
   }, [projet, onMàjStructure, t]);
 
   // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
+  // Trouve le titre d'un nœud dans l'arbre, pour l'afficher dans la
+  // confirmation de suppression — pour que l'auteur sache précisément ce
+  // qu'il s'apprête à effacer, pas juste "cet élément".
+  const trouverTitreNœud = (liste, id) => {
+    for (const n of liste) {
+      if (n.id === id) return n.titre;
+      const trouvé = trouverTitreNœud(n.enfants || [], id);
+      if (trouvé) return trouvé;
+    }
+    return null;
+  };
+
+  // CORRECTIF 18/07/2026 — CRITIQUE : la suppression n'exigeait auparavant
+  // aucune confirmation, alors que les boutons "renommer" (✎) et "supprimer"
+  // (✕) sont très proches l'un de l'autre. Un chapitre entier a été perdu
+  // par un clic accidentel. La suppression en base est définitive (pas de
+  // corbeille) — la confirmation est donc la seule protection réelle tant
+  // qu'il n'existe pas de corbeille ou d'historique permanent (voir mémoire
+  // sur le chantier d'historique daté, toujours en attente).
   const supprimerNœud = useCallback(async (nœudId) => {
+    const titre = trouverTitreNœud(projet.structure || [], nœudId) || "cet élément";
+    const confirmé = window.confirm(
+      t("confirmations.supprimerNoeud", { titre }) ||
+      `Supprimer « ${titre} » ? Cette action est définitive et ne peut pas être annulée.`
+    );
+    if (!confirmé) return;
+
     const { error } = await nœudsAPI.supprimer(nœudId);
     if (error) {
       journaliserErreur("VueProjet:supprimerNœud", error.message, projet.id);
@@ -1394,6 +1421,7 @@ function AppConnectée({ user, déconnecter }) {
                 typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
+                titreNœud={nœudActif.titre || ""}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
               />
