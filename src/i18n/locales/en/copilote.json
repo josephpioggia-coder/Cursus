@@ -26,6 +26,11 @@
     "analyserTout": "Tout le chapitre",
     "texteTropVolumineux": "Ce texte fait {{count}} caractères — trop volumineux pour garantir une analyse complète. Réduisez la partie surlignée (par exemple une section plutôt que tout le chapitre) avant de relancer."
   },
+  "demarrage": {
+    "description": "Page blanche ? Le co-pilote peut proposer une piste de départ à partir de ce que vous avez déjà défini pour ce projet.",
+    "bouton": "Aide au démarrage",
+    "sansADN": "Complétez d'abord le questionnaire d'intention du projet pour activer cette aide."
+  },
   "videEtat": {
     "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
     "personnages": "Extraction et analyse de cohérence des personnages.",
@@ -45,4 +50,3 @@
     "aucunProbleme": "✓ Aucun problème détecté."
   }
 }
-
