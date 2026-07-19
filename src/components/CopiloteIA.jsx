@@ -8,13 +8,22 @@
  * - `langueProjet` est propagée à claude-prox pour que la réponse générée
  *   par l'IA soit dans la langue du projet, pas seulement l'UI autour d'elle
  *
- * MODIF 20/07/2026 : l'aide au démarrage d'un CHAPITRE sans titre s'appuie
+ * MODIF 20/07/2026 (a) : l'aide au démarrage d'un CHAPITRE sans titre s'appuie
  * désormais sur deux informations transmises par App.jsx :
  *   - titrePartieParente : titre de la Partie qui contient ce chapitre
  *   - titresChapitresVoisins : titres des chapitres frères déjà nommés
  * Avant cette modif, un chapitre sans titre produisait des suggestions
  * génériques sur "pourquoi ce chapitre n'a pas de titre" plutôt que des
  * pistes ancrées dans la place réelle du chapitre dans le manuscrit.
+ *
+ * MODIF 20/07/2026 (b) : bouton "Copier" ajouté sur les cartes Suggestion,
+ * Personnage et Cohérence (la carte Référence avait déjà son propre bouton
+ * de copie, dédié à la citation APA — inchangé). Les libellés utilisent la
+ * valeur par défaut d'i18next (t("clé", "texte par défaut")) plutôt que
+ * d'ajouter des clés dans copilote.json — choix délibéré pour ne pas
+ * toucher aux fichiers de traduction aujourd'hui après l'incident JSON du
+ * 19/07/2026. À migrer proprement vers les fichiers de traduction quand
+ * l'occasion s'y prêtera, sans urgence.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -265,13 +274,48 @@ async function chargerNotesEtCitations(projetId) {
   }
 }
 
+// ─── Bouton "Copier" réutilisable ──────────────────────────────────────────────
+// Ajouté le 20/07/2026. Petit bouton icône, en haut à droite de chaque carte,
+// qui copie un texte formaté dans le presse-papier avec confirmation visuelle
+// brève (icône ✓ pendant 2s). Les libellés utilisent la valeur par défaut
+// d'i18next plutôt qu'une clé dans copilote.json (voir note en tête de
+// fichier) : pas de risque de casser un fichier de traduction pour ce détail.
+function BoutonCopier({ texte, couleur = "#888" }) {
+  const { t } = useTranslation("copilote");
+  const [copié, setCopié] = useState(false);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(texte);
+        setCopié(true);
+        setTimeout(() => setCopié(false), 2000);
+      }}
+      title={copié ? t("copierTout.copie", "Copié !") : t("copierTout.bouton", "Copier")}
+      style={{
+        fontSize: 11, lineHeight: 1,
+        color: copié ? "#1D9E75" : couleur,
+        background: "transparent", border: "none",
+        cursor: "pointer", fontFamily: "inherit",
+        padding: "2px 4px", borderRadius: 4,
+        flexShrink: 0,
+      }}
+    >
+      {copié ? "✓" : "⧉"}
+    </button>
+  );
+}
+
 // ─── Composants d'affichage ───────────────────────────────────────────────────
 
 function CarteSuggestion({ s, couleur }) {
   const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷", ouverture: "✍️", angle: "🎯", question: "❓" };
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{icônes[s.type] || "→"} {s.type}</div>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
+        <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{icônes[s.type] || "→"} {s.type}</div>
+        <BoutonCopier texte={`${s.titre}\n\n${s.texte}`} couleur={couleur} />
+      </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
     </div>
@@ -280,11 +324,20 @@ function CarteSuggestion({ s, couleur }) {
 
 function CartePersonnage({ p }) {
   const c = { ok: "#1D9E75", attention: "#BA7517", problème: "#E24B4A" }[p.cohérence] || "#888";
+  const texteÀCopier = [
+    p.nom,
+    p.rôle,
+    p.traits?.length ? `Traits : ${p.traits.join(", ")}` : null,
+    p.note || null,
+  ].filter(Boolean).join("\n");
   return (
     <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4, gap: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 500 }}>{p.nom}</span>
-        <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: c + "20", color: c, fontWeight: 500 }}>{p.cohérence}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: c + "20", color: c, fontWeight: 500 }}>{p.cohérence}</span>
+          <BoutonCopier texte={texteÀCopier} couleur={c} />
+        </div>
       </div>
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
@@ -312,10 +365,20 @@ function CarteRéférence({ r }) {
 
 function CarteCoherence({ p }) {
   const s = { info: { c: "#378ADD", bg: "#E6F1FB" }, attention: { c: "#BA7517", bg: "#FAEEDA" }, important: { c: "#E24B4A", bg: "#FCEBEB" } }[p.sévérité] || { c: "#888", bg: "#f0f0f0" };
+  const texteÀCopier = [
+    `[${p.sévérité}] ${p.type}`,
+    p.description,
+    p.suggestion ? `Suggestion : ${p.suggestion}` : null,
+  ].filter(Boolean).join("\n");
   return (
     <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, fontWeight: 500, marginRight: 6 }}>{p.sévérité}</span>
-      <span style={{ fontSize: 11, color: "#999" }}>{p.type}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+        <div>
+          <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, fontWeight: 500, marginRight: 6 }}>{p.sévérité}</span>
+          <span style={{ fontSize: 11, color: "#999" }}>{p.type}</span>
+        </div>
+        <BoutonCopier texte={texteÀCopier} couleur={s.c} />
+      </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
     </div>
