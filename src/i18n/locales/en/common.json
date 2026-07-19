@@ -1,4 +1,58 @@
 {
+  "titre": "Co-pilote IA",
+  "onglets": {
+    "suggestions": "Suggestions",
+    "personnages": "Personnages",
+    "references": "References",
+    "coherence": "Coherence"
+  },
+  "modeAuto": {
+    "label": "Auto",
+    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez le bouton Analyser maintenant pour forcer une analyse immediate."
+  },
+  "bouton": {
+    "analyser": "Analyser maintenant",
+    "forcerAnalyse": "Forcer une analyse maintenant",
+    "enCours": "Analyse en cours..."
+  },
+  "erreur": {
+    "motsInsuffisants": "Ecrivez au moins 20 mots pour activer l'analyse.",
+    "sessionExpiree": "Session expiree. Reconnectez-vous.",
+    "generique": "Le co-pilote n'a pas pu traiter ce passage.",
+    "texteTronque": "Ce texte depasse 4000 caracteres."
+  },
+  "selection": {
+    "analyserSelection": "Selection ({{count}} mots)",
+    "analyserTout": "Tout le chapitre",
+    "texteTropVolumineux": "Ce texte fait {{count}} caracteres, trop volumineux pour garantir une analyse complete. Reduisez la partie surlignee avant de relancer."
+  },
+  "demarrage": {
+    "description": "Page blanche ? Le co-pilote peut proposer une piste de depart a partir de ce que vous avez deja defini pour ce projet.",
+    "description_partie": "Cette partie est encore vide. Le co-pilote peut rappeler la colonne vertebrale de cette section et vous aider a structurer ses chapitres.",
+    "description_chapitre": "Page blanche ? Le co-pilote peut proposer plusieurs pistes de depart differentes pour ce chapitre.",
+    "description_scene": "Cette scene est encore vide. Le co-pilote peut s'appuyer sur vos citations et idees deja enregistrees pour ce projet.",
+    "bouton": "Aide au demarrage",
+    "sansADN": "Completez d'abord le questionnaire d'intention du projet pour activer cette aide."
+  },
+  "videEtat": {
+    "suggestions": "Suggestions contextuelles basees sur votre texte en cours.",
+    "personnages": "Extraction et analyse de coherence des personnages.",
+    "references": "References academiques APA pour etayer votre argumentation.",
+    "coherence": "Detection d'incoherences et faiblesses structurelles."
+  },
+  "personnages": {
+    "aucun": "Aucun personnage detecte."
+  },
+  "references": {
+    "aucune": "Aucune reference suggeree.",
+    "pageSuggeree": "Page suggeree : {{page}}",
+    "copier": "Copier APA",
+    "copie": "Copie !"
+  },
+  "coherence": {
+    "aucunProbleme": "Aucun probleme detecte."
+  }
+}{
   "_note": "GENRES et STATUTS ne sont volontairement PAS ici.",
 
   "marque": "Cursus",
