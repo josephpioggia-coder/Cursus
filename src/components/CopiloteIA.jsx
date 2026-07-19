@@ -132,13 +132,28 @@ const PROMPTS = {
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
 
-  // Aide au démarrage — ajouté le 18/07/2026. Jusqu'ici, le co-pilote exigeait
-  // au moins 20 mots déjà écrits pour fonctionner, ce qui le rendait inutile
-  // précisément au moment où l'auteur en a le plus besoin : la page blanche.
-  // Ce prompt ne s'appuie sur aucun texte de l'éditeur — uniquement sur le
-  // contexte ADN du projet et le titre du chapitre/partie en cours.
-  demarrage: () => `Tu es le co-pilote d'un écrivain qui n'a pas encore commencé à écrire ce chapitre — la page est blanche ou presque. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus (réponses au questionnaire d'intention) et sur le titre du chapitre donné. Propose exactement 3 pistes concrètes et courtes pour amorcer précisément CE chapitre : une proposition de première phrase ou de scène d'ouverture, un angle d'attaque possible pour aborder le sujet du chapitre, et une question qui pourrait en structurer le déroulement. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
-{"suggestions":[{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`,
+  // Aide au démarrage — ajouté le 18/07/2026, différencié par niveau le
+  // 19/07/2026. Trois comportements distincts selon que la page blanche est
+  // une Partie, un Chapitre ou une Scène — pas un seul mode générique.
+  demarrage: (typeNœud, titresEnfants = [], notesEtCitations = null) => {
+    if (typeNœud === "partie") {
+      const chapitresConnus = titresEnfants.length > 0
+        ? `Cette partie contient déjà ces chapitres : ${titresEnfants.join(", ")}. Appuie-toi dessus.`
+        : `Cette partie n'a pas encore de chapitres définis.`;
+      return `Tu es le co-pilote d'un écrivain qui ouvre une "Partie" encore vide de son manuscrit. Une Partie est le niveau le plus large : elle regroupe plusieurs chapitres autour d'une même colonne vertébrale thématique. ${chapitresConnus} À partir du titre de cette partie et du contexte du projet fourni ci-dessus (notamment les thèmes retenus au questionnaire d'intention), rappelle en 2-3 phrases la colonne vertébrale que cette partie est censée porter — ce qui la relie à l'ensemble du livre. Si aucun chapitre n'est encore défini, suggère explicitement de revenir compléter cette Partie une fois que les chapitres auront été déterminés dans le sommaire, en les copiant ici. Réponds UNIQUEMENT en JSON valide, avec exactement 2 suggestions :
+{"suggestions":[{"type":"structure","titre":"...","texte":"..."},{"type":"structure","titre":"...","texte":"..."}]}`;
+    }
+    if (typeNœud === "scene") {
+      const blocRéférences = notesEtCitations
+        ? `Éléments déjà enregistrés par l'auteur pour ce projet, à mobiliser s'ils sont pertinents pour cette scène précise :\n${notesEtCitations}`
+        : `Aucune citation ni idée enregistrée pour ce projet pour l'instant.`;
+      return `Tu es le co-pilote d'un écrivain qui ouvre une "Scène" encore vide — le niveau le plus fin du manuscrit (souvent une note, un repère de lecture, ou un développement court). ${blocRéférences} À partir du titre de cette scène et du contexte du projet, propose des pistes de démarrage adaptées à ce niveau de détail : rappels de cohérence à surveiller, précisions utiles sur des personnages ou des références bibliographiques déjà notées, ou toute piste concrète et courte pour ce point précis. Reste bref — une scène n'a pas besoin d'un plan, juste d'un point de départ. Réponds UNIQUEMENT en JSON valide, avec exactement 3 suggestions :
+{"suggestions":[{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`;
+    }
+    // chapitre (par défaut)
+    return `Tu es le co-pilote d'un écrivain qui ouvre un "Chapitre" encore vide. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus et sur le titre du chapitre donné. Propose exactement 4 pistes de nature DIFFÉRENTE les unes des autres pour amorcer précisément CE chapitre — varie les approches, ne répète pas le même type d'angle : un titre alternatif possiblement plus juste, une situation ou un cas concret par lequel entrer dans le sujet, une explication du titre lui-même (ce qu'il signifie, pourquoi ce mot), et une énigme ou question qui intrigue le lecteur dès l'ouverture. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
+{"suggestions":[{"type":"reformulation","titre":"...","texte":"..."},{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`;
+  },
 };
 
 function systemAvecLangue(promptBase, langueProjet, contexteADN) {
@@ -185,6 +200,39 @@ async function chargerContexteADN(projetId) {
     return lignes.length ? lignes.join("\n") : null;
   } catch {
     return null; // le co-pilote continue de fonctionner même sans ce contexte
+  }
+}
+
+// Récupère les citations et idées déjà enregistrées pour ce projet, pour
+// nourrir l'aide au démarrage au niveau "scène" — ajouté 19/07/2026, à la
+// demande de Joseph : réutiliser la Bibliothèque (citations) et le Carnet
+// d'idées existants plutôt que de tout réinventer.
+async function chargerNotesEtCitations(projetId) {
+  if (!projetId) return null;
+  try {
+    const { data: citations } = await supabase
+      .from("citations")
+      .select("texte, page, tags, livres(titre, auteur)")
+      .eq("projet_id", projetId)
+      .limit(10);
+    const { data: idées } = await supabase
+      .from("idees")
+      .select("texte, tags")
+      .eq("projet_id", projetId)
+      .limit(10);
+
+    const lignes = [];
+    (citations || []).forEach((c) => {
+      const source = c.livres ? `${c.livres.titre} (${c.livres.auteur})` : "source inconnue";
+      lignes.push(`- Citation [${source}${c.page ? `, p.${c.page}` : ""}] : "${c.texte}"`);
+    });
+    (idées || []).forEach((i) => {
+      lignes.push(`- Idée notée : ${i.texte}`);
+    });
+
+    return lignes.length ? lignes.join("\n") : null;
+  } catch {
+    return null;
   }
 }
 
@@ -247,7 +295,7 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", langueProjet = "fr", projetId = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], langueProjet = "fr", projetId = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
   // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
@@ -352,9 +400,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     setErreur(e => ({ ...e, suggestions: null }));
     try {
       const sig = abortRef.current.signal;
+      const notesEtCitations = typeNœud === "scene" ? await chargerNotesEtCitations(projetId) : null;
       const résultat = await appelClaude(
-        systemAvecLangue(PROMPTS.demarrage(), langueProjet, contexteADN),
-        `Titre du chapitre ou de la partie à démarrer : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
+        systemAvecLangue(PROMPTS.demarrage(typeNœud, titresEnfants, notesEtCitations), langueProjet, contexteADN),
+        `Titre à démarrer (${typeNœud}) : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
         sig, 2048
       );
       const p = parserJSON(résultat);
@@ -367,7 +416,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, suggestions: false }));
     }
-  }, [titreNœud, projetTitre, langueProjet, contexteADN, messageErreur]);
+  }, [titreNœud, typeNœud, titresEnfants, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
 
   useEffect(() => {
     if (modeAuto) {
@@ -515,7 +564,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
               compterMots(texteActif) < 20 ? (
                 <div style={{ padding: "4px 4px 8px" }}>
                   <div style={{ fontSize: 22, marginBottom: 8 }}>🌱</div>
-                  <div style={{ marginBottom: 12 }}>{t("demarrage.description")}</div>
+                  <div style={{ marginBottom: 12 }}>{t(`demarrage.description_${typeNœud}`) || t("demarrage.description")}</div>
                   <button
                     onClick={analyserDémarrage}
                     disabled={!contexteADN}
