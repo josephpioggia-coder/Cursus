@@ -661,6 +661,25 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     return null;
   };
 
+  // Trouve un nœud complet (pas juste son titre) pour pouvoir compter ses
+  // descendants avant suppression.
+  const trouverNœudComplet = (liste, id) => {
+    for (const n of liste) {
+      if (n.id === id) return n;
+      const trouvé = trouverNœudComplet(n.enfants || [], id);
+      if (trouvé) return trouvé;
+    }
+    return null;
+  };
+
+  const compterDescendants = (nœud) => {
+    let total = 0;
+    for (const enfant of nœud.enfants || []) {
+      total += 1 + compterDescendants(enfant);
+    }
+    return total;
+  };
+
   // CORRECTIF 18/07/2026 — CRITIQUE : la suppression n'exigeait auparavant
   // aucune confirmation, alors que les boutons "renommer" (✎) et "supprimer"
   // (✕) sont très proches l'un de l'autre. Un chapitre entier a été perdu
@@ -668,12 +687,24 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // corbeille) — la confirmation est donc la seule protection réelle tant
   // qu'il n'existe pas de corbeille ou d'historique permanent (voir mémoire
   // sur le chantier d'historique daté, toujours en attente).
+  //
+  // CORRECTIF 18/07/2026 (bis) — la confirmation ci-dessus ne prévenait pas
+  // que la suppression est en CASCADE : supprimer un chapitre supprime aussi
+  // silencieusement tout ce qu'il contient. Un second chapitre a été perdu
+  // de cette façon le jour même. Le message indique désormais explicitement
+  // le nombre d'éléments enfants qui seront supprimés avec.
   const supprimerNœud = useCallback(async (nœudId) => {
-    const titre = trouverTitreNœud(projet.structure || [], nœudId) || "cet élément";
-    const confirmé = window.confirm(
-      t("confirmations.supprimerNoeud", { titre }) ||
-      `Supprimer « ${titre} » ? Cette action est définitive et ne peut pas être annulée.`
-    );
+    const nœudCible = trouverNœudComplet(projet.structure || [], nœudId);
+    const titre = nœudCible?.titre || "cet élément";
+    const nbDescendants = nœudCible ? compterDescendants(nœudCible) : 0;
+
+    const message = nbDescendants > 0
+      ? (t("confirmations.supprimerNoeudAvecEnfants", { titre, count: nbDescendants }) ||
+         `Supprimer « ${titre} » ET ses ${nbDescendants} éléments enfants (sous-parties, notes, bibliographie) ? Cette action est définitive et ne peut pas être annulée.`)
+      : (t("confirmations.supprimerNoeud", { titre }) ||
+         `Supprimer « ${titre} » ? Cette action est définitive et ne peut pas être annulée.`);
+
+    const confirmé = window.confirm(message);
     if (!confirmé) return;
 
     const { error } = await nœudsAPI.supprimer(nœudId);
