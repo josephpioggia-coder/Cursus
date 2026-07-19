@@ -28,6 +28,9 @@
   },
   "demarrage": {
     "description": "Page blanche ? Le co-pilote peut proposer une piste de départ à partir de ce que vous avez déjà défini pour ce projet.",
+    "description_partie": "Cette partie est encore vide. Le co-pilote peut rappeler la colonne vertébrale de cette section et vous aider à structurer ses chapitres.",
+    "description_chapitre": "Page blanche ? Le co-pilote peut proposer plusieurs pistes de départ différentes pour ce chapitre.",
+    "description_scene": "Cette scène est encore vide. Le co-pilote peut s'appuyer sur vos citations et idées déjà enregistrées pour ce projet.",
     "bouton": "Aide au démarrage",
     "sansADN": "Complétez d'abord le questionnaire d'intention du projet pour activer cette aide."
   },
@@ -50,3 +53,4 @@
     "aucunProbleme": "✓ Aucun problème détecté."
   }
 }
+
