@@ -1,36 +1,36 @@
-{{
-  "_note": "GENRES et STATUTS ne sont volontairement PAS ici : ce sont des valeurs canoniques utilisées comme identifiants internes (ex. typeProjet dérivé de projet.genre). Les traduire casserait cette logique — voir la note de fin de fichier dans App.jsx.",
+{
+  "_note": "GENRES et STATUTS ne sont volontairement PAS ici.",
 
   "marque": "Cursus",
-  "chargement": "Chargement…",
-  "deconnexion": "Déconnexion",
+  "chargement": "Chargement...",
+  "deconnexion": "Deconnexion",
 
   "aide": {
     "bouton": "Aide",
     "titre": "Centre d'aide",
     "vide": "Aucune question pour l'instant.",
-    "pied": "Vous ne trouvez pas votre réponse ? Écrivez à bonjour@cursus.pro"
+    "pied": "Vous ne trouvez pas votre reponse ? Ecrivez a bonjour@cursus.pro"
   },
   "faq": [
     {
-      "question": "Comment revenir à une question précédente dans le questionnaire ADN ?",
-      "reponse": "Sous le bouton \"Suivant\", cliquez sur \"← Question précédente\". Vos réponses ne sont jamais perdues, même en revenant en arrière."
+      "question": "Comment revenir a une question precedente dans le questionnaire ADN ?",
+      "reponse": "Sous le bouton Suivant, cliquez sur Question precedente. Vos reponses ne sont jamais perdues, meme en revenant en arriere."
     },
     {
       "question": "Le questionnaire affiche une erreur de connexion, que faire ?",
-      "reponse": "Vos réponses précédentes sont déjà enregistrées. Cliquez sur le bouton \"Recharger la page\" qui apparaît, ou faites Ctrl+Shift+R (Ctrl+F5 sur certains claviers)."
+      "reponse": "Vos reponses precedentes sont deja enregistrees. Cliquez sur le bouton Recharger la page, ou faites Ctrl+Shift+R."
     },
     {
-      "question": "Puis-je reporter le questionnaire ADN à plus tard ?",
-      "reponse": "Oui. Cliquez sur \"Reporter à plus tard\" : vos réponses sont conservées, et le questionnaire reprendra exactement là où vous vous êtes arrêté la prochaine fois que vous ouvrirez ce projet."
+      "question": "Puis-je reporter le questionnaire ADN a plus tard ?",
+      "reponse": "Oui. Cliquez sur Reporter a plus tard : vos reponses sont conservees, et le questionnaire reprendra ou vous vous etes arrete."
     },
     {
       "question": "Comment changer le genre ou la couleur de mon projet ?",
-      "reponse": "Ouvrez le formulaire du projet et modifiez le champ Genre. La couleur suit automatiquement le genre choisi, sauf si vous cliquez vous-même sur une autre pastille de couleur."
+      "reponse": "Ouvrez le formulaire du projet et modifiez le champ Genre. La couleur suit automatiquement le genre choisi, sauf si vous cliquez vous-meme sur une autre pastille de couleur."
     },
     {
       "question": "Le co-pilote IA affiche une erreur de session",
-      "reponse": "Votre session a probablement expiré. Déconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
+      "reponse": "Votre session a probablement expire. Deconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
     }
   ],
 
@@ -44,9 +44,9 @@
   "navigation": {
     "titre": "Navigation",
     "tableauDeBord": "Tableau de bord",
-    "editeur": "Éditeur",
-    "bibliotheque": "Bibliothèque",
-    "carnetIdees": "Carnet d'idées",
+    "editeur": "Editeur",
+    "bibliotheque": "Bibliotheque",
+    "carnetIdees": "Carnet d'idees",
     "tarification": "Tarification"
   },
 
@@ -58,16 +58,16 @@
   },
 
   "sidebarBibliotheque": {
-    "titre": "Bibliothèque",
+    "titre": "Bibliotheque",
     "enCoursLecture": "En cours de lecture",
     "citations": "Citations",
-    "carnetIdees": "Carnet d'idées"
+    "carnetIdees": "Carnet d'idees"
   },
 
   "structureTypes": {
     "partie": "Partie",
     "chapitre": "Chapitre",
-    "scene": "Scène"
+    "scene": "Scene"
   },
 
   "actions": {
@@ -78,24 +78,24 @@
     "descendre": "Descendre",
     "supprimerCeProjet": "Supprimer ce projet",
     "retourAuxProjets": "Retour aux projets",
-    "retourALaStructure": "Retour à la structure",
+    "retourALaStructure": "Retour a la structure",
     "retour": "Retour"
   },
 
   "confirmations": {
-    "supprimerProjet": "Supprimer ce projet ? Cette action est irréversible.",
-    "supprimerNoeud": "Supprimer « {{titre}} » ? Cette action est définitive et ne peut pas être annulée.",
-    "supprimerNoeudAvecEnfants": "Supprimer « {{titre}} » ET ses {{count}} éléments enfants (sous-parties, notes, bibliographie) ? Cette action est définitive et ne peut pas être annulée."
+    "supprimerProjet": "Supprimer ce projet ? Cette action est irreversible.",
+    "supprimerNoeud": "Supprimer {{titre}} ? Cette action est definitive et ne peut pas etre annulee.",
+    "supprimerNoeudAvecEnfants": "Supprimer {{titre}} ET ses {{count}} elements enfants (sous-parties, notes, bibliographie) ? Cette action est definitive et ne peut pas etre annulee."
   },
   "erreur": {
-    "creationNoeud": "Impossible de créer cet élément. Vérifiez votre connexion et réessayez.",
-    "renommageNoeud": "Impossible de renommer cet élément. Vérifiez votre connexion et réessayez.",
-    "suppressionNoeud": "Impossible de supprimer cet élément. Vérifiez votre connexion et réessayez.",
-    "deplacementNoeud": "Impossible de déplacer cet élément. Vérifiez votre connexion et réessayez."
+    "creationNoeud": "Impossible de creer cet element. Verifiez votre connexion et reessayez.",
+    "renommageNoeud": "Impossible de renommer cet element. Verifiez votre connexion et reessayez.",
+    "suppressionNoeud": "Impossible de supprimer cet element. Verifiez votre connexion et reessayez.",
+    "deplacementNoeud": "Impossible de deplacer cet element. Verifiez votre connexion et reessayez."
   },
 
   "carteProjet": {
-    "motsRediges": "{{count}} mots rédigés",
+    "motsRediges": "{{count}} mots rediges",
     "objectif": "Objectif : {{count}}",
     "supprimerTitre": "Supprimer ce projet"
   },
@@ -103,14 +103,14 @@
   "formulaireProjet": {
     "titre": "Nouveau projet",
     "titreChamp": "Titre du projet *",
-    "titrePlaceholder": "Ex : La Méthode 361°+i",
+    "titrePlaceholder": "Ex : La Methode 361 i",
     "genre": "Genre",
     "statut": "Statut",
     "objectifMots": "Objectif (nombre de mots)",
     "description": "Description courte",
     "descriptionPlaceholder": "En quelques mots, de quoi parle ce projet ?",
     "couleur": "Couleur du projet",
-    "creer": "Créer le projet",
+    "creer": "Creer le projet",
     "annuler": "Annuler"
   },
 
@@ -119,23 +119,22 @@
     "ajouterPartie": "+ Partie",
     "ajouterPartieTitre": "Ajouter une partie",
     "aucuneStructure": "Aucune structure pour l'instant.",
-    "ajouterPremierePartie": "Ajouter la première partie"
+    "ajouterPremierePartie": "Ajouter la premiere partie"
   },
 
   "panneauNoeud": {
-    "ouvrirEditeur": "✍️ Ouvrir l'éditeur",
+    "ouvrirEditeur": "Ouvrir l'editeur",
     "chapitreVide": "Ce chapitre est vide.",
-    "commencerAEcrire": "Commencer à écrire"
+    "commencerAEcrire": "Commencer a ecrire"
   },
 
   "vues": {
     "mesProjets": "Mes projets",
     "nouveauProjetBtn": "+ Nouveau projet",
     "aucunProjetTitre": "Aucun projet pour l'instant",
-    "creerPremierProjet": "Créer mon premier projet",
-    "importerWord": "📄 Importer un fichier Word",
-    "selectionnerChapitre": "Sélectionnez un chapitre dans la structure pour commencer à écrire.",
+    "creerPremierProjet": "Creer mon premier projet",
+    "importerWord": "Importer un fichier Word",
+    "selectionnerChapitre": "Selectionnez un chapitre dans la structure pour commencer a ecrire.",
     "voirStructure": "Voir la structure",
-    "selectionnerChapitreOuScene": "Sélectionnez un chapitre ou une scène dans la structure pour commencer à écrire."
+    "selectionnerChapitreOuScene": "Selectionnez un chapitre ou une scene dans la structure pour commencer a ecrire."
   }
-}
