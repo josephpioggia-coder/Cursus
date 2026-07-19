@@ -1,8 +1,10 @@
-{
+{{
   "_note": "GENRES et STATUTS ne sont volontairement PAS ici : ce sont des valeurs canoniques utilisées comme identifiants internes (ex. typeProjet dérivé de projet.genre). Les traduire casserait cette logique — voir la note de fin de fichier dans App.jsx.",
+
   "marque": "Cursus",
   "chargement": "Chargement…",
   "deconnexion": "Déconnexion",
+
   "aide": {
     "bouton": "Aide",
     "titre": "Centre d'aide",
@@ -31,12 +33,14 @@
       "reponse": "Votre session a probablement expiré. Déconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
     }
   ],
+
   "mots_one": "{{count}} mot",
   "mots_other": "{{count}} mots",
   "projets_one": "{{count}} projet",
   "projets_other": "{{count}} projets",
   "parties_one": "{{count}} partie",
   "parties_other": "{{count}} parties",
+
   "navigation": {
     "titre": "Navigation",
     "tableauDeBord": "Tableau de bord",
@@ -45,23 +49,27 @@
     "carnetIdees": "Carnet d'idées",
     "tarification": "Tarification"
   },
+
   "sidebarProjets": {
     "titre": "Projets actifs",
     "nouveau": "+ Nouveau",
     "nouveauTitre": "Nouveau projet",
     "aucun": "Aucun projet. Cliquez sur + Nouveau."
   },
+
   "sidebarBibliotheque": {
     "titre": "Bibliothèque",
     "enCoursLecture": "En cours de lecture",
     "citations": "Citations",
     "carnetIdees": "Carnet d'idées"
   },
+
   "structureTypes": {
     "partie": "Partie",
     "chapitre": "Chapitre",
     "scene": "Scène"
   },
+
   "actions": {
     "ajouter": "Ajouter {{label}}",
     "renommer": "Renommer",
@@ -73,9 +81,11 @@
     "retourALaStructure": "Retour à la structure",
     "retour": "Retour"
   },
+
   "confirmations": {
     "supprimerProjet": "Supprimer ce projet ? Cette action est irréversible.",
-    "supprimerNoeud": "Supprimer « {{titre}} » ? Cette action est définitive et ne peut pas être annulée."
+    "supprimerNoeud": "Supprimer « {{titre}} » ? Cette action est définitive et ne peut pas être annulée.",
+    "supprimerNoeudAvecEnfants": "Supprimer « {{titre}} » ET ses {{count}} éléments enfants (sous-parties, notes, bibliographie) ? Cette action est définitive et ne peut pas être annulée."
   },
   "erreur": {
     "creationNoeud": "Impossible de créer cet élément. Vérifiez votre connexion et réessayez.",
@@ -83,11 +93,13 @@
     "suppressionNoeud": "Impossible de supprimer cet élément. Vérifiez votre connexion et réessayez.",
     "deplacementNoeud": "Impossible de déplacer cet élément. Vérifiez votre connexion et réessayez."
   },
+
   "carteProjet": {
     "motsRediges": "{{count}} mots rédigés",
     "objectif": "Objectif : {{count}}",
     "supprimerTitre": "Supprimer ce projet"
   },
+
   "formulaireProjet": {
     "titre": "Nouveau projet",
     "titreChamp": "Titre du projet *",
@@ -101,6 +113,7 @@
     "creer": "Créer le projet",
     "annuler": "Annuler"
   },
+
   "vueProjet": {
     "structureManuscrit": "Structure du manuscrit",
     "ajouterPartie": "+ Partie",
@@ -108,11 +121,13 @@
     "aucuneStructure": "Aucune structure pour l'instant.",
     "ajouterPremierePartie": "Ajouter la première partie"
   },
+
   "panneauNoeud": {
     "ouvrirEditeur": "✍️ Ouvrir l'éditeur",
     "chapitreVide": "Ce chapitre est vide.",
     "commencerAEcrire": "Commencer à écrire"
   },
+
   "vues": {
     "mesProjets": "Mes projets",
     "nouveauProjetBtn": "+ Nouveau projet",
