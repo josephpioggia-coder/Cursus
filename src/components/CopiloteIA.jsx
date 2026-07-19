@@ -7,6 +7,14 @@
  * - Tous les textes d'interface passent par t('copilote.xxx')
  * - `langueProjet` est propagée à claude-prox pour que la réponse générée
  *   par l'IA soit dans la langue du projet, pas seulement l'UI autour d'elle
+ *
+ * MODIF 20/07/2026 : l'aide au démarrage d'un CHAPITRE sans titre s'appuie
+ * désormais sur deux informations transmises par App.jsx :
+ *   - titrePartieParente : titre de la Partie qui contient ce chapitre
+ *   - titresChapitresVoisins : titres des chapitres frères déjà nommés
+ * Avant cette modif, un chapitre sans titre produisait des suggestions
+ * génériques sur "pourquoi ce chapitre n'a pas de titre" plutôt que des
+ * pistes ancrées dans la place réelle du chapitre dans le manuscrit.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -135,7 +143,14 @@ const PROMPTS = {
   // Aide au démarrage — ajouté le 18/07/2026, différencié par niveau le
   // 19/07/2026. Trois comportements distincts selon que la page blanche est
   // une Partie, un Chapitre ou une Scène — pas un seul mode générique.
-  demarrage: (typeNœud, titresEnfants = [], notesEtCitations = null) => {
+  //
+  // MODIF 20/07/2026 : pour un Chapitre dont le titre est vide ou générique
+  // ("Chapitre sans titre" / "Chapter untitled"), on injecte désormais le
+  // titre de la Partie parente et les titres des chapitres frères déjà
+  // nommés, pour ancrer les 4 pistes dans la place réelle du chapitre dans
+  // le manuscrit — plutôt que de laisser le modèle philosopher sur
+  // l'absence de titre elle-même, ce qui n'aide pas concrètement l'auteur.
+  demarrage: (typeNœud, titreNœud, titresEnfants = [], notesEtCitations = null, titrePartieParente = null, titresChapitresVoisins = []) => {
     if (typeNœud === "partie") {
       const chapitresConnus = titresEnfants.length > 0
         ? `Cette partie contient déjà ces chapitres : ${titresEnfants.join(", ")}. Appuie-toi dessus.`
@@ -150,8 +165,22 @@ const PROMPTS = {
       return `Tu es le co-pilote d'un écrivain qui ouvre une "Scène" encore vide — le niveau le plus fin du manuscrit (souvent une note, un repère de lecture, ou un développement court). ${blocRéférences} À partir du titre de cette scène et du contexte du projet, propose des pistes de démarrage adaptées à ce niveau de détail : rappels de cohérence à surveiller, précisions utiles sur des personnages ou des références bibliographiques déjà notées, ou toute piste concrète et courte pour ce point précis. Reste bref — une scène n'a pas besoin d'un plan, juste d'un point de départ. Réponds UNIQUEMENT en JSON valide, avec exactement 3 suggestions :
 {"suggestions":[{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`;
     }
+
     // chapitre (par défaut)
-    return `Tu es le co-pilote d'un écrivain qui ouvre un "Chapitre" encore vide. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus et sur le titre du chapitre donné. Propose exactement 4 pistes de nature DIFFÉRENTE les unes des autres pour amorcer précisément CE chapitre — varie les approches, ne répète pas le même type d'angle : un titre alternatif possiblement plus juste, une situation ou un cas concret par lequel entrer dans le sujet, une explication du titre lui-même (ce qu'il signifie, pourquoi ce mot), et une énigme ou question qui intrigue le lecteur dès l'ouverture. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
+    const titreEstVide = !titreNœud || /sans titre|untitled/i.test(titreNœud);
+
+    let contexteChapitreSansTitre = "";
+    if (titreEstVide) {
+      const partieInfo = titrePartieParente
+        ? `Ce chapitre appartient à la partie "${titrePartieParente}" : c'est ton point d'ancrage principal — chaque piste doit se rattacher clairement à cette colonne vertébrale, pas rester générique.`
+        : `Aucune partie parente identifiée pour ce chapitre.`;
+      const voisinsInfo = titresChapitresVoisins.length > 0
+        ? `D'autres chapitres de cette même partie portent déjà ces titres : ${titresChapitresVoisins.join(", ")}. Positionne ce chapitre par rapport à eux (ce qu'il apporte de nouveau, sa place probable dans la progression) — ne propose rien qui ferait doublon avec l'un d'eux.`
+        : `Aucun autre chapitre de cette partie n'a encore de titre défini : ce chapitre est probablement le premier, ou l'un des tout premiers, de cette partie.`;
+      contexteChapitreSansTitre = `IMPORTANT — ce chapitre n'a pas encore de titre. ${partieInfo} ${voisinsInfo} Tes 4 pistes doivent être des propositions concrètes ancrées dans ce contexte réel (la partie, les chapitres voisins) — PAS une réflexion sur le sens ou la valeur de l'absence de titre elle-même. Le titre alternatif que tu proposes en piste "reformulation" doit être un vrai candidat de titre pour ce chapitre, cohérent avec les titres déjà utilisés dans cette partie.\n\n`;
+    }
+
+    return `${contexteChapitreSansTitre}Tu es le co-pilote d'un écrivain qui ouvre un "Chapitre" encore vide. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus et sur le titre du chapitre donné. Propose exactement 4 pistes de nature DIFFÉRENTE les unes des autres pour amorcer précisément CE chapitre — varie les approches, ne répète pas le même type d'angle : un titre alternatif possiblement plus juste, une situation ou un cas concret par lequel entrer dans le sujet, une explication du titre lui-même (ce qu'il signifie, pourquoi ce mot), et une énigme ou question qui intrigue le lecteur dès l'ouverture. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"reformulation","titre":"...","texte":"..."},{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`;
   },
 };
@@ -295,7 +324,7 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], langueProjet = "fr", projetId = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
   // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
@@ -393,6 +422,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
+  // MODIF 20/07/2026 : transmet aussi titrePartieParente et
+  // titresChapitresVoisins pour ancrer les pistes d'un chapitre sans titre.
   const analyserDémarrage = useCallback(async () => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -402,7 +433,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const sig = abortRef.current.signal;
       const notesEtCitations = typeNœud === "scene" ? await chargerNotesEtCitations(projetId) : null;
       const résultat = await appelClaude(
-        systemAvecLangue(PROMPTS.demarrage(typeNœud, titresEnfants, notesEtCitations), langueProjet, contexteADN),
+        systemAvecLangue(
+          PROMPTS.demarrage(typeNœud, titreNœud, titresEnfants, notesEtCitations, titrePartieParente, titresChapitresVoisins),
+          langueProjet,
+          contexteADN
+        ),
         `Titre à démarrer (${typeNœud}) : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
         sig, 2048
       );
@@ -416,7 +451,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, suggestions: false }));
     }
-  }, [titreNœud, typeNœud, titresEnfants, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
+  }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
 
   useEffect(() => {
     if (modeAuto) {
