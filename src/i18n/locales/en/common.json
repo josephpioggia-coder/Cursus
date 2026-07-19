@@ -1,55 +1,142 @@
 {
-  "titre": "Co-pilote IA",
-  "onglets": {
-    "suggestions": "Suggestions",
-    "personnages": "Personnages",
-    "references": "Références",
-    "coherence": "Cohérence"
+  "_note": "GENRES et STATUTS ne sont volontairement PAS ici.",
+
+  "marque": "Cursus",
+  "chargement": "Chargement...",
+  "deconnexion": "Deconnexion",
+
+  "aide": {
+    "bouton": "Aide",
+    "titre": "Centre d'aide",
+    "vide": "Aucune question pour l'instant.",
+    "pied": "Vous ne trouvez pas votre reponse ? Ecrivez a bonjour@cursus.pro"
   },
-  "modeAuto": {
-    "label": "Auto",
-    "banniere": "Analyse automatique toutes les 10 minutes. Utilisez « Analyser maintenant » pour forcer une analyse immédiate."
+  "faq": [
+    {
+      "question": "Comment revenir a une question precedente dans le questionnaire ADN ?",
+      "reponse": "Sous le bouton Suivant, cliquez sur Question precedente. Vos reponses ne sont jamais perdues, meme en revenant en arriere."
+    },
+    {
+      "question": "Le questionnaire affiche une erreur de connexion, que faire ?",
+      "reponse": "Vos reponses precedentes sont deja enregistrees. Cliquez sur le bouton Recharger la page, ou faites Ctrl+Shift+R."
+    },
+    {
+      "question": "Puis-je reporter le questionnaire ADN a plus tard ?",
+      "reponse": "Oui. Cliquez sur Reporter a plus tard : vos reponses sont conservees, et le questionnaire reprendra ou vous vous etes arrete."
+    },
+    {
+      "question": "Comment changer le genre ou la couleur de mon projet ?",
+      "reponse": "Ouvrez le formulaire du projet et modifiez le champ Genre. La couleur suit automatiquement le genre choisi, sauf si vous cliquez vous-meme sur une autre pastille de couleur."
+    },
+    {
+      "question": "Le co-pilote IA affiche une erreur de session",
+      "reponse": "Votre session a probablement expire. Deconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
+    }
+  ],
+
+  "mots_one": "{{count}} mot",
+  "mots_other": "{{count}} mots",
+  "projets_one": "{{count}} projet",
+  "projets_other": "{{count}} projets",
+  "parties_one": "{{count}} partie",
+  "parties_other": "{{count}} parties",
+
+  "navigation": {
+    "titre": "Navigation",
+    "tableauDeBord": "Tableau de bord",
+    "editeur": "Editeur",
+    "bibliotheque": "Bibliotheque",
+    "carnetIdees": "Carnet d'idees",
+    "tarification": "Tarification"
   },
-  "bouton": {
-    "analyser": "↻ Analyser maintenant",
-    "forcerAnalyse": "↻ Forcer une analyse maintenant",
-    "enCours": "Analyse en cours…"
+
+  "sidebarProjets": {
+    "titre": "Projets actifs",
+    "nouveau": "+ Nouveau",
+    "nouveauTitre": "Nouveau projet",
+    "aucun": "Aucun projet. Cliquez sur + Nouveau."
+  },
+
+  "sidebarBibliotheque": {
+    "titre": "Bibliotheque",
+    "enCoursLecture": "En cours de lecture",
+    "citations": "Citations",
+    "carnetIdees": "Carnet d'idees"
+  },
+
+  "structureTypes": {
+    "partie": "Partie",
+    "chapitre": "Chapitre",
+    "scene": "Scene"
+  },
+
+  "actions": {
+    "ajouter": "Ajouter {{label}}",
+    "renommer": "Renommer",
+    "supprimer": "Supprimer",
+    "monter": "Monter",
+    "descendre": "Descendre",
+    "supprimerCeProjet": "Supprimer ce projet",
+    "retourAuxProjets": "Retour aux projets",
+    "retourALaStructure": "Retour a la structure",
+    "retour": "Retour"
+  },
+
+  "confirmations": {
+    "supprimerProjet": "Supprimer ce projet ? Cette action est irreversible.",
+    "supprimerNoeud": "Supprimer {{titre}} ? Cette action est definitive et ne peut pas etre annulee.",
+    "supprimerNoeudAvecEnfants": "Supprimer {{titre}} ET ses {{count}} elements enfants (sous-parties, notes, bibliographie) ? Cette action est definitive et ne peut pas etre annulee."
   },
   "erreur": {
-    "motsInsuffisants": "Écrivez au moins 20 mots pour activer l'analyse.",
-    "sessionExpiree": "Session expirée. Reconnectez-vous.",
-    "generique": "Le co-pilote n'a pas pu traiter ce passage.",
-    "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
+    "creationNoeud": "Impossible de creer cet element. Verifiez votre connexion et reessayez.",
+    "renommageNoeud": "Impossible de renommer cet element. Verifiez votre connexion et reessayez.",
+    "suppressionNoeud": "Impossible de supprimer cet element. Verifiez votre connexion et reessayez.",
+    "deplacementNoeud": "Impossible de deplacer cet element. Verifiez votre connexion et reessayez."
   },
-  "selection": {
-    "analyserSelection": "Sélection ({{count}} mots)",
-    "analyserTout": "Tout le chapitre",
-    "texteTropVolumineux": "Ce texte fait {{count}} caractères — trop volumineux pour garantir une analyse complète. Réduisez la partie surlignée (par exemple une section plutôt que tout le chapitre) avant de relancer."
+
+  "carteProjet": {
+    "motsRediges": "{{count}} mots rediges",
+    "objectif": "Objectif : {{count}}",
+    "supprimerTitre": "Supprimer ce projet"
   },
-  "demarrage": {
-    "description": "Page blanche ? Le co-pilote peut proposer une piste de départ à partir de ce que vous avez déjà défini pour ce projet.",
-    "description_partie": "Cette partie est encore vide. Le co-pilote peut rappeler la colonne vertébrale de cette section et vous aider à structurer ses chapitres.",
-    "description_chapitre": "Page blanche ? Le co-pilote peut proposer plusieurs pistes de départ différentes pour ce chapitre.",
-    "description_scene": "Cette scène est encore vide. Le co-pilote peut s'appuyer sur vos citations et idées déjà enregistrées pour ce projet.",
-    "bouton": "Aide au démarrage",
-    "sansADN": "Complétez d'abord le questionnaire d'intention du projet pour activer cette aide."
+
+  "formulaireProjet": {
+    "titre": "Nouveau projet",
+    "titreChamp": "Titre du projet *",
+    "titrePlaceholder": "Ex : La Methode 361 i",
+    "genre": "Genre",
+    "statut": "Statut",
+    "objectifMots": "Objectif (nombre de mots)",
+    "description": "Description courte",
+    "descriptionPlaceholder": "En quelques mots, de quoi parle ce projet ?",
+    "couleur": "Couleur du projet",
+    "creer": "Creer le projet",
+    "annuler": "Annuler"
   },
-  "videEtat": {
-    "suggestions": "Suggestions contextuelles basées sur votre texte en cours.",
-    "personnages": "Extraction et analyse de cohérence des personnages.",
-    "references": "Références académiques APA pour étayer votre argumentation.",
-    "coherence": "Détection d'incohérences et faiblesses structurelles."
+
+  "vueProjet": {
+    "structureManuscrit": "Structure du manuscrit",
+    "ajouterPartie": "+ Partie",
+    "ajouterPartieTitre": "Ajouter une partie",
+    "aucuneStructure": "Aucune structure pour l'instant.",
+    "ajouterPremierePartie": "Ajouter la premiere partie"
   },
-  "personnages": {
-    "aucun": "Aucun personnage détecté."
+
+  "panneauNoeud": {
+    "ouvrirEditeur": "Ouvrir l'editeur",
+    "chapitreVide": "Ce chapitre est vide.",
+    "commencerAEcrire": "Commencer a ecrire"
   },
-  "references": {
-    "aucune": "Aucune référence suggérée.",
-    "pageSuggeree": "Page suggérée : {{page}}",
-    "copier": "📋 Copier APA",
-    "copie": "✓ Copié !"
-  },
-  "coherence": {
-    "aucunProbleme": "✓ Aucun problème détecté."
+
+  "vues": {
+    "mesProjets": "Mes projets",
+    "nouveauProjetBtn": "+ Nouveau projet",
+    "aucunProjetTitre": "Aucun projet pour l'instant",
+    "creerPremierProjet": "Creer mon premier projet",
+    "importerWord": "Importer un fichier Word",
+    "selectionnerChapitre": "Selectionnez un chapitre dans la structure pour commencer a ecrire.",
+    "voirStructure": "Voir la structure",
+    "selectionnerChapitreOuScene": "Selectionnez un chapitre ou une scene dans la structure pour commencer a ecrire."
   }
 }
+
