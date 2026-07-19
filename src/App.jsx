@@ -12,6 +12,13 @@
  * - langueProjet propagée depuis projetActif.langue vers CopiloteIA et
  *   QuestionnaireIntention (colonne `langue` sur `projets`, défaut 'fr' —
  *   à confirmer que la migration existe déjà, sinon fallback sur 'fr' suffit)
+ *
+ * MODIF 20/07/2026 : ajout de trouverContexteHiérarchique() — calcule, pour
+ * le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les titres
+ * des chapitres frères déjà nommés. Transmis à CopiloteIA pour que l'aide au
+ * démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel plutôt que
+ * de rester générique. Voir props titrePartieParente / titresChapitresVoisins
+ * sur <CopiloteIA>.
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -1177,6 +1184,45 @@ function AppConnectée({ user, déconnecter }) {
 
   const nœudActif = projetActif ? trouverNœud(projetActif.structure, nœudActifId) : null;
 
+  // Calcule le contexte hiérarchique d'un nœud (titre de la partie parente,
+  // titres des chapitres frères déjà nommés) — utilisé par le co-pilote pour
+  // l'aide au démarrage d'un chapitre SANS TITRE. Ajouté le 20/07/2026.
+  const trouverContexteHiérarchique = (structure, id) => {
+    const chercherChemin = (liste, cible, chemin) => {
+      for (const n of liste) {
+        if (n.id === cible) return [...chemin, n];
+        if (n.enfants?.length) {
+          const trouvé = chercherChemin(n.enfants, cible, [...chemin, n]);
+          if (trouvé) return trouvé;
+        }
+      }
+      return null;
+    };
+    const chemin = chercherChemin(structure || [], id, []);
+    if (!chemin) return { titrePartieParente: null, titresChapitresVoisins: [] };
+
+    const nœudCible = chemin[chemin.length - 1];
+    const parentDirect = chemin.length >= 2 ? chemin[chemin.length - 2] : null;
+
+    // Remonte le chemin pour trouver l'ancêtre le plus proche de type "partie"
+    const partieAncêtre = [...chemin].reverse().find((n) => n.type === "partie" && n.id !== nœudCible.id);
+    const titrePartieParente = partieAncêtre?.titre || null;
+
+    // Frères du même niveau (même parent direct, ou racine du projet si le
+    // nœud est lui-même une partie), limités aux chapitres déjà nommés
+    // (on exclut les autres chapitres eux-mêmes encore "sans titre").
+    const fratrie = parentDirect ? (parentDirect.enfants || []) : (structure || []);
+    const titresChapitresVoisins = fratrie
+      .filter((n) => n.id !== nœudCible.id && n.type === "chapitre" && n.titre && !/sans titre|untitled/i.test(n.titre))
+      .map((n) => n.titre);
+
+    return { titrePartieParente, titresChapitresVoisins };
+  };
+
+  const contexteHiérarchiqueActif = (projetActif && nœudActif)
+    ? trouverContexteHiérarchique(projetActif.structure, nœudActif.id)
+    : { titrePartieParente: null, titresChapitresVoisins: [] };
+
   // ── Actions projets ──
 
   const créerProjet = async (données) => {
@@ -1555,6 +1601,10 @@ function AppConnectée({ user, déconnecter }) {
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
                 titreNœud={nœudActif.titre || ""}
+                typeNœud={nœudActif.type || "chapitre"}
+                titresEnfants={(nœudActif.enfants || []).map((e) => e.titre)}
+                titrePartieParente={contexteHiérarchiqueActif.titrePartieParente}
+                titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
               />
