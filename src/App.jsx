@@ -684,36 +684,11 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
       }
     }
 
-    // CASCADE 21/07/2026 — sans ça, promouvoir un chapitre en partie laissait
-    // ses scènes directes au type "scene", incohérent sous une partie (dont
-    // le type d'enfant attendu est "chapitre") : il fallait alors les
-    // reclasser une par une manuellement. Un seul niveau de cascade suffit —
-    // les petits-enfants restent cohérents automatiquement grâce à
-    // l'auto-imbrication des scènes (l'enfant d'une scène est une scène).
-    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
-    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
-    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
-    if (nouveauTypeEnfants) {
-      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
-      if (enfantsÀCorriger.length > 0) {
-        const résultats = await Promise.all(
-          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
-        );
-        const échec = résultats.find((r) => r.error);
-        if (échec) {
-          journaliserErreur("VueProjet:promouvoirNœud (cascade enfants)", échec.error.message, projet.id);
-          window.alert("L'élément a été promu, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
-        }
-        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
-        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
-      }
-    }
-
     let nœudExtrait = null;
     const extraire = (liste) =>
       liste
         .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
           return true;
         })
         .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
@@ -775,33 +750,11 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
       window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
     }
 
-    // CASCADE 21/07/2026 — symétrique de celle de promouvoirNœud : une
-    // partie rétrogradée en chapitre doit voir ses chapitres directs
-    // devenir des scènes, sinon la hiérarchie reste incohérente.
-    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
-    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
-    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
-    if (nouveauTypeEnfants) {
-      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
-      if (enfantsÀCorriger.length > 0) {
-        const résultats = await Promise.all(
-          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
-        );
-        const échec = résultats.find((r) => r.error);
-        if (échec) {
-          journaliserErreur("VueProjet:rétrograderNœud (cascade enfants)", échec.error.message, projet.id);
-          window.alert("L'élément a été rétrogradé, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
-        }
-        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
-        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
-      }
-    }
-
     let nœudExtrait = null;
     const extraire = (liste) =>
       liste
         .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
           return true;
         })
         .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
