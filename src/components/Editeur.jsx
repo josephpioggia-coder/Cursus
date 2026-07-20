@@ -14,7 +14,7 @@
  *   - Mode structure (sidebar arborescence visible)
  *   - Triple objectif : journalier / session (minuterie) / chapitre
  *   - Sauvegarde automatique toutes les 30s + indicateur d'état
- *   - Historique de versions par session (snapshots horodatés)
+ *   - Historique de versions PERMANENT et daté, par nœud (voir MODIF 21/07)
  *   - Statistiques de session : mots, durée, rythme
  *
  * Correctif 16/07/2026 : ajout de minHeight:0 sur les conteneurs flex
@@ -23,6 +23,14 @@
  * la page qui se met à défiler au lieu du texte seul, entraînant le
  * panneau Co-pilote IA avec elle (symptôme observé : les deux panneaux
  * semblent défiler ensemble).
+ *
+ * MODIF 21/07/2026 — Historique de versions permanent : l'historique
+ * n'était auparavant stocké que dans un useState local, perdu à chaque
+ * rechargement de page ou changement de chapitre. Il est désormais lu et
+ * écrit dans la table Supabase `versions_noeuds` (créée le 21/07/2026).
+ * Effet de bord bénéfique : ça corrige aussi une fuite silencieuse où
+ * l'historique d'un chapitre pouvait rester affiché en ouvrant un autre
+ * chapitre, faute de réinitialisation explicite au changement de nœud.
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -34,6 +42,8 @@ import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { supabase } from "../lib/supabase.js";
+import { journaliserErreur } from "../lib/journalErreurs.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -51,8 +61,19 @@ const formaterDurée = (secondes) => {
   return `${s}s`;
 };
 
-const horodatage = () =>
-  new Date().toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
+// Formate un horodatage de version : juste l'heure si c'est aujourd'hui,
+// jour/mois + heure sinon — utile maintenant que l'historique est permanent
+// et peut donc contenir des versions vieilles de plusieurs jours, pas
+// seulement de la session en cours. Ajouté 21/07/2026, remplace l'ancienne
+// fonction horodatage() qui ne gérait que "maintenant".
+const formaterDateHeure = (isoString) => {
+  const d = new Date(isoString);
+  const heure = d.toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
+  const estAujourdHui = d.toDateString() === new Date().toDateString();
+  if (estAujourdHui) return heure;
+  const jourMois = d.toLocaleDateString("fr-BE", { day: "2-digit", month: "2-digit" });
+  return `${jourMois} ${heure}`;
+};
 
 // ─── Styles globaux de l'éditeur (injectés une seule fois) ─────────────────────
 
@@ -292,8 +313,10 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
 }
 
 // ─── Composant : Panneau historique ──────────────────────────────────────────────
+// MODIF 21/07/2026 : "Historique de session" renommé "Historique des versions" —
+// ce n'est plus limité à la session en cours, c'est désormais permanent.
 
-function PanneauHistorique({ historique, onRestaurer, onFermer, couleur }) {
+function PanneauHistorique({ historique, chargement, onRestaurer, onFermer, couleur }) {
   return (
     <div style={{
       width: 260, borderLeft: "0.5px solid #e5e5e5",
@@ -304,17 +327,21 @@ function PanneauHistorique({ historique, onRestaurer, onFermer, couleur }) {
         padding: "12px 14px", borderBottom: "0.5px solid #e5e5e5",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "#555" }}>Historique de session</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "#555" }}>Historique des versions</span>
         <button onClick={onFermer} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999" }}>×</button>
       </div>
-      {historique.length === 0 ? (
+      {chargement ? (
+        <div style={{ padding: "20px 14px", color: "#bbb", fontSize: 12, textAlign: "center" }}>
+          Chargement…
+        </div>
+      ) : historique.length === 0 ? (
         <div style={{ padding: "20px 14px", color: "#bbb", fontSize: 12, textAlign: "center" }}>
           Les versions apparaîtront ici au fil de l'écriture.
         </div>
       ) : (
         <div style={{ padding: "8px" }}>
-          {historique.map((v, i) => (
-            <div key={i} style={{
+          {historique.map((v) => (
+            <div key={v.id} style={{
               padding: "8px 10px", borderRadius: 8, marginBottom: 4,
               border: "0.5px solid #e5e5e5", background: "#fff",
             }}>
@@ -380,6 +407,7 @@ export default function Editeur({
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
   const [historique, setHistorique] = useState([]);
+  const [chargementHistorique, setChargementHistorique] = useState(false);
   const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
   const [objectifJournalier, setObjectifJournalier] = useState(500);
   const [objectifChapitre, setObjectifChapitre] = useState(0);
@@ -389,6 +417,12 @@ export default function Editeur({
   const timerSauvegarde = useRef(null);
   const timerSession = useRef(null);
   const contenuRef = useRef(nœud?.texte || "");
+  // Mots du dernier instantané connu pour CE nœud — sert à décider si un
+  // nouvel instantané mérite d'être créé (seuil de 50 mots de différence).
+  // Utilise une ref (pas un state) pour rester lisible de façon synchrone
+  // dans le callback différé de sauvegarde, sans dépendre d'une closure
+  // React potentiellement obsolète. Ajouté 21/07/2026.
+  const dernierMotsHistoriqueRef = useRef(null);
 
   // Injecter les styles TipTap une seule fois
   useEffect(() => {
@@ -414,6 +448,44 @@ export default function Editeur({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  // Charge l'historique de versions DEPUIS SUPABASE pour le nœud ouvert, et
+  // le recharge intégralement à chaque changement de chapitre — ce qui
+  // corrige au passage l'ancienne fuite où l'historique d'un chapitre
+  // précédent pouvait rester affiché en ouvrant un nouveau chapitre.
+  // Ajouté 21/07/2026 (remplace le useState local, perdu au rechargement).
+  useEffect(() => {
+    let annulé = false;
+    setHistorique([]);
+    dernierMotsHistoriqueRef.current = null;
+    if (!nœud?.id) return;
+
+    setChargementHistorique(true);
+    supabase
+      .from("versions_noeuds")
+      .select("id, contenu, mots, apercu, created_at")
+      .eq("noeud_id", nœud.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (annulé) return;
+        setChargementHistorique(false);
+        if (error) {
+          journaliserErreur("Editeur:chargerHistorique", error.message, nœud.id);
+          return;
+        }
+        const versions = (data || []).map((v) => ({
+          id: v.id,
+          contenu: v.contenu,
+          mots: v.mots,
+          aperçu: v.apercu,
+          horodatage: formaterDateHeure(v.created_at),
+        }));
+        setHistorique(versions);
+        dernierMotsHistoriqueRef.current = versions.length > 0 ? versions[0].mots : null;
+      });
+
+    return () => { annulé = true; };
+  }, [nœud?.id]);
 
   // Initialisation de l'éditeur TipTap
   const editor = useEditor({
@@ -459,21 +531,41 @@ export default function Editeur({
 
       // Sauvegarde différée (debounce 2s)
       clearTimeout(timerSauvegarde.current);
-      timerSauvegarde.current = setTimeout(() => {
+      timerSauvegarde.current = setTimeout(async () => {
         onSauvegarder?.(nœud.id, html);
         setStatutSauvegarde("sauvegardé");
 
-        // Snapshot historique toutes les 5 minutes ou 200 mots
-        setHistorique((prev) => {
-          const dernier = prev[0];
-          const motsCourants = compterMots(html);
-          const diffMots = dernier ? Math.abs(motsCourants - dernier.mots) : motsCourants;
-          if (diffMots < 50 && prev.length > 0) return prev;
+        // Instantané d'historique — MODIF 21/07/2026 : écrit désormais dans
+        // Supabase (table versions_noeuds) au lieu d'un simple état local.
+        // Seuil de 50 mots de différence conservé (évite de créer un
+        // instantané à chaque frappe), mais plus de plafond arbitraire à
+        // 20 versions : l'historique est désormais permanent, comme
+        // demandé.
+        const motsCourants = compterMots(html);
+        const dernierConnu = dernierMotsHistoriqueRef.current;
+        const diffMots = dernierConnu === null ? motsCourants : Math.abs(motsCourants - dernierConnu);
+        if (diffMots < 50 && dernierConnu !== null) return;
 
-          const aperçu = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) + "…";
-          const snapshot = { contenu: html, mots: motsCourants, aperçu, horodatage: horodatage() };
-          return [snapshot, ...prev].slice(0, 20); // garder 20 versions max
-        });
+        const apercu = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) + "…";
+        const { data, error } = await supabase
+          .from("versions_noeuds")
+          .insert({ noeud_id: nœud.id, contenu: html, mots: motsCourants, apercu })
+          .select()
+          .single();
+
+        if (error) {
+          journaliserErreur("Editeur:snapshotHistorique", error.message, nœud.id);
+          return; // le texte est déjà sauvegardé (onSauvegarder ci-dessus) ; seul l'instantané a échoué
+        }
+
+        dernierMotsHistoriqueRef.current = motsCourants;
+        setHistorique((prev) => [{
+          id: data.id,
+          contenu: data.contenu,
+          mots: data.mots,
+          aperçu: data.apercu,
+          horodatage: formaterDateHeure(data.created_at),
+        }, ...prev]);
       }, 2000);
     },
   });
@@ -603,6 +695,7 @@ export default function Editeur({
         {voirHistorique && !modeFocus && (
           <PanneauHistorique
             historique={historique}
+            chargement={chargementHistorique}
             onRestaurer={restaurerVersion}
             onFermer={() => setVoirHistorique(false)}
             couleur={projetCouleur}
