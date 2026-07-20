@@ -13,12 +13,17 @@
  *   QuestionnaireIntention (colonne `langue` sur `projets`, défaut 'fr' —
  *   à confirmer que la migration existe déjà, sinon fallback sur 'fr' suffit)
  *
- * MODIF 20/07/2026 : ajout de trouverContexteHiérarchique() — calcule, pour
- * le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les titres
- * des chapitres frères déjà nommés. Transmis à CopiloteIA pour que l'aide au
- * démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel plutôt que
- * de rester générique. Voir props titrePartieParente / titresChapitresVoisins
- * sur <CopiloteIA>.
+ * MODIF 20/07/2026 (a) : ajout de trouverContexteHiérarchique() — calcule,
+ * pour le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les
+ * titres des chapitres frères déjà nommés. Transmis à CopiloteIA pour que
+ * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel.
+ *
+ * MODIF 21/07/2026 : la promotion d'un nœud (bouton ⬆) change désormais
+ * AUSSI son type, pas seulement sa position. Une scène directement sous un
+ * chapitre, une fois promue, devient elle-même un chapitre (frère de son
+ * ancien parent) ; un chapitre promu devient une partie. Règle : le nœud
+ * promu prend le type de son ANCIEN PARENT, puisqu'il devient son frère.
+ * Corrige aussi un bug d'affichage du bouton ⬆ (voir NœudStructure).
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -192,12 +197,13 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
               fontSize: 10, color: "var(--texte-tertiaire)",
               transform: ouvert ? "rotate(90deg)" : "rotate(0deg)",
               transition: "transform 0.2s", userSelect: "none", width: 12,
+              flexShrink: 0,
             }}
           >▶</span>
-        ) : <span style={{ width: 12 }} />}
+        ) : <span style={{ width: 12, flexShrink: 0 }} />}
 
         {/* Icône type */}
-        <span style={{ fontSize: 13 }}>{typeInfo.icone}</span>
+        <span style={{ fontSize: 13, flexShrink: 0 }}>{typeInfo.icone}</span>
 
         {/* Titre ou champ renommage */}
         {enRenommage ? (
@@ -209,14 +215,26 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
             onKeyDown={(e) => { if (e.key === "Enter") validerRenommage(); if (e.key === "Escape") setEnRenommage(false); }}
             onClick={(e) => e.stopPropagation()}
             style={{
-              flex: 1, border: "none", background: "transparent",
+              flex: 1, minWidth: 0, border: "none", background: "transparent",
               fontSize: 13, color: "var(--texte-primaire)", outline: "none",
               fontFamily: "inherit",
             }}
           />
         ) : (
+          // CORRECTIF 21/07/2026 — BUG DU BOUTON ⬆ INVISIBLE : cette balise
+          // avait `flex: 1` mais pas `minWidth: 0`. En flexbox, un élément
+          // avec flex:1 ne peut par défaut jamais rétrécir sous la largeur
+          // de son propre contenu (min-width:auto implicite) — même avec
+          // "overflow: hidden, textOverflow: ellipsis" posés dessus. Avec
+          // beaucoup de boutons d'action affichés au survol (↑ ↓ + ⬆ menu
+          // ✎ ✕), la ligne entière devenait alors plus large que le
+          // panneau, et les derniers boutons (dont ⬆, souvent le plus à
+          // droite) se retrouvaient poussés hors de la zone visible, sans
+          // scroll horizontal évident pour l'utilisateur — d'où "invisible
+          // malgré un code correct". minWidth: 0 corrige ça en autorisant
+          // enfin le titre à rétrécir et l'ellipse à s'appliquer.
           <span style={{
-            flex: 1, fontSize: 13,
+            flex: 1, minWidth: 0, fontSize: 13,
             color: sélectionné === nœud.id ? projetCouleur : "var(--texte-secondaire)",
             fontWeight: sélectionné === nœud.id ? 500 : 400,
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -227,14 +245,14 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
 
         {/* Mots du nœud */}
         {compterMots(nœud.texte) > 0 && (
-          <span style={{ fontSize: 10, color: "var(--texte-tertiaire)" }}>
+          <span style={{ fontSize: 10, color: "var(--texte-tertiaire)", flexShrink: 0 }}>
             {compterMots(nœud.texte).toLocaleString("fr-FR")}
           </span>
         )}
 
         {/* Actions au survol */}
         {survol && !enRenommage && (
-          <div style={{ display: "flex", gap: 2 }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
             {!estPremier && (
               <button onClick={() => onDéplacer(nœud.id, "haut")} style={btnIconStyle} title={t("actions.monter")}>↑</button>
             )}
@@ -245,7 +263,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
             )}
             {!estRacine && (
-              <button onClick={() => onPromouvoir(nœud.id)} style={btnIconStyle} title="Faire remonter d'un niveau (devient frère de son parent actuel)">⬆</button>
+              <button onClick={() => onPromouvoir(nœud.id)} style={btnIconStyle} title="Faire remonter d'un niveau (devient frère de son parent actuel, et prend son type)">⬆</button>
             )}
             <select
               value={nœud.type}
@@ -607,13 +625,27 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // ce parent (remonte d'un niveau dans la hiérarchie). Ajouté 18/07/2026,
   // en réponse au constat que ni le sélecteur de type ni les flèches
   // monter/descendre ne permettaient ce changement de niveau réel.
-  const trouverContextePourPromotion = (liste, id, idParentCourant = null, idGrandParentCourant = null) => {
+  //
+  // MODIF 21/07/2026 — la promotion change désormais AUSSI le type du nœud,
+  // pas seulement sa position. Règle : le nœud promu prend le type de son
+  // ANCIEN PARENT, puisqu'il devient son frère (une scène directement sous
+  // un chapitre devient elle-même un chapitre une fois promue ; un chapitre
+  // promu devient une partie). Cette règle reste correcte même pour des
+  // scènes imbriquées à plusieurs niveaux (scène dans scène dans chapitre) :
+  // promouvoir la scène la plus profonde la fait juste devenir sœur de sa
+  // scène-parente immédiate, donc son type reste "scene" — inchangé, et
+  // c'est le comportement voulu.
+  const trouverContextePourPromotion = (liste, id, parentCourant = null, grandParentCourant = null) => {
     for (const n of liste) {
       if (n.id === id) {
-        return { idParentActuel: idParentCourant, idNouveauParent: idGrandParentCourant };
+        return {
+          idParentActuel: parentCourant ? parentCourant.id : null,
+          typeParentActuel: parentCourant ? parentCourant.type : null,
+          idNouveauParent: grandParentCourant ? grandParentCourant.id : null,
+        };
       }
       if (n.enfants?.length) {
-        const résultat = trouverContextePourPromotion(n.enfants, id, n.id, idParentCourant);
+        const résultat = trouverContextePourPromotion(n.enfants, id, n, parentCourant);
         if (résultat) return résultat;
       }
     }
@@ -624,18 +656,35 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     const contexte = trouverContextePourPromotion(projet.structure || [], nœudId);
     if (!contexte || !contexte.idParentActuel) return; // déjà à la racine
 
-    const { error } = await nœudsAPI.changerParent(nœudId, contexte.idNouveauParent);
-    if (error) {
-      journaliserErreur("VueProjet:promouvoirNœud", error.message, projet.id);
+    // Le nœud promu prend le type de son ancien parent (voir note ci-dessus).
+    // Si l'ancien parent n'a pas de type identifiable (cas normalement
+    // impossible ici puisqu'on vient de vérifier idParentActuel), on
+    // retombe sur "partie" par prudence plutôt que de planter.
+    const nouveauType = contexte.typeParentActuel || "partie";
+
+    const { error: erreurParent } = await nœudsAPI.changerParent(nœudId, contexte.idNouveauParent);
+    if (erreurParent) {
+      journaliserErreur("VueProjet:promouvoirNœud", erreurParent.message, projet.id);
       window.alert("Impossible de déplacer cet élément vers un niveau supérieur.");
       return;
+    }
+
+    // Deuxième appel, séparé : si celui-ci échoue, la position a quand même
+    // changé (le plus important) — on prévient sans tout annuler, l'auteur
+    // peut ajuster le type manuellement via le menu déroulant.
+    if (nouveauType !== undefined) {
+      const { error: erreurType } = await nœudsAPI.changerType(nœudId, nouveauType);
+      if (erreurType) {
+        journaliserErreur("VueProjet:promouvoirNœud (type)", erreurType.message, projet.id);
+        window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
+      }
     }
 
     let nœudExtrait = null;
     const extraire = (liste) =>
       liste
         .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = n; return false; }
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
           return true;
         })
         .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
