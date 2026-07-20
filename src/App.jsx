@@ -148,7 +148,7 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
@@ -265,6 +265,9 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
             {!estRacine && (
               <button onClick={() => onPromouvoir(nœud.id)} style={btnIconStyle} title="Faire remonter d'un niveau (devient frère de son parent actuel, et prend son type)">⬆</button>
             )}
+            {!estPremier && (
+              <button onClick={() => onRétrograder(nœud.id)} style={btnIconStyle} title="Faire descendre d'un niveau (devient enfant du frère précédent, et prend son type)">⬇</button>
+            )}
             <select
               value={nœud.type}
               onChange={(e) => onChangerType(nœud.id, e.target.value)}
@@ -302,6 +305,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           onChangerType={onChangerType}
           estRacine={false}
           onPromouvoir={onPromouvoir}
+          onRétrograder={onRétrograder}
         />
       ))}
     </div>
@@ -704,6 +708,70 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     onMàjStructure(projet.id, insérerAprèsAncienParent(structureSansNœud));
   }, [projet, onMàjStructure]);
 
+  // Fait entrer un nœud comme dernier enfant de son frère précédent —
+  // descend d'un niveau dans la hiérarchie. Symétrique de promouvoirNœud
+  // ci-dessus. Ajouté le 21/07/2026, à la demande de Joseph : "si on monte
+  // on doit pouvoir descendre de niveau".
+  // Règle : le nœud rétrogradé prend le type ENFANT de son nouveau parent
+  // (le frère qui le précède) — une partie rétrogradée sous une autre
+  // partie devient un chapitre ; un chapitre rétrogradé sous un autre
+  // chapitre devient une scène ; une scène rétrogradée sous une autre
+  // scène reste une scène (imbrication).
+  const rétrograderNœud = useCallback(async (nœudId) => {
+    const trouverFratrieEtIndexPourRétrogradation = (liste) => {
+      const index = liste.findIndex((n) => n.id === nœudId);
+      if (index !== -1) return { fratrie: liste, index };
+      for (const n of liste) {
+        const trouvé = trouverFratrieEtIndexPourRétrogradation(n.enfants || []);
+        if (trouvé) return trouvé;
+      }
+      return null;
+    };
+
+    const résultat = trouverFratrieEtIndexPourRétrogradation(projet.structure || []);
+    if (!résultat) return;
+    const { fratrie, index } = résultat;
+    if (index === 0) return; // pas de frère précédent pour devenir son nouveau parent
+
+    const nouveauParent = fratrie[index - 1];
+    const nouveauType = STRUCTURE_TYPES_META[nouveauParent.type]?.enfant;
+    if (!nouveauType) return; // sécurité : ne devrait jamais arriver (tous les types ont un enfant défini)
+
+    const { error: erreurParent } = await nœudsAPI.changerParent(nœudId, nouveauParent.id);
+    if (erreurParent) {
+      journaliserErreur("VueProjet:rétrograderNœud", erreurParent.message, projet.id);
+      window.alert("Impossible de déplacer cet élément vers un niveau inférieur.");
+      return;
+    }
+
+    const { error: erreurType } = await nœudsAPI.changerType(nœudId, nouveauType);
+    if (erreurType) {
+      journaliserErreur("VueProjet:rétrograderNœud (type)", erreurType.message, projet.id);
+      window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
+    }
+
+    let nœudExtrait = null;
+    const extraire = (liste) =>
+      liste
+        .filter((n) => {
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
+          return true;
+        })
+        .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
+
+    const structureSansNœud = extraire(projet.structure || []);
+
+    const insérerCommeDernierEnfant = (liste) =>
+      liste.map((n) => {
+        if (n.id === nouveauParent.id) {
+          return { ...n, enfants: [...(n.enfants || []), nœudExtrait] };
+        }
+        return { ...n, enfants: insérerCommeDernierEnfant(n.enfants || []) };
+      });
+
+    onMàjStructure(projet.id, insérerCommeDernierEnfant(structureSansNœud));
+  }, [projet, onMàjStructure]);
+
   // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
   // Trouve le titre d'un nœud dans l'arbre, pour l'afficher dans la
   // confirmation de suppression — pour que l'auteur sache précisément ce
@@ -918,6 +986,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               onChangerType={changerTypeNœud}
               estRacine={true}
               onPromouvoir={promouvoirNœud}
+              onRétrograder={rétrograderNœud}
             />
           ))
         )}
