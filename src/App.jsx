@@ -16,7 +16,7 @@
  * MODIF 20/07/2026 (a) : ajout de trouverContexteHiérarchique() — calcule,
  * pour le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les
  * titres des chapitres frères déjà nommés. Transmis à CopiloteIA pour que
- * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel.
+ * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte rAéel.
  *
  * MODIF 21/07/2026 : la promotion d'un nœud (bouton ⬆) change désormais
  * AUSSI son type, pas seulement sa position. Une scène directement sous un
@@ -41,6 +41,7 @@ import ImportDocx from "./components/ImportDocx.jsx";
 import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
+import { exporterProjetWord } from "./lib/exportWord.js";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -684,11 +685,36 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
       }
     }
 
+    // CASCADE 21/07/2026 — sans ça, promouvoir un chapitre en partie laissait
+    // ses scènes directes au type "scene", incohérent sous une partie (dont
+    // le type d'enfant attendu est "chapitre") : il fallait alors les
+    // reclasser une par une manuellement. Un seul niveau de cascade suffit —
+    // les petits-enfants restent cohérents automatiquement grâce à
+    // l'auto-imbrication des scènes (l'enfant d'une scène est une scène).
+    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
+    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
+    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
+    if (nouveauTypeEnfants) {
+      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
+      if (enfantsÀCorriger.length > 0) {
+        const résultats = await Promise.all(
+          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
+        );
+        const échec = résultats.find((r) => r.error);
+        if (échec) {
+          journaliserErreur("VueProjet:promouvoirNœud (cascade enfants)", échec.error.message, projet.id);
+          window.alert("L'élément a été promu, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
+        }
+        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
+        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
+      }
+    }
+
     let nœudExtrait = null;
     const extraire = (liste) =>
       liste
         .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
           return true;
         })
         .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
@@ -750,11 +776,33 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
       window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
     }
 
+    // CASCADE 21/07/2026 — symétrique de celle de promouvoirNœud : une
+    // partie rétrogradée en chapitre doit voir ses chapitres directs
+    // devenir des scènes, sinon la hiérarchie reste incohérente.
+    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
+    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
+    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
+    if (nouveauTypeEnfants) {
+      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
+      if (enfantsÀCorriger.length > 0) {
+        const résultats = await Promise.all(
+          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
+        );
+        const échec = résultats.find((r) => r.error);
+        if (échec) {
+          journaliserErreur("VueProjet:rétrograderNœud (cascade enfants)", échec.error.message, projet.id);
+          window.alert("L'élément a été rétrogradé, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
+        }
+        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
+        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
+      }
+    }
+
     let nœudExtrait = null;
     const extraire = (liste) =>
       liste
         .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType }; return false; }
+          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
           return true;
         })
         .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
@@ -1163,6 +1211,7 @@ function AppConnectée({ user, déconnecter }) {
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
+  const [exportEnCours, setExportEnCours]                 = useState(false);
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
@@ -1654,9 +1703,32 @@ function AppConnectée({ user, déconnecter }) {
             {/* Barre d'actions projet */}
             <div style={{
               padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
-              display: "flex", alignItems: "center", justifyContent: "flex-end",
+              display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
               background: "#fafafa",
             }}>
+              <button
+                onClick={async () => {
+                  setExportEnCours(true);
+                  try {
+                    await exporterProjetWord(projetActif);
+                  } catch (err) {
+                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
+                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
+                  } finally {
+                    setExportEnCours(false);
+                  }
+                }}
+                disabled={exportEnCours}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: projetActif.couleur,
+                  border: `0.5px solid ${projetActif.couleur}40`, borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
+                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
+                }}
+              >
+                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
               <button
                 onClick={() => setImportOuvert(true)}
                 style={{
