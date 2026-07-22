@@ -41,7 +41,7 @@ import ImportDocx from "./components/ImportDocx.jsx";
 import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
-import { exporterProjetWord } from "./lib/exportWord.js";
+import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -1212,6 +1212,7 @@ function AppConnectée({ user, déconnecter }) {
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
   const [exportEnCours, setExportEnCours]                 = useState(false);
+  const [formatExport, setFormatExport]                   = useState("a4");
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
@@ -1706,11 +1707,25 @@ function AppConnectée({ user, déconnecter }) {
               display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
               background: "#fafafa",
             }}>
+              <select
+                value={formatExport}
+                onChange={(e) => setFormatExport(e.target.value)}
+                title="Format de page pour l'export Word"
+                style={{
+                  fontSize: 12, color: "#555", background: "#fff",
+                  border: "0.5px solid #ddd", borderRadius: 8, padding: "6px 8px",
+                  fontFamily: "inherit", cursor: "pointer",
+                }}
+              >
+                {Object.entries(FORMATS_PAGE).map(([clé, f]) => (
+                  <option key={clé} value={clé}>{f.label}</option>
+                ))}
+              </select>
               <button
                 onClick={async () => {
                   setExportEnCours(true);
                   try {
-                    await exporterProjetWord(projetActif);
+                    await exporterProjetWord(projetActif, formatExport);
                   } catch (err) {
                     journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
                     window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
@@ -1909,3 +1924,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
+
