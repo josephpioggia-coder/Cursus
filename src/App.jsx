@@ -16,7 +16,7 @@
  * MODIF 20/07/2026 (a) : ajout de trouverContexteHiérarchique() — calcule,
  * pour le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les
  * titres des chapitres frères déjà nommés. Transmis à CopiloteIA pour que
- * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte rAéel.
+ * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel.
  *
  * MODIF 21/07/2026 : la promotion d'un nœud (bouton ⬆) change désormais
  * AUSSI son type, pas seulement sa position. Une scène directement sous un
@@ -1909,4 +1909,3 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
-
