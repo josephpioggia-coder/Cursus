@@ -1,6 +1,6 @@
 /**
  * CURSUS — Export Word (.docx)
- * Ajouté le 21/07/2026.
+ * Ajouté le 21/07/2026. Formats de page ajoutés le 22/07/2026.
  *
  * Génère un document Word complet à partir de la structure d'un projet :
  * page de titre, table des matières (Parties/Chapitres/Scènes), puis le
@@ -42,6 +42,30 @@ const NIVEAU_TITRE_CORPS = {
   h1: HeadingLevel.HEADING_4,
   h2: HeadingLevel.HEADING_5,
   h3: HeadingLevel.HEADING_6,
+};
+
+// Formats de page disponibles à l'export — ajouté 22/07/2026, à la demande
+// de Joseph. Dimensions en DXA (1440 = 1 pouce), l'unité attendue par la
+// librairie docx. Les marges sont réduites pour les petits formats (poche,
+// A5) où des marges standard de 2,5 cm mangeraient une part disproportionnée
+// de la page.
+export const FORMATS_PAGE = {
+  a4: {
+    label: "A4 (21 × 29,7 cm) — manuscrit de travail",
+    width: 11906, height: 16838, margin: 1440,
+  },
+  a5: {
+    label: "A5 (14,8 × 21 cm) — format livre courant",
+    width: 8392, height: 11906, margin: 850,
+  },
+  poche: {
+    label: "Poche (11 × 18 cm)",
+    width: 6236, height: 10205, margin: 620,
+  },
+  broche: {
+    label: "Broché standard (15,24 × 22,86 cm — 6×9\")",
+    width: 8640, height: 12960, margin: 1080,
+  },
 };
 
 // Construit les segments de texte (TextRun) d'un nœud DOM, en respectant le
@@ -142,8 +166,11 @@ function nomDeFichierSûr(titre) {
 /**
  * Génère et déclenche le téléchargement du fichier Word pour un projet.
  * @param {object} projet — { titre, genre, structure } tel que manipulé dans App.jsx
+ * @param {string} formatPage — clé de FORMATS_PAGE ("a4", "a5", "poche", "broche"). Défaut : "a4".
  */
-export async function exporterProjetWord(projet) {
+export async function exporterProjetWord(projet, formatPage = "a4") {
+  const format = FORMATS_PAGE[formatPage] || FORMATS_PAGE.a4;
+
   const pageDeTitre = [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -182,7 +209,15 @@ export async function exporterProjetWord(projet) {
   parcourirStructure(projet.structure || []);
 
   const documentWord = new Document({
-    sections: [{ children: [...pageDeTitre, ...sommaire, ...contenu] }],
+    sections: [{
+      properties: {
+        page: {
+          size: { width: format.width, height: format.height },
+          margin: { top: format.margin, bottom: format.margin, left: format.margin, right: format.margin },
+        },
+      },
+      children: [...pageDeTitre, ...sommaire, ...contenu],
+    }],
     styles: {
       default: {
         document: { run: { font: "Georgia", size: 24 } },
