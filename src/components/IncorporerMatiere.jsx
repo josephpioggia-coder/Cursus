@@ -156,7 +156,7 @@ L'auteur vient de coller un texte brut (notes, brouillon, transcription) qu'il s
 
 RÈGLES IMPÉRATIVES :
 1. Le champ "texte" de chaque segment doit être une COPIE EXACTE d'un passage contigu du texte original — ne reformule JAMAIS, ne résume JAMAIS, ne corrige JAMAIS la moindre virgule. Un simple copier-coller de passages, jamais une réécriture.
-2. Chaque mot du texte original doit apparaître dans exactement un segment (pas de perte, pas de doublon), sauf les titres/intertitres purement structurels que l'auteur a mis dans son brouillon, que tu peux omettre du texte des segments s'ils servent uniquement à annoncer la section suivante.
+2. OMETS SYSTÉMATIQUEMENT du texte de chaque segment tout titre ou intertitre du brouillon qui se contente d'annoncer le sujet de la section (ex. "Giuseppe : le prénom de l'oncle disparu" en tête de paragraphe) — ce n'est jamais de la prose à conserver, seulement un repère de structuration de l'auteur. Le segment doit commencer directement par le contenu narratif ou analytique lui-même. Chaque mot de PROSE du texte original doit apparaître dans exactement un segment (pas de perte, pas de doublon) ; seuls ces intertitres structurels peuvent être omis.
 3. Pour chaque segment, deux options de destination :
    - "existant" : le segment complète un nœud déjà présent dans la structure (donne son id exact dans "idCible")
    - "nouveau" : le segment mérite un nouveau nœud, à créer comme enfant d'un nœud PARENT déjà présent dans la structure (donne l'id du parent dans "idCible", et un titre court et fidèle au contenu dans "titreSuggere")
@@ -592,16 +592,22 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                         {aperçuOuvert && s.typeDestination === "existant" && (
                           <div style={{
                             marginTop: 10, marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
-                            padding: 8, maxHeight: 220, overflowY: "auto", background: "#fcfcfc",
+                            padding: 10, maxHeight: 280, overflowY: "auto", background: "#fcfcfc",
                           }}>
-                            <div style={{ fontSize: 10.5, color: "#999", marginBottom: 6 }}>
-                              Cliquez entre deux paragraphes pour choisir où insérer :
+                            <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
+                              Cliquez sur une barre <strong>+ Insérer ici</strong> pour choisir où le segment sera placé :
                             </div>
                             <BarreInsertion active={s.indexInsertion === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
                             {blocsCible.map((bloc, i) => (
                               <div key={i}>
-                                <div style={{ fontSize: 11.5, color: "#555", padding: "4px 2px", lineHeight: 1.4 }}>
-                                  {texteBrutDuBloc(bloc).slice(0, 140) || "(bloc vide)"}
+                                <div style={{
+                                  fontSize: 11.5, color: "#444", lineHeight: 1.5,
+                                  border: "0.5px solid #eee", borderRadius: 6,
+                                  padding: "6px 8px", background: "#fff",
+                                }}>
+                                  <span style={{ fontSize: 9.5, color: "#bbb", fontWeight: 600, marginRight: 6 }}>§{i + 1}</span>
+                                  {texteBrutDuBloc(bloc).slice(0, 160) || "(bloc vide)"}
+                                  {texteBrutDuBloc(bloc).length > 160 && "…"}
                                 </div>
                                 <BarreInsertion active={s.indexInsertion === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
                               </div>
@@ -667,12 +673,18 @@ function BarreInsertion({ active, onClick }) {
       onMouseEnter={() => setSurvol(true)}
       onMouseLeave={() => setSurvol(false)}
       style={{
-        height: active ? 4 : 8, margin: "1px 0", borderRadius: 2, cursor: "pointer",
-        background: active ? "#7F77DD" : (survol ? "#7F77DD50" : "transparent"),
-        transition: "background 0.1s",
+        display: "flex", alignItems: "center", gap: 6,
+        margin: "3px 0", padding: "3px 8px", borderRadius: 5, cursor: "pointer",
+        border: active ? "1px solid #7F77DD" : "1px dashed #ddd",
+        background: active ? "#EEEDFE" : (survol ? "#f5f5ff" : "transparent"),
+        transition: "all 0.1s",
       }}
       title="Cliquer pour insérer ici"
-    />
+    >
+      <span style={{ fontSize: 10, color: active ? "#534AB7" : "#aaa", fontWeight: active ? 600 : 400 }}>
+        {active ? "✓ Insertion ici" : "+ Insérer ici"}
+      </span>
+    </div>
   );
 }
 
