@@ -162,15 +162,40 @@ function couleurScore(score) {
   return { c: "#E24B4A", bg: "#FCEBEB" };
 }
 
-function normaliserPonctuationCommeOriginal(texteSegment, texteOriginal) {
-  let corrigé = texteSegment;
-  if (texteOriginal.includes("’") && !texteOriginal.includes("'")) {
-    corrigé = corrigé.replace(/'/g, "’");
+// VÉRIFICATION RÉELLE, pas un score de probabilité : retrouve le passage
+// proposé par l'IA DIRECTEMENT dans le texte original collé, et si trouvé,
+// utilise l'extrait EXACT du texte source (découpé par le code, jamais
+// retapé par l'IA) — ponctuation, apostrophes, tout garanti identique
+// puisqu'il s'agit littéralement du même texte, pas d'une reproduction.
+// Ajouté 24/07/2026 en remplacement du simple score de similarité, suite
+// au constat que faire "retaper" le texte par l'IA dans le JSON était la
+// cause structurelle des écarts (apostrophes, omissions), pas juste un
+// détail à corriger après coup.
+function localiserSegmentDansOriginal(segmentTexte, texteOriginal) {
+  const segTrim = (segmentTexte || "").trim();
+  if (!segTrim) return { texte: segmentTexte, vérifié: false };
+
+  // 1. Correspondance exacte, telle quelle.
+  const indexExact = texteOriginal.indexOf(segTrim);
+  if (indexExact !== -1) {
+    return { texte: texteOriginal.slice(indexExact, indexExact + segTrim.length), vérifié: true };
   }
-  if (texteOriginal.includes("“") && texteOriginal.includes("”") && !texteOriginal.includes('"')) {
-    corrigé = corrigé.replace(/"([^"]*)"/g, "“$1”");
+
+  // 2. Correspondance par ancrage début/fin — tolère une variation mineure
+  // au milieu (ex. un retour à la ligne différent) sans jamais utiliser le
+  // texte de l'IA : le résultat final vient toujours du texte original,
+  // découpé entre les deux ancres retrouvées.
+  const début = segTrim.slice(0, 30);
+  const fin = segTrim.slice(-30);
+  const indexDébut = texteOriginal.indexOf(début);
+  const indexFin = début && fin ? texteOriginal.indexOf(fin, indexDébut >= 0 ? indexDébut : 0) : -1;
+  if (indexDébut !== -1 && indexFin !== -1 && indexFin >= indexDébut) {
+    return { texte: texteOriginal.slice(indexDébut, indexFin + fin.length), vérifié: true };
   }
-  return corrigé;
+
+  // 3. Aucune correspondance fiable — le texte proposé par l'IA est gardé,
+  // mais explicitement marqué NON vérifié pour que ce soit visible à l'écran.
+  return { texte: segmentTexte, vérifié: false };
 }
 
 function diffMots(texteA, texteB) {
@@ -311,16 +336,17 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       );
       const p = parserJSON(résultat);
       const segmentsAvecÉtat = (p.segments || []).map((s, i) => {
-        const texteCorrigé = normaliserPonctuationCommeOriginal(s.texte, texteBrut);
+        const { texte: texteVérifié, vérifié } = localiserSegmentDansOriginal(s.texte, texteBrut);
         return {
           clé: `seg-${i}`,
-          texte: texteCorrigé,
+          texte: texteVérifié,
+          origineVérifiée: vérifié,
           typeDestination: s.typeDestination,
           idCible: s.idCible,
           titreSuggere: s.titreSuggere,
           justification: s.justification,
           inclus: true,
-          score: scoreFidélité(texteCorrigé, texteBrut),
+          score: vérifié ? 100 : scoreFidélité(s.texte, texteBrut),
           statutInsertion: "propose",
           indexInsertion: null,
           transition: "",
@@ -370,8 +396,9 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         1024
       );
       const p = parserJSON(résultat);
-      const nouveauTexte = p.texteCorrigé || p.texteCorrige || segment.texte;
-      modifierSegment(clé, { texte: nouveauTexte, score: scoreFidélité(nouveauTexte, texteBrut) });
+      const texteRenvoyé = p.texteCorrigé || p.texteCorrige || segment.texte;
+      const { texte: texteVérifié, vérifié } = localiserSegmentDansOriginal(texteRenvoyé, texteBrut);
+      modifierSegment(clé, { texte: texteVérifié, origineVérifiée: vérifié, score: vérifié ? 100 : scoreFidélité(texteRenvoyé, texteBrut) });
     } catch {
       setErreur("La revérification a échoué. Vous pouvez modifier le texte manuellement.");
     } finally {
@@ -627,9 +654,10 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           {segments === null ? (
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
-                Collez un texte brut (notes, brouillon, transcription). Le co-pilote proposera un découpage
-                en segments, chacun avec sa destination, son emplacement précis et une transition optionnelle
-                — tout reste modifiable jusqu'à l'insertion effective de chaque segment.
+                Collez un texte brut (notes, brouillon, transcription). Le co-pilote propose un découpage en
+                segments et une destination pour chacun ; chaque segment est ensuite retrouvé et vérifié
+                directement dans votre texte collé (pas retapé par l'IA) avant de vous être présenté — le texte
+                final utilisé est garanti identique à l'original quand cette vérification réussit.
               </p>
               <textarea
                 value={texteBrut}
@@ -722,11 +750,17 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                              <span style={{ fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 20, padding: "2px 8px" }}>
-                                Fidélité : {s.score}%
-                              </span>
+                              {s.origineVérifiée ? (
+                                <span style={{ fontSize: 10.5, fontWeight: 600, color: "#1D9E75", background: "#E1F5EE", borderRadius: 20, padding: "2px 8px" }}>
+                                  ✓ Extrait vérifié — identique au texte original
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 20, padding: "2px 8px" }}>
+                                  ⚠️ Non retrouvé tel quel — {s.score}% de similarité estimée
+                                </span>
+                              )}
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                {s.score < SEUIL_SCORE_ALERTE && (
+                                {!s.origineVérifiée && (
                                   <button
                                     onClick={() => revérifierSegment(s.clé)}
                                     disabled={enCours}
@@ -739,7 +773,10 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             </div>
                             <textarea
                               value={s.texte}
-                              onChange={(e) => modifierSegment(s.clé, { texte: e.target.value, score: scoreFidélité(e.target.value, texteBrut) })}
+                              onChange={(e) => {
+                                const { texte: v, vérifié } = localiserSegmentDansOriginal(e.target.value, texteBrut);
+                                modifierSegment(s.clé, { texte: e.target.value, origineVérifiée: e.target.value === v ? vérifié : false, score: vérifié && e.target.value === v ? 100 : scoreFidélité(e.target.value, texteBrut) });
+                              }}
                               rows={3}
                               style={{
                                 width: "100%", fontSize: 12, color: "#333", lineHeight: 1.5,
