@@ -357,6 +357,14 @@ function texteBrutDuBloc(blocHTML) {
   return (dom.body.textContent || "").trim();
 }
 
+// Aperçu début…fin d'un paragraphe — ajouté 24/07/2026 : pour juger si une
+// transition est nécessaire, la FIN d'un paragraphe compte au moins autant
+// que son début, souvent plus. Le milieu est tronqué plutôt que la fin.
+function aperçuDébutFin(texteComplet, longueur = 90) {
+  if (texteComplet.length <= longueur * 2 + 5) return texteComplet;
+  return `${texteComplet.slice(0, longueur)} […] ${texteComplet.slice(-longueur)}`;
+}
+
 export default function IncorporerMatiere({ projet, onFermer, onStructureChangée }) {
   const [texteBrut, setTexteBrut] = useState("");
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
@@ -1023,6 +1031,18 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                                 fontFamily: "Georgia, serif", border: "0.5px dashed #7F77DD60", boxSizing: "border-box", resize: "vertical",
                               }}
                             />
+                            {s.transition.trim() && (
+                              <button
+                                onClick={() => {
+                                  const nouveauTexte = `${s.transition.trim()}\n\n${s.texte}`;
+                                  modifierSegment(s.clé, { texte: nouveauTexte, transition: "", origineVérifiée: false, score: scoreFidélité(nouveauTexte, texteBrut) });
+                                }}
+                                title="Intègre la transition directement dans le texte du segment, sans copier-coller manuel"
+                                style={{ fontSize: 10.5, color: "#534AB7", background: "#EEEDFE", border: "none", borderRadius: 5, padding: "3px 10px", marginTop: 4, cursor: "pointer", fontFamily: "inherit" }}
+                              >
+                                ⤵ Fusionner la transition dans le texte du segment
+                              </button>
+                            )}
                           </div>
                         )}
 
@@ -1044,8 +1064,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                                   padding: "6px 8px", background: "#fff",
                                 }}>
                                   <span style={{ fontSize: 9.5, color: "#bbb", fontWeight: 600, marginRight: 6 }}>§{i + 1}</span>
-                                  {texteBrutDuBloc(bloc).slice(0, 160) || "(bloc vide)"}
-                                  {texteBrutDuBloc(bloc).length > 160 && "…"}
+                                  {aperçuDébutFin(texteBrutDuBloc(bloc)) || "(bloc vide)"}
                                 </div>
                                 <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
                                 {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.texte} transition={s.transition} />}
