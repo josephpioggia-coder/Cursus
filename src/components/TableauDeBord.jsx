@@ -7,10 +7,22 @@
  *   - Historique des sessions (date, projet, mots écrits, durée)
  *   - Suggestion "sur quoi travailler aujourd'hui"
  *   - Statistiques globales (mots totaux, jours actifs, série en cours)
- *   - Persistance des sessions dans localStorage
+ *
+ * CORRECTIF 24/07/2026 — CRITIQUE : ce fichier générait auparavant des
+ * "sessions de démo" entièrement fictives (générerSessionsDémo), avec des
+ * nombres de mots codés en dur et attribués AU HASARD aux projets réels de
+ * l'auteur (via un simple modulo, sans aucun lien avec l'activité réelle).
+ * Ces fausses sessions étaient ensuite sauvegardées dans localStorage et
+ * persistaient indéfiniment, donnant l'impression trompeuse d'une activité
+ * réelle sur des projets jamais touchés. Retiré. Le tableau de bord
+ * n'affiche plus AUCUNE session tant qu'un vrai suivi (connecté à Supabase)
+ * n'aura pas été construit — un chantier à part entière, volontairement
+ * pas fait ici pour ne pas le bâcler. En attendant, "Sessions récentes" et
+ * le graphique hebdomadaire affichent honnêtement l'absence de données
+ * plutôt que des chiffres inventés.
  */
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -44,41 +56,6 @@ const formaterDurée = (s) => {
   return `${s}s`;
 };
 
-const chargerSessions = () => {
-  try { return JSON.parse(localStorage.getItem("atelier-sessions")) || []; }
-  catch { return []; }
-};
-
-// Génère des sessions de démo pour avoir un graphique vivant
-const générerSessionsDémo = (projets) => {
-  if (!projets.length) return [];
-  const sessions = [];
-  const aujourdhui = new Date();
-  const données = [
-    { joursAvant: 6, mots: 312, durée: 2700 },
-    { joursAvant: 5, mots: 487, durée: 3600 },
-    { joursAvant: 4, mots: 0,   durée: 0    },
-    { joursAvant: 3, mots: 621, durée: 4200 },
-    { joursAvant: 2, mots: 290, durée: 1800 },
-    { joursAvant: 1, mots: 755, durée: 5400 },
-    { joursAvant: 0, mots: 180, durée: 1200 },
-  ];
-  données.forEach(({ joursAvant, mots, durée }) => {
-    if (mots === 0) return;
-    const date = new Date(aujourdhui);
-    date.setDate(date.getDate() - joursAvant);
-    sessions.push({
-      id: `demo-${joursAvant}`,
-      date: cléJour(date),
-      projetId: projets[joursAvant % projets.length]?.id,
-      projetTitre: projets[joursAvant % projets.length]?.titre || "Projet",
-      projetCouleur: projets[joursAvant % projets.length]?.couleur || "#7F77DD",
-      mots, durée,
-    });
-  });
-  return sessions;
-};
-
 // ─── Composant : Carte statistique ───────────────────────────────────────────────
 
 function CarteStats({ label, valeur, sous, couleur }) {
@@ -95,6 +72,8 @@ function CarteStats({ label, valeur, sous, couleur }) {
 }
 
 // ─── Composant : Graphique hebdomadaire ──────────────────────────────────────────
+// Affiche désormais toujours 0 mot par jour (aucune session réelle suivie
+// pour l'instant) — honnête plutôt que de fabriquer une activité.
 
 function GraphiqueSemaine({ sessions, couleurAccent }) {
   const lundi = getLundi();
@@ -109,6 +88,7 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
   });
 
   const max = Math.max(...jours.map((j) => j.mots), 100);
+  const aucuneSession = sessions.length === 0;
 
   return (
     <div style={{
@@ -147,36 +127,32 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
           );
         })}
       </div>
+      {aucuneSession && (
+        <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 10, textAlign: "center" }}>
+          Le suivi des sessions d'écriture n'est pas encore actif.
+        </div>
+      )}
     </div>
   );
 }
 
 // ─── Composant : Carte de suggestion ─────────────────────────────────────────────
+// Simplifiée : ne dépend plus de fausses sessions pour "deviner" depuis
+// combien de temps un projet n'a pas été touché. Suggère simplement le
+// projet "En cours" le moins avancé en proportion de son objectif.
 
-function CarteSuggestion({ projets, sessions, onOuvrirProjet }) {
-  // Logique de suggestion : projet le plus avancé mais pas terminé,
-  // ou celui non touché depuis le plus longtemps
+function CarteSuggestion({ projets, onOuvrirProjet }) {
   const projetsSuggérés = projets
     .filter((p) => p.statut === "En cours")
     .map((p) => {
       const mots = totalMotsProjet(p.structure);
       const pct = Math.round((mots / (p.objectifMots || 1)) * 100);
-      const dernièreSession = sessions
-        .filter((s) => s.projetId === p.id)
-        .sort((a, b) => b.date.localeCompare(a.date))[0];
-      const joursDepuis = dernièreSession
-        ? Math.floor((Date.now() - new Date(dernièreSession.date)) / 86400000)
-        : 999;
-      return { ...p, mots, pct, joursDepuis };
+      return { ...p, mots, pct };
     })
-    .sort((a, b) => b.joursDepuis - a.joursDepuis);
+    .sort((a, b) => a.pct - b.pct);
 
   const suggestion = projetsSuggérés[0];
   if (!suggestion) return null;
-
-  const message = suggestion.joursDepuis >= 3
-    ? `Pas écrit depuis ${suggestion.joursDepuis === 999 ? "longtemps" : `${suggestion.joursDepuis} jours`}`
-    : `${suggestion.pct}% complété · continuez sur votre lancée`;
 
   return (
     <div style={{
@@ -191,7 +167,9 @@ function CarteSuggestion({ projets, sessions, onOuvrirProjet }) {
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: suggestion.couleur, flexShrink: 0 }} />
         <span style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)" }}>{suggestion.titre}</span>
       </div>
-      <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 14 }}>{message}</div>
+      <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 14 }}>
+        {suggestion.pct}% complété
+      </div>
       <button
         onClick={() => onOuvrirProjet(suggestion.id)}
         style={{
@@ -298,7 +276,7 @@ function HistoriqueSessions({ sessions }) {
       </div>
       {récentes.length === 0 ? (
         <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 }}>
-          Vos sessions d'écriture apparaîtront ici.
+          Le suivi des sessions d'écriture n'est pas encore actif — chantier à venir.
         </div>
       ) : (
         récentes.map((s, i) => (
@@ -332,11 +310,10 @@ function HistoriqueSessions({ sessions }) {
 // ─── Composant principal : Tableau de bord ────────────────────────────────────────
 
 export default function TableauDeBord({ projets = [], onOuvrirProjet }) {
-  const [sessions, setSessions] = useState(() => {
-    const sauvegardées = chargerSessions();
-    if (sauvegardées.length > 0) return sauvegardées;
-    return générerSessionsDémo(projets);
-  });
+  // CORRECTIF 24/07/2026 : plus de fausses sessions générées ni lues depuis
+  // localStorage. Tableau vide tant que le vrai suivi (Supabase) n'existe
+  // pas — voir note en tête de fichier.
+  const [sessions] = useState([]);
 
   // Statistiques globales
   const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
@@ -344,7 +321,6 @@ export default function TableauDeBord({ projets = [], onOuvrirProjet }) {
 
   const joursActifs = new Set(sessions.map((s) => s.date)).size;
 
-  // Série actuelle (jours consécutifs avec au moins une session)
   const calculerSérie = () => {
     let série = 0;
     const aujourd = new Date();
@@ -381,15 +357,15 @@ export default function TableauDeBord({ projets = [], onOuvrirProjet }) {
       {/* Statistiques globales */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
         <CarteStats label="Mots écrits au total" valeur={totalMots.toLocaleString("fr-FR")} sous="dans tous les projets" couleur="var(--color-text-primary)" />
-        <CarteStats label="Cette semaine" valeur={totalMotsSemaine.toLocaleString("fr-FR")} sous="mots" couleur="#7F77DD" />
+        <CarteStats label="Cette semaine" valeur={totalMotsSemaine.toLocaleString("fr-FR")} sous="mots (suivi à venir)" couleur="#7F77DD" />
         <CarteStats label="Projets actifs" valeur={projetsActifs} sous={`sur ${projets.length} projets`} couleur="var(--color-text-primary)" />
-        <CarteStats label="Série actuelle" valeur={`${série} jour${série !== 1 ? "s" : ""}`} sous={`${joursActifs} jours actifs au total`} couleur={série >= 3 ? "#1D9E75" : "var(--color-text-primary)"} />
+        <CarteStats label="Série actuelle" valeur={`${série} jour${série !== 1 ? "s" : ""}`} sous="suivi à venir" couleur="var(--color-text-primary)" />
       </div>
 
       {/* Ligne principale : graphique + suggestion */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, marginBottom: 16 }}>
         <GraphiqueSemaine sessions={sessions} couleurAccent="#7F77DD" />
-        <CarteSuggestion projets={projets} sessions={sessions} onOuvrirProjet={onOuvrirProjet} />
+        <CarteSuggestion projets={projets} onOuvrirProjet={onOuvrirProjet} />
       </div>
 
       {/* Ligne secondaire : projets + sessions */}
