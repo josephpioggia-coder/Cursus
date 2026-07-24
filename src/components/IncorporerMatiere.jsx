@@ -1,25 +1,22 @@
 /**
  * CURSUS — Incorporer de la matière brute
- * Ajouté le 24/07/2026. v2 puis v3 le même jour, suite aux retours de
- * Joseph après tests successifs.
+ * Ajouté le 24/07/2026. Revu plusieurs fois le même jour suite aux retours
+ * successifs de Joseph.
  *
  * PRINCIPE DE SÉCURITÉ NON NÉGOCIABLE : ceci reste une RECOMMANDATION,
  * jamais une insertion automatique. Chaque segment est inséré, modifié,
  * annulé ou déplacé INDIVIDUELLEMENT, à la demande explicite de l'auteur.
  *
- * v3 — nouveautés :
- * - Score de fidélité (0-100%) affiché pour CHAQUE segment, pas seulement
- *   ceux jugés douteux. Calcul heuristique par recouvrement de trigrammes
- *   de caractères entre le segment et le texte original collé — une copie
- *   exacte donne 100%, un passage reformulé ou déplacé donne un score plus
- *   bas. Ce n'est pas une preuve absolue, juste un signal utile.
- * - Aperçu cliquable du chapitre cible quand la destination est un nœud
- *   EXISTANT : les paragraphes du chapitre s'affichent, et un clic entre
- *   deux paragraphes fixe le point d'insertion exact (avant tel paragraphe,
- *   après tel autre) — plutôt que de toujours coller à la fin. Choix
- *   délibéré de limiter le clic aux frontières de paragraphes (pas au
- *   caractère près en plein milieu d'un paragraphe) pour ne jamais risquer
- *   de couper une mise en forme existante au mauvais endroit.
+ * v4 — nouveauté majeure : un ÉCRAN DE COMPARAISON s'intercale désormais
+ * entre l'analyse et le positionnement/insertion. Après analyse, l'auteur
+ * voit un diff mot à mot entre son texte collé et le texte reconstitué à
+ * partir des segments proposés — ce qui a été omis (en rouge), ce qui a
+ * été ajouté (en violet). Rien n'est positionnable ni insérable tant que
+ * l'auteur n'a pas explicitement validé ce comparatif. Ajouté suite à un
+ * écart constaté par Joseph : un score de fidélité élevé par segment
+ * (~97% en moyenne) masquait une couverture globale réelle de seulement
+ * 78% du texte original — un score par segment ne suffit pas, il faut
+ * pouvoir comparer les deux textes complets côte à côte.
  */
 
 import { useState } from "react";
@@ -34,7 +31,7 @@ const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SEUIL_CARACTÈRES = 8000;
-const SEUIL_SCORE_ALERTE = 90; // en dessous, le bouton "Revérifier" apparaît
+const SEUIL_SCORE_ALERTE = 90;
 
 async function appelClaude(system, user, maxTokens = 4096) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -111,11 +108,6 @@ function supprimerNœudLocal(structure, nœudId) {
     .map((n) => n.enfants?.length ? { ...n, enfants: supprimerNœudLocal(n.enfants, nœudId) } : n);
 }
 
-// Score heuristique de fidélité (0-100). 100 = copie exacte retrouvée telle
-// quelle dans le texte original. En dessous, calcul par recouvrement de
-// trigrammes de caractères — donne un signal continu même quand le passage
-// n'apparaît pas identique mot pour mot (reformulation, découpage différent).
-// Ce n'est pas une preuve absolue de fidélité, juste un indicateur utile.
 function scoreFidélité(segment, texteOriginal) {
   const normaliser = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
   const segNorm = normaliser(segment);
@@ -140,6 +132,42 @@ function couleurScore(score) {
   if (score >= 95) return { c: "#1D9E75", bg: "#E1F5EE" };
   if (score >= SEUIL_SCORE_ALERTE) return { c: "#BA7517", bg: "#FAEEDA" };
   return { c: "#E24B4A", bg: "#FCEBEB" };
+}
+
+// Diff mot à mot par recherche de la plus longue sous-séquence commune
+// (LCS) — algorithme standard, calculé une seule fois après l'analyse
+// (pas en continu), pour rester performant même sur des textes de
+// plusieurs milliers de caractères. Les espaces sont conservés comme
+// jetons à part entière pour une reconstruction fidèle de la lecture.
+function diffMots(texteA, texteB) {
+  const motsA = texteA.split(/(\s+)/).filter((t) => t !== "");
+  const motsB = texteB.split(/(\s+)/).filter((t) => t !== "");
+  const n = motsA.length, m = motsB.length;
+
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = motsA[i] === motsB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+
+  const résultat = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (motsA[i] === motsB[j]) {
+      résultat.push({ type: "égal", texte: motsA[i] });
+      i++; j++;
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      résultat.push({ type: "supprimé", texte: motsA[i] });
+      i++;
+    } else {
+      résultat.push({ type: "ajouté", texte: motsB[j] });
+      j++;
+    }
+  }
+  while (i < n) { résultat.push({ type: "supprimé", texte: motsA[i] }); i++; }
+  while (j < m) { résultat.push({ type: "ajouté", texte: motsB[j] }); j++; }
+  return résultat;
 }
 
 function construireContexteStructure(nœudsPlats) {
@@ -194,8 +222,6 @@ function texteVersHTML(texte) {
     .join("");
 }
 
-// Découpe le HTML d'un nœud en blocs de haut niveau (paragraphes, titres,
-// citations, listes…), pour l'aperçu cliquable de positionnement.
 function découperEnBlocs(html) {
   const dom = new DOMParser().parseFromString(html || "", "text/html");
   return Array.from(dom.body.children).map((el) => el.outerHTML);
@@ -211,9 +237,11 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [segments, setSegments] = useState(null); // null = pas encore analysé
+  const [diff, setDiff] = useState(null); // résultat du diff mot à mot, calculé une fois après analyse
+  const [comparaisonValidée, setComparaisonValidée] = useState(false);
   const [structureActuelle, setStructureActuelle] = useState(projet.structure || []);
   const [actionEnCours, setActionEnCours] = useState(null);
-  const [aperçuOuvertPour, setAperçuOuvertPour] = useState(null); // clé du segment dont l'aperçu de positionnement est déplié
+  const [aperçuOuvertPour, setAperçuOuvertPour] = useState(null);
 
   const nœudsPlats = aplatirStructure(structureActuelle);
   const nœudsPouvantRecevoirNouveau = nœudsPlats.filter((n) => TYPE_ENFANT[n.type]);
@@ -238,13 +266,19 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         inclus: true,
         score: scoreFidélité(s.texte, texteBrut),
         statutInsertion: "propose",
-        indexInsertion: null, // null = à la fin (par défaut)
+        indexInsertion: null,
         idNœudFinal: null,
         texteAvantInsertion: null,
         texteAprèsInsertion: null,
         typeDestinationInsérée: null,
       }));
+
+      const texteReconstitué = segmentsAvecÉtat.map((s) => s.texte).join(" ");
+      const diffCalculé = diffMots(texteBrut, texteReconstitué);
+
       setSegments(segmentsAvecÉtat);
+      setDiff(diffCalculé);
+      setComparaisonValidée(false);
     } catch (err) {
       setErreur(
         err.message === "SESSION_EXPIREE" ? "Votre session a expiré. Reconnectez-vous et réessayez."
@@ -254,6 +288,12 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
     } finally {
       setAnalyseEnCours(false);
     }
+  };
+
+  const recommencer = () => {
+    setSegments(null);
+    setDiff(null);
+    setComparaisonValidée(false);
   };
 
   const modifierSegment = (clé, champs) => {
@@ -393,6 +433,12 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   const texteTropVolumineux = texteBrut.length > SEUIL_CARACTÈRES;
   const auMoinsUnSegmentÀInsérer = segments?.some((s) => s.inclus && s.statutInsertion === "propose");
 
+  // Statistiques du diff, pour un résumé chiffré en tête de l'écran de comparaison.
+  const statsDiff = diff ? {
+    supprimés: diff.filter((d) => d.type === "supprimé" && d.texte.trim() !== "").length,
+    ajoutés: diff.filter((d) => d.type === "ajouté" && d.texte.trim() !== "").length,
+  } : null;
+
   return (
     <div style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
@@ -412,11 +458,12 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
 
         <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
           {segments === null ? (
+            // ═══ ÉCRAN 1 : coller le texte ═══
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
                 Collez un texte brut (notes, brouillon, transcription). Le co-pilote proposera un découpage
-                en segments et une destination pour chacun — vous pourrez modifier le texte, choisir l'emplacement
-                exact dans le chapitre, insérer individuellement, et annuler après coup.
+                en segments ; vous verrez d'abord un comparatif complet avec votre texte original avant de
+                pouvoir choisir où placer quoi que ce soit.
               </p>
               <textarea
                 value={texteBrut}
@@ -439,11 +486,51 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                 </div>
               )}
             </>
+          ) : !comparaisonValidée ? (
+            // ═══ ÉCRAN 2 : comparatif texte original vs reconstitué, à valider avant tout positionnement ═══
+            <>
+              <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
+                Voici votre texte original comparé au texte reconstitué à partir des {segments.length} segments
+                proposés. <span style={{ color: "#E24B4A" }}>En rouge barré</span> : passages de votre texte absents
+                du découpage. <span style={{ color: "#7F77DD" }}>En violet</span> : texte apparu dans le découpage
+                sans être dans votre original (ne devrait normalement pas arriver).
+              </p>
+              <div style={{
+                display: "flex", gap: 16, fontSize: 12, marginBottom: 12,
+                padding: "8px 12px", borderRadius: 8,
+                background: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#E1F5EE" : "#FAEEDA",
+                color: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#1D9E75" : "#854F0B",
+              }}>
+                <span><strong>{statsDiff.supprimés}</strong> mot{statsDiff.supprimés !== 1 ? "s" : ""} potentiellement omis</span>
+                <span><strong>{statsDiff.ajoutés}</strong> mot{statsDiff.ajoutés !== 1 ? "s" : ""} ajouté{statsDiff.ajoutés !== 1 ? "s" : ""} (hors original)</span>
+              </div>
+              <div style={{
+                border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12,
+                fontSize: 12.5, lineHeight: 1.7, fontFamily: "Georgia, serif",
+                background: "#fafafa", maxHeight: 420, overflowY: "auto",
+              }}>
+                {diff.map((d, i) => {
+                  if (d.type === "égal") return <span key={i}>{d.texte}</span>;
+                  if (d.type === "supprimé") return (
+                    <span key={i} style={{ color: "#E24B4A", textDecoration: "line-through", background: "#FCEBEB" }}>{d.texte}</span>
+                  );
+                  return (
+                    <span key={i} style={{ color: "#7F77DD", background: "#EEEDFE", fontWeight: 600 }}>{d.texte}</span>
+                  );
+                })}
+              </div>
+              {erreur && (
+                <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 10 }}>
+                  {erreur}
+                </div>
+              )}
+            </>
           ) : (
+            // ═══ ÉCRAN 3 : positionnement et insertion, segment par segment ═══
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 14, lineHeight: 1.5 }}>
-                {segments.length} segment{segments.length > 1 ? "s" : ""} proposé{segments.length > 1 ? "s" : ""}.
-                Le score indique la fidélité au texte original collé (100% = copie exacte retrouvée telle quelle).
+                {segments.length} segment{segments.length > 1 ? "s" : ""} — comparatif validé. Choisissez
+                l'emplacement de chacun et insérez individuellement ou tous ensemble.
               </p>
               {erreur && (
                 <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 12 }}>
@@ -456,6 +543,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                 const nœudCible = s.typeDestination === "existant" ? trouverNœudParId(structureActuelle, s.idCible) : null;
                 const blocsCible = nœudCible ? découperEnBlocs(nœudCible.texte) : [];
                 const aperçuOuvert = aperçuOuvertPour === s.clé;
+                const positionEffective = s.indexInsertion === null ? blocsCible.length : s.indexInsertion;
 
                 return (
                   <div key={s.clé} style={{
@@ -588,16 +676,16 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                           </button>
                         </div>
 
-                        {/* Aperçu cliquable de positionnement — n'apparaît que si déplié */}
                         {aperçuOuvert && s.typeDestination === "existant" && (
                           <div style={{
                             marginTop: 10, marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
-                            padding: 10, maxHeight: 280, overflowY: "auto", background: "#fcfcfc",
+                            padding: 10, maxHeight: 320, overflowY: "auto", background: "#fcfcfc",
                           }}>
                             <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
-                              Cliquez sur une barre <strong>+ Insérer ici</strong> pour choisir où le segment sera placé :
+                              Cliquez sur une barre pour choisir où le segment (en violet) sera inséré :
                             </div>
-                            <BarreInsertion active={s.indexInsertion === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
+                            <BarreInsertion active={positionEffective === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
+                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.texte} />}
                             {blocsCible.map((bloc, i) => (
                               <div key={i}>
                                 <div style={{
@@ -609,7 +697,8 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                                   {texteBrutDuBloc(bloc).slice(0, 160) || "(bloc vide)"}
                                   {texteBrutDuBloc(bloc).length > 160 && "…"}
                                 </div>
-                                <BarreInsertion active={s.indexInsertion === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
+                                <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
+                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.texte} />}
                               </div>
                             ))}
                           </div>
@@ -641,6 +730,18 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                 {analyseEnCours ? "Analyse en cours…" : "Analyser et proposer un découpage"}
               </button>
             </>
+          ) : !comparaisonValidée ? (
+            <>
+              <button onClick={recommencer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
+                ↩ Recommencer
+              </button>
+              <button
+                onClick={() => setComparaisonValidée(true)}
+                style={{ fontSize: 13, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                ✓ Valider ce découpage et choisir les emplacements
+              </button>
+            </>
           ) : (
             <>
               <button onClick={onFermer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -661,6 +762,21 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AperçuSegmentInséré({ texte }) {
+  return (
+    <div style={{
+      background: "#EEEDFE", border: "1px solid #7F77DD", borderRadius: 6,
+      padding: "8px 10px", margin: "4px 0", fontSize: 11.5, color: "#3d3580",
+      lineHeight: 1.5, fontFamily: "Georgia, serif",
+    }}>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: "#7F77DD", marginBottom: 3, fontFamily: "-apple-system, sans-serif" }}>
+        ↓ NOUVEAU SEGMENT ↓
+      </div>
+      {texte.slice(0, 220)}{texte.length > 220 && "…"}
     </div>
   );
 }
