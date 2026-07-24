@@ -102,6 +102,26 @@ const FORMATS_RÉFÉRENCE = {
   broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720 },
 };
 
+// Regroupe des positions verticales proches (à `seuil` pixels près) en une
+// seule valeur — corrige un artefact du navigateur observé dans les listes
+// à puces, où Range.getClientRects() peut renvoyer deux rectangles à
+// quelques pixels d'écart pour UNE SEULE ligne visuelle réelle (autour de
+// la puce). Un simple dédoublonnage par arrondi ne suffisait pas si l'écart
+// dépassait 1px, provoquant des numéros de ligne superposés à l'écran.
+// Corrigé 24/07/2026. Le seuil (8px) est largement inférieur à une vraie
+// hauteur de ligne (~25-30px pour le corps de texte), donc deux vraies
+// lignes distinctes ne sont jamais fusionnées à tort.
+function regrouperPositionsProches(tops, seuil = 8) {
+  const triés = [...tops].sort((a, b) => a - b);
+  const résultat = [];
+  for (const t of triés) {
+    if (résultat.length === 0 || t - résultat[résultat.length - 1] > seuil) {
+      résultat.push(t);
+    }
+  }
+  return résultat;
+}
+
 function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
   if (!éditeurDOM) return [];
   const lignes = [];
@@ -116,7 +136,7 @@ function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
         // Paragraphe vide : une seule "ligne" à la position du bloc lui-même.
         tops = [élément.getBoundingClientRect().top];
       } else {
-        tops = [...new Set(rects.map((r) => Math.round(r.top)))].sort((a, b) => a - b);
+        tops = regrouperPositionsProches(rects.map((r) => r.top));
       }
       tops.forEach((top) => lignes.push(top - topWrapper));
     } else if (élément.children?.length) {
