@@ -75,6 +75,58 @@ const formaterDateHeure = (isoString) => {
   return `${jourMois} ${heure}`;
 };
 
+// Calcule les numéros de LIGNE VISUELLES réelles (pas de paragraphe) —
+// ajouté 24/07/2026. Pour chaque bloc de texte (paragraphe, titre,
+// citation, item de liste…), mesure les rectangles de rendu réels du
+// navigateur (Range.getClientRects()) pour retrouver où le texte revient
+// effectivement à la ligne selon la largeur actuelle de la fenêtre — pas
+// une approximation, la vraie disposition affichée à l'écran. Recalculé à
+// chaque modification du texte et à chaque redimensionnement de fenêtre.
+// `topWrapper` est la position de référence (le conteneur qui porte la
+// numérotation), pour que chaque numéro soit positionné en absolu par
+// rapport à lui, indépendamment du défilement de la page.
+const BLOCS_DE_LIGNE = new Set(["P", "H1", "H2", "H3", "BLOCKQUOTE", "LI", "PRE"]);
+
+// Formats de référence pour la largeur de colonne — mêmes dimensions que
+// l'export Word (voir FORMATS_PAGE dans exportWord.js), converties en
+// pixels (1 DXA = 1/1440 pouce = 96/1440 px). Dupliqué ici plutôt
+// qu'importé pour ne pas faire dépendre l'éditeur de la librairie docx à
+// chaque frappe. Ajouté 24/07/2026 : sans largeur FIXE liée à un vrai
+// format cible, les numéros de ligne n'ont aucune valeur de référence
+// stable — ils changeraient à chaque redimensionnement de la fenêtre.
+const FORMATS_RÉFÉRENCE = {
+  a4:     { label: "A4",               largeurPx: 602 },
+  a5:     { label: "A5",               largeurPx: 446 },
+  poche:  { label: "Poche",            largeurPx: 333 },
+  broche: { label: "Broché (6×9)",     largeurPx: 432 },
+};
+
+function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
+  if (!éditeurDOM) return [];
+  const lignes = [];
+
+  const marcher = (élément) => {
+    if (BLOCS_DE_LIGNE.has(élément.tagName)) {
+      const range = document.createRange();
+      range.selectNodeContents(élément);
+      const rects = Array.from(range.getClientRects());
+      let tops;
+      if (rects.length === 0) {
+        // Paragraphe vide : une seule "ligne" à la position du bloc lui-même.
+        tops = [élément.getBoundingClientRect().top];
+      } else {
+        tops = [...new Set(rects.map((r) => Math.round(r.top)))].sort((a, b) => a - b);
+      }
+      tops.forEach((top) => lignes.push(top - topWrapper));
+    } else if (élément.children?.length) {
+      Array.from(élément.children).forEach(marcher);
+    }
+  };
+
+  Array.from(éditeurDOM.children).forEach(marcher);
+  return lignes.map((top, i) => ({ numéro: i + 1, top }));
+}
+
 // ─── Styles globaux de l'éditeur (injectés une seule fois) ─────────────────────
 
 const STYLES_EDITEUR = `
@@ -404,6 +456,7 @@ export default function Editeur({
   onRetour,                // () => void
 }) {
   const [modeFocus, setModeFocus] = useState(false);
+  const [formatRéférence, setFormatRéférence] = useState("a4");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
   const [historique, setHistorique] = useState([]);
@@ -423,6 +476,9 @@ export default function Editeur({
   // dans le callback différé de sauvegarde, sans dépendre d'une closure
   // React potentiellement obsolète. Ajouté 21/07/2026.
   const dernierMotsHistoriqueRef = useRef(null);
+  // Numéros de ligne — ajouté 24/07/2026.
+  const wrapperLigneRef = useRef(null);
+  const [numérosDeLigne, setNumérosDeLigne] = useState([]);
 
   // Injecter les styles TipTap une seule fois
   useEffect(() => {
@@ -591,6 +647,38 @@ export default function Editeur({
 
   const motsChapitre = editor ? compterMots(editor.getHTML()) : 0;
 
+  // Recalcule les numéros de ligne — sur chaque modification du texte, à
+  // chaque redimensionnement de fenêtre (le retour à la ligne automatique
+  // change avec la largeur disponible), et au changement de mode focus
+  // (la taille de police change). Ajouté 24/07/2026.
+  const recalculerNumérosDeLigne = useCallback(() => {
+    if (!editor || !wrapperLigneRef.current) return;
+    const topWrapper = wrapperLigneRef.current.getBoundingClientRect().top;
+    setNumérosDeLigne(calculerNumérosDeLigne(editor.view.dom, topWrapper));
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    recalculerNumérosDeLigne();
+    editor.on("update", recalculerNumérosDeLigne);
+    return () => editor.off("update", recalculerNumérosDeLigne);
+  }, [editor, recalculerNumérosDeLigne]);
+
+  useEffect(() => {
+    let timer;
+    const surRedimensionnement = () => {
+      clearTimeout(timer);
+      timer = setTimeout(recalculerNumérosDeLigne, 150);
+    };
+    window.addEventListener("resize", surRedimensionnement);
+    return () => { window.removeEventListener("resize", surRedimensionnement); clearTimeout(timer); };
+  }, [recalculerNumérosDeLigne]);
+
+  useEffect(() => {
+    const timer = setTimeout(recalculerNumérosDeLigne, 60);
+    return () => clearTimeout(timer);
+  }, [modeFocus, formatRéférence, recalculerNumérosDeLigne]);
+
   const restaurerVersion = useCallback((contenu) => {
     editor?.commands.setContent(contenu);
     setVoirHistorique(false);
@@ -627,6 +715,16 @@ export default function Editeur({
           <span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>{nœud.titre}</span>
           <div style={{ flex: 1 }} />
           <IndicateurSauvegarde état={statutSauvegarde} />
+          <select
+            value={formatRéférence}
+            onChange={(e) => setFormatRéférence(e.target.value)}
+            title="Format de référence pour la largeur de colonne et les numéros de ligne — les numéros restent stables tant que ce choix ne change pas"
+            style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+          >
+            {Object.entries(FORMATS_RÉFÉRENCE).map(([clé, f]) => (
+              <option key={clé} value={clé}>{f.label}</option>
+            ))}
+          </select>
           <button
             onClick={() => {
               const texte = editor?.getText() || "";
@@ -673,7 +771,7 @@ export default function Editeur({
         }}>
           <div style={{
             width: "100%",
-            maxWidth: modeFocus ? 680 : 720,
+            maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx,
             padding: "0 40px",
           }}>
             {/* Titre du chapitre en mode focus */}
@@ -687,7 +785,26 @@ export default function Editeur({
               </div>
             )}
 
-            <EditorContent editor={editor} />
+            {/* Numéros de ligne + éditeur — la gouttière est un élément
+                totalement séparé du contenu éditable de ProseMirror : elle
+                ne peut donc jamais se retrouver dans editor.getText() ni
+                dans une sélection/copie faite dans le texte. */}
+            <div ref={wrapperLigneRef} style={{ position: "relative" }}>
+              <div style={{
+                position: "absolute", left: -34, top: 0, width: 28,
+                textAlign: "right", userSelect: "none", pointerEvents: "none",
+              }}>
+                {numérosDeLigne.map((l) => (
+                  <div key={l.numéro} style={{
+                    position: "absolute", top: l.top, right: 0,
+                    fontSize: 11, color: "#ccc", fontFamily: "Georgia, serif",
+                  }}>
+                    {l.numéro}
+                  </div>
+                ))}
+              </div>
+              <EditorContent editor={editor} />
+            </div>
           </div>
         </div>
 
@@ -716,4 +833,3 @@ export default function Editeur({
     </div>
   );
 }
-
