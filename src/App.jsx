@@ -38,10 +38,11 @@ import Bibliotheque from "./components/Bibliotheque.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
+import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
-import { exporterProjetWord } from "./lib/exportWord.js";
+import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -1208,10 +1209,12 @@ function AppConnectée({ user, déconnecter }) {
   const [projetActifId, setProjetActifId] = useState(null);
   const [nœudActifId, setNœudActifId]     = useState(null);
   const [importOuvert, setImportOuvert]   = useState(false);
+  const [incorporerOuvert, setIncorporerOuvert] = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
   const [exportEnCours, setExportEnCours]                 = useState(false);
+  const [formatExport, setFormatExport]                   = useState("a4");
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
@@ -1706,11 +1709,25 @@ function AppConnectée({ user, déconnecter }) {
               display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
               background: "#fafafa",
             }}>
+              <select
+                value={formatExport}
+                onChange={(e) => setFormatExport(e.target.value)}
+                title="Format de page pour l'export Word"
+                style={{
+                  fontSize: 12, color: "#555", background: "#fff",
+                  border: "0.5px solid #ddd", borderRadius: 8, padding: "6px 8px",
+                  fontFamily: "inherit", cursor: "pointer",
+                }}
+              >
+                {Object.entries(FORMATS_PAGE).map(([clé, f]) => (
+                  <option key={clé} value={clé}>{f.label}</option>
+                ))}
+              </select>
               <button
                 onClick={async () => {
                   setExportEnCours(true);
                   try {
-                    await exporterProjetWord(projetActif);
+                    await exporterProjetWord(projetActif, formatExport);
                   } catch (err) {
                     journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
                     window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
@@ -1728,6 +1745,18 @@ function AppConnectée({ user, déconnecter }) {
                 }}
               >
                 {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
+              <button
+                onClick={() => setIncorporerOuvert(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: "#7F77DD",
+                  border: "0.5px solid #7F77DD40", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                📥 Incorporer de la matière
               </button>
               <button
                 onClick={() => setImportOuvert(true)}
@@ -1838,6 +1867,24 @@ function AppConnectée({ user, déconnecter }) {
             });
           }}
           onFermer={() => setImportOuvert(false)}
+        />
+      )}
+
+      {/* Modal Incorporer de la matière — même mécanisme de rafraîchissement que ImportDocx ci-dessus */}
+      {incorporerOuvert && projetActif && (
+        <IncorporerMatiere
+          projet={projetActif}
+          onTerminé={() => {
+            setIncorporerOuvert(false);
+            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
+              if (data) {
+                setProjets(prev => prev.map(p =>
+                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
+                ));
+              }
+            });
+          }}
+          onFermer={() => setIncorporerOuvert(false)}
         />
       )}
 
