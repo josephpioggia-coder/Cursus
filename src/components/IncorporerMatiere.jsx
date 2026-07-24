@@ -134,6 +134,26 @@ function couleurScore(score) {
   return { c: "#E24B4A", bg: "#FCEBEB" };
 }
 
+// Restaure la ponctuation typographique du texte ORIGINAL dans un segment
+// généré par l'IA — corrige un comportement connu des modèles de langage
+// qui "nettoient" souvent la ponctuation (apostrophes courbes ’ → droites ',
+// guillemets typographiques “” → droits "") même quand on leur demande
+// explicitement une copie exacte. Sans cette correction, chaque apostrophe
+// du texte déclenchait une fausse alerte de mot "omis" ET "ajouté" dans le
+// comparatif — gonflant artificiellement les écarts sans perte réelle de
+// contenu. Ajouté 24/07/2026 suite à un cas concret : 169 écarts détectés,
+// quasi tous dus à ce seul phénomène.
+function normaliserPonctuationCommeOriginal(texteSegment, texteOriginal) {
+  let corrigé = texteSegment;
+  if (texteOriginal.includes("’") && !texteOriginal.includes("'")) {
+    corrigé = corrigé.replace(/'/g, "’");
+  }
+  if (texteOriginal.includes("“") && texteOriginal.includes("”") && !texteOriginal.includes('"')) {
+    corrigé = corrigé.replace(/"([^"]*)"/g, "“$1”");
+  }
+  return corrigé;
+}
+
 // Diff mot à mot par recherche de la plus longue sous-séquence commune
 // (LCS) — algorithme standard, calculé une seule fois après l'analyse
 // (pas en continu), pour rester performant même sur des textes de
@@ -184,7 +204,7 @@ L'auteur vient de coller un texte brut (notes, brouillon, transcription) qu'il s
 
 RÈGLES IMPÉRATIVES :
 1. Le champ "texte" de chaque segment doit être une COPIE EXACTE d'un passage contigu du texte original — ne reformule JAMAIS, ne résume JAMAIS, ne corrige JAMAIS la moindre virgule. Un simple copier-coller de passages, jamais une réécriture.
-2. OMETS SYSTÉMATIQUEMENT du texte de chaque segment tout titre ou intertitre du brouillon qui se contente d'annoncer le sujet de la section (ex. "Giuseppe : le prénom de l'oncle disparu" en tête de paragraphe) — ce n'est jamais de la prose à conserver, seulement un repère de structuration de l'auteur. Le segment doit commencer directement par le contenu narratif ou analytique lui-même. Chaque mot de PROSE du texte original doit apparaître dans exactement un segment (pas de perte, pas de doublon) ; seuls ces intertitres structurels peuvent être omis.
+2. OMETS SYSTÉMATIQUEMENT du texte de chaque segment tout titre ou intertitre du brouillon qui se contente d'annoncer le sujet de la section (ex. "Giuseppe : le prénom de l'oncle disparu" en tête de paragraphe) — ce n'est jamais de la prose à conserver, seulement un repère de structuration de l'auteur. Le segment doit commencer directement par le contenu narratif ou analytique lui-même. Chaque mot de PROSE du texte original doit apparaître dans exactement un segment (pas de perte, pas de doublon) ; seuls ces intertitres structurels peuvent être omis DU TEXTE — mais ils ne doivent JAMAIS être perdus : si le segment est destiné à un NOUVEAU nœud ("typeDestination": "nouveau"), REPRENDS CET INTERTITRE MOT POUR MOT comme valeur de "titreSuggere" (ne l'invente jamais, recopie-le exactement). L'intertitre devient ainsi le titre du nouveau chapitre/scène plutôt que la première ligne de son texte.
 3. Pour chaque segment, deux options de destination :
    - "existant" : le segment complète un nœud déjà présent dans la structure (donne son id exact dans "idCible")
    - "nouveau" : le segment mérite un nouveau nœud, à créer comme enfant d'un nœud PARENT déjà présent dans la structure (donne l'id du parent dans "idCible", et un titre court et fidèle au contenu dans "titreSuggere")
@@ -256,24 +276,29 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         PROMPT_SEGMENTATION(contexteStructure, texteBrut)
       );
       const p = parserJSON(résultat);
-      const segmentsAvecÉtat = (p.segments || []).map((s, i) => ({
-        clé: `seg-${i}`,
-        texte: s.texte,
-        typeDestination: s.typeDestination,
-        idCible: s.idCible,
-        titreSuggere: s.titreSuggere,
-        justification: s.justification,
-        inclus: true,
-        score: scoreFidélité(s.texte, texteBrut),
-        statutInsertion: "propose",
-        indexInsertion: null,
-        idNœudFinal: null,
-        texteAvantInsertion: null,
-        texteAprèsInsertion: null,
-        typeDestinationInsérée: null,
-      }));
+      const segmentsAvecÉtat = (p.segments || []).map((s, i) => {
+        const texteCorrigé = normaliserPonctuationCommeOriginal(s.texte, texteBrut);
+        return {
+          clé: `seg-${i}`,
+          texte: texteCorrigé,
+          typeDestination: s.typeDestination,
+          idCible: s.idCible,
+          titreSuggere: s.titreSuggere,
+          justification: s.justification,
+          inclus: true,
+          score: scoreFidélité(texteCorrigé, texteBrut),
+          statutInsertion: "propose",
+          indexInsertion: null,
+          idNœudFinal: null,
+          texteAvantInsertion: null,
+          texteAprèsInsertion: null,
+          typeDestinationInsérée: null,
+        };
+      });
 
-      const texteReconstitué = segmentsAvecÉtat.map((s) => s.texte).join(" ");
+      const texteReconstitué = segmentsAvecÉtat
+        .map((s) => (s.titreSuggere ? s.titreSuggere + " " : "") + s.texte)
+        .join(" ");
       const diffCalculé = diffMots(texteBrut, texteReconstitué);
 
       setSegments(segmentsAvecÉtat);
@@ -491,9 +516,10 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
                 Voici votre texte original comparé au texte reconstitué à partir des {segments.length} segments
-                proposés. <span style={{ color: "#E24B4A" }}>En rouge barré</span> : passages de votre texte absents
-                du découpage. <span style={{ color: "#7F77DD" }}>En violet</span> : texte apparu dans le découpage
-                sans être dans votre original (ne devrait normalement pas arriver).
+                proposés (titres des nouveaux chapitres/scènes inclus dans la comparaison, puisqu'ils reprennent vos
+                intertitres). <span style={{ color: "#E24B4A" }}>En rouge barré</span> : passages réellement absents
+                du découpage. <span style={{ color: "#7F77DD" }}>En violet</span> : texte apparu sans être dans
+                votre original (ne devrait normalement pas arriver).
               </p>
               <div style={{
                 display: "flex", gap: 16, fontSize: 12, marginBottom: 12,
