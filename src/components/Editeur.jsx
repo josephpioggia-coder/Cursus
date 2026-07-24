@@ -143,6 +143,9 @@ const STYLES_EDITEUR = `
   .ProseMirror h1 { font-size: 1.6em; font-weight: 500; margin: 1.4em 0 0.5em; line-height: 1.3; }
   .ProseMirror h2 { font-size: 1.3em; font-weight: 500; margin: 1.2em 0 0.4em; line-height: 1.3; }
   .ProseMirror h3 { font-size: 1.1em; font-weight: 500; margin: 1em 0 0.3em; line-height: 1.3; }
+  .ProseMirror h4 { font-size: 1em; font-weight: 600; margin: 0.9em 0 0.3em; line-height: 1.3; }
+  .ProseMirror h5 { font-size: 0.95em; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.3; text-transform: uppercase; letter-spacing: 0.02em; }
+  .ProseMirror h6 { font-size: 0.9em; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.3; color: #666; font-style: italic; }
   .ProseMirror blockquote {
     border-left: 3px solid #7F77DD;
     margin: 1.2em 0;
@@ -235,6 +238,12 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
       <BoutonOutil actif={editor.isActive("heading", { level: 3 })} titre="Titre 3"
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>H3</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 4 })} titre="Titre 4"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}>H4</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 5 })} titre="Titre 5"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}>H5</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 6 })} titre="Titre 6"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}>H6</BoutonOutil>
 
       <Sep />
 
@@ -265,6 +274,19 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().toggleCode().run()}>{"`"}</BoutonOutil>
       <BoutonOutil actif={false} titre="Séparateur horizontal"
         onClick={() => editor.chain().focus().setHorizontalRule().run()}>—</BoutonOutil>
+
+      <Sep />
+
+      {/* Alignement — extension TextAlign déjà installée mais jamais exposée
+          dans la barre d'outils jusqu'ici. Ajouté 24/07/2026. */}
+      <BoutonOutil actif={editor.isActive({ textAlign: "left" })} titre="Aligner à gauche"
+        onClick={() => editor.chain().focus().setTextAlign("left").run()}>⇤</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "center" })} titre="Centrer"
+        onClick={() => editor.chain().focus().setTextAlign("center").run()}>≡</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "right" })} titre="Aligner à droite"
+        onClick={() => editor.chain().focus().setTextAlign("right").run()}>⇥</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "justify" })} titre="Justifier (étiré)"
+        onClick={() => editor.chain().focus().setTextAlign("justify").run()}>☰</BoutonOutil>
 
       <Sep />
 
@@ -547,7 +569,10 @@ export default function Editeur({
   // Initialisation de l'éditeur TipTap
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ history: { depth: 100 } }),
+      StarterKit.configure({
+        history: { depth: 100 },
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
+      }),
       Typography,
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
