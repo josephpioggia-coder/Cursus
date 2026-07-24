@@ -1874,7 +1874,20 @@ function AppConnectée({ user, déconnecter }) {
       {incorporerOuvert && projetActif && (
         <IncorporerMatiere
           projet={projetActif}
-          onTerminé={() => {
+          onStructureChangée={() => {
+            // Rafraîchit la structure du projet dans App.jsx SANS fermer la
+            // fenêtre — pour que la vue "Structure du manuscrit" en arrière-plan
+            // reste à jour au fil des insertions/annulations, sans interrompre
+            // le travail en cours dans la fenêtre Incorporer de la matière.
+            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
+              if (data) {
+                setProjets(prev => prev.map(p =>
+                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
+                ));
+              }
+            });
+          }}
+          onFermer={() => {
             setIncorporerOuvert(false);
             nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
               if (data) {
@@ -1884,7 +1897,6 @@ function AppConnectée({ user, déconnecter }) {
               }
             });
           }}
-          onFermer={() => setIncorporerOuvert(false)}
         />
       )}
 
@@ -1956,4 +1968,3 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
-
