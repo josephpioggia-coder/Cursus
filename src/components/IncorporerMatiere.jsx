@@ -162,33 +162,48 @@ function couleurScore(score) {
   return { c: "#E24B4A", bg: "#FCEBEB" };
 }
 
+// Normalise uniquement les apostrophes/guillemets typographiques vers leur
+// équivalent droit — remplacement caractère par caractère (jamais de
+// fusion d'espaces), pour que les INDEX de position restent strictement
+// identiques entre le texte normalisé et le texte original. C'est ce qui
+// permet de rechercher un passage malgré une différence de style
+// d'apostrophe, tout en découpant ensuite l'extrait dans le texte ORIGINAL
+// (ponctuation d'origine intacte), jamais dans la version normalisée.
+function normaliserApostrophes(s) {
+  return s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
+}
+
 // VÉRIFICATION RÉELLE, pas un score de probabilité : retrouve le passage
 // proposé par l'IA DIRECTEMENT dans le texte original collé, et si trouvé,
 // utilise l'extrait EXACT du texte source (découpé par le code, jamais
 // retapé par l'IA) — ponctuation, apostrophes, tout garanti identique
 // puisqu'il s'agit littéralement du même texte, pas d'une reproduction.
-// Ajouté 24/07/2026 en remplacement du simple score de similarité, suite
-// au constat que faire "retaper" le texte par l'IA dans le JSON était la
-// cause structurelle des écarts (apostrophes, omissions), pas juste un
-// détail à corriger après coup.
+// CORRECTIF 24/07/2026 (v6) : la première version de cette fonction
+// cherchait le texte tel quel, apostrophes comprises — ce qui la faisait
+// échouer précisément à cause du problème qu'elle devait contourner (l'IA
+// retape presque toujours les apostrophes en version droite). Recherche
+// désormais sur une version normalisée des deux textes, mais découpe
+// toujours l'extrait final dans le texte ORIGINAL non normalisé.
 function localiserSegmentDansOriginal(segmentTexte, texteOriginal) {
   const segTrim = (segmentTexte || "").trim();
   if (!segTrim) return { texte: segmentTexte, vérifié: false };
 
-  // 1. Correspondance exacte, telle quelle.
-  const indexExact = texteOriginal.indexOf(segTrim);
+  const origNorm = normaliserApostrophes(texteOriginal);
+  const segNorm = normaliserApostrophes(segTrim);
+
+  // 1. Correspondance exacte (sur texte normalisé), extrait depuis l'original.
+  const indexExact = origNorm.indexOf(segNorm);
   if (indexExact !== -1) {
-    return { texte: texteOriginal.slice(indexExact, indexExact + segTrim.length), vérifié: true };
+    return { texte: texteOriginal.slice(indexExact, indexExact + segNorm.length), vérifié: true };
   }
 
   // 2. Correspondance par ancrage début/fin — tolère une variation mineure
-  // au milieu (ex. un retour à la ligne différent) sans jamais utiliser le
-  // texte de l'IA : le résultat final vient toujours du texte original,
-  // découpé entre les deux ancres retrouvées.
-  const début = segTrim.slice(0, 30);
-  const fin = segTrim.slice(-30);
-  const indexDébut = texteOriginal.indexOf(début);
-  const indexFin = début && fin ? texteOriginal.indexOf(fin, indexDébut >= 0 ? indexDébut : 0) : -1;
+  // au milieu (ex. un retour à la ligne différent), extrait toujours depuis
+  // l'original.
+  const début = segNorm.slice(0, 30);
+  const fin = segNorm.slice(-30);
+  const indexDébut = origNorm.indexOf(début);
+  const indexFin = début && fin ? origNorm.indexOf(fin, indexDébut >= 0 ? indexDébut : 0) : -1;
   if (indexDébut !== -1 && indexFin !== -1 && indexFin >= indexDébut) {
     return { texte: texteOriginal.slice(indexDébut, indexFin + fin.length), vérifié: true };
   }
@@ -285,6 +300,22 @@ ${débutSegment}
 Propose UNE SEULE phrase de transition courte et naturelle, dans un ton sobre cohérent avec le contexte, qui pourrait s'insérer entre les deux pour adoucir l'enchaînement. Ne réécris ni l'un ni l'autre passage, juste la phrase de liaison elle-même. Réponds UNIQUEMENT en JSON valide :
 {"transition":"..."}`;
 
+// Avis INDICATIF du co-pilote sur un segment — n'affecte JAMAIS le texte
+// qui sera réellement inséré (celui-ci reste toujours l'extrait vérifié du
+// texte original). Ajouté 24/07/2026 à la demande explicite de Joseph :
+// même niveau de suggestions que le Co-pilote classique (suite,
+// approfondissement, reformulation), mais purement consultatif, dans un
+// panneau séparé du texte à insérer.
+const PROMPT_AVIS = (texte) => `Tu es le co-pilote d'un écrivain professionnel. Voici un passage de son texte, qui va être intégré tel quel au manuscrit. Génère exactement 3 suggestions concrètes À TITRE INDICATIF SEULEMENT — ce commentaire n'affecte jamais le texte lui-même, qui reste inséré sans modification.
+
+Passage :
+"""
+${texte}
+"""
+
+Réponds UNIQUEMENT en JSON valide :
+{"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`;
+
 function texteVersHTML(texte) {
   return texte
     .split(/\n{2,}/)
@@ -350,6 +381,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           statutInsertion: "propose",
           indexInsertion: null,
           transition: "",
+          avisCopilote: null,
           idNœudFinal: null,
           texteAvantInsertion: null,
           texteAprèsInsertion: null,
@@ -434,6 +466,28 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       modifierSegment(clé, { transition: p.transition || "" });
     } catch {
       setErreur("La proposition de transition a échoué. Vous pouvez l'écrire manuellement.");
+    } finally {
+      setActionEnCours(null);
+    }
+  };
+
+  // Avis indicatif — ne modifie JAMAIS s.texte (le texte à insérer), stocke
+  // le résultat séparément dans s.avisCopilote pour affichage informatif.
+  const obtenirAvisCopilote = async (clé) => {
+    const segment = segments.find((s) => s.clé === clé);
+    if (!segment) return;
+    setActionEnCours(clé);
+    setErreur(null);
+    try {
+      const résultat = await appelClaude(
+        "Réponds en français. (Les clés JSON restent telles quelles.)",
+        PROMPT_AVIS(segment.texte),
+        1536
+      );
+      const p = parserJSON(résultat);
+      modifierSegment(clé, { avisCopilote: p.suggestions || [] });
+    } catch {
+      setErreur("Impossible d'obtenir l'avis du co-pilote pour ce segment. Réessayez.");
     } finally {
       setActionEnCours(null);
     }
@@ -837,6 +891,13 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             {enCours ? "…" : "🤖 Proposer une transition"}
                           </button>
                           <button
+                            onClick={() => obtenirAvisCopilote(s.clé)}
+                            disabled={enCours}
+                            style={{ fontSize: 11, color: "#185FA5", background: "#E6F1FB", border: "none", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
+                          >
+                            {enCours ? "…" : "💬 Avis du co-pilote"}
+                          </button>
+                          <button
                             onClick={() => insérerSegment(s.clé)}
                             disabled={enCours}
                             style={{
@@ -848,6 +909,21 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             {enCours ? "…" : "Insérer ce segment"}
                           </button>
                         </div>
+
+                        {s.avisCopilote && (
+                          <div style={{ marginLeft: 24, marginBottom: 8, border: "0.5px solid #378ADD30", borderRadius: 8, padding: 10, background: "#F7FAFE" }}>
+                            <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                              💬 Avis indicatif — n'affecte pas le texte inséré ci-dessus
+                            </div>
+                            {s.avisCopilote.map((av, i) => (
+                              <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < s.avisCopilote.length - 1 ? "0.5px solid #378ADD20" : "none" }}>
+                                <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", marginBottom: 2 }}>{av.type}</div>
+                                <div style={{ fontSize: 11.5, fontWeight: 500, color: "#1a1a1a", marginBottom: 2 }}>{av.titre}</div>
+                                <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.5 }}>{av.texte}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
 
                         {(s.transition || aperçuOuvert) && (
                           <div style={{ marginLeft: 24, marginBottom: 8 }}>
