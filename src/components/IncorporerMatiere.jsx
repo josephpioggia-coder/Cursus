@@ -893,7 +893,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                           <button
                             onClick={() => obtenirAvisCopilote(s.clé)}
                             disabled={enCours}
-                            style={{ fontSize: 11, color: "#185FA5", background: "#E6F1FB", border: "none", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
+                            style={{ fontSize: 11.5, fontWeight: 600, color: "#fff", background: "#D85A30", border: "none", borderRadius: 6, padding: "5px 12px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
                           >
                             {enCours ? "…" : "💬 Avis du co-pilote"}
                           </button>
@@ -917,7 +917,17 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             </div>
                             {s.avisCopilote.map((av, i) => (
                               <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < s.avisCopilote.length - 1 ? "0.5px solid #378ADD20" : "none" }}>
-                                <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", marginBottom: 2 }}>{av.type}</div>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+                                  <span style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase" }}>{av.type}</span>
+                                  {av.type === "reformulation" && (
+                                    <button
+                                      onClick={() => modifierSegment(s.clé, { texte: av.texte, origineVérifiée: false, score: scoreFidélité(av.texte, texteBrut) })}
+                                      style={{ fontSize: 10, color: "#7F77DD", background: "#EEEDFE", border: "none", borderRadius: 5, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit" }}
+                                    >
+                                      ↳ Utiliser cette version
+                                    </button>
+                                  )}
+                                </div>
                                 <div style={{ fontSize: 11.5, fontWeight: 500, color: "#1a1a1a", marginBottom: 2 }}>{av.titre}</div>
                                 <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.5 }}>{av.texte}</div>
                               </div>
