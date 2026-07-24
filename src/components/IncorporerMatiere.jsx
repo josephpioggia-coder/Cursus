@@ -1,29 +1,25 @@
 /**
  * CURSUS — Incorporer de la matière brute
- * Ajouté le 24/07/2026. Revu en profondeur le 24/07/2026 (v2) suite au
- * retour de Joseph après premier test : la v1 était "tout ou rien" (un
- * seul bouton d'insertion globale, texte figé, aucun retour en arrière).
+ * Ajouté le 24/07/2026. v2 puis v3 le même jour, suite aux retours de
+ * Joseph après tests successifs.
  *
  * PRINCIPE DE SÉCURITÉ NON NÉGOCIABLE : ceci reste une RECOMMANDATION,
  * jamais une insertion automatique. Chaque segment est inséré, modifié,
  * annulé ou déplacé INDIVIDUELLEMENT, à la demande explicite de l'auteur.
  *
- * v2 — nouveautés :
- * - Texte de chaque segment modifiable avant insertion
- * - Bouton "Revérifier" par segment (redemande au co-pilote de retrouver
- *   l'extrait exact dans le texte original, si le contrôle de fidélité a
- *   échoué)
- * - Insertion INDIVIDUELLE par segment (plus seulement un bloc global)
- * - Après insertion : affichage de la destination réelle, bouton "Changer
- *   d'emplacement" (annule proprement puis rouvre le segment) et bouton
- *   "Annuler l'insertion"
- * - L'annulation vérifie que le nœud cible n'a pas été modifié depuis
- *   (par un autre segment inséré ensuite) avant de restaurer l'état
- *   antérieur — sinon elle refuse plutôt que de risquer une perte de
- *   contenu.
- * - La structure du manuscrit est tenue à jour localement au fil des
- *   insertions/annulations, sans jamais fermer la fenêtre ni perdre le
- *   fil de l'analyse en cours.
+ * v3 — nouveautés :
+ * - Score de fidélité (0-100%) affiché pour CHAQUE segment, pas seulement
+ *   ceux jugés douteux. Calcul heuristique par recouvrement de trigrammes
+ *   de caractères entre le segment et le texte original collé — une copie
+ *   exacte donne 100%, un passage reformulé ou déplacé donne un score plus
+ *   bas. Ce n'est pas une preuve absolue, juste un signal utile.
+ * - Aperçu cliquable du chapitre cible quand la destination est un nœud
+ *   EXISTANT : les paragraphes du chapitre s'affichent, et un clic entre
+ *   deux paragraphes fixe le point d'insertion exact (avant tel paragraphe,
+ *   après tel autre) — plutôt que de toujours coller à la fin. Choix
+ *   délibéré de limiter le clic aux frontières de paragraphes (pas au
+ *   caractère près en plein milieu d'un paragraphe) pour ne jamais risquer
+ *   de couper une mise en forme existante au mauvais endroit.
  */
 
 import { useState } from "react";
@@ -38,6 +34,7 @@ const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const SEUIL_CARACTÈRES = 8000;
+const SEUIL_SCORE_ALERTE = 90; // en dessous, le bouton "Revérifier" apparaît
 
 async function appelClaude(system, user, maxTokens = 4096) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -92,9 +89,6 @@ function trouverNœudParId(liste, id) {
   return null;
 }
 
-// Met à jour le texte d'un nœud dans une copie de la structure locale
-// (immutabilité respectée), sans toucher Supabase — utilisé pour refléter
-// immédiatement à l'écran une insertion/annulation déjà faite en base.
 function màjTexteLocal(structure, nœudId, nouveauTexte) {
   return structure.map((n) => {
     if (n.id === nœudId) return { ...n, texte: nouveauTexte };
@@ -117,9 +111,35 @@ function supprimerNœudLocal(structure, nœudId) {
     .map((n) => n.enfants?.length ? { ...n, enfants: supprimerNœudLocal(n.enfants, nœudId) } : n);
 }
 
-function segmentEstFidèle(segment, texteOriginal) {
-  const normaliser = (s) => s.replace(/\s+/g, " ").trim();
-  return normaliser(texteOriginal).includes(normaliser(segment).slice(0, 200));
+// Score heuristique de fidélité (0-100). 100 = copie exacte retrouvée telle
+// quelle dans le texte original. En dessous, calcul par recouvrement de
+// trigrammes de caractères — donne un signal continu même quand le passage
+// n'apparaît pas identique mot pour mot (reformulation, découpage différent).
+// Ce n'est pas une preuve absolue de fidélité, juste un indicateur utile.
+function scoreFidélité(segment, texteOriginal) {
+  const normaliser = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
+  const segNorm = normaliser(segment);
+  const origNorm = normaliser(texteOriginal);
+  if (!segNorm) return 100;
+  if (origNorm.includes(segNorm)) return 100;
+
+  const trigrammes = (s) => {
+    const set = new Set();
+    for (let i = 0; i < s.length - 2; i++) set.add(s.slice(i, i + 3));
+    return set;
+  };
+  const segTri = trigrammes(segNorm);
+  const origTri = trigrammes(origNorm);
+  if (segTri.size === 0) return 100;
+  let intersection = 0;
+  segTri.forEach((t) => { if (origTri.has(t)) intersection++; });
+  return Math.round((intersection / segTri.size) * 100);
+}
+
+function couleurScore(score) {
+  if (score >= 95) return { c: "#1D9E75", bg: "#E1F5EE" };
+  if (score >= SEUIL_SCORE_ALERTE) return { c: "#BA7517", bg: "#FAEEDA" };
+  return { c: "#E24B4A", bg: "#FCEBEB" };
 }
 
 function construireContexteStructure(nœudsPlats) {
@@ -174,13 +194,26 @@ function texteVersHTML(texte) {
     .join("");
 }
 
+// Découpe le HTML d'un nœud en blocs de haut niveau (paragraphes, titres,
+// citations, listes…), pour l'aperçu cliquable de positionnement.
+function découperEnBlocs(html) {
+  const dom = new DOMParser().parseFromString(html || "", "text/html");
+  return Array.from(dom.body.children).map((el) => el.outerHTML);
+}
+
+function texteBrutDuBloc(blocHTML) {
+  const dom = new DOMParser().parseFromString(blocHTML, "text/html");
+  return (dom.body.textContent || "").trim();
+}
+
 export default function IncorporerMatiere({ projet, onFermer, onStructureChangée }) {
   const [texteBrut, setTexteBrut] = useState("");
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [segments, setSegments] = useState(null); // null = pas encore analysé
   const [structureActuelle, setStructureActuelle] = useState(projet.structure || []);
-  const [actionEnCours, setActionEnCours] = useState(null); // clé du segment en cours de traitement
+  const [actionEnCours, setActionEnCours] = useState(null);
+  const [aperçuOuvertPour, setAperçuOuvertPour] = useState(null); // clé du segment dont l'aperçu de positionnement est déplié
 
   const nœudsPlats = aplatirStructure(structureActuelle);
   const nœudsPouvantRecevoirNouveau = nœudsPlats.filter((n) => TYPE_ENFANT[n.type]);
@@ -203,8 +236,9 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         titreSuggere: s.titreSuggere,
         justification: s.justification,
         inclus: true,
-        fidèle: segmentEstFidèle(s.texte, texteBrut),
-        statutInsertion: "propose", // "propose" | "insere"
+        score: scoreFidélité(s.texte, texteBrut),
+        statutInsertion: "propose",
+        indexInsertion: null, // null = à la fin (par défaut)
         idNœudFinal: null,
         texteAvantInsertion: null,
         texteAprèsInsertion: null,
@@ -226,9 +260,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
     setSegments((prev) => prev.map((s) => s.clé === clé ? { ...s, ...champs } : s));
   };
 
-  // Redemande au co-pilote de retrouver l'extrait exact dans le texte
-  // original, pour UN SEUL segment — répond au point "pourquoi ne puis-je
-  // pas demander d'analyser sur place le texte proposé".
   const revérifierSegment = async (clé) => {
     const segment = segments.find((s) => s.clé === clé);
     if (!segment) return;
@@ -242,7 +273,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       );
       const p = parserJSON(résultat);
       const nouveauTexte = p.texteCorrigé || p.texteCorrige || segment.texte;
-      modifierSegment(clé, { texte: nouveauTexte, fidèle: segmentEstFidèle(nouveauTexte, texteBrut) });
+      modifierSegment(clé, { texte: nouveauTexte, score: scoreFidélité(nouveauTexte, texteBrut) });
     } catch {
       setErreur("La revérification a échoué. Vous pouvez modifier le texte manuellement.");
     } finally {
@@ -250,8 +281,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
     }
   };
 
-  // Insère UN segment, indépendamment des autres. Retourne silencieusement
-  // si le segment n'est plus dans l'état "propose" (déjà inséré).
   const insérerSegment = async (clé) => {
     const segment = segments.find((s) => s.clé === clé);
     if (!segment || segment.statutInsertion === "insere") return;
@@ -262,7 +291,11 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         const nœudCible = trouverNœudParId(structureActuelle, segment.idCible);
         if (!nœudCible) throw new Error("Nœud cible introuvable — la structure a peut-être changé.");
         const texteAvant = nœudCible.texte || "";
-        const texteAprès = texteAvant + texteVersHTML(segment.texte);
+        const blocs = découperEnBlocs(texteAvant);
+        const position = segment.indexInsertion === null ? blocs.length : Math.min(segment.indexInsertion, blocs.length);
+        const nouveauxBlocs = texteVersHTML(segment.texte);
+        const texteAprès = blocs.slice(0, position).join("") + nouveauxBlocs + blocs.slice(position).join("");
+
         const { error } = await nœudsAPI.sauvegarderTexte(segment.idCible, texteAprès);
         if (error) throw error;
 
@@ -318,12 +351,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
     }
   };
 
-  // Annule l'insertion d'un segment — supprime le nœud créé (cas "nouveau"),
-  // ou restaure le texte antérieur du nœud complété (cas "existant"). Dans
-  // ce second cas, vérifie D'ABORD que rien d'autre n'a modifié ce nœud
-  // depuis (par exemple un autre segment inséré ensuite au même endroit) :
-  // si le contenu actuel ne correspond plus exactement à ce qu'on attend,
-  // l'annulation est refusée plutôt que de risquer d'effacer autre chose.
   const annulerInsertion = async (clé) => {
     const segment = segments.find((s) => s.clé === clé);
     if (!segment || segment.statutInsertion !== "insere") return;
@@ -372,7 +399,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }}>
       <div style={{
-        background: "#fff", borderRadius: 12, width: "min(760px, 92vw)",
+        background: "#fff", borderRadius: 12, width: "min(780px, 94vw)",
         maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
         <div style={{
@@ -388,8 +415,8 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
                 Collez un texte brut (notes, brouillon, transcription). Le co-pilote proposera un découpage
-                en segments et une destination pour chacun — vous pourrez modifier le texte, changer la
-                destination, insérer chaque segment individuellement, et annuler après coup.
+                en segments et une destination pour chacun — vous pourrez modifier le texte, choisir l'emplacement
+                exact dans le chapitre, insérer individuellement, et annuler après coup.
               </p>
               <textarea
                 value={texteBrut}
@@ -416,7 +443,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 14, lineHeight: 1.5 }}>
                 {segments.length} segment{segments.length > 1 ? "s" : ""} proposé{segments.length > 1 ? "s" : ""}.
-                Modifiez, insérez un par un ou tous ensemble — chaque insertion peut être annulée après coup.
+                Le score indique la fidélité au texte original collé (100% = copie exacte retrouvée telle quelle).
               </p>
               {erreur && (
                 <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 12 }}>
@@ -425,6 +452,11 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
               )}
               {segments.map((s) => {
                 const enCours = actionEnCours === s.clé;
+                const sc = couleurScore(s.score);
+                const nœudCible = s.typeDestination === "existant" ? trouverNœudParId(structureActuelle, s.idCible) : null;
+                const blocsCible = nœudCible ? découperEnBlocs(nœudCible.texte) : [];
+                const aperçuOuvert = aperçuOuvertPour === s.clé;
+
                 return (
                   <div key={s.clé} style={{
                     border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12, marginBottom: 10,
@@ -432,7 +464,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                     opacity: (s.inclus || s.statutInsertion === "insere") ? 1 : 0.6,
                   }}>
                     {s.statutInsertion === "insere" ? (
-                      // ── Segment déjà inséré ──
                       <>
                         <div style={{ fontSize: 12, color: "#1D9E75", fontWeight: 500, marginBottom: 6 }}>
                           ✓ Inséré dans {ICONES_TYPE[trouverNœudParId(structureActuelle, s.idNœudFinal)?.type] || ""} {trouverTitreNœud(s.idNœudFinal)}
@@ -463,7 +494,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                         </div>
                       </>
                     ) : (
-                      // ── Segment proposé, pas encore inséré ──
                       <>
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
                           <input
@@ -474,21 +504,14 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             title="Inclure dans l'insertion groupée (bouton en bas)"
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <textarea
-                              value={s.texte}
-                              onChange={(e) => modifierSegment(s.clé, { texte: e.target.value, fidèle: segmentEstFidèle(e.target.value, texteBrut) })}
-                              rows={3}
-                              style={{
-                                width: "100%", fontSize: 12, color: "#333", lineHeight: 1.5,
-                                background: "#fafafa", borderRadius: 6, padding: 8, marginBottom: 6,
-                                fontFamily: "Georgia, serif", border: "0.5px solid #e5e5e5", boxSizing: "border-box", resize: "vertical",
-                              }}
-                            />
-                            {!s.fidèle && (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                <span style={{ fontSize: 10.5, color: "#BA7517" }}>
-                                  ⚠️ Ne correspond pas exactement au texte collé.
-                                </span>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                              <span style={{
+                                fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg,
+                                borderRadius: 20, padding: "2px 8px",
+                              }}>
+                                Fidélité : {s.score}%
+                              </span>
+                              {s.score < SEUIL_SCORE_ALERTE && (
                                 <button
                                   onClick={() => revérifierSegment(s.clé)}
                                   disabled={enCours}
@@ -496,8 +519,18 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                                 >
                                   {enCours ? "Vérification…" : "🔍 Revérifier"}
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
+                            <textarea
+                              value={s.texte}
+                              onChange={(e) => modifierSegment(s.clé, { texte: e.target.value, score: scoreFidélité(e.target.value, texteBrut) })}
+                              rows={3}
+                              style={{
+                                width: "100%", fontSize: 12, color: "#333", lineHeight: 1.5,
+                                background: "#fafafa", borderRadius: 6, padding: 8, marginBottom: 6,
+                                fontFamily: "Georgia, serif", border: "0.5px solid #e5e5e5", boxSizing: "border-box", resize: "vertical",
+                              }}
+                            />
                             <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{s.justification}</div>
                           </div>
                         </div>
@@ -506,7 +539,8 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             value={`${s.typeDestination}::${s.idCible}`}
                             onChange={(e) => {
                               const [typeDestination, idCible] = e.target.value.split("::");
-                              modifierSegment(s.clé, { typeDestination, idCible });
+                              modifierSegment(s.clé, { typeDestination, idCible, indexInsertion: null });
+                              setAperçuOuvertPour(null);
                             }}
                             style={{ fontSize: 11.5, padding: "3px 6px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit" }}
                           >
@@ -533,6 +567,14 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                               style={{ fontSize: 11.5, padding: "3px 6px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", flex: 1, minWidth: 140 }}
                             />
                           )}
+                          {s.typeDestination === "existant" && blocsCible.length > 0 && (
+                            <button
+                              onClick={() => setAperçuOuvertPour(aperçuOuvert ? null : s.clé)}
+                              style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                              📍 {aperçuOuvert ? "Fermer l'aperçu" : `Emplacement : ${s.indexInsertion === null ? "à la fin" : `avant §${s.indexInsertion + 1}`}`}
+                            </button>
+                          )}
                           <button
                             onClick={() => insérerSegment(s.clé)}
                             disabled={enCours}
@@ -545,6 +587,27 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             {enCours ? "Insertion…" : "Insérer ce segment"}
                           </button>
                         </div>
+
+                        {/* Aperçu cliquable de positionnement — n'apparaît que si déplié */}
+                        {aperçuOuvert && s.typeDestination === "existant" && (
+                          <div style={{
+                            marginTop: 10, marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
+                            padding: 8, maxHeight: 220, overflowY: "auto", background: "#fcfcfc",
+                          }}>
+                            <div style={{ fontSize: 10.5, color: "#999", marginBottom: 6 }}>
+                              Cliquez entre deux paragraphes pour choisir où insérer :
+                            </div>
+                            <BarreInsertion active={s.indexInsertion === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
+                            {blocsCible.map((bloc, i) => (
+                              <div key={i}>
+                                <div style={{ fontSize: 11.5, color: "#555", padding: "4px 2px", lineHeight: 1.4 }}>
+                                  {texteBrutDuBloc(bloc).slice(0, 140) || "(bloc vide)"}
+                                </div>
+                                <BarreInsertion active={s.indexInsertion === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -593,6 +656,23 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         </div>
       </div>
     </div>
+  );
+}
+
+function BarreInsertion({ active, onClick }) {
+  const [survol, setSurvol] = useState(false);
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setSurvol(true)}
+      onMouseLeave={() => setSurvol(false)}
+      style={{
+        height: active ? 4 : 8, margin: "1px 0", borderRadius: 2, cursor: "pointer",
+        background: active ? "#7F77DD" : (survol ? "#7F77DD50" : "transparent"),
+        transition: "background 0.1s",
+      }}
+      title="Cliquer pour insérer ici"
+    />
   );
 }
 
