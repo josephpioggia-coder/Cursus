@@ -316,6 +316,28 @@ ${texte}
 Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`;
 
+// Version enrichie — ajoutée 24/07/2026 suite au constat qu'un remplacement
+// PARTIEL (une seule phrase reformulée écrasant tout le paragraphe) causait
+// une perte de contenu. Ici, le texte COMPLET est renvoyé à l'IA avec les
+// 3 avis, pour produire une vraie version amendée intégrale — exactement
+// la méthode que Joseph utilise manuellement (recopier texte + avis,
+// demander une version augmentée), reproduite directement dans l'outil.
+const PROMPT_VERSION_ENRICHIE = (texteOriginal, avis) => {
+  const blocAvis = avis.map((a) => `- [${a.type}] ${a.titre} : ${a.texte}`).join("\n");
+  return `Tu es le co-pilote d'un écrivain. Voici un passage de son texte, suivi de plusieurs pistes d'amélioration que tu as toi-même proposées pour ce passage :
+
+TEXTE ORIGINAL COMPLET DU PASSAGE :
+"""
+${texteOriginal}
+"""
+
+PISTES PROPOSÉES :
+${blocAvis}
+
+Rédige une version AMENDÉE et ENRICHIE de CE PASSAGE ENTIER (pas seulement une phrase) qui intègre naturellement et de façon cohérente les pistes pertinentes ci-dessus, dans le même ton et la même voix que l'original. Ce n'est pas un résumé ni un commentaire séparé — c'est le texte final complet tel qu'il pourrait remplacer l'original dans son intégralité. Réponds UNIQUEMENT en JSON valide :
+{"versionEnrichie":"..."}`;
+};
+
 function texteVersHTML(texte) {
   return texte
     .split(/\n{2,}/)
@@ -382,6 +404,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           indexInsertion: null,
           transition: "",
           avisCopilote: null,
+          versionEnrichie: null,
           idNœudFinal: null,
           texteAvantInsertion: null,
           texteAprèsInsertion: null,
@@ -488,6 +511,29 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       modifierSegment(clé, { avisCopilote: p.suggestions || [] });
     } catch {
       setErreur("Impossible d'obtenir l'avis du co-pilote pour ce segment. Réessayez.");
+    } finally {
+      setActionEnCours(null);
+    }
+  };
+
+  // Prend le texte COMPLET du segment + les avis déjà obtenus, et demande
+  // une version amendée intégrale — jamais un remplacement partiel. Le
+  // résultat est proposé, jamais appliqué automatiquement.
+  const genererVersionEnrichie = async (clé) => {
+    const segment = segments.find((s) => s.clé === clé);
+    if (!segment || !segment.avisCopilote?.length) return;
+    setActionEnCours(clé);
+    setErreur(null);
+    try {
+      const résultat = await appelClaude(
+        "Réponds en français. (Les clés JSON restent telles quelles.)",
+        PROMPT_VERSION_ENRICHIE(segment.texte, segment.avisCopilote),
+        3072
+      );
+      const p = parserJSON(résultat);
+      modifierSegment(clé, { versionEnrichie: p.versionEnrichie || null });
+    } catch {
+      setErreur("La génération de la version enrichie a échoué. Réessayez.");
     } finally {
       setActionEnCours(null);
     }
@@ -912,26 +958,55 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
 
                         {s.avisCopilote && (
                           <div style={{ marginLeft: 24, marginBottom: 8, border: "0.5px solid #378ADD30", borderRadius: 8, padding: 10, background: "#F7FAFE" }}>
-                            <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                              💬 Avis indicatif — n'affecte pas le texte inséré ci-dessus
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                              <span style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>
+                                💬 Avis indicatif — n'affecte pas le texte inséré ci-dessus
+                              </span>
+                              <button
+                                onClick={() => genererVersionEnrichie(s.clé)}
+                                disabled={enCours}
+                                title="Réécrit le passage ENTIER en intégrant les pistes ci-dessous, sans rien perdre"
+                                style={{ fontSize: 10.5, fontWeight: 600, color: "#fff", background: "#1D9E75", border: "none", borderRadius: 5, padding: "3px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
+                              >
+                                {enCours ? "…" : "✨ Générer une version enrichie"}
+                              </button>
                             </div>
                             {s.avisCopilote.map((av, i) => (
                               <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < s.avisCopilote.length - 1 ? "0.5px solid #378ADD20" : "none" }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-                                  <span style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase" }}>{av.type}</span>
-                                  {av.type === "reformulation" && (
-                                    <button
-                                      onClick={() => modifierSegment(s.clé, { texte: av.texte, origineVérifiée: false, score: scoreFidélité(av.texte, texteBrut) })}
-                                      style={{ fontSize: 10, color: "#7F77DD", background: "#EEEDFE", border: "none", borderRadius: 5, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit" }}
-                                    >
-                                      ↳ Utiliser cette version
-                                    </button>
-                                  )}
-                                </div>
+                                <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", marginBottom: 2 }}>{av.type}</div>
                                 <div style={{ fontSize: 11.5, fontWeight: 500, color: "#1a1a1a", marginBottom: 2 }}>{av.titre}</div>
                                 <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.5 }}>{av.texte}</div>
                               </div>
                             ))}
+                            {s.versionEnrichie && (
+                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #1D9E7530" }}>
+                                <div style={{ fontSize: 10, color: "#1D9E75", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>
+                                  ✨ Version enrichie proposée (texte complet)
+                                </div>
+                                <div style={{
+                                  fontSize: 11.5, color: "#333", lineHeight: 1.6, fontFamily: "Georgia, serif",
+                                  background: "#fff", border: "0.5px solid #1D9E7540", borderRadius: 6, padding: 10,
+                                  marginBottom: 8, maxHeight: 240, overflowY: "auto",
+                                }}>
+                                  {s.versionEnrichie}
+                                </div>
+                                <div style={{ display: "flex", gap: 8 }}>
+                                  <button
+                                    onClick={() => modifierSegment(s.clé, { texte: s.versionEnrichie, origineVérifiée: false, score: scoreFidélité(s.versionEnrichie, texteBrut), versionEnrichie: null, avisCopilote: null })}
+                                    style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: "#1D9E75", border: "none", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}
+                                  >
+                                    ↳ Remplacer le texte du segment par cette version
+                                  </button>
+                                  <button
+                                    onClick={() => modifierSegment(s.clé, { versionEnrichie: null })}
+                                    title="Ferme cette proposition sans l'appliquer — modifiez le texte ci-dessus puis relancez si besoin"
+                                    style={{ fontSize: 11, color: "#999", background: "none", border: "0.5px solid #ddd", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}
+                                  >
+                                    ✕ Refuser cette proposition
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
