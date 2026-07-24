@@ -33,7 +33,8 @@
  * chapitre, faute de réinitialisation explicite au changement de nœud.
  */
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Typography from "@tiptap/extension-typography";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -41,7 +42,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 
@@ -126,6 +127,90 @@ function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
   Array.from(éditeurDOM.children).forEach(marcher);
   return lignes.map((top, i) => ({ numéro: i + 1, top }));
 }
+
+// ─── Notes de bas de page (extension personnalisée) ──────────────────────────────
+// Ajouté 24/07/2026. TipTap n'a pas d'extension officielle "notes de bas de
+// page" ; celle-ci est construite sur mesure. Chaque note est un nœud
+// inline atomique portant son texte en attribut. Le numéro affiché est
+// recalculé à chaque rendu en comptant les notes précédentes dans le
+// document — jamais stocké en dur, donc toujours juste même après
+// suppression/déplacement d'une note antérieure.
+
+function ComposantNote({ node, updateAttributes, deleteNode, editor, getPos }) {
+  const [enÉdition, setEnÉdition] = useState(!node.attrs.texte);
+  const [texteTemp, setTexteTemp] = useState(node.attrs.texte || "");
+
+  const numéro = useMemo(() => {
+    let n = 0, trouvé = false, résultat = 1;
+    editor.state.doc.descendants((n2, pos) => {
+      if (trouvé) return false;
+      if (n2.type.name === "note") {
+        n++;
+        if (pos === getPos()) { résultat = n; trouvé = true; return false; }
+      }
+      return true;
+    });
+    return résultat;
+  }, [editor.state.doc, getPos]);
+
+  return (
+    <NodeViewWrapper as="span" style={{ position: "relative", display: "inline" }}>
+      <sup
+        onClick={() => { setTexteTemp(node.attrs.texte || ""); setEnÉdition(true); }}
+        contentEditable={false}
+        style={{ color: "#7F77DD", cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "0 1px", userSelect: "none" }}
+        title={node.attrs.texte || "Cliquer pour rédiger la note"}
+      >
+        [{numéro}]
+      </sup>
+      {enÉdition && (
+        <span contentEditable={false} style={{
+          position: "absolute", top: "120%", left: 0, zIndex: 60,
+          background: "#fff", border: "0.5px solid #ddd", borderRadius: 8,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 8, width: 260,
+        }}>
+          <textarea
+            autoFocus
+            value={texteTemp}
+            onChange={(e) => setTexteTemp(e.target.value)}
+            placeholder="Texte de la note…"
+            rows={3}
+            style={{ width: "100%", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 6, padding: 6, resize: "vertical" }}
+          />
+          <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "space-between" }}>
+            <button onClick={() => { deleteNode(); setEnÉdition(false); }}
+              style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              Supprimer
+            </button>
+            <button onClick={() => { updateAttributes({ texte: texteTemp }); setEnÉdition(false); }}
+              style={{ fontSize: 11, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 5, padding: "3px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+              OK
+            </button>
+          </div>
+        </span>
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+const Note = Node.create({
+  name: "note",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return { texte: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "span[data-note]" }];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { "data-note": "true", "data-texte": node.attrs.texte || "" }), "[note]"];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ComposantNote);
+  },
+});
 
 // ─── Styles globaux de l'éditeur (injectés une seule fois) ─────────────────────
 
@@ -287,6 +372,13 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().setTextAlign("right").run()}>⇥</BoutonOutil>
       <BoutonOutil actif={editor.isActive({ textAlign: "justify" })} titre="Justifier (étiré)"
         onClick={() => editor.chain().focus().setTextAlign("justify").run()}>☰</BoutonOutil>
+
+      <Sep />
+
+      <BoutonOutil actif={false} titre="Insérer une note de bas de page"
+        onClick={() => editor.chain().focus().insertContent({ type: "note", attrs: { texte: "" } }).run()}>
+        📝
+      </BoutonOutil>
 
       <Sep />
 
@@ -501,6 +593,7 @@ export default function Editeur({
   // Numéros de ligne — ajouté 24/07/2026.
   const wrapperLigneRef = useRef(null);
   const [numérosDeLigne, setNumérosDeLigne] = useState([]);
+  const [listeNotes, setListeNotes] = useState([]);
   const [sautsDePage, setSautsDePage] = useState([]);
 
   // Injecter les styles TipTap une seule fois
@@ -573,6 +666,7 @@ export default function Editeur({
         history: { depth: 100 },
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
+      Note,
       Typography,
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -694,6 +788,13 @@ export default function Editeur({
       pageSuivante: i + 2,
     }));
     setSautsDePage(sauts);
+
+    // Liste des notes du chapitre, dans l'ordre d'apparition. Ajouté 24/07/2026.
+    const notes = [];
+    editor.state.doc.descendants((n) => {
+      if (n.type.name === "note") notes.push({ id: notes.length + 1, texte: n.attrs.texte });
+    });
+    setListeNotes(notes);
   }, [editor, formatRéférence]);
 
   useEffect(() => {
@@ -858,6 +959,22 @@ export default function Editeur({
               ))}
               <EditorContent editor={editor} />
             </div>
+
+            {listeNotes.length > 0 && (
+              <div style={{
+                marginTop: 24, paddingTop: 12, borderTop: "0.5px solid #e5e5e5",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                  Notes
+                </div>
+                {listeNotes.map((n) => (
+                  <div key={n.id} style={{ fontSize: 11.5, color: "#777", lineHeight: 1.6, marginBottom: 4, display: "flex", gap: 6 }}>
+                    <span style={{ color: "#7F77DD", fontWeight: 600, flexShrink: 0 }}>[{n.id}]</span>
+                    <span>{n.texte || <em style={{ color: "#bbb" }}>(note vide)</em>}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

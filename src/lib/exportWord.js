@@ -29,7 +29,7 @@
 
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  PageBreak, BorderStyle, TableOfContents,
+  PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun,
 } from "docx";
 
 const NIVEAU_STRUCTURE = {
@@ -72,7 +72,12 @@ export const FORMATS_PAGE = {
 // gras/italique/souligné/surlignage même imbriqués (ex. gras ET italique sur
 // le même passage). `styleInitial` permet de forcer un style de départ
 // (utilisé pour les citations, toujours en italique).
-function runsDepuisNœudDOM(nœudDOM, styleInitial = {}) {
+// `registreNotes` est un tableau partagé, rempli au fil du parcours de tout
+// le manuscrit — chaque note rencontrée y est ajoutée dans l'ordre, et son
+// index (1-based) sert d'identifiant Word. Nécessaire car docx exige que
+// toutes les notes de bas de page du document soient déclarées au niveau du
+// Document lui-même (propriété "footnotes"), pas localement par paragraphe.
+function runsDepuisNœudDOM(nœudDOM, styleInitial = {}, registreNotes = []) {
   const runs = [];
 
   const parcourir = (n, style) => {
@@ -85,11 +90,21 @@ function runsDepuisNœudDOM(nœudDOM, styleInitial = {}) {
           underline: style.souligné ? {} : undefined,
           highlight: style.surligné ? "yellow" : undefined,
           font: style.code ? "Courier New" : undefined,
+          size: style.taille || undefined,
         }));
       }
       return;
     }
     if (n.nodeType !== Node.ELEMENT_NODE) return;
+
+    // Note de bas de page — produite par l'extension Note de l'éditeur
+    // (span[data-note] avec le texte dans data-texte). Enregistrée dans le
+    // registre plutôt que recopiée comme texte visible ("[note]" factice).
+    if (n.hasAttribute && n.hasAttribute("data-note")) {
+      registreNotes.push(n.getAttribute("data-texte") || "");
+      runs.push(new FootnoteReferenceRun(registreNotes.length));
+      return;
+    }
 
     const tag = n.tagName.toLowerCase();
     const nouveauStyle = { ...style };
@@ -109,7 +124,7 @@ function runsDepuisNœudDOM(nœudDOM, styleInitial = {}) {
 // Convertit le HTML d'un nœud (produit par TipTap) en une liste de
 // paragraphes Word. Un seul niveau de balises est géré (pas de récursion
 // dans les listes) — suffisant pour le contenu réel observé à ce jour.
-function paragraphesDepuisHTML(html) {
+function paragraphesDepuisHTML(html, registreNotes = []) {
   const dom = new DOMParser().parseFromString(html || "", "text/html");
   const paragraphes = [];
 
@@ -118,22 +133,33 @@ function paragraphesDepuisHTML(html) {
     const tag = n.tagName.toLowerCase();
 
     if (tag === "p") {
-      paragraphes.push(new Paragraph({ children: runsDepuisNœudDOM(n), spacing: { after: 160 } }));
+      paragraphes.push(new Paragraph({ children: runsDepuisNœudDOM(n, {}, registreNotes), spacing: { after: 160 } }));
     } else if (tag === "h1" || tag === "h2" || tag === "h3") {
-      paragraphes.push(new Paragraph({ heading: NIVEAU_TITRE_CORPS[tag], children: runsDepuisNœudDOM(n) }));
+      paragraphes.push(new Paragraph({ heading: NIVEAU_TITRE_CORPS[tag], children: runsDepuisNœudDOM(n, {}, registreNotes) }));
+    } else if (tag === "h4" || tag === "h5" || tag === "h6") {
+      // H4-H6 du corps de texte : pas de niveau Word "Heading" disponible
+      // au-delà de 6 (déjà utilisés par la structure Partie/Chapitre/Scène
+      // et par H1-H3 du corps) — traités comme des paragraphes stylés
+      // (gras, taille décroissante) plutôt que de risquer une valeur
+      // HeadingLevel non garantie par la librairie. Ajouté 24/07/2026.
+      const taille = { h4: 26, h5: 24, h6: 22 }[tag]; // en demi-points (26 = 13pt)
+      paragraphes.push(new Paragraph({
+        spacing: { before: 200, after: 100 },
+        children: runsDepuisNœudDOM(n, { gras: true, taille }, registreNotes),
+      }));
     } else if (tag === "blockquote") {
       paragraphes.push(new Paragraph({
         indent: { left: 720 },
         spacing: { before: 120, after: 160 },
-        children: runsDepuisNœudDOM(n, { italique: true }),
+        children: runsDepuisNœudDOM(n, { italique: true }, registreNotes),
       }));
     } else if (tag === "ul") {
       n.querySelectorAll(":scope > li").forEach((li) => {
-        paragraphes.push(new Paragraph({ bullet: { level: 0 }, children: runsDepuisNœudDOM(li) }));
+        paragraphes.push(new Paragraph({ bullet: { level: 0 }, children: runsDepuisNœudDOM(li, {}, registreNotes) }));
       });
     } else if (tag === "ol") {
       Array.from(n.querySelectorAll(":scope > li")).forEach((li, index) => {
-        const runs = runsDepuisNœudDOM(li);
+        const runs = runsDepuisNœudDOM(li, {}, registreNotes);
         paragraphes.push(new Paragraph({ children: [new TextRun(`${index + 1}. `), ...runs] }));
       });
     } else if (tag === "hr") {
@@ -146,7 +172,7 @@ function paragraphesDepuisHTML(html) {
     } else {
       // Balise non reconnue : traitée comme un paragraphe simple plutôt
       // qu'ignorée, pour ne jamais perdre silencieusement du contenu.
-      paragraphes.push(new Paragraph({ children: runsDepuisNœudDOM(n) }));
+      paragraphes.push(new Paragraph({ children: runsDepuisNœudDOM(n, {}, registreNotes) }));
     }
   });
 
@@ -192,6 +218,7 @@ export async function exporterProjetWord(projet, formatPage = "a4") {
   ];
 
   const contenu = [];
+  const registreNotes = [];
   const parcourirStructure = (nœuds) => {
     for (const n of nœuds) {
       const niveau = NIVEAU_STRUCTURE[n.type] || HeadingLevel.HEADING_3;
@@ -201,12 +228,20 @@ export async function exporterProjetWord(projet, formatPage = "a4") {
         pageBreakBefore: n.type === "partie" || n.type === "chapitre" || n.type === "scene",
       }));
       if (n.texte && n.texte.trim()) {
-        contenu.push(...paragraphesDepuisHTML(n.texte));
+        contenu.push(...paragraphesDepuisHTML(n.texte, registreNotes));
       }
       if (n.enfants?.length) parcourirStructure(n.enfants);
     }
   };
   parcourirStructure(projet.structure || []);
+
+  // Déclaration des notes de bas de page au niveau du Document — docx exige
+  // qu'elles soient toutes enregistrées ici, indexées par le même numéro
+  // que celui utilisé par chaque FootnoteReferenceRun inséré dans le texte.
+  const footnotes = {};
+  registreNotes.forEach((texteNote, i) => {
+    footnotes[i + 1] = { children: [new Paragraph({ children: [new TextRun(texteNote || "(note vide)")] })] };
+  });
 
   const documentWord = new Document({
     sections: [{
@@ -218,6 +253,7 @@ export async function exporterProjetWord(projet, formatPage = "a4") {
       },
       children: [...pageDeTitre, ...sommaire, ...contenu],
     }],
+    footnotes,
     styles: {
       default: {
         document: { run: { font: "Georgia", size: 24 } },
