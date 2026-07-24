@@ -1,22 +1,33 @@
 /**
  * CURSUS — Incorporer de la matière brute
- * Ajouté le 24/07/2026. Revu plusieurs fois le même jour suite aux retours
- * successifs de Joseph.
+ * Ajouté le 24/07/2026. Refondu plusieurs fois le même jour suite aux
+ * retours successifs de Joseph. v5 — refonte architecturale majeure :
+ * plus d'écrans séparés (comparatif → validation → placement), tout est
+ * désormais visible et modifiable dans UN SEUL espace de travail par
+ * segment, avec le comparatif global toujours visible en haut.
  *
  * PRINCIPE DE SÉCURITÉ NON NÉGOCIABLE : ceci reste une RECOMMANDATION,
  * jamais une insertion automatique. Chaque segment est inséré, modifié,
  * annulé ou déplacé INDIVIDUELLEMENT, à la demande explicite de l'auteur.
  *
- * v4 — nouveauté majeure : un ÉCRAN DE COMPARAISON s'intercale désormais
- * entre l'analyse et le positionnement/insertion. Après analyse, l'auteur
- * voit un diff mot à mot entre son texte collé et le texte reconstitué à
- * partir des segments proposés — ce qui a été omis (en rouge), ce qui a
- * été ajouté (en violet). Rien n'est positionnable ni insérable tant que
- * l'auteur n'a pas explicitement validé ce comparatif. Ajouté suite à un
- * écart constaté par Joseph : un score de fidélité élevé par segment
- * (~97% en moyenne) masquait une couverture globale réelle de seulement
- * 78% du texte original — un score par segment ne suffit pas, il faut
- * pouvoir comparer les deux textes complets côte à côte.
+ * v5 — nouveautés :
+ * - Un seul espace de travail par segment : texte modifiable, score de
+ *   fidélité, choix de destination, positionnement précis, transition
+ *   optionnelle, et insertion — tout au même endroit, plus de validation
+ *   séparée avant de voir où le texte atterrit.
+ * - Positionnement entre NŒUDS FRÈRES quand la destination est un NOUVEAU
+ *   chapitre/scène (symétrique au positionnement entre paragraphes pour
+ *   un nœud existant) : on voit les frères déjà présents sous le même
+ *   parent et on choisit où le nouveau vient s'intercaler. Les frères
+ *   suivants sont renumérotés en conséquence (nœudsAPI.réordonner), et
+ *   l'annulation restaure leur numérotation d'origine.
+ * - Transition optionnelle par segment : un bouton demande au co-pilote
+ *   une phrase de liaison courte entre ce qui précède et le nouveau texte
+ *   (basée sur le paragraphe/frère précédent) ; modifiable ou effaçable
+ *   avant insertion, jamais générée automatiquement sans action explicite.
+ * - Comparatif global (couverture, mots omis/ajoutés) toujours visible en
+ *   haut de la fenêtre, dépliable pour le détail, jamais une étape
+ *   obligatoire séparée.
  */
 
 import { useState } from "react";
@@ -94,10 +105,27 @@ function màjTexteLocal(structure, nœudId, nouveauTexte) {
   });
 }
 
-function ajouterNœudLocal(structure, parentId, nouveauNœud) {
+// Insère un nouveau nœud à une position précise (index) parmi les enfants
+// d'un parent donné — pas seulement à la fin. Nécessaire pour le
+// positionnement entre frères (v5).
+function insérerNœudÀPositionLocal(structure, parentId, index, nouveauNœud) {
   return structure.map((n) => {
-    if (n.id === parentId) return { ...n, enfants: [...(n.enfants || []), nouveauNœud] };
-    if (n.enfants?.length) return { ...n, enfants: ajouterNœudLocal(n.enfants, parentId, nouveauNœud) };
+    if (n.id === parentId) {
+      const copie = [...(n.enfants || [])];
+      copie.splice(index, 0, nouveauNœud);
+      return { ...n, enfants: copie };
+    }
+    if (n.enfants?.length) return { ...n, enfants: insérerNœudÀPositionLocal(n.enfants, parentId, index, nouveauNœud) };
+    return n;
+  });
+}
+
+function màjOrdresEnfantsLocal(structure, parentId, ordresParId) {
+  return structure.map((n) => {
+    if (n.id === parentId) {
+      return { ...n, enfants: (n.enfants || []).map((e) => ordresParId[e.id] !== undefined ? { ...e, ordre: ordresParId[e.id] } : e) };
+    }
+    if (n.enfants?.length) return { ...n, enfants: màjOrdresEnfantsLocal(n.enfants, parentId, ordresParId) };
     return n;
   });
 }
@@ -134,15 +162,6 @@ function couleurScore(score) {
   return { c: "#E24B4A", bg: "#FCEBEB" };
 }
 
-// Restaure la ponctuation typographique du texte ORIGINAL dans un segment
-// généré par l'IA — corrige un comportement connu des modèles de langage
-// qui "nettoient" souvent la ponctuation (apostrophes courbes ’ → droites ',
-// guillemets typographiques “” → droits "") même quand on leur demande
-// explicitement une copie exacte. Sans cette correction, chaque apostrophe
-// du texte déclenchait une fausse alerte de mot "omis" ET "ajouté" dans le
-// comparatif — gonflant artificiellement les écarts sans perte réelle de
-// contenu. Ajouté 24/07/2026 suite à un cas concret : 169 écarts détectés,
-// quasi tous dus à ce seul phénomène.
 function normaliserPonctuationCommeOriginal(texteSegment, texteOriginal) {
   let corrigé = texteSegment;
   if (texteOriginal.includes("’") && !texteOriginal.includes("'")) {
@@ -154,11 +173,6 @@ function normaliserPonctuationCommeOriginal(texteSegment, texteOriginal) {
   return corrigé;
 }
 
-// Diff mot à mot par recherche de la plus longue sous-séquence commune
-// (LCS) — algorithme standard, calculé une seule fois après l'analyse
-// (pas en continu), pour rester performant même sur des textes de
-// plusieurs milliers de caractères. Les espaces sont conservés comme
-// jetons à part entière pour une reconstruction fidèle de la lecture.
 function diffMots(texteA, texteB) {
   const motsA = texteA.split(/(\s+)/).filter((t) => t !== "");
   const motsB = texteB.split(/(\s+)/).filter((t) => t !== "");
@@ -233,6 +247,19 @@ ${passageProposé}
 Le passage proposé est-il un extrait exact et fidèle du texte original (aux espaces/retours à la ligne près) ? Si oui, renvoie-le tel quel. Si non — s'il a été reformulé, résumé ou modifié — retrouve et renvoie l'extrait le plus proche et le plus pertinent qui EST réellement présent mot pour mot dans le texte original. Réponds UNIQUEMENT en JSON valide :
 {"texteCorrige":"..."}`;
 
+const PROMPT_TRANSITION = (contextePrécédent, débutSegment) => `Tu es le co-pilote d'un écrivain. Voici ce qui précède immédiatement l'endroit où un nouveau passage va être inséré dans le manuscrit :
+"""
+${contextePrécédent}
+"""
+
+Voici le début du nouveau passage qui va suivre :
+"""
+${débutSegment}
+"""
+
+Propose UNE SEULE phrase de transition courte et naturelle, dans un ton sobre cohérent avec le contexte, qui pourrait s'insérer entre les deux pour adoucir l'enchaînement. Ne réécris ni l'un ni l'autre passage, juste la phrase de liaison elle-même. Réponds UNIQUEMENT en JSON valide :
+{"transition":"..."}`;
+
 function texteVersHTML(texte) {
   return texte
     .split(/\n{2,}/)
@@ -256,15 +283,22 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   const [texteBrut, setTexteBrut] = useState("");
   const [analyseEnCours, setAnalyseEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
-  const [segments, setSegments] = useState(null); // null = pas encore analysé
-  const [diff, setDiff] = useState(null); // résultat du diff mot à mot, calculé une fois après analyse
-  const [comparaisonValidée, setComparaisonValidée] = useState(false);
+  const [segments, setSegments] = useState(null);
+  const [diff, setDiff] = useState(null);
+  const [détailComparatifOuvert, setDétailComparatifOuvert] = useState(false);
   const [structureActuelle, setStructureActuelle] = useState(projet.structure || []);
   const [actionEnCours, setActionEnCours] = useState(null);
   const [aperçuOuvertPour, setAperçuOuvertPour] = useState(null);
 
   const nœudsPlats = aplatirStructure(structureActuelle);
   const nœudsPouvantRecevoirNouveau = nœudsPlats.filter((n) => TYPE_ENFANT[n.type]);
+
+  const recalculerDiff = (segmentsActuels) => {
+    const texteReconstitué = segmentsActuels
+      .map((s) => (s.titreSuggere ? s.titreSuggere + " " : "") + s.texte)
+      .join(" ");
+    setDiff(diffMots(texteBrut, texteReconstitué));
+  };
 
   const analyser = async () => {
     setErreur(null);
@@ -289,21 +323,17 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           score: scoreFidélité(texteCorrigé, texteBrut),
           statutInsertion: "propose",
           indexInsertion: null,
+          transition: "",
           idNœudFinal: null,
           texteAvantInsertion: null,
           texteAprèsInsertion: null,
           typeDestinationInsérée: null,
+          ordresAvantInsertion: null,
         };
       });
 
-      const texteReconstitué = segmentsAvecÉtat
-        .map((s) => (s.titreSuggere ? s.titreSuggere + " " : "") + s.texte)
-        .join(" ");
-      const diffCalculé = diffMots(texteBrut, texteReconstitué);
-
       setSegments(segmentsAvecÉtat);
-      setDiff(diffCalculé);
-      setComparaisonValidée(false);
+      recalculerDiff(segmentsAvecÉtat);
     } catch (err) {
       setErreur(
         err.message === "SESSION_EXPIREE" ? "Votre session a expiré. Reconnectez-vous et réessayez."
@@ -318,11 +348,14 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   const recommencer = () => {
     setSegments(null);
     setDiff(null);
-    setComparaisonValidée(false);
   };
 
   const modifierSegment = (clé, champs) => {
-    setSegments((prev) => prev.map((s) => s.clé === clé ? { ...s, ...champs } : s));
+    setSegments((prev) => {
+      const suivant = prev.map((s) => s.clé === clé ? { ...s, ...champs } : s);
+      if ("texte" in champs || "titreSuggere" in champs) recalculerDiff(suivant);
+      return suivant;
+    });
   };
 
   const revérifierSegment = async (clé) => {
@@ -346,20 +379,55 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
     }
   };
 
+  const proposerTransition = async (clé) => {
+    const segment = segments.find((s) => s.clé === clé);
+    if (!segment) return;
+    setActionEnCours(clé);
+    setErreur(null);
+    try {
+      let contextePrécédent = "(début — rien ne précède)";
+      if (segment.typeDestination === "existant") {
+        const nœudCible = trouverNœudParId(structureActuelle, segment.idCible);
+        const blocs = nœudCible ? découperEnBlocs(nœudCible.texte) : [];
+        const position = segment.indexInsertion === null ? blocs.length : segment.indexInsertion;
+        if (position > 0 && blocs[position - 1]) contextePrécédent = texteBrutDuBloc(blocs[position - 1]).slice(-300);
+      } else {
+        const parent = trouverNœudParId(structureActuelle, segment.idCible);
+        const fratrie = parent?.enfants || [];
+        const position = segment.indexInsertion === null ? fratrie.length : segment.indexInsertion;
+        if (position > 0 && fratrie[position - 1]) contextePrécédent = `[Fin du chapitre/scène précédent : "${fratrie[position - 1].titre}"]`;
+        else if (parent) contextePrécédent = `[Début de "${parent.titre}", rien avant]`;
+      }
+      const résultat = await appelClaude(
+        "Réponds en français. (Les clés JSON restent telles quelles.)",
+        PROMPT_TRANSITION(contextePrécédent, segment.texte.slice(0, 300)),
+        512
+      );
+      const p = parserJSON(résultat);
+      modifierSegment(clé, { transition: p.transition || "" });
+    } catch {
+      setErreur("La proposition de transition a échoué. Vous pouvez l'écrire manuellement.");
+    } finally {
+      setActionEnCours(null);
+    }
+  };
+
   const insérerSegment = async (clé) => {
     const segment = segments.find((s) => s.clé === clé);
     if (!segment || segment.statutInsertion === "insere") return;
     setActionEnCours(clé);
     setErreur(null);
     try {
+      const transitionHTML = segment.transition.trim() ? texteVersHTML(segment.transition.trim()) : "";
+
       if (segment.typeDestination === "existant") {
         const nœudCible = trouverNœudParId(structureActuelle, segment.idCible);
         if (!nœudCible) throw new Error("Nœud cible introuvable — la structure a peut-être changé.");
         const texteAvant = nœudCible.texte || "";
         const blocs = découperEnBlocs(texteAvant);
         const position = segment.indexInsertion === null ? blocs.length : Math.min(segment.indexInsertion, blocs.length);
-        const nouveauxBlocs = texteVersHTML(segment.texte);
-        const texteAprès = blocs.slice(0, position).join("") + nouveauxBlocs + blocs.slice(position).join("");
+        const nouveauContenu = transitionHTML + texteVersHTML(segment.texte);
+        const texteAprès = blocs.slice(0, position).join("") + nouveauContenu + blocs.slice(position).join("");
 
         const { error } = await nœudsAPI.sauvegarderTexte(segment.idCible, texteAprès);
         if (error) throw error;
@@ -376,28 +444,54 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         const parent = trouverNœudParId(structureActuelle, segment.idCible);
         if (!parent) throw new Error("Nœud parent introuvable — la structure a peut-être changé.");
         const typeNouveau = TYPE_ENFANT[parent.type] || "scene";
-        const ordre = (parent.enfants?.length || 0) + 1;
+        const fratrie = parent.enfants || [];
+        const position = segment.indexInsertion === null ? fratrie.length : Math.min(segment.indexInsertion, fratrie.length);
+
+        // Renumérotation séquentielle de toute la fratrie avec le nouveau
+        // nœud inséré à la position choisie — plus sûr que de ne décaler
+        // qu'une partie de la liste. Le "avant" est conservé pour permettre
+        // une annulation propre (restauration exacte des numéros d'ordre).
+        const ordresAvant = fratrie.map((f) => ({ id: f.id, ordre: f.ordre ?? 0 }));
+        const fratrieAvecPlaceholder = [...fratrie];
+        fratrieAvecPlaceholder.splice(position, 0, { id: "__nouveau__" });
+        const nouvelOrdreParId = {};
+        let ordreDuNouveau = 1;
+        fratrieAvecPlaceholder.forEach((f, idx) => {
+          if (f.id === "__nouveau__") ordreDuNouveau = idx + 1;
+          else nouvelOrdreParId[f.id] = idx + 1;
+        });
+
+        if (Object.keys(nouvelOrdreParId).length > 0) {
+          const misÀJour = Object.entries(nouvelOrdreParId).map(([id, ordre]) => ({ id, ordre }));
+          const { error: erreurRéordre } = await nœudsAPI.réordonner(misÀJour);
+          if (erreurRéordre) throw erreurRéordre;
+        }
+
         const { data, error } = await nœudsAPI.créer({
           type: typeNouveau,
           titre: segment.titreSuggere || "Sans titre",
-          ordre,
+          ordre: ordreDuNouveau,
           parentId: parent.id,
           texte: "",
         }, projet.id);
         if (error || !data) throw error || new Error("Échec de création du nœud");
 
-        const contenuHTML = texteVersHTML(segment.texte);
+        const contenuHTML = transitionHTML + texteVersHTML(segment.texte);
         const { error: erreurTexte } = await nœudsAPI.sauvegarderTexte(data.id, contenuHTML);
         if (erreurTexte) throw erreurTexte;
 
-        const nouveauNœud = { id: data.id, type: typeNouveau, titre: data.titre, texte: contenuHTML, enfants: [] };
-        setStructureActuelle((prev) => ajouterNœudLocal(prev, parent.id, nouveauNœud));
+        const nouveauNœud = { id: data.id, type: typeNouveau, titre: data.titre, texte: contenuHTML, ordre: ordreDuNouveau, enfants: [] };
+        setStructureActuelle((prev) => {
+          const avecOrdresMisÀJour = màjOrdresEnfantsLocal(prev, parent.id, nouvelOrdreParId);
+          return insérerNœudÀPositionLocal(avecOrdresMisÀJour, parent.id, position, nouveauNœud);
+        });
         modifierSegment(clé, {
           statutInsertion: "insere",
           idNœudFinal: data.id,
           texteAvantInsertion: null,
           texteAprèsInsertion: contenuHTML,
           typeDestinationInsérée: "nouveau",
+          ordresAvantInsertion: ordresAvant,
         });
       }
       onStructureChangée?.();
@@ -426,6 +520,16 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         const { error } = await nœudsAPI.supprimer(segment.idNœudFinal);
         if (error) throw error;
         setStructureActuelle((prev) => supprimerNœudLocal(prev, segment.idNœudFinal));
+
+        // Restaure la numérotation d'ordre des frères telle qu'avant l'insertion.
+        if (segment.ordresAvantInsertion?.length) {
+          const { error: erreurRéordre } = await nœudsAPI.réordonner(segment.ordresAvantInsertion);
+          if (erreurRéordre) throw erreurRéordre;
+          const ordresParId = {};
+          segment.ordresAvantInsertion.forEach((o) => { ordresParId[o.id] = o.ordre; });
+          const parent = trouverNœudParId(structureActuelle, segment.idCible);
+          if (parent) setStructureActuelle((prev) => màjOrdresEnfantsLocal(prev, parent.id, ordresParId));
+        }
       } else {
         const nœudActuel = trouverNœudParId(structureActuelle, segment.idNœudFinal);
         if (nœudActuel?.texte !== segment.texteAprèsInsertion) {
@@ -443,6 +547,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         texteAvantInsertion: null,
         texteAprèsInsertion: null,
         typeDestinationInsérée: null,
+        ordresAvantInsertion: null,
       });
       onStructureChangée?.();
     } catch (err) {
@@ -458,7 +563,6 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   const texteTropVolumineux = texteBrut.length > SEUIL_CARACTÈRES;
   const auMoinsUnSegmentÀInsérer = segments?.some((s) => s.inclus && s.statutInsertion === "propose");
 
-  // Statistiques du diff, pour un résumé chiffré en tête de l'écran de comparaison.
   const statsDiff = diff ? {
     supprimés: diff.filter((d) => d.type === "supprimé" && d.texte.trim() !== "").length,
     ajoutés: diff.filter((d) => d.type === "ajouté" && d.texte.trim() !== "").length,
@@ -470,25 +574,62 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
     }}>
       <div style={{
-        background: "#fff", borderRadius: 12, width: "min(780px, 94vw)",
-        maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden",
+        background: "#fff", borderRadius: 12, width: "min(820px, 95vw)",
+        maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
         <div style={{
           padding: "16px 20px", borderBottom: "0.5px solid #e5e5e5",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
         }}>
           <span style={{ fontSize: 15, fontWeight: 500 }}>📥 Incorporer de la matière</span>
           <button onClick={onFermer} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#999" }}>×</button>
         </div>
 
+        {segments !== null && (
+          <div style={{ padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5", flexShrink: 0 }}>
+            <div
+              onClick={() => setDétailComparatifOuvert(!détailComparatifOuvert)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer",
+                padding: "6px 10px", borderRadius: 8,
+                background: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#E1F5EE" : "#FAEEDA",
+                color: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#1D9E75" : "#854F0B",
+                fontSize: 12,
+              }}
+            >
+              <span>
+                <strong>Couverture du texte collé :</strong> {statsDiff.supprimés} mot{statsDiff.supprimés !== 1 ? "s" : ""} potentiellement omis,{" "}
+                {statsDiff.ajoutés} mot{statsDiff.ajoutés !== 1 ? "s" : ""} ajouté{statsDiff.ajoutés !== 1 ? "s" : ""}
+              </span>
+              <span>{détailComparatifOuvert ? "▲ Masquer le détail" : "▼ Voir le détail"}</span>
+            </div>
+            {détailComparatifOuvert && (
+              <div style={{
+                marginTop: 8, border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12,
+                fontSize: 12, lineHeight: 1.6, fontFamily: "Georgia, serif",
+                background: "#fafafa", maxHeight: 200, overflowY: "auto",
+              }}>
+                {diff.map((d, i) => {
+                  if (d.type === "égal") return <span key={i}>{d.texte}</span>;
+                  if (d.type === "supprimé") return (
+                    <span key={i} style={{ color: "#E24B4A", textDecoration: "line-through", background: "#FCEBEB" }}>{d.texte}</span>
+                  );
+                  return (
+                    <span key={i} style={{ color: "#7F77DD", background: "#EEEDFE", fontWeight: 600 }}>{d.texte}</span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
           {segments === null ? (
-            // ═══ ÉCRAN 1 : coller le texte ═══
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
                 Collez un texte brut (notes, brouillon, transcription). Le co-pilote proposera un découpage
-                en segments ; vous verrez d'abord un comparatif complet avec votre texte original avant de
-                pouvoir choisir où placer quoi que ce soit.
+                en segments, chacun avec sa destination, son emplacement précis et une transition optionnelle
+                — tout reste modifiable jusqu'à l'insertion effective de chaque segment.
               </p>
               <textarea
                 value={texteBrut}
@@ -511,52 +652,11 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                 </div>
               )}
             </>
-          ) : !comparaisonValidée ? (
-            // ═══ ÉCRAN 2 : comparatif texte original vs reconstitué, à valider avant tout positionnement ═══
-            <>
-              <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
-                Voici votre texte original comparé au texte reconstitué à partir des {segments.length} segments
-                proposés (titres des nouveaux chapitres/scènes inclus dans la comparaison, puisqu'ils reprennent vos
-                intertitres). <span style={{ color: "#E24B4A" }}>En rouge barré</span> : passages réellement absents
-                du découpage. <span style={{ color: "#7F77DD" }}>En violet</span> : texte apparu sans être dans
-                votre original (ne devrait normalement pas arriver).
-              </p>
-              <div style={{
-                display: "flex", gap: 16, fontSize: 12, marginBottom: 12,
-                padding: "8px 12px", borderRadius: 8,
-                background: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#E1F5EE" : "#FAEEDA",
-                color: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#1D9E75" : "#854F0B",
-              }}>
-                <span><strong>{statsDiff.supprimés}</strong> mot{statsDiff.supprimés !== 1 ? "s" : ""} potentiellement omis</span>
-                <span><strong>{statsDiff.ajoutés}</strong> mot{statsDiff.ajoutés !== 1 ? "s" : ""} ajouté{statsDiff.ajoutés !== 1 ? "s" : ""} (hors original)</span>
-              </div>
-              <div style={{
-                border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12,
-                fontSize: 12.5, lineHeight: 1.7, fontFamily: "Georgia, serif",
-                background: "#fafafa", maxHeight: 420, overflowY: "auto",
-              }}>
-                {diff.map((d, i) => {
-                  if (d.type === "égal") return <span key={i}>{d.texte}</span>;
-                  if (d.type === "supprimé") return (
-                    <span key={i} style={{ color: "#E24B4A", textDecoration: "line-through", background: "#FCEBEB" }}>{d.texte}</span>
-                  );
-                  return (
-                    <span key={i} style={{ color: "#7F77DD", background: "#EEEDFE", fontWeight: 600 }}>{d.texte}</span>
-                  );
-                })}
-              </div>
-              {erreur && (
-                <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 10 }}>
-                  {erreur}
-                </div>
-              )}
-            </>
           ) : (
-            // ═══ ÉCRAN 3 : positionnement et insertion, segment par segment ═══
             <>
               <p style={{ fontSize: 12.5, color: "#777", marginBottom: 14, lineHeight: 1.5 }}>
-                {segments.length} segment{segments.length > 1 ? "s" : ""} — comparatif validé. Choisissez
-                l'emplacement de chacun et insérez individuellement ou tous ensemble.
+                {segments.length} segment{segments.length > 1 ? "s" : ""}. Modifiez, positionnez et insérez
+                chacun individuellement, ou tous ensemble en bas.
               </p>
               {erreur && (
                 <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 12 }}>
@@ -566,10 +666,13 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
               {segments.map((s) => {
                 const enCours = actionEnCours === s.clé;
                 const sc = couleurScore(s.score);
-                const nœudCible = s.typeDestination === "existant" ? trouverNœudParId(structureActuelle, s.idCible) : null;
-                const blocsCible = nœudCible ? découperEnBlocs(nœudCible.texte) : [];
+                const nœudCibleExistant = s.typeDestination === "existant" ? trouverNœudParId(structureActuelle, s.idCible) : null;
+                const parentPourNouveau = s.typeDestination === "nouveau" ? trouverNœudParId(structureActuelle, s.idCible) : null;
+                const blocsParagraphes = nœudCibleExistant ? découperEnBlocs(nœudCibleExistant.texte) : [];
+                const fratrieNouveau = parentPourNouveau?.enfants || [];
                 const aperçuOuvert = aperçuOuvertPour === s.clé;
-                const positionEffective = s.indexInsertion === null ? blocsCible.length : s.indexInsertion;
+                const nbRepères = s.typeDestination === "existant" ? blocsParagraphes.length : fratrieNouveau.length;
+                const positionEffective = s.indexInsertion === null ? nbRepères : s.indexInsertion;
 
                 return (
                   <div key={s.clé} style={{
@@ -619,21 +722,20 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                              <span style={{
-                                fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg,
-                                borderRadius: 20, padding: "2px 8px",
-                              }}>
+                              <span style={{ fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 20, padding: "2px 8px" }}>
                                 Fidélité : {s.score}%
                               </span>
-                              {s.score < SEUIL_SCORE_ALERTE && (
-                                <button
-                                  onClick={() => revérifierSegment(s.clé)}
-                                  disabled={enCours}
-                                  style={{ fontSize: 10.5, color: "#BA7517", background: "#FAEEDA", border: "none", borderRadius: 5, padding: "2px 8px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                                >
-                                  {enCours ? "Vérification…" : "🔍 Revérifier"}
-                                </button>
-                              )}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {s.score < SEUIL_SCORE_ALERTE && (
+                                  <button
+                                    onClick={() => revérifierSegment(s.clé)}
+                                    disabled={enCours}
+                                    style={{ fontSize: 10.5, color: "#BA7517", background: "#FAEEDA", border: "none", borderRadius: 5, padding: "2px 8px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
+                                  >
+                                    {enCours ? "…" : "🔍 Revérifier"}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <textarea
                               value={s.texte}
@@ -648,7 +750,8 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                             <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{s.justification}</div>
                           </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 24, flexWrap: "wrap" }}>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 24, flexWrap: "wrap", marginBottom: 8 }}>
                           <select
                             value={`${s.typeDestination}::${s.idCible}`}
                             onChange={(e) => {
@@ -681,14 +784,21 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                               style={{ fontSize: 11.5, padding: "3px 6px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", flex: 1, minWidth: 140 }}
                             />
                           )}
-                          {s.typeDestination === "existant" && blocsCible.length > 0 && (
+                          {nbRepères > 0 && (
                             <button
                               onClick={() => setAperçuOuvertPour(aperçuOuvert ? null : s.clé)}
                               style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}
                             >
-                              📍 {aperçuOuvert ? "Fermer l'aperçu" : `Emplacement : ${s.indexInsertion === null ? "à la fin" : `avant §${s.indexInsertion + 1}`}`}
+                              📍 {aperçuOuvert ? "Fermer l'aperçu" : `Emplacement : ${s.indexInsertion === null ? "à la fin" : `position ${s.indexInsertion + 1}`}`}
                             </button>
                           )}
+                          <button
+                            onClick={() => proposerTransition(s.clé)}
+                            disabled={enCours}
+                            style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", border: "none", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
+                          >
+                            {enCours ? "…" : "🤖 Proposer une transition"}
+                          </button>
                           <button
                             onClick={() => insérerSegment(s.clé)}
                             disabled={enCours}
@@ -698,21 +808,37 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                               fontFamily: "inherit", marginLeft: "auto",
                             }}
                           >
-                            {enCours ? "Insertion…" : "Insérer ce segment"}
+                            {enCours ? "…" : "Insérer ce segment"}
                           </button>
                         </div>
 
+                        {(s.transition || aperçuOuvert) && (
+                          <div style={{ marginLeft: 24, marginBottom: 8 }}>
+                            <textarea
+                              value={s.transition}
+                              onChange={(e) => modifierSegment(s.clé, { transition: e.target.value })}
+                              placeholder="Phrase de transition (optionnelle) — laissez vide pour ne rien ajouter"
+                              rows={2}
+                              style={{
+                                width: "100%", fontSize: 11.5, color: "#534AB7", lineHeight: 1.5,
+                                background: "#F5F4FE", borderRadius: 6, padding: 6,
+                                fontFamily: "Georgia, serif", border: "0.5px dashed #7F77DD60", boxSizing: "border-box", resize: "vertical",
+                              }}
+                            />
+                          </div>
+                        )}
+
                         {aperçuOuvert && s.typeDestination === "existant" && (
                           <div style={{
-                            marginTop: 10, marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
+                            marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
                             padding: 10, maxHeight: 320, overflowY: "auto", background: "#fcfcfc",
                           }}>
                             <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
-                              Cliquez sur une barre pour choisir où le segment (en violet) sera inséré :
+                              Cliquez sur une barre pour choisir où le segment (en violet) sera inséré parmi les paragraphes existants :
                             </div>
                             <BarreInsertion active={positionEffective === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
-                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.texte} />}
-                            {blocsCible.map((bloc, i) => (
+                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.texte} transition={s.transition} />}
+                            {blocsParagraphes.map((bloc, i) => (
                               <div key={i}>
                                 <div style={{
                                   fontSize: 11.5, color: "#444", lineHeight: 1.5,
@@ -724,7 +850,33 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                                   {texteBrutDuBloc(bloc).length > 160 && "…"}
                                 </div>
                                 <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
-                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.texte} />}
+                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.texte} transition={s.transition} />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {aperçuOuvert && s.typeDestination === "nouveau" && fratrieNouveau.length > 0 && (
+                          <div style={{
+                            marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
+                            padding: 10, maxHeight: 320, overflowY: "auto", background: "#fcfcfc",
+                          }}>
+                            <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
+                              Cliquez sur une barre pour choisir entre quels éléments déjà présents le nouveau {TYPE_ENFANT[parentPourNouveau?.type]} (en violet) viendra s'intercaler :
+                            </div>
+                            <BarreInsertion active={positionEffective === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
+                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.titreSuggere || s.texte} estTitre={!!s.titreSuggere} transition={s.transition} />}
+                            {fratrieNouveau.map((frère, i) => (
+                              <div key={frère.id}>
+                                <div style={{
+                                  fontSize: 11.5, color: "#444", lineHeight: 1.5,
+                                  border: "0.5px solid #eee", borderRadius: 6,
+                                  padding: "6px 8px", background: "#fff",
+                                }}>
+                                  {ICONES_TYPE[frère.type]} {frère.titre}
+                                </div>
+                                <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
+                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.titreSuggere || s.texte} estTitre={!!s.titreSuggere} transition={s.transition} />}
                               </div>
                             ))}
                           </div>
@@ -738,7 +890,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
           )}
         </div>
 
-        <div style={{ padding: "12px 20px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <div style={{ padding: "12px 20px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0 }}>
           {segments === null ? (
             <>
               <button onClick={onFermer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -756,20 +908,11 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
                 {analyseEnCours ? "Analyse en cours…" : "Analyser et proposer un découpage"}
               </button>
             </>
-          ) : !comparaisonValidée ? (
+          ) : (
             <>
               <button onClick={recommencer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
                 ↩ Recommencer
               </button>
-              <button
-                onClick={() => setComparaisonValidée(true)}
-                style={{ fontSize: 13, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}
-              >
-                ✓ Valider ce découpage et choisir les emplacements
-              </button>
-            </>
-          ) : (
-            <>
               <button onClick={onFermer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
                 Fermer
               </button>
@@ -792,7 +935,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
   );
 }
 
-function AperçuSegmentInséré({ texte }) {
+function AperçuSegmentInséré({ texte, transition, estTitre }) {
   return (
     <div style={{
       background: "#EEEDFE", border: "1px solid #7F77DD", borderRadius: 6,
@@ -800,9 +943,10 @@ function AperçuSegmentInséré({ texte }) {
       lineHeight: 1.5, fontFamily: "Georgia, serif",
     }}>
       <div style={{ fontSize: 9.5, fontWeight: 700, color: "#7F77DD", marginBottom: 3, fontFamily: "-apple-system, sans-serif" }}>
-        ↓ NOUVEAU SEGMENT ↓
+        ↓ NOUVEAU {estTitre ? "CHAPITRE/SCÈNE" : "SEGMENT"} ↓
       </div>
-      {texte.slice(0, 220)}{texte.length > 220 && "…"}
+      {transition && <div style={{ fontStyle: "italic", marginBottom: 4, opacity: 0.85 }}>{transition}</div>}
+      {estTitre ? <strong>{texte}</strong> : (<>{texte.slice(0, 220)}{texte.length > 220 && "…"}</>)}
     </div>
   );
 }
