@@ -95,10 +95,10 @@ const BLOCS_DE_LIGNE = new Set(["P", "H1", "H2", "H3", "BLOCKQUOTE", "LI", "PRE"
 // format cible, les numéros de ligne n'ont aucune valeur de référence
 // stable — ils changeraient à chaque redimensionnement de la fenêtre.
 const FORMATS_RÉFÉRENCE = {
-  a4:     { label: "A4",               largeurPx: 602 },
-  a5:     { label: "A5",               largeurPx: 446 },
-  poche:  { label: "Poche",            largeurPx: 333 },
-  broche: { label: "Broché (6×9)",     largeurPx: 432 },
+  a4:     { label: "A4",               largeurPx: 602, hauteurPx: 931 },
+  a5:     { label: "A5",               largeurPx: 446, hauteurPx: 680 },
+  poche:  { label: "Poche",            largeurPx: 333, hauteurPx: 598 },
+  broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720 },
 };
 
 function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
@@ -479,6 +479,7 @@ export default function Editeur({
   // Numéros de ligne — ajouté 24/07/2026.
   const wrapperLigneRef = useRef(null);
   const [numérosDeLigne, setNumérosDeLigne] = useState([]);
+  const [sautsDePage, setSautsDePage] = useState([]);
 
   // Injecter les styles TipTap une seule fois
   useEffect(() => {
@@ -654,8 +655,21 @@ export default function Editeur({
   const recalculerNumérosDeLigne = useCallback(() => {
     if (!editor || !wrapperLigneRef.current) return;
     const topWrapper = wrapperLigneRef.current.getBoundingClientRect().top;
-    setNumérosDeLigne(calculerNumérosDeLigne(editor.view.dom, topWrapper));
-  }, [editor]);
+    const lignes = calculerNumérosDeLigne(editor.view.dom, topWrapper);
+    setNumérosDeLigne(lignes);
+
+    // Sauts de page — mêmes mesures que les lignes, divisées par la hauteur
+    // de page utile du format choisi (hauteur totale moins marges haut/bas).
+    // Ajouté 24/07/2026.
+    const hauteurPage = FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx;
+    const hauteurTotale = lignes.length ? lignes[lignes.length - 1].top + 30 : 0;
+    const nombrePages = hauteurTotale > 0 ? Math.ceil(hauteurTotale / hauteurPage) : 1;
+    const sauts = Array.from({ length: Math.max(0, nombrePages - 1) }, (_, i) => ({
+      top: (i + 1) * hauteurPage,
+      pageSuivante: i + 2,
+    }));
+    setSautsDePage(sauts);
+  }, [editor, formatRéférence]);
 
   useEffect(() => {
     if (!editor) return;
@@ -803,6 +817,20 @@ export default function Editeur({
                   </div>
                 ))}
               </div>
+              {sautsDePage.map((s) => (
+                <div key={s.top} style={{
+                  position: "absolute", top: s.top, left: 0, right: 0,
+                  borderTop: "1px dashed #ddd", userSelect: "none", pointerEvents: "none",
+                }}>
+                  <span style={{
+                    position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
+                    background: "#fff", padding: "0 8px", fontSize: 10, color: "#bbb",
+                    fontFamily: "-apple-system, sans-serif",
+                  }}>
+                    Page {s.pageSuivante}
+                  </span>
+                </div>
+              ))}
               <EditorContent editor={editor} />
             </div>
           </div>
