@@ -21,6 +21,77 @@ async function chargerJSZip() {
   });
 }
 
+// Recolle les paragraphes fragmentés — chantier 28/07/2026, découvert sur
+// le manuscrit "Les Orchidées du sous-sol" (720 paragraphes XML pour ~65
+// attendus). CAUSE : certains documents Word sont saisis avec une touche
+// Entrée à chaque retour visuel de ligne plutôt qu'un vrai paragraphe —
+// chaque ligne de la page devient alors un <w:p> à part entière dans le
+// XML. Résultat sans ce correctif : le texte importé arrive en dizaines de
+// petits blocs fragmentés dans l'éditeur (constaté noir sur blanc :
+// "Au prononcé du verdict... trop de temps pour" / "que la lente" comme
+// DEUX paragraphes distincts).
+// RÈGLE DE FUSION : une ligne qui se termine par une ponctuation FINALE
+// (. ! ? … » ou guillemet fermant) marque une vraie fin de paragraphe ;
+// sinon, la ligne suivante en est la suite naturelle et doit être recollée
+// avec un simple espace. Validée manuellement sur le texte réel de ce
+// manuscrit (66 paragraphes correctement reconstitués, aucun mot perdu).
+// Les DEUX lignes qui composaient un même paragraphe original restent deux
+// lignes DOM séparées en amont (une par <w:p>) : c'est pourquoi on fusionne
+// au niveau des lignes de texte brut, avant construction du HTML — pas
+// après, où l'information de coupure serait déjà perdue dans un unique <p>.
+const FIN_PARAGRAPHE = /[.!?…»”']\'?\s*$/;
+
+function fusionnerLignesFragmentées(lignes) {
+  const fusionnées = []; // éléments : { texte, estListe }
+  let courante = "";
+  for (const ligne of lignes) {
+    if (ligne.estListe) {
+      // Frontière ferme des DEUX côtés : on clôt d'abord ce qui était en
+      // cours de fusion (même incomplet — mieux vaut un paragraphe scindé
+      // qu'un item de liste avalé), puis l'item de liste est poussé seul,
+      // jamais fusionné avec le suivant même si son texte ne se termine
+      // pas par une ponctuation finale (fréquent en fin d'item de liste).
+      if (courante) { fusionnées.push({ texte: courante, estListe: false }); courante = ""; }
+      fusionnées.push({ texte: ligne.texte, estListe: true });
+      continue;
+    }
+    courante = courante ? `${courante} ${ligne.texte}` : ligne.texte;
+    if (FIN_PARAGRAPHE.test(ligne.texte)) {
+      fusionnées.push({ texte: courante, estListe: false });
+      courante = "";
+    }
+  }
+  if (courante) fusionnées.push({ texte: courante, estListe: false });
+  return fusionnées;
+}
+
+// Construit le html et le compte de mots d'un chapitre, en appliquant
+// D'ABORD la fusion des lignes fragmentées — chantier 28/07/2026. Les
+// items de liste consécutifs sont regroupés en un seul <ul> (plutôt que
+// des <p> isolés qui perdraient visuellement la puce à l'affichage).
+function construireChapitre(courant, lignes) {
+  const éléments = fusionnerLignesFragmentées(lignes);
+  const morceauxHtml = [];
+  let listeEnCours = [];
+  const clôtLaListe = () => {
+    if (listeEnCours.length) {
+      morceauxHtml.push(`<ul>${listeEnCours.map((t) => `<li>${t}</li>`).join("")}</ul>`);
+      listeEnCours = [];
+    }
+  };
+  for (const é of éléments) {
+    if (é.estListe) { listeEnCours.push(é.texte); }
+    else { clôtLaListe(); morceauxHtml.push(`<p>${é.texte}</p>`); }
+  }
+  clôtLaListe();
+
+  return {
+    ...courant,
+    html: morceauxHtml.join(""),
+    mots: éléments.map((é) => é.texte).join(" ").split(/\s+/).filter(Boolean).length,
+  };
+}
+
 async function extraireChapitres(fichier) {
   const JSZip = await chargerJSZip();
   const zip = await JSZip.loadAsync(await fichier.arrayBuffer());
@@ -50,18 +121,30 @@ async function extraireChapitres(fichier) {
     if (!texte || IGNORER.has(style)) continue;
 
     if (style === "Titre1") {
-      if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
+      if (courant) chapitres.push(construireChapitre(courant, lignes));
       courant = { titre: texte, type: "partie" };
       lignes = [];
     } else if (style === "Titre2") {
-      if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
+      if (courant) chapitres.push(construireChapitre(courant, lignes));
       courant = { titre: texte, type: "chapitre" };
       lignes = [];
     } else if (courant) {
-      lignes.push(texte);
+      // Détection des puces/listes — chantier 28/07/2026, découvert sur un
+      // intitulé terminé par ":" suivi d'une liste : ":" n'est pas une
+      // ponctuation FINALE de phrase, donc l'ancienne fusion recollait
+      // l'intitulé au premier item, puis chaque item au suivant — la liste
+      // entière fondait en un seul bloc, puces ET paragraphes perdus.
+      // Un item de liste Word porte soit le style "Paragraphedeliste" soit
+      // une numérotation <w:numPr> (puce ou numéro automatique). On le
+      // MARQUE plutôt que de le fusionner : fusionnerLignesFragmentées
+      // traitera toute ligne estListe=true comme une frontière de
+      // paragraphe ferme, des deux côtés.
+      const estListe = style === "Paragraphedeliste" ||
+        p.getElementsByTagNameNS(ns, "numPr").length > 0;
+      lignes.push({ texte, estListe });
     }
   }
-  if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
+  if (courant) chapitres.push(construireChapitre(courant, lignes));
 
   return chapitres.filter(c => c.mots > 0);
 }
@@ -280,3 +363,4 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
     </div>
   );
 }
+
