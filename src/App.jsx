@@ -38,6 +38,7 @@ import Bibliotheque from "./components/Bibliotheque.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
+import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -76,6 +77,22 @@ const STRUCTURE_TYPES_META = {
   // et autant de niveaux supplémentaires que nécessaire ensuite, sans avoir
   // à inventer un nouveau type à chaque fois.
   scene: { enfant: "scene", icone: "✏️" },
+};
+
+// Zones de visibilité par nœud — chantier 28/07/2026. Un seul manuscrit,
+// plusieurs régimes de visibilité, plusieurs sorties possibles : scènes en
+// zone réservée (version intégrale vs version famille du témoignage),
+// notes méthodologiques du MAAT (édition praticiens vs grand public),
+// brouillons jamais exportés par défaut. La zone est stockée en base
+// (colonne `noeuds.zone`, DEFAULT 'corps') ; un nœud sans zone est traité
+// partout comme 'corps' — les projets existants se comportent strictement
+// comme avant tant qu'on ne touche à rien.
+// ⚠️ badge "🚧" (brouillon) et non "✏️", déjà pris par l'icône de scène.
+const ZONES_META = {
+  corps:     { label: "Corps du texte", badge: null, couleur: null },
+  reserve:   { label: "Réservé",        badge: "🔒", couleur: "#8B2635" },
+  methodo:   { label: "Méthodologique", badge: "📎", couleur: "#3F4650" },
+  brouillon: { label: "Brouillon",      badge: "🚧", couleur: "#BA7517" },
 };
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -149,12 +166,21 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées }) {
   const { t } = useTranslation("common");
   const [ouvert, setOuvert] = useState(true);
   const [enRenommage, setEnRenommage] = useState(false);
   const [nomTemp, setNomTemp] = useState(nœud.titre);
   const [survol, setSurvol] = useState(false);
+
+  // Masquage visuel par zone — chantier 28/07/2026. Purement visuel :
+  // aucune suppression, aucun impact données. Un nœud masqué emporte
+  // visuellement ses enfants (le return est avant leur rendu récursif),
+  // cohérent avec la règle d'export "un nœud exclu exclut tout ce qu'il
+  // contient". Les hooks ci-dessus restent appelés avant ce return —
+  // obligatoire pour respecter les règles des hooks React.
+  const zoneNœud = nœud.zone || "corps";
+  if (zonesMasquées?.includes(zoneNœud)) return null;
 
   const aDesEnfants = nœud.enfants?.length > 0;
   const typeInfo = STRUCTURE_TYPES_META[nœud.type];
@@ -244,6 +270,17 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           </span>
         )}
 
+        {/* Badge de zone — discret, seulement pour les zones hors corps.
+            Chantier 28/07/2026. */}
+        {ZONES_META[zoneNœud]?.badge && (
+          <span
+            title={`Zone : ${ZONES_META[zoneNœud].label}`}
+            style={{ fontSize: 10, flexShrink: 0, opacity: 0.85 }}
+          >
+            {ZONES_META[zoneNœud].badge}
+          </span>
+        )}
+
         {/* Mots du nœud */}
         {compterMots(nœud.texte) > 0 && (
           <span style={{ fontSize: 10, color: "var(--texte-tertiaire)", flexShrink: 0 }}>
@@ -280,6 +317,20 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
               <option value="chapitre">📄 Chapitre</option>
               <option value="scene">✏️ Scène</option>
             </select>
+            {/* Sélecteur de zone de visibilité — chantier 28/07/2026.
+                Même facture que le sélecteur de type juste au-dessus. */}
+            <select
+              value={zoneNœud}
+              onChange={(e) => onChangerZone(nœud.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              title={`Zone de visibilité : ${ZONES_META[zoneNœud].label} — détermine dans quelles versions exportées ce nœud (et tout ce qu'il contient) apparaît`}
+              style={{ fontSize: 10, border: "0.5px solid #ddd", borderRadius: 4, background: "#fff", color: ZONES_META[zoneNœud].couleur || "#777", padding: "1px 2px", fontFamily: "inherit", cursor: "pointer" }}
+            >
+              <option value="corps">Corps</option>
+              <option value="reserve">🔒 Réservé</option>
+              <option value="methodo">📎 Méthodo</option>
+              <option value="brouillon">🚧 Brouillon</option>
+            </select>
             <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title={t("actions.renommer")}>✎</button>
             <span style={{ width: 6 }} />
             <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title={t("actions.supprimer")}>✕</button>
@@ -307,6 +358,8 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           estRacine={false}
           onPromouvoir={onPromouvoir}
           onRétrograder={onRétrograder}
+          onChangerZone={onChangerZone}
+          zonesMasquées={zonesMasquées}
         />
       ))}
     </div>
@@ -532,7 +585,26 @@ function FormulaireProjet({ onCréer, onAnnuler }) {
 function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernierNœudVisitéId }) {
   const { t } = useTranslation("common");
   const [sélectionné, setSélectionné] = useState(null);
+  // Zones actuellement masquées dans l'arborescence (visuel uniquement) —
+  // chantier 28/07/2026. Défaut : tout afficher.
+  const [zonesMasquées, setZonesMasquées] = useState([]);
   const mots = totalMotsProjet(projet.structure);
+
+  // Zones (hors corps) réellement présentes dans le projet — les chips de
+  // masquage ne s'affichent que pour elles : un projet qui n'utilise pas
+  // les zones garde une interface strictement identique à avant.
+  const zonesPrésentes = (() => {
+    const trouvées = new Set();
+    const parcourir = (liste) => {
+      for (const n of liste || []) {
+        const z = n.zone || "corps";
+        if (z !== "corps") trouvées.add(z);
+        if (n.enfants?.length) parcourir(n.enfants);
+      }
+    };
+    parcourir(projet.structure);
+    return Object.keys(ZONES_META).filter((z) => trouvées.has(z));
+  })();
 
   // Trouve un nœud dans l'arbre local (pour calculer l'ordre du prochain enfant)
   const trouverNœudLocal = (liste, id) => {
@@ -575,7 +647,7 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
       return;
     }
 
-    const nouveauNœud = { id: data.id, type: data.type, titre: data.titre, texte: data.texte || "", enfants: [] };
+    const nouveauNœud = { id: data.id, type: data.type, titre: data.titre, texte: data.texte || "", zone: data.zone || "corps", enfants: [] };
 
     if (estRacine) {
       onMàjStructure(projet.id, [...(projet.structure || []), nouveauNœud]);
@@ -624,6 +696,54 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
           : { ...n, enfants: changer(n.enfants || []) }
       );
     onMàjStructure(projet.id, changer(projet.structure || []));
+  }, [projet, onMàjStructure]);
+
+  // Change la zone de visibilité d'un nœud — chantier 28/07/2026.
+  // Contrairement à la promotion/rétrogradation, la zone ne cascade PAS
+  // automatiquement sur les enfants : elle le PROPOSE. Deux raisons :
+  // 1) pour l'export, marquer le seul nœud parent suffit déjà à emporter
+  //    tout son contenu (règle "un nœud exclu exclut tout ce qu'il
+  //    contient" dans exportWord.js) ;
+  // 2) mais cascader rend les badges 🔒 visibles sur chaque enfant dans
+  //    l'arborescence, ce qui peut être voulu (cartographie d'un coup
+  //    d'œil) ou non (bruit visuel). L'auteur décide.
+  // Si la cascade est acceptée, elle s'applique à TOUS les descendants
+  // (pas seulement les enfants directs) — une demi-cascade laisserait des
+  // petits-enfants incohérents avec la zone de leur sous-arbre.
+  const changerZoneNœud = useCallback(async (nœudId, nouvelleZone) => {
+    const nœudCible = trouverNœudLocal(projet.structure, nœudId);
+    if (!nœudCible) return;
+
+    const descendants = [];
+    const collecter = (n) => (n.enfants || []).forEach((e) => { descendants.push(e); collecter(e); });
+    collecter(nœudCible);
+
+    let appliquerAuxDescendants = false;
+    if (descendants.length > 0) {
+      appliquerAuxDescendants = window.confirm(
+        `Appliquer aussi la zone « ${ZONES_META[nouvelleZone].label} » aux ${descendants.length} élément(s) contenus dans « ${nœudCible.titre} » ?\n\n` +
+        `OK — oui, tout le contenu porte la même zone (badges visibles partout).\n` +
+        `Annuler — seulement « ${nœudCible.titre} » (à l'export, son contenu suivra de toute façon son sort).`
+      );
+    }
+
+    const ids = [nœudId, ...(appliquerAuxDescendants ? descendants.map((d) => d.id) : [])];
+    const résultats = await Promise.all(ids.map((id) => nœudsAPI.changerZone(id, nouvelleZone)));
+    const échec = résultats.find((r) => r.error);
+    if (échec) {
+      journaliserErreur("VueProjet:changerZoneNœud", échec.error.message, projet.id);
+      window.alert("Impossible de changer la zone de cet élément. Vérifiez que la migration Supabase du 28/07/2026 (colonne zone) a bien été exécutée.");
+      return;
+    }
+
+    const idsModifiés = new Set(ids);
+    const màj = (liste) =>
+      liste.map((n) => ({
+        ...n,
+        zone: idsModifiés.has(n.id) ? nouvelleZone : (n.zone || "corps"),
+        enfants: màj(n.enfants || []),
+      }));
+    onMàjStructure(projet.id, màj(projet.structure || []));
   }, [projet, onMàjStructure]);
 
   // Fait sortir un nœud de son parent actuel pour qu'il devienne le frère de
@@ -988,6 +1108,41 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
           <span style={{ fontSize: 11, fontWeight: 500, color: "var(--texte-tertiaire)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
             {t("vueProjet.structureManuscrit")}
           </span>
+          {/* Chips de masquage par zone — chantier 28/07/2026. Visibles
+              uniquement si le projet contient des nœuds hors corps. Cliquer
+              une chip masque/réaffiche visuellement la zone (aucun impact
+              données). */}
+          {zonesPrésentes.length > 0 && (
+            <div style={{ display: "flex", gap: 4 }}>
+              {zonesPrésentes.map((z) => {
+                const masquée = zonesMasquées.includes(z);
+                return (
+                  <button
+                    key={z}
+                    onClick={() =>
+                      setZonesMasquées((prev) =>
+                        masquée ? prev.filter((x) => x !== z) : [...prev, z]
+                      )
+                    }
+                    title={masquée
+                      ? `Réafficher les nœuds « ${ZONES_META[z].label} »`
+                      : `Masquer visuellement les nœuds « ${ZONES_META[z].label} » (aucune suppression)`}
+                    style={{
+                      fontSize: 10, padding: "1px 6px", borderRadius: 10,
+                      border: `0.5px solid ${ZONES_META[z].couleur}40`,
+                      background: masquée ? "transparent" : `${ZONES_META[z].couleur}12`,
+                      color: ZONES_META[z].couleur,
+                      opacity: masquée ? 0.45 : 1,
+                      cursor: "pointer", fontFamily: "inherit",
+                      textDecoration: masquée ? "line-through" : "none",
+                    }}
+                  >
+                    {ZONES_META[z].badge} {ZONES_META[z].label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <button
             onClick={() => ajouterNœud(projet.id, "partie")}
             style={{
@@ -1035,6 +1190,8 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               estRacine={true}
               onPromouvoir={promouvoirNœud}
               onRétrograder={rétrograderNœud}
+              onChangerZone={changerZoneNœud}
+              zonesMasquées={zonesMasquées}
             />
           ))
         )}
@@ -1208,11 +1365,43 @@ function AppConnectée({ user, déconnecter }) {
   const [projetActifId, setProjetActifId] = useState(null);
   const [nœudActifId, setNœudActifId]     = useState(null);
   const [importOuvert, setImportOuvert]   = useState(false);
+  const [incorporerOuvert, setIncorporerOuvert] = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
   const [exportEnCours, setExportEnCours]                 = useState(false);
   const [formatExport, setFormatExport]                   = useState("a4");
+  // Zones de visibilité incluses à l'export Word — chantier 28/07/2026.
+  // Défaut : corps seul. Le dernier choix est mémorisé PAR PROJET dans
+  // localStorage — simple préférence d'interface, pas une donnée du
+  // manuscrit (la règle "le localStorage n'est plus utilisé" de l'en-tête
+  // vise les données de projet, perdues jadis faute de Supabase ; une
+  // préférence d'affichage re-déductible en deux clics n'en fait pas
+  // partie). Confort visé : la "version famille" et la "version
+  // praticiens" se ré-exportent à l'identique sans recocher à chaque fois.
+  const [zonesExport, setZonesExport]                     = useState(["corps"]);
+
+  useEffect(() => {
+    if (!projetActifId) return;
+    try {
+      const mémo = localStorage.getItem(`cursus-zones-export-${projetActifId}`);
+      const parsé = mémo ? JSON.parse(mémo) : null;
+      setZonesExport(Array.isArray(parsé) && parsé.length > 0 ? parsé : ["corps"]);
+    } catch {
+      setZonesExport(["corps"]);
+    }
+  }, [projetActifId]);
+
+  const basculerZoneExport = (clé) => {
+    setZonesExport((prev) => {
+      const suivant = prev.includes(clé) ? prev.filter((z) => z !== clé) : [...prev, clé];
+      if (suivant.length === 0) return prev; // au moins une zone incluse
+      try {
+        localStorage.setItem(`cursus-zones-export-${projetActifId}`, JSON.stringify(suivant));
+      } catch { /* stockage indisponible : le choix vaut pour la session en cours */ }
+      return suivant;
+    });
+  };
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
@@ -1333,6 +1522,22 @@ function AppConnectée({ user, déconnecter }) {
   };
 
   const projetActif = projets.find((p) => p.id === projetActifId);
+
+  // Le projet actif contient-il au moins un nœud hors zone "corps" ?
+  // Si non, le sélecteur de zones à l'export ne s'affiche pas du tout :
+  // un projet qui n'utilise pas les zones garde une barre d'actions
+  // strictement identique à avant le chantier. Chantier 28/07/2026.
+  const projetActifUtiliseZones = (() => {
+    if (!projetActif) return false;
+    const parcourir = (liste) => {
+      for (const n of liste || []) {
+        if ((n.zone || "corps") !== "corps") return true;
+        if (n.enfants?.length && parcourir(n.enfants)) return true;
+      }
+      return false;
+    };
+    return parcourir(projetActif.structure);
+  })();
 
   // Synchronise la langue de l'interface i18next sur la langue DU PROJET actif
   // (règle du chantier : la langue est par projet, pas par compte).
@@ -1467,7 +1672,15 @@ function AppConnectée({ user, déconnecter }) {
       display: "grid",
       gridTemplateColumns: "220px 1fr",
       gridTemplateRows: "48px minmax(0, 1fr)",
-      height: "100vh",
+      // CORRECTIF TABLETTE 28/07/2026 : 100dvh (dynamic viewport height) au
+      // lieu de 100vh. Sur les navigateurs mobiles/tablettes, 100vh est
+      // calculé barre d'adresse MASQUÉE : quand elle est visible, la page
+      // est plus haute que l'écran réel et la mise en page déborde ou
+      // laisse des zones mortes. 100dvh suit la hauteur réellement
+      // disponible à chaque instant. Supporté par tous les navigateurs
+      // depuis fin 2022 (Chrome 108+, Safari 15.4+, Samsung Internet 21+) —
+      // aucun risque sur les PC de Joseph ni sur la Tab S8.
+      height: "100dvh",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       "--surface": "#ffffff",
       "--surface-hover": "#f5f5f5",
@@ -1707,6 +1920,34 @@ function AppConnectée({ user, déconnecter }) {
               display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
               background: "#fafafa",
             }}>
+              {/* Sélecteur des zones à inclure dans l'export Word — chantier
+                  28/07/2026. "Un nœud exclu exclut tout ce qu'il contient."
+                  Affiché seulement si le projet utilise réellement les
+                  zones — sinon la barre reste identique à avant. */}
+              {projetActifUtiliseZones && (
+              <div
+                title="Zones de visibilité incluses dans l'export Word. Un nœud exclu exclut tout ce qu'il contient."
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  fontSize: 11, color: "#777",
+                  border: "0.5px solid #ddd", borderRadius: 8,
+                  padding: "5px 10px", background: "#fff",
+                }}
+              >
+                <span style={{ color: "#999" }}>Exporter :</span>
+                {Object.entries(ZONES_META).map(([clé, z]) => (
+                  <label key={clé} style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", color: zonesExport.includes(clé) ? (z.couleur || "#555") : "#bbb" }}>
+                    <input
+                      type="checkbox"
+                      checked={zonesExport.includes(clé)}
+                      onChange={() => basculerZoneExport(clé)}
+                      style={{ cursor: "pointer", margin: 0 }}
+                    />
+                    {z.badge ? `${z.badge} ` : ""}{clé === "corps" ? "Corps" : z.label}
+                  </label>
+                ))}
+              </div>
+              )}
               <select
                 value={formatExport}
                 onChange={(e) => setFormatExport(e.target.value)}
@@ -1725,7 +1966,7 @@ function AppConnectée({ user, déconnecter }) {
                 onClick={async () => {
                   setExportEnCours(true);
                   try {
-                    await exporterProjetWord(projetActif, formatExport);
+                    await exporterProjetWord(projetActif, formatExport, zonesExport);
                   } catch (err) {
                     journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
                     window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
@@ -1743,6 +1984,18 @@ function AppConnectée({ user, déconnecter }) {
                 }}
               >
                 {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
+              <button
+                onClick={() => setIncorporerOuvert(true)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: "#7F77DD",
+                  border: "0.5px solid #7F77DD40", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                📥 Incorporer de la matière
               </button>
               <button
                 onClick={() => setImportOuvert(true)}
@@ -1853,6 +2106,36 @@ function AppConnectée({ user, déconnecter }) {
             });
           }}
           onFermer={() => setImportOuvert(false)}
+        />
+      )}
+
+      {/* Modal Incorporer de la matière — même mécanisme de rafraîchissement que ImportDocx ci-dessus */}
+      {incorporerOuvert && projetActif && (
+        <IncorporerMatiere
+          projet={projetActif}
+          onStructureChangée={() => {
+            // Rafraîchit la structure du projet dans App.jsx SANS fermer la
+            // fenêtre — pour que la vue "Structure du manuscrit" en arrière-plan
+            // reste à jour au fil des insertions/annulations, sans interrompre
+            // le travail en cours dans la fenêtre Incorporer de la matière.
+            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
+              if (data) {
+                setProjets(prev => prev.map(p =>
+                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
+                ));
+              }
+            });
+          }}
+          onFermer={() => {
+            setIncorporerOuvert(false);
+            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
+              if (data) {
+                setProjets(prev => prev.map(p =>
+                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
+                ));
+              }
+            });
+          }}
         />
       )}
 
