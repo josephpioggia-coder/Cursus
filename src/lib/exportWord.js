@@ -179,6 +179,26 @@ function paragraphesDepuisHTML(html, registreNotes = []) {
   return paragraphes.length > 0 ? paragraphes : [];
 }
 
+// Filtre l'arbre du manuscrit selon les zones de visibilité à inclure —
+// chantier "Zones de visibilité par nœud", 28/07/2026. Règle simple et
+// prévisible : un nœud exclu emporte TOUT ce qu'il contient, quel que soit
+// le statut propre de ses enfants ("Un nœud exclu exclut tout ce qu'il
+// contient"). Les nœuds sans zone (créés avant la migration, ou structure
+// locale pas encore rechargée) sont traités comme 'corps' — garantit un
+// comportement strictement identique à avant sur les projets existants.
+// La table des matières se recalcule naturellement sur l'arbre filtré,
+// puisqu'elle est générée par Word à partir des titres réellement présents.
+function filtrerParZones(nœuds, zonesIncluses) {
+  const ensemble = new Set(
+    zonesIncluses && zonesIncluses.length > 0 ? zonesIncluses : ["corps"]
+  );
+  const filtrer = (liste) =>
+    (liste || [])
+      .filter((n) => ensemble.has(n.zone || "corps"))
+      .map((n) => ({ ...n, enfants: filtrer(n.enfants) }));
+  return filtrer(nœuds);
+}
+
 // Nettoie un titre de projet pour en faire un nom de fichier sûr (garde
 // lettres, chiffres, espaces → underscore).
 function nomDeFichierSûr(titre) {
@@ -193,8 +213,12 @@ function nomDeFichierSûr(titre) {
  * Génère et déclenche le téléchargement du fichier Word pour un projet.
  * @param {object} projet — { titre, genre, structure } tel que manipulé dans App.jsx
  * @param {string} formatPage — clé de FORMATS_PAGE ("a4", "a5", "poche", "broche"). Défaut : "a4".
+ * @param {string[]} zonesIncluses — zones de visibilité à inclure dans le
+ *   document ("corps", "reserve", "methodo", "brouillon"). Défaut : corps
+ *   seul — un export sans autre indication produit exactement le même
+ *   document qu'avant le chantier zones. Ajouté 28/07/2026.
  */
-export async function exporterProjetWord(projet, formatPage = "a4") {
+export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluses = ["corps"]) {
   const format = FORMATS_PAGE[formatPage] || FORMATS_PAGE.a4;
 
   const pageDeTitre = [
@@ -233,7 +257,7 @@ export async function exporterProjetWord(projet, formatPage = "a4") {
       if (n.enfants?.length) parcourirStructure(n.enfants);
     }
   };
-  parcourirStructure(projet.structure || []);
+  parcourirStructure(filtrerParZones(projet.structure || [], zonesIncluses));
 
   // Déclaration des notes de bas de page au niveau du Document — docx exige
   // qu'elles soient toutes enregistrées ici, indexées par le même numéro

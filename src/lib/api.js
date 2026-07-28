@@ -112,6 +112,10 @@ export const nœudsAPI = {
         titre:     nœud.titre,
         ordre:     nœud.ordre || 0,
         texte:     nœud.texte || "",
+        // Zone de visibilité — chantier 28/07/2026. La colonne a un DEFAULT
+        // 'corps' en base, mais on l'envoie explicitement pour que le nœud
+        // retourné par .select() la contienne toujours.
+        zone:      nœud.zone || "corps",
       }])
       .select()
       .single();
@@ -141,6 +145,17 @@ export const nœudsAPI = {
     const { error } = await supabase
       .from("noeuds")
       .update({ type })
+      .eq("id", nœudId);
+    return { error };
+  },
+
+  /** Change la zone de visibilité d'un nœud (corps / reserve / methodo /
+   *  brouillon) — ajouté 28/07/2026, chantier "Zones de visibilité par nœud".
+   *  La contrainte CHECK en base rejette toute autre valeur. */
+  async changerZone(nœudId, zone) {
+    const { error } = await supabase
+      .from("noeuds")
+      .update({ zone })
       .eq("id", nœudId);
     return { error };
   },

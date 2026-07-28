@@ -237,7 +237,13 @@ const Note = Node.create({
 const STYLES_EDITEUR = `
   .ProseMirror {
     outline: none;
-    min-height: 400px;
+    /* CORRECTIF TABLETTE 28/07/2026 : min-height abaissé de 400px à 240px.
+       Sur la Tab S8, la hauteur de fenêtre utile est nettement plus faible
+       que sur PC : les 400px réservés sous un chapitre de quelques lignes
+       produisaient une grande zone blanche sans contenu ni utilité
+       apparente (constaté sur l'avant-propos de 5 lignes). 240px suffisent
+       à offrir une cible de clic confortable sous le texte. */
+    min-height: 240px;
     font-size: 16px;
     line-height: 1.8;
     color: var(--editeur-texte, #1a1a1a);
@@ -442,10 +448,21 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
       display: "flex", alignItems: "center", gap: 20,
       fontSize: 12,
     }}>
-      {/* Session */}
+      {/* CORRECTIF 28/07/2026 — l'étiquette "Session" laissait croire à un
+          cumul journalier, alors que le compteur repart à zéro à chaque
+          chapitre ouvert (constaté : 1137 affiché vs ~10 000 mots réels
+          dans la journée). Libellé retenu : "Depuis l'ouverture" plutôt
+          que "Ce chapitre" (option initialement envisagée), parce que la
+          jauge "Chapitre" juste à côté affiche déjà le total de mots DU
+          chapitre — deux étiquettes quasi identiques pour deux mesures
+          différentes auraient recréé la confusion qu'on corrige. Le vrai
+          cumul journalier viendra avec le chantier "suivi de sessions"
+          Supabase, toujours à programmer. Correctif minimal : aucun
+          changement de comportement, seulement d'honnêteté. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 120 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span style={{ color: "#999" }}>Session</span>
+        <div style={{ display: "flex", justifyContent: "space-between" }}
+          title="Mots tapés depuis l'ouverture de ce chapitre dans l'éditeur — pas un cumul de la journée">
+          <span style={{ color: "#999" }}>Depuis l'ouverture</span>
           <span style={{ color: couleur, fontWeight: 500 }}>{motsSession} / {objectifJournalier} mots</span>
         </div>
         <div style={{ height: 3, background: "#e5e5e5", borderRadius: 4, overflow: "hidden" }}>
