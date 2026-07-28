@@ -1618,7 +1618,23 @@ function AppConnectée({ user, déconnecter }) {
   };
 
   const supprimerProjet = async (id) => {
-    if (!window.confirm(t("confirmations.supprimerProjet"))) return;
+    // Confirmation renforcée 28/07/2026 : le message générique ne disait ni
+    // QUEL projet allait disparaître, ni QUE la suppression emporte plus que
+    // le texte (historique de versions, réponses au questionnaire, zones,
+    // notes) — un réimport Word ne restaure PAS tout ça. L'auteur doit le
+    // savoir au moment de confirmer, pas le découvrir après.
+    const projetCible = projets.find((p) => p.id === id);
+    const nbMots = projetCible ? totalMotsProjet(projetCible.structure) : 0;
+    const message =
+      `Supprimer définitivement « ${projetCible?.titre || "ce projet"} » ` +
+      `(${nbMots.toLocaleString("fr-FR")} mots) ?\n\n` +
+      `Seront perdus : tous les chapitres et leur texte, l'historique de ` +
+      `versions, les réponses au questionnaire, les zones de visibilité et ` +
+      `les notes de bas de page.\n\n` +
+      `Un réimport Word ultérieur ne restaurera que le texte. ` +
+      `Cette action ne peut pas être annulée.\n\n` +
+      `(Pour un livre terminé, le statut « Terminé » conserve tout.)`;
+    if (!window.confirm(message)) return;
     const { error } = await projetsAPI.supprimer(id);
     if (!error) {
       setProjets((prev) => prev.filter((p) => p.id !== id));
@@ -1735,6 +1751,12 @@ function AppConnectée({ user, déconnecter }) {
           <div style={sectionLabelStyle}>{t("navigation.titre")}</div>
           {[
             { id: "tableau",      label: t("navigation.tableauDeBord"),  icone: "⊞" },
+            // "Mes projets" — ajouté 28/07/2026 : la vue "liste" (cartes de
+            // projets, avec suppression au survol) existait mais n'était
+            // reliée à AUCUNE entrée de navigation — on n'y accédait que par
+            // détour (après suppression du projet actif, notamment). C'est
+            // désormais l'accès officiel à la gestion des projets.
+            { id: "liste",        label: t("vues.mesProjets"),           icone: "📚" },
             { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
@@ -1914,12 +1936,46 @@ function AppConnectée({ user, déconnecter }) {
         {/* Vue : structure du projet (avec panneau éditeur+IA intégré) */}
         {vue === "projet" && projetActif && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-            {/* Barre d'actions projet */}
+            {/* Barre d'actions projet — réorganisée 28/07/2026 à la demande
+                de Joseph : tout ce qui EXPORTE regroupé à gauche (zones +
+                format + bouton rouge), les ENTRÉES de contenu à droite
+                (Incorporer en vert, Importer en bleu), et un code couleur
+                stable par fonction — rouge = sortie, vert = incorporation,
+                bleu = import — au lieu de la couleur du projet, qui variait
+                d'un livre à l'autre et ne signifiait rien. */}
             <div style={{
               padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
-              display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
               background: "#fafafa",
             }}>
+              {/* ── Groupe gauche : export ── Ordre validé sur maquette de
+                  Joseph (28/07) : le bouton rouge D'ABORD, tout à gauche,
+                  puis les cases de zones (boîte teintée rose pour signer
+                  l'appartenance au même groupe), puis le format. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={async () => {
+                  setExportEnCours(true);
+                  try {
+                    await exporterProjetWord(projetActif, formatExport, zonesExport);
+                  } catch (err) {
+                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
+                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
+                  } finally {
+                    setExportEnCours(false);
+                  }
+                }}
+                disabled={exportEnCours}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#C0392B", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
+                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
+                }}
+              >
+                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
               {/* Sélecteur des zones à inclure dans l'export Word — chantier
                   28/07/2026. "Un nœud exclu exclut tout ce qu'il contient."
                   Affiché seulement si le projet utilise réellement les
@@ -1930,8 +1986,8 @@ function AppConnectée({ user, déconnecter }) {
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   fontSize: 11, color: "#777",
-                  border: "0.5px solid #ddd", borderRadius: 8,
-                  padding: "5px 10px", background: "#fff",
+                  border: "0.5px solid #C0392B30", borderRadius: 8,
+                  padding: "5px 10px", background: "#C0392B0D",
                 }}
               >
                 <span style={{ color: "#999" }}>Exporter :</span>
@@ -1953,8 +2009,8 @@ function AppConnectée({ user, déconnecter }) {
                 onChange={(e) => setFormatExport(e.target.value)}
                 title="Format de page pour l'export Word"
                 style={{
-                  fontSize: 12, color: "#555", background: "#fff",
-                  border: "0.5px solid #ddd", borderRadius: 8, padding: "6px 8px",
+                  fontSize: 12, color: "#3B6D4F", background: "#EAF6EF",
+                  border: "0.5px solid #9CCDB0", borderRadius: 8, padding: "6px 8px",
                   fontFamily: "inherit", cursor: "pointer",
                 }}
               >
@@ -1962,35 +2018,16 @@ function AppConnectée({ user, déconnecter }) {
                   <option key={clé} value={clé}>{f.label}</option>
                 ))}
               </select>
-              <button
-                onClick={async () => {
-                  setExportEnCours(true);
-                  try {
-                    await exporterProjetWord(projetActif, formatExport, zonesExport);
-                  } catch (err) {
-                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
-                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
-                  } finally {
-                    setExportEnCours(false);
-                  }
-                }}
-                disabled={exportEnCours}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#fff", color: projetActif.couleur,
-                  border: `0.5px solid ${projetActif.couleur}40`, borderRadius: 8, padding: "6px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
-                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
-                }}
-              >
-                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
-              </button>
+              </div>
+
+              {/* ── Groupe droit : entrées de contenu + suppression ── */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 onClick={() => setIncorporerOuvert(true)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: "#fff", color: "#7F77DD",
-                  border: "0.5px solid #7F77DD40", borderRadius: 8, padding: "6px 14px",
+                  background: "#2AA7B8", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "6px 14px",
                   fontSize: 12, fontWeight: 500, cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -2001,7 +2038,7 @@ function AppConnectée({ user, déconnecter }) {
                 onClick={() => setImportOuvert(true)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: projetActif.couleur, color: "#fff",
+                  background: "#2F6FDE", color: "#fff",
                   border: "none", borderRadius: 8, padding: "6px 14px",
                   fontSize: 12, fontWeight: 500, cursor: "pointer",
                   fontFamily: "inherit",
@@ -2009,6 +2046,25 @@ function AppConnectée({ user, déconnecter }) {
               >
                 {t("vues.importerWord")}
               </button>
+              {/* Suppression du projet — ajouté 28/07/2026 à la demande de
+                  Joseph : jusqu'ici le seul bouton vivait sur les cartes de
+                  la vue "Mes projets", difficile d'accès. La confirmation
+                  détaillée (supprimerProjet) reste le seul garde-fou :
+                  suppression définitive, cascade sur tout le contenu. */}
+              <button
+                onClick={() => supprimerProjet(projetActif.id)}
+                title="Supprimer définitivement ce projet et tout son contenu"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: "#E24B4A",
+                  border: "0.5px solid #E24B4A40", borderRadius: 8, padding: "6px 10px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                🗑
+              </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <VueProjet
@@ -2207,3 +2263,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
+
