@@ -66,12 +66,21 @@ async function extraireChapitres(fichier) {
   return chapitres.filter(c => c.mots > 0);
 }
 
-// Normalise un titre pour la comparaison
+// Normalise un titre pour la comparaison.
+// CORRECTIF 28/07/2026 — BUG DE COLLISION : l'ancienne version EFFAÇAIT le
+// numéro ("Chapitre 1", "Chapitre 2"… devenaient tous "chapitre "), si bien
+// que la "correspondance exacte" renvoyait le PREMIER nœud "Chapitre N" de
+// la liste pour TOUS les chapitres du Word. À l'import, les six textes
+// s'écrivaient successivement dans ce même nœud (le dernier écrasant les
+// autres) et les nœuds suivants restaient vides. Le numéro est désormais
+// CONSERVÉ dans la forme normalisée ("chapitre 1" ≠ "chapitre 2") ; seule
+// la ponctuation qui le suit est unifiée. Même correctif pour les parties
+// ("Partie I" / "Partie II", chiffres romains ou arabes).
 function normaliser(titre) {
   return titre.toLowerCase()
-    .replace(/chapitre\s+\d+[\.\-—\s]*/gi, "chapitre ")
-    .replace(/partie\s+[ivxlcdm\d]+[\.\-—\s]*/gi, "partie ")
-    .replace(/[^a-zàâäéèêëîïôùûüç\s]/g, " ")
+    .replace(/chapitre\s+(\d+)[\.\-—\s]*/gi, "chapitre $1 ")
+    .replace(/partie\s+([ivxlcdm\d]+)[\.\-—\s]*/gi, "partie $1 ")
+    .replace(/[^a-z0-9àâäéèêëîïôùûüç\s]/g, " ")
     .replace(/\s+/g, " ").trim();
 }
 
