@@ -41,7 +41,22 @@ const ICONES_TYPE = { partie: "📂", chapitre: "📄", scene: "✏️" };
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const SEUIL_CARACTÈRES = 8000;
+// SEUIL_CARACTÈRES : relevé le 28/07/2026 (soir) de 8000 à 20000, à la
+// demande de Joseph — le plafond initial bloquait même un seul chapitre
+// complet (ex. Chapitre 6 du témoignage : ~14 000-15 000 caractères).
+// RAISON TECHNIQUE DU PLAFOND (pas arbitraire) : la réponse de l'appel
+// appelClaude() ci-dessous doit RÉÉCRIRE chaque segment vérifié dans son
+// JSON de retour — sa taille croît avec le texte d'entrée. Le budget de
+// réponse (maxTokens) a donc été relevé EN PARALLÈLE (4096 → 8192, voir
+// l'appel dans analyser() plus bas) pour rester cohérent avec ce nouveau
+// plafond d'entrée. ⚠️ NON TESTÉ EN CONDITIONS RÉELLES — nécessite une
+// session Supabase authentifiée hors d'accès pour Claude en dehors de
+// l'environnement de Joseph. À valider à la prochaine session avec un
+// texte réel proche de 20000 caractères : si le JSON de réponse est
+// tronqué, réduire ce seuil ou augmenter encore maxTokens (le plafond
+// exact du modèle est à vérifier dans la documentation API au moment du
+// test, plutôt que supposé ici).
+const SEUIL_CARACTÈRES = 20000;
 const SEUIL_SCORE_ALERTE = 90;
 
 async function appelClaude(system, user, maxTokens = 4096) {
@@ -393,7 +408,12 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
       const contexteStructure = construireContexteStructure(nœudsPlats);
       const résultat = await appelClaude(
         "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_SEGMENTATION(contexteStructure, texteBrut)
+        PROMPT_SEGMENTATION(contexteStructure, texteBrut),
+        // maxTokens relevé 28/07/2026 (4096 → 8192), en cohérence avec le
+        // SEUIL_CARACTÈRES relevé à 20000 — la réponse réécrit chaque
+        // segment vérifié, sa taille croît avec le texte d'entrée. Non
+        // testé en conditions réelles, voir note sur SEUIL_CARACTÈRES.
+        8192
       );
       const p = parserJSON(résultat);
       const segmentsAvecÉtat = (p.segments || []).map((s, i) => {
@@ -1194,3 +1214,4 @@ function BarreInsertion({ active, onClick }) {
 function compterMotsMinimal(texte) {
   return texte.trim().split(/\s+/).filter(Boolean).length < 20;
 }
+
