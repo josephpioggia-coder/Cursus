@@ -1363,6 +1363,10 @@ function AppConnectée({ user, déconnecter }) {
   const [chargement, setChargement] = useState(true);
   const [vue, setVue]           = useState("tableau");
   const [projetActifId, setProjetActifId] = useState(null);
+  // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
+  // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
+  // pour permettre la mise en garde en rouge demandée par Joseph.
+  const [confirmationSuppression, setConfirmationSuppression] = useState(null);
   const [nœudActifId, setNœudActifId]     = useState(null);
   const [importOuvert, setImportOuvert]   = useState(false);
   const [incorporerOuvert, setIncorporerOuvert] = useState(false);
@@ -1617,29 +1621,34 @@ function AppConnectée({ user, déconnecter }) {
     setVue("editeur");
   };
 
-  const supprimerProjet = async (id) => {
-    // Confirmation renforcée 28/07/2026 : le message générique ne disait ni
-    // QUEL projet allait disparaître, ni QUE la suppression emporte plus que
-    // le texte (historique de versions, réponses au questionnaire, zones,
-    // notes) — un réimport Word ne restaure PAS tout ça. L'auteur doit le
-    // savoir au moment de confirmer, pas le découvrir après.
+  // Suppression de projet — ajouté 28/07/2026, remplacé le même jour par une
+  // VRAIE modale (plutôt que window.confirm) suite au retour de Joseph :
+  // "peux-tu mettre le texte de mise en garde en rouge". window.confirm()
+  // est une fenêtre NATIVE du navigateur — aucun CSS de Cursus ne peut
+  // l'atteindre, donc aucune couleur n'y est possible. Cette fonction ne
+  // fait plus que PRÉPARER la modale ; la suppression réelle se fait dans
+  // confirmerSuppressionProjet ci-dessous, déclenchée par le bouton rouge.
+  const supprimerProjet = (id) => {
     const projetCible = projets.find((p) => p.id === id);
-    const nbMots = projetCible ? totalMotsProjet(projetCible.structure) : 0;
-    const message =
-      `Supprimer définitivement « ${projetCible?.titre || "ce projet"} » ` +
-      `(${nbMots.toLocaleString("fr-FR")} mots) ?\n\n` +
-      `Seront perdus : tous les chapitres et leur texte, l'historique de ` +
-      `versions, les réponses au questionnaire, les zones de visibilité et ` +
-      `les notes de bas de page.\n\n` +
-      `Un réimport Word ultérieur ne restaurera que le texte. ` +
-      `Cette action ne peut pas être annulée.\n\n` +
-      `(Pour un livre terminé, le statut « Terminé » conserve tout.)`;
-    if (!window.confirm(message)) return;
+    if (!projetCible) return;
+    setConfirmationSuppression({
+      id,
+      titre: projetCible.titre,
+      mots: totalMotsProjet(projetCible.structure),
+      caseCochée: false,
+    });
+  };
+
+  // Exécute la suppression réelle, une fois la modale confirmée.
+  const confirmerSuppressionProjet = async () => {
+    if (!confirmationSuppression) return;
+    const { id } = confirmationSuppression;
     const { error } = await projetsAPI.supprimer(id);
     if (!error) {
       setProjets((prev) => prev.filter((p) => p.id !== id));
       if (projetActifId === id) { setVue("liste"); setProjetActifId(null); }
     }
+    setConfirmationSuppression(null);
   };
 
   // ── Actions nœuds ──
@@ -2197,6 +2206,80 @@ function AppConnectée({ user, déconnecter }) {
         />
       )}
 
+      {/* Modale de confirmation de suppression de projet — ajoutée 28/07/2026
+          en remplacement de window.confirm, pour permettre la mise en garde
+          en rouge demandée par Joseph. Double sécurité : le bouton rouge
+          final ne devient cliquable qu'après avoir coché explicitement la
+          case de confirmation — un clic accidentel sur la modale elle-même
+          ne peut donc jamais déclencher la suppression. */}
+      {confirmationSuppression && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: 480, boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+            <div style={{ padding: "24px 28px 8px" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+                Supprimer « {confirmationSuppression.titre} » ?
+              </div>
+              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+                {confirmationSuppression.mots.toLocaleString("fr-FR")} mots dans ce projet
+              </div>
+
+              {/* La mise en garde — en rouge, but demandé par Joseph */}
+              <div style={{
+                background: "#FCEBEB", border: "0.5px solid #E24B4A40", borderRadius: 10,
+                padding: "14px 16px", marginBottom: 16,
+              }}>
+                <div style={{ color: "#A32D2D", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  ⚠️ Action définitive et irréversible
+                </div>
+                <div style={{ color: "#A32D2D", fontSize: 13, lineHeight: 1.5 }}>
+                  Seront perdus : tous les chapitres et leur texte, l'historique
+                  de versions (lui aussi supprimé en cascade), les réponses au
+                  questionnaire, les zones de visibilité et les notes de bas de
+                  page. Un réimport Word ultérieur ne restaurera que le texte
+                  brut — rien d'autre.
+                </div>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+                Pour un livre terminé plutôt qu'à supprimer, le statut « Terminé »
+                (menu du projet) conserve tout sans l'effacer.
+              </div>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#333", cursor: "pointer", marginBottom: 20 }}>
+                <input
+                  type="checkbox"
+                  checked={confirmationSuppression.caseCochée}
+                  onChange={(e) => setConfirmationSuppression((c) => ({ ...c, caseCochée: e.target.checked }))}
+                  style={{ marginTop: 2, cursor: "pointer" }}
+                />
+                Je comprends que cette suppression est définitive et ne peut pas être annulée.
+              </label>
+            </div>
+
+            <div style={{ padding: "16px 28px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setConfirmationSuppression(null)}
+                style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmerSuppressionProjet}
+                disabled={!confirmationSuppression.caseCochée}
+                style={{
+                  background: confirmationSuppression.caseCochée ? "#E24B4A" : "#F0B8B6",
+                  color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
+                  fontSize: 13, fontWeight: 500, fontFamily: "inherit",
+                  cursor: confirmationSuppression.caseCochée ? "pointer" : "not-allowed",
+                }}
+              >
+                🗑 Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal questionnaire d'intention — affiché obligatoirement après création d'un projet */}
       {projetVenantDêtreCréé && (
         <QuestionnaireIntention
@@ -2265,4 +2348,5 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
+
 
