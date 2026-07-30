@@ -483,6 +483,18 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
         </div>
       )}
 
+      {/* Compteur de sélection façon Word — ajouté 28/07/2026. N'apparaît
+          que lorsqu'une sélection existe (sinon la barre reste identique à
+          avant) : mots ET caractères, comme dans Word en bas de fenêtre. */}
+      {sélectionInfo && (
+        <div style={{ color: couleur, display: "flex", alignItems: "center", gap: 4 }} title="Nombre de mots et de caractères dans la sélection actuelle">
+          <span style={{ fontSize: 13 }}>✂️</span>
+          {sélectionInfo.mots.toLocaleString("fr-FR")} mot{sélectionInfo.mots > 1 ? "s" : ""}
+          <span style={{ color: "#bbb" }}>·</span>
+          {sélectionInfo.caractères.toLocaleString("fr-FR")} caractère{sélectionInfo.caractères > 1 ? "s" : ""}
+        </div>
+      )}
+
       {/* Durée + rythme */}
       <div style={{ color: "#999" }}>
         ⏱ {formaterDurée(durée)}
@@ -616,6 +628,11 @@ export default function Editeur({
   const [objectifJournalier, setObjectifJournalier] = useState(500);
   const [objectifChapitre, setObjectifChapitre] = useState(0);
   const [motsSession, setMotsSession] = useState(0);
+  // Compteur de sélection façon Word — ajouté 28/07/2026 à la demande de
+  // Joseph. null = pas de sélection active (rien à afficher dans la barre
+  // du bas). Calculé dans onSelectionUpdate ci-dessous, sur le même texte
+  // déjà extrait pour onSelectionChange (aucun calcul redondant).
+  const [sélectionInfo, setSélectionInfo] = useState(null);
   const [duréeSession, setDuréeSession] = useState(0);
   const motsInitiaux = useRef(compterMots(nœud?.texte || ""));
   const timerSauvegarde = useRef(null);
@@ -721,9 +738,16 @@ export default function Editeur({
       const { from, to } = editor.state.selection;
       if (from === to) {
         onSelectionChange?.("");
+        setSélectionInfo(null);
       } else {
         const texte = editor.state.doc.textBetween(from, to, " ");
         onSelectionChange?.(texte);
+        // Compteur façon Word — ajouté 28/07/2026. Mots : découpage sur
+        // espaces/retours, filtré des chaînes vides (cohérent avec
+        // compterMots() utilisé partout ailleurs dans ce fichier).
+        // Caractères : longueur brute, espaces incluses (convention Word).
+        const mots = texte.trim() ? texte.trim().split(/\s+/).length : 0;
+        setSélectionInfo({ mots, caractères: texte.length });
       }
     },
     onUpdate: ({ editor }) => {
@@ -1040,3 +1064,4 @@ export default function Editeur({
     </div>
   );
 }
+
