@@ -588,6 +588,11 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // Zones actuellement masquées dans l'arborescence (visuel uniquement) —
   // chantier 28/07/2026. Défaut : tout afficher.
   const [zonesMasquées, setZonesMasquées] = useState([]);
+  // Modale de confirmation de suppression de nœud — ajoutée 28/07/2026,
+  // remplace window.confirm (impossible à styler, focus par défaut sur OK
+  // hors de contrôle) suite au retour de Joseph sur la modale de projet.
+  // null = fermée ; sinon { id, titre, nbDescendants }.
+  const [confirmationSuppressionNœud, setConfirmationSuppressionNœud] = useState(null);
   const mots = totalMotsProjet(projet.structure);
 
   // Zones (hors corps) réellement présentes dans le projet — les chips de
@@ -985,19 +990,19 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // silencieusement tout ce qu'il contient. Un second chapitre a été perdu
   // de cette façon le jour même. Le message indique désormais explicitement
   // le nombre d'éléments enfants qui seront supprimés avec.
-  const supprimerNœud = useCallback(async (nœudId) => {
+  const supprimerNœud = useCallback((nœudId) => {
     const nœudCible = trouverNœudComplet(projet.structure || [], nœudId);
     const titre = nœudCible?.titre || "cet élément";
     const nbDescendants = nœudCible ? compterDescendants(nœudCible) : 0;
+    setConfirmationSuppressionNœud({ id: nœudId, titre, nbDescendants });
+  }, [projet]);
 
-    const message = nbDescendants > 0
-      ? (t("confirmations.supprimerNoeudAvecEnfants", { titre, count: nbDescendants }) ||
-         `Supprimer « ${titre} » ET ses ${nbDescendants} éléments enfants (sous-parties, notes, bibliographie) ? Cette action est définitive et ne peut pas être annulée.`)
-      : (t("confirmations.supprimerNoeud", { titre }) ||
-         `Supprimer « ${titre} » ? Cette action est définitive et ne peut pas être annulée.`);
-
-    const confirmé = window.confirm(message);
-    if (!confirmé) return;
+  // Exécute la suppression réelle, une fois la modale confirmée — logique
+  // inchangée par rapport à l'ancienne fonction, seul le déclenchement change.
+  const confirmerSuppressionNœud = useCallback(async () => {
+    if (!confirmationSuppressionNœud) return;
+    const { id: nœudId } = confirmationSuppressionNœud;
+    setConfirmationSuppressionNœud(null);
 
     const { error } = await nœudsAPI.supprimer(nœudId);
     if (error) {
@@ -1070,6 +1075,52 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Modale de confirmation de suppression de nœud — ajoutée 28/07/2026,
+          remplace window.confirm suite au retour de Joseph : "mettre le
+          curseur sur Annuler plutôt que sur OK" pour imposer une réflexion
+          de plus. window.confirm() ne permet aucun contrôle du focus par
+          défaut (entièrement géré par le système d'exploitation, thème
+          sombre/clair inclus, hors de portée de tout code) — cette modale,
+          elle, est du HTML réel : autoFocus sur le bouton Annuler fonctionne
+          véritablement, et un appui sur Entrée par réflexe annule au lieu
+          de confirmer. */}
+      {confirmationSuppressionNœud && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: 440, boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+            <div style={{ padding: "24px 28px 8px" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+                Supprimer « {confirmationSuppressionNœud.titre} » ?
+              </div>
+              <div style={{
+                background: "#FCEBEB", border: "0.5px solid #E24B4A40", borderRadius: 10,
+                padding: "12px 14px", marginBottom: 8,
+              }}>
+                <div style={{ color: "#A32D2D", fontSize: 13, lineHeight: 1.5 }}>
+                  {confirmationSuppressionNœud.nbDescendants > 0
+                    ? <>Sera supprimé <strong>avec ses {confirmationSuppressionNœud.nbDescendants} éléments enfants</strong> (sous-parties, notes, bibliographie). Action définitive, impossible à annuler.</>
+                    : <>Action définitive, impossible à annuler.</>}
+                </div>
+              </div>
+            </div>
+            <div style={{ padding: "16px 28px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                autoFocus
+                onClick={() => setConfirmationSuppressionNœud(null)}
+                style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmerSuppressionNœud}
+                style={{ background: "#E24B4A", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                🗑 Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* En-tête projet */}
       <div style={{
         padding: "16px 20px",
@@ -2258,6 +2309,7 @@ function AppConnectée({ user, déconnecter }) {
 
             <div style={{ padding: "16px 28px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <button
+                autoFocus
                 onClick={() => setConfirmationSuppression(null)}
                 style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}
               >
@@ -2348,5 +2400,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
-
 
