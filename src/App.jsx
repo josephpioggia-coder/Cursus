@@ -2046,23 +2046,25 @@ function AppConnectée({ user, déconnecter }) {
               >
                 {t("vues.importerWord")}
               </button>
-              {/* Suppression du projet — ajouté 28/07/2026 à la demande de
-                  Joseph : jusqu'ici le seul bouton vivait sur les cartes de
-                  la vue "Mes projets", difficile d'accès. La confirmation
-                  détaillée (supprimerProjet) reste le seul garde-fou :
-                  suppression définitive, cascade sur tout le contenu. */}
+              {/* Suppression du projet — ajouté 28/07/2026, AGRANDI le même
+                  jour suite au retour de Joseph ("le bouton est vraiment
+                  trop petit, je ne l'avais pas vu") : l'icône seule à 12px
+                  sur fond blanc était quasi invisible dans la barre. Passage
+                  à un bouton plein (fond rouge), icône plus grande, texte
+                  explicite "Supprimer le projet" — même gabarit que les
+                  autres boutons de la barre, plus de doute possible. */}
               <button
                 onClick={() => supprimerProjet(projetActif.id)}
                 title="Supprimer définitivement ce projet et tout son contenu"
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#fff", color: "#E24B4A",
-                  border: "0.5px solid #E24B4A40", borderRadius: 8, padding: "6px 10px",
-                  fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  fontFamily: "inherit",
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "#E24B4A", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "8px 16px",
+                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit", whiteSpace: "nowrap",
                 }}
               >
-                🗑
+                <span style={{ fontSize: 16 }}>🗑</span> Supprimer le projet
               </button>
               </div>
             </div>
