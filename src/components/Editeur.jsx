@@ -1,1217 +1,1070 @@
 /**
- * CURSUS — Incorporer de la matière brute
- * Ajouté le 24/07/2026. Refondu plusieurs fois le même jour suite aux
- * retours successifs de Joseph. v5 — refonte architecturale majeure :
- * plus d'écrans séparés (comparatif → validation → placement), tout est
- * désormais visible et modifiable dans UN SEUL espace de travail par
- * segment, avec le comparatif global toujours visible en haut.
+ * ATELIER D'ÉCRIVAIN — Module 2 : Éditeur
  *
- * PRINCIPE DE SÉCURITÉ NON NÉGOCIABLE : ceci reste une RECOMMANDATION,
- * jamais une insertion automatique. Chaque segment est inséré, modifié,
- * annulé ou déplacé INDIVIDUELLEMENT, à la demande explicite de l'auteur.
+ * Dépendances à installer :
+ *   npm install @tiptap/react @tiptap/pm @tiptap/starter-kit
+ *               @tiptap/extension-typography @tiptap/extension-placeholder
+ *               @tiptap/extension-character-count @tiptap/extension-underline
+ *               @tiptap/extension-text-align @tiptap/extension-highlight
+ *               @tiptap/extension-footnotes
  *
- * v5 — nouveautés :
- * - Un seul espace de travail par segment : texte modifiable, score de
- *   fidélité, choix de destination, positionnement précis, transition
- *   optionnelle, et insertion — tout au même endroit, plus de validation
- *   séparée avant de voir où le texte atterrit.
- * - Positionnement entre NŒUDS FRÈRES quand la destination est un NOUVEAU
- *   chapitre/scène (symétrique au positionnement entre paragraphes pour
- *   un nœud existant) : on voit les frères déjà présents sous le même
- *   parent et on choisit où le nouveau vient s'intercaler. Les frères
- *   suivants sont renumérotés en conséquence (nœudsAPI.réordonner), et
- *   l'annulation restaure leur numérotation d'origine.
- * - Transition optionnelle par segment : un bouton demande au co-pilote
- *   une phrase de liaison courte entre ce qui précède et le nouveau texte
- *   (basée sur le paragraphe/frère précédent) ; modifiable ou effaçable
- *   avant insertion, jamais générée automatiquement sans action explicite.
- * - Comparatif global (couverture, mots omis/ajoutés) toujours visible en
- *   haut de la fenêtre, dépliable pour le détail, jamais une étape
- *   obligatoire séparée.
+ * Fonctionnalités :
+ *   - Éditeur riche TipTap (gras, italique, titres, listes, citations, notes)
+ *   - Mode focus (plein écran, tout masqué sauf le texte)
+ *   - Mode structure (sidebar arborescence visible)
+ *   - Triple objectif : journalier / session (minuterie) / chapitre
+ *   - Sauvegarde automatique toutes les 30s + indicateur d'état
+ *   - Historique de versions PERMANENT et daté, par nœud (voir MODIF 21/07)
+ *   - Statistiques de session : mots, durée, rythme
+ *
+ * Correctif 16/07/2026 : ajout de minHeight:0 sur les conteneurs flex
+ * imbriqués (Zone centrale + Zone d'écriture) — sans ça, un texte long
+ * fait grandir l'éditeur au-delà de sa cellule de grille, et c'est toute
+ * la page qui se met à défiler au lieu du texte seul, entraînant le
+ * panneau Co-pilote IA avec elle (symptôme observé : les deux panneaux
+ * semblent défiler ensemble).
+ *
+ * MODIF 21/07/2026 — Historique de versions permanent : l'historique
+ * n'était auparavant stocké que dans un useState local, perdu à chaque
+ * rechargement de page ou changement de chapitre. Il est désormais lu et
+ * écrit dans la table Supabase `versions_noeuds` (créée le 21/07/2026).
+ * Effet de bord bénéfique : ça corrige aussi une fuite silencieuse où
+ * l'historique d'un chapitre pouvait rester affiché en ouvrant un autre
+ * chapitre, faute de réinitialisation explicite au changement de nœud.
  */
 
-import { useState } from "react";
+import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
+import StarterKit from "@tiptap/starter-kit";
+import Typography from "@tiptap/extension-typography";
+import Placeholder from "@tiptap/extension-placeholder";
+import CharacterCount from "@tiptap/extension-character-count";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import Highlight from "@tiptap/extension-highlight";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
-import { nœudsAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 
-const TYPE_ENFANT = { partie: "chapitre", chapitre: "scene", scene: "scene" };
-const ICONES_TYPE = { partie: "📂", chapitre: "📄", scene: "✏️" };
+// ─── Utilitaires ────────────────────────────────────────────────────────────────
 
-const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-// SEUIL_CARACTÈRES : relevé le 28/07/2026 (soir) de 8000 à 20000, à la
-// demande de Joseph — le plafond initial bloquait même un seul chapitre
-// complet (ex. Chapitre 6 du témoignage : ~14 000-15 000 caractères).
-// RAISON TECHNIQUE DU PLAFOND (pas arbitraire) : la réponse de l'appel
-// appelClaude() ci-dessous doit RÉÉCRIRE chaque segment vérifié dans son
-// JSON de retour — sa taille croît avec le texte d'entrée. Le budget de
-// réponse (maxTokens) a donc été relevé EN PARALLÈLE (4096 → 8192, voir
-// l'appel dans analyser() plus bas) pour rester cohérent avec ce nouveau
-// plafond d'entrée. ⚠️ NON TESTÉ EN CONDITIONS RÉELLES — nécessite une
-// session Supabase authentifiée hors d'accès pour Claude en dehors de
-// l'environnement de Joseph. À valider à la prochaine session avec un
-// texte réel proche de 20000 caractères : si le JSON de réponse est
-// tronqué, réduire ce seuil ou augmenter encore maxTokens (le plafond
-// exact du modèle est à vérifier dans la documentation API au moment du
-// test, plutôt que supposé ici).
-const SEUIL_CARACTÈRES = 20000;
-const SEUIL_SCORE_ALERTE = 90;
-
-async function appelClaude(system, user, maxTokens = 4096) {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new Error("SESSION_EXPIREE");
-
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-      "apikey": SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
-  if (data.error) throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error);
-  return data.content?.[0]?.text || "";
-}
-
-function parserJSON(résultat) {
-  const nettoyé = résultat.replace(/```json|```/g, "").trim();
-  try {
-    return JSON.parse(nettoyé);
-  } catch {
-    throw new Error("__ERREUR_PARSING__");
-  }
-}
-
-function aplatirStructure(nœuds, profondeur = 0, résultat = []) {
-  for (const n of nœuds) {
-    résultat.push({ id: n.id, type: n.type, titre: n.titre, profondeur, texte: n.texte || "" });
-    if (n.enfants?.length) aplatirStructure(n.enfants, profondeur + 1, résultat);
-  }
-  return résultat;
-}
-
-function trouverNœudParId(liste, id) {
-  for (const n of liste) {
-    if (n.id === id) return n;
-    if (n.enfants?.length) {
-      const trouvé = trouverNœudParId(n.enfants, id);
-      if (trouvé) return trouvé;
-    }
-  }
-  return null;
-}
-
-function màjTexteLocal(structure, nœudId, nouveauTexte) {
-  return structure.map((n) => {
-    if (n.id === nœudId) return { ...n, texte: nouveauTexte };
-    if (n.enfants?.length) return { ...n, enfants: màjTexteLocal(n.enfants, nœudId, nouveauTexte) };
-    return n;
-  });
-}
-
-// Insère un nouveau nœud à une position précise (index) parmi les enfants
-// d'un parent donné — pas seulement à la fin. Nécessaire pour le
-// positionnement entre frères (v5).
-function insérerNœudÀPositionLocal(structure, parentId, index, nouveauNœud) {
-  return structure.map((n) => {
-    if (n.id === parentId) {
-      const copie = [...(n.enfants || [])];
-      copie.splice(index, 0, nouveauNœud);
-      return { ...n, enfants: copie };
-    }
-    if (n.enfants?.length) return { ...n, enfants: insérerNœudÀPositionLocal(n.enfants, parentId, index, nouveauNœud) };
-    return n;
-  });
-}
-
-function màjOrdresEnfantsLocal(structure, parentId, ordresParId) {
-  return structure.map((n) => {
-    if (n.id === parentId) {
-      return { ...n, enfants: (n.enfants || []).map((e) => ordresParId[e.id] !== undefined ? { ...e, ordre: ordresParId[e.id] } : e) };
-    }
-    if (n.enfants?.length) return { ...n, enfants: màjOrdresEnfantsLocal(n.enfants, parentId, ordresParId) };
-    return n;
-  });
-}
-
-function supprimerNœudLocal(structure, nœudId) {
-  return structure
-    .filter((n) => n.id !== nœudId)
-    .map((n) => n.enfants?.length ? { ...n, enfants: supprimerNœudLocal(n.enfants, nœudId) } : n);
-}
-
-function scoreFidélité(segment, texteOriginal) {
-  const normaliser = (s) => s.replace(/\s+/g, " ").trim().toLowerCase();
-  const segNorm = normaliser(segment);
-  const origNorm = normaliser(texteOriginal);
-  if (!segNorm) return 100;
-  if (origNorm.includes(segNorm)) return 100;
-
-  const trigrammes = (s) => {
-    const set = new Set();
-    for (let i = 0; i < s.length - 2; i++) set.add(s.slice(i, i + 3));
-    return set;
-  };
-  const segTri = trigrammes(segNorm);
-  const origTri = trigrammes(origNorm);
-  if (segTri.size === 0) return 100;
-  let intersection = 0;
-  segTri.forEach((t) => { if (origTri.has(t)) intersection++; });
-  return Math.round((intersection / segTri.size) * 100);
-}
-
-function couleurScore(score) {
-  if (score >= 95) return { c: "#1D9E75", bg: "#E1F5EE" };
-  if (score >= SEUIL_SCORE_ALERTE) return { c: "#BA7517", bg: "#FAEEDA" };
-  return { c: "#E24B4A", bg: "#FCEBEB" };
-}
-
-// Normalise uniquement les apostrophes/guillemets typographiques vers leur
-// équivalent droit — remplacement caractère par caractère (jamais de
-// fusion d'espaces), pour que les INDEX de position restent strictement
-// identiques entre le texte normalisé et le texte original. C'est ce qui
-// permet de rechercher un passage malgré une différence de style
-// d'apostrophe, tout en découpant ensuite l'extrait dans le texte ORIGINAL
-// (ponctuation d'origine intacte), jamais dans la version normalisée.
-function normaliserApostrophes(s) {
-  return s.replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
-}
-
-// VÉRIFICATION RÉELLE, pas un score de probabilité : retrouve le passage
-// proposé par l'IA DIRECTEMENT dans le texte original collé, et si trouvé,
-// utilise l'extrait EXACT du texte source (découpé par le code, jamais
-// retapé par l'IA) — ponctuation, apostrophes, tout garanti identique
-// puisqu'il s'agit littéralement du même texte, pas d'une reproduction.
-// CORRECTIF 24/07/2026 (v6) : la première version de cette fonction
-// cherchait le texte tel quel, apostrophes comprises — ce qui la faisait
-// échouer précisément à cause du problème qu'elle devait contourner (l'IA
-// retape presque toujours les apostrophes en version droite). Recherche
-// désormais sur une version normalisée des deux textes, mais découpe
-// toujours l'extrait final dans le texte ORIGINAL non normalisé.
-function localiserSegmentDansOriginal(segmentTexte, texteOriginal) {
-  const segTrim = (segmentTexte || "").trim();
-  if (!segTrim) return { texte: segmentTexte, vérifié: false };
-
-  const origNorm = normaliserApostrophes(texteOriginal);
-  const segNorm = normaliserApostrophes(segTrim);
-
-  // 1. Correspondance exacte (sur texte normalisé), extrait depuis l'original.
-  const indexExact = origNorm.indexOf(segNorm);
-  if (indexExact !== -1) {
-    return { texte: texteOriginal.slice(indexExact, indexExact + segNorm.length), vérifié: true };
-  }
-
-  // 2. Correspondance par ancrage début/fin — tolère une variation mineure
-  // au milieu (ex. un retour à la ligne différent), extrait toujours depuis
-  // l'original.
-  const début = segNorm.slice(0, 30);
-  const fin = segNorm.slice(-30);
-  const indexDébut = origNorm.indexOf(début);
-  const indexFin = début && fin ? origNorm.indexOf(fin, indexDébut >= 0 ? indexDébut : 0) : -1;
-  if (indexDébut !== -1 && indexFin !== -1 && indexFin >= indexDébut) {
-    return { texte: texteOriginal.slice(indexDébut, indexFin + fin.length), vérifié: true };
-  }
-
-  // 3. Aucune correspondance fiable — le texte proposé par l'IA est gardé,
-  // mais explicitement marqué NON vérifié pour que ce soit visible à l'écran.
-  return { texte: segmentTexte, vérifié: false };
-}
-
-function diffMots(texteA, texteB) {
-  const motsA = texteA.split(/(\s+)/).filter((t) => t !== "");
-  const motsB = texteB.split(/(\s+)/).filter((t) => t !== "");
-  const n = motsA.length, m = motsB.length;
-
-  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
-  for (let i = n - 1; i >= 0; i--) {
-    for (let j = m - 1; j >= 0; j--) {
-      dp[i][j] = motsA[i] === motsB[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
-    }
-  }
-
-  const résultat = [];
-  let i = 0, j = 0;
-  while (i < n && j < m) {
-    if (motsA[i] === motsB[j]) {
-      résultat.push({ type: "égal", texte: motsA[i] });
-      i++; j++;
-    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
-      résultat.push({ type: "supprimé", texte: motsA[i] });
-      i++;
-    } else {
-      résultat.push({ type: "ajouté", texte: motsB[j] });
-      j++;
-    }
-  }
-  while (i < n) { résultat.push({ type: "supprimé", texte: motsA[i] }); i++; }
-  while (j < m) { résultat.push({ type: "ajouté", texte: motsB[j] }); j++; }
-  return résultat;
-}
-
-function construireContexteStructure(nœudsPlats) {
-  return nœudsPlats
-    .map((n) => `${"  ".repeat(n.profondeur)}${ICONES_TYPE[n.type]} ${n.titre} [id:${n.id}]`)
-    .join("\n");
-}
-
-const PROMPT_SEGMENTATION = (contexteStructure, texteAuteur) => `Tu es le co-pilote d'un écrivain travaillant sur un manuscrit structuré en Parties, Chapitres et Scènes. Voici la structure actuelle complète du manuscrit (identifiants entre crochets) :
-
-${contexteStructure}
-
-L'auteur vient de coller un texte brut (notes, brouillon, transcription) qu'il souhaite intégrer à ce manuscrit. Ton rôle : découper ce texte en segments cohérents, et pour CHAQUE segment proposer une destination.
-
-RÈGLES IMPÉRATIVES :
-1. Le champ "texte" de chaque segment doit être une COPIE EXACTE d'un passage contigu du texte original, CARACTÈRE PAR CARACTÈRE — ne reformule JAMAIS, ne résume JAMAIS, ne corrige JAMAIS la moindre virgule. Conserve impérativement les caractères de ponctuation EXACTS du texte original, notamment le type d'apostrophe utilisé (apostrophe typographique ’ ou apostrophe droite ', selon ce que l'auteur a réellement écrit) et le type de guillemets (« » ou "" ou “”) — ne les uniformise ni ne les "nettoie" jamais vers un autre style, même si cela semble plus correct typographiquement. Un simple copier-coller de passages, jamais une réécriture, pas même au niveau de la ponctuation.
-2. OMETS SYSTÉMATIQUEMENT du texte de chaque segment tout titre ou intertitre du brouillon qui se contente d'annoncer le sujet de la section (ex. "Giuseppe : le prénom de l'oncle disparu" en tête de paragraphe) — ce n'est jamais de la prose à conserver, seulement un repère de structuration de l'auteur. Le segment doit commencer directement par le contenu narratif ou analytique lui-même. Chaque mot de PROSE du texte original doit apparaître dans exactement un segment (pas de perte, pas de doublon) ; seuls ces intertitres structurels peuvent être omis DU TEXTE — mais ils ne doivent JAMAIS être perdus : si le segment est destiné à un NOUVEAU nœud ("typeDestination": "nouveau"), REPRENDS CET INTERTITRE MOT POUR MOT comme valeur de "titreSuggere" (ne l'invente jamais, recopie-le exactement). L'intertitre devient ainsi le titre du nouveau chapitre/scène plutôt que la première ligne de son texte.
-3. Pour chaque segment, deux options de destination :
-   - "existant" : le segment complète un nœud déjà présent dans la structure (donne son id exact dans "idCible")
-   - "nouveau" : le segment mérite un nouveau nœud, à créer comme enfant d'un nœud PARENT déjà présent dans la structure (donne l'id du parent dans "idCible", et un titre court et fidèle au contenu dans "titreSuggere")
-4. Justifie chaque proposition en une phrase courte.
-
-Texte de l'auteur à segmenter :
-"""
-${texteAuteur}
-"""
-
-Réponds UNIQUEMENT en JSON valide :
-{"segments":[{"texte":"...","typeDestination":"existant","idCible":"...","titreSuggere":null,"justification":"..."},{"texte":"...","typeDestination":"nouveau","idCible":"...","titreSuggere":"...","justification":"..."}]}`;
-
-const PROMPT_REVERIFICATION = (texteOriginal, passageProposé) => `Voici un texte original complet, et un passage censé en être un extrait EXACT (copié-collé, sans aucune reformulation) :
-
-TEXTE ORIGINAL COMPLET :
-"""
-${texteOriginal}
-"""
-
-PASSAGE PROPOSÉ (censé être un extrait exact) :
-"""
-${passageProposé}
-"""
-
-Le passage proposé est-il un extrait exact et fidèle du texte original (aux espaces/retours à la ligne près) ? Si oui, renvoie-le tel quel. Si non — s'il a été reformulé, résumé ou modifié — retrouve et renvoie l'extrait le plus proche et le plus pertinent qui EST réellement présent mot pour mot dans le texte original. Réponds UNIQUEMENT en JSON valide :
-{"texteCorrige":"..."}`;
-
-const PROMPT_TRANSITION = (contextePrécédent, débutSegment) => `Tu es le co-pilote d'un écrivain. Voici ce qui précède immédiatement l'endroit où un nouveau passage va être inséré dans le manuscrit :
-"""
-${contextePrécédent}
-"""
-
-Voici le début du nouveau passage qui va suivre :
-"""
-${débutSegment}
-"""
-
-Propose UNE SEULE phrase de transition courte et naturelle, dans un ton sobre cohérent avec le contexte, qui pourrait s'insérer entre les deux pour adoucir l'enchaînement. Ne réécris ni l'un ni l'autre passage, juste la phrase de liaison elle-même. Réponds UNIQUEMENT en JSON valide :
-{"transition":"..."}`;
-
-// Avis INDICATIF du co-pilote sur un segment — n'affecte JAMAIS le texte
-// qui sera réellement inséré (celui-ci reste toujours l'extrait vérifié du
-// texte original). Ajouté 24/07/2026 à la demande explicite de Joseph :
-// même niveau de suggestions que le Co-pilote classique (suite,
-// approfondissement, reformulation), mais purement consultatif, dans un
-// panneau séparé du texte à insérer.
-const PROMPT_AVIS = (texte) => `Tu es le co-pilote d'un écrivain professionnel. Voici un passage de son texte, qui va être intégré tel quel au manuscrit. Génère exactement 3 suggestions concrètes À TITRE INDICATIF SEULEMENT — ce commentaire n'affecte jamais le texte lui-même, qui reste inséré sans modification.
-
-Passage :
-"""
-${texte}
-"""
-
-Réponds UNIQUEMENT en JSON valide :
-{"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`;
-
-// Version enrichie — ajoutée 24/07/2026 suite au constat qu'un remplacement
-// PARTIEL (une seule phrase reformulée écrasant tout le paragraphe) causait
-// une perte de contenu. Ici, le texte COMPLET est renvoyé à l'IA avec les
-// 3 avis, pour produire une vraie version amendée intégrale — exactement
-// la méthode que Joseph utilise manuellement (recopier texte + avis,
-// demander une version augmentée), reproduite directement dans l'outil.
-const PROMPT_VERSION_ENRICHIE = (texteOriginal, avis) => {
-  const blocAvis = avis.map((a) => `- [${a.type}] ${a.titre} : ${a.texte}`).join("\n");
-  return `Tu es le co-pilote d'un écrivain. Voici un passage de son texte, suivi de plusieurs pistes d'amélioration que tu as toi-même proposées pour ce passage :
-
-TEXTE ORIGINAL COMPLET DU PASSAGE :
-"""
-${texteOriginal}
-"""
-
-PISTES PROPOSÉES :
-${blocAvis}
-
-Rédige une version AMENDÉE et ENRICHIE de CE PASSAGE ENTIER (pas seulement une phrase) qui intègre naturellement et de façon cohérente les pistes pertinentes ci-dessus, dans le même ton et la même voix que l'original. Ce n'est pas un résumé ni un commentaire séparé — c'est le texte final complet tel qu'il pourrait remplacer l'original dans son intégralité. Réponds UNIQUEMENT en JSON valide :
-{"versionEnrichie":"..."}`;
+const compterMots = (html = "") => {
+  const texte = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return texte === "" ? 0 : texte.split(" ").length;
 };
 
-function texteVersHTML(texte) {
-  return texte
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
-    .join("");
+const formaterDurée = (secondes) => {
+  const h = Math.floor(secondes / 3600);
+  const m = Math.floor((secondes % 3600) / 60);
+  const s = secondes % 60;
+  if (h > 0) return `${h}h ${m.toString().padStart(2, "0")}min`;
+  if (m > 0) return `${m}min ${s.toString().padStart(2, "0")}s`;
+  return `${s}s`;
+};
+
+// Formate un horodatage de version : juste l'heure si c'est aujourd'hui,
+// jour/mois + heure sinon — utile maintenant que l'historique est permanent
+// et peut donc contenir des versions vieilles de plusieurs jours, pas
+// seulement de la session en cours. Ajouté 21/07/2026, remplace l'ancienne
+// fonction horodatage() qui ne gérait que "maintenant".
+const formaterDateHeure = (isoString) => {
+  const d = new Date(isoString);
+  const heure = d.toLocaleTimeString("fr-BE", { hour: "2-digit", minute: "2-digit" });
+  const estAujourdHui = d.toDateString() === new Date().toDateString();
+  if (estAujourdHui) return heure;
+  const jourMois = d.toLocaleDateString("fr-BE", { day: "2-digit", month: "2-digit" });
+  return `${jourMois} ${heure}`;
+};
+
+// Calcule les numéros de LIGNE VISUELLES réelles (pas de paragraphe) —
+// ajouté 24/07/2026. Pour chaque bloc de texte (paragraphe, titre,
+// citation, item de liste…), mesure les rectangles de rendu réels du
+// navigateur (Range.getClientRects()) pour retrouver où le texte revient
+// effectivement à la ligne selon la largeur actuelle de la fenêtre — pas
+// une approximation, la vraie disposition affichée à l'écran. Recalculé à
+// chaque modification du texte et à chaque redimensionnement de fenêtre.
+// `topWrapper` est la position de référence (le conteneur qui porte la
+// numérotation), pour que chaque numéro soit positionné en absolu par
+// rapport à lui, indépendamment du défilement de la page.
+const BLOCS_DE_LIGNE = new Set(["P", "H1", "H2", "H3", "BLOCKQUOTE", "LI", "PRE"]);
+
+// Formats de référence pour la largeur de colonne — mêmes dimensions que
+// l'export Word (voir FORMATS_PAGE dans exportWord.js), converties en
+// pixels (1 DXA = 1/1440 pouce = 96/1440 px). Dupliqué ici plutôt
+// qu'importé pour ne pas faire dépendre l'éditeur de la librairie docx à
+// chaque frappe. Ajouté 24/07/2026 : sans largeur FIXE liée à un vrai
+// format cible, les numéros de ligne n'ont aucune valeur de référence
+// stable — ils changeraient à chaque redimensionnement de la fenêtre.
+const FORMATS_RÉFÉRENCE = {
+  a4:     { label: "A4",               largeurPx: 602, hauteurPx: 931 },
+  a5:     { label: "A5",               largeurPx: 446, hauteurPx: 680 },
+  poche:  { label: "Poche",            largeurPx: 333, hauteurPx: 598 },
+  broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720 },
+};
+
+// Regroupe des positions verticales proches (à `seuil` pixels près) en une
+// seule valeur — corrige un artefact du navigateur observé dans les listes
+// à puces, où Range.getClientRects() peut renvoyer deux rectangles à
+// quelques pixels d'écart pour UNE SEULE ligne visuelle réelle (autour de
+// la puce). Un simple dédoublonnage par arrondi ne suffisait pas si l'écart
+// dépassait 1px, provoquant des numéros de ligne superposés à l'écran.
+// Corrigé 24/07/2026. Le seuil (8px) est largement inférieur à une vraie
+// hauteur de ligne (~25-30px pour le corps de texte), donc deux vraies
+// lignes distinctes ne sont jamais fusionnées à tort.
+function regrouperPositionsProches(tops, seuil = 8) {
+  const triés = [...tops].sort((a, b) => a - b);
+  const résultat = [];
+  for (const t of triés) {
+    if (résultat.length === 0 || t - résultat[résultat.length - 1] > seuil) {
+      résultat.push(t);
+    }
+  }
+  return résultat;
 }
 
-function découperEnBlocs(html) {
-  const dom = new DOMParser().parseFromString(html || "", "text/html");
-  return Array.from(dom.body.children).map((el) => el.outerHTML);
-}
+function calculerNumérosDeLigne(éditeurDOM, topWrapper) {
+  if (!éditeurDOM) return [];
+  const lignes = [];
 
-function texteBrutDuBloc(blocHTML) {
-  const dom = new DOMParser().parseFromString(blocHTML, "text/html");
-  return (dom.body.textContent || "").trim();
-}
-
-// Aperçu début…fin d'un paragraphe — ajouté 24/07/2026 : pour juger si une
-// transition est nécessaire, la FIN d'un paragraphe compte au moins autant
-// que son début, souvent plus. Le milieu est tronqué plutôt que la fin.
-function aperçuDébutFin(texteComplet, longueur = 90) {
-  if (texteComplet.length <= longueur * 2 + 5) return texteComplet;
-  return `${texteComplet.slice(0, longueur)} […] ${texteComplet.slice(-longueur)}`;
-}
-
-export default function IncorporerMatiere({ projet, onFermer, onStructureChangée }) {
-  const [texteBrut, setTexteBrut] = useState("");
-  const [analyseEnCours, setAnalyseEnCours] = useState(false);
-  const [erreur, setErreur] = useState(null);
-  const [segments, setSegments] = useState(null);
-  const [diff, setDiff] = useState(null);
-  const [détailComparatifOuvert, setDétailComparatifOuvert] = useState(false);
-  const [structureActuelle, setStructureActuelle] = useState(projet.structure || []);
-  const [actionEnCours, setActionEnCours] = useState(null);
-  const [aperçuOuvertPour, setAperçuOuvertPour] = useState(null);
-
-  const nœudsPlats = aplatirStructure(structureActuelle);
-  const nœudsPouvantRecevoirNouveau = nœudsPlats.filter((n) => TYPE_ENFANT[n.type]);
-
-  const recalculerDiff = (segmentsActuels) => {
-    const texteReconstitué = segmentsActuels
-      .map((s) => (s.titreSuggere ? s.titreSuggere + " " : "") + s.texte)
-      .join(" ");
-    setDiff(diffMots(texteBrut, texteReconstitué));
-  };
-
-  const analyser = async () => {
-    setErreur(null);
-    setAnalyseEnCours(true);
-    try {
-      const contexteStructure = construireContexteStructure(nœudsPlats);
-      const résultat = await appelClaude(
-        "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_SEGMENTATION(contexteStructure, texteBrut),
-        // maxTokens relevé 28/07/2026 (4096 → 8192), en cohérence avec le
-        // SEUIL_CARACTÈRES relevé à 20000 — la réponse réécrit chaque
-        // segment vérifié, sa taille croît avec le texte d'entrée. Non
-        // testé en conditions réelles, voir note sur SEUIL_CARACTÈRES.
-        8192
-      );
-      const p = parserJSON(résultat);
-      const segmentsAvecÉtat = (p.segments || []).map((s, i) => {
-        const { texte: texteVérifié, vérifié } = localiserSegmentDansOriginal(s.texte, texteBrut);
-        return {
-          clé: `seg-${i}`,
-          texte: texteVérifié,
-          origineVérifiée: vérifié,
-          typeDestination: s.typeDestination,
-          idCible: s.idCible,
-          titreSuggere: s.titreSuggere,
-          justification: s.justification,
-          inclus: true,
-          score: vérifié ? 100 : scoreFidélité(s.texte, texteBrut),
-          statutInsertion: "propose",
-          indexInsertion: null,
-          transition: "",
-          avisCopilote: null,
-          versionEnrichie: null,
-          idNœudFinal: null,
-          texteAvantInsertion: null,
-          texteAprèsInsertion: null,
-          typeDestinationInsérée: null,
-          ordresAvantInsertion: null,
-        };
-      });
-
-      setSegments(segmentsAvecÉtat);
-      recalculerDiff(segmentsAvecÉtat);
-    } catch (err) {
-      setErreur(
-        err.message === "SESSION_EXPIREE" ? "Votre session a expiré. Reconnectez-vous et réessayez."
-        : err.message === "__ERREUR_PARSING__" ? "La réponse du co-pilote n'a pas pu être interprétée. Réessayez."
-        : "Une erreur est survenue. Réessayez."
-      );
-    } finally {
-      setAnalyseEnCours(false);
+  const marcher = (élément) => {
+    if (BLOCS_DE_LIGNE.has(élément.tagName)) {
+      const range = document.createRange();
+      range.selectNodeContents(élément);
+      const rects = Array.from(range.getClientRects());
+      let tops;
+      if (rects.length === 0) {
+        // Paragraphe vide : une seule "ligne" à la position du bloc lui-même.
+        tops = [élément.getBoundingClientRect().top];
+      } else {
+        tops = regrouperPositionsProches(rects.map((r) => r.top));
+      }
+      tops.forEach((top) => lignes.push(top - topWrapper));
+    } else if (élément.children?.length) {
+      Array.from(élément.children).forEach(marcher);
     }
   };
 
-  const recommencer = () => {
-    setSegments(null);
-    setDiff(null);
-  };
+  Array.from(éditeurDOM.children).forEach(marcher);
+  return lignes.map((top, i) => ({ numéro: i + 1, top }));
+}
 
-  const modifierSegment = (clé, champs) => {
-    setSegments((prev) => {
-      const suivant = prev.map((s) => s.clé === clé ? { ...s, ...champs } : s);
-      if ("texte" in champs || "titreSuggere" in champs) recalculerDiff(suivant);
-      return suivant;
+// ─── Notes de bas de page (extension personnalisée) ──────────────────────────────
+// Ajouté 24/07/2026. TipTap n'a pas d'extension officielle "notes de bas de
+// page" ; celle-ci est construite sur mesure. Chaque note est un nœud
+// inline atomique portant son texte en attribut. Le numéro affiché est
+// recalculé à chaque rendu en comptant les notes précédentes dans le
+// document — jamais stocké en dur, donc toujours juste même après
+// suppression/déplacement d'une note antérieure.
+
+function ComposantNote({ node, updateAttributes, deleteNode, editor, getPos }) {
+  const [enÉdition, setEnÉdition] = useState(!node.attrs.texte);
+  const [texteTemp, setTexteTemp] = useState(node.attrs.texte || "");
+
+  const numéro = useMemo(() => {
+    let n = 0, trouvé = false, résultat = 1;
+    editor.state.doc.descendants((n2, pos) => {
+      if (trouvé) return false;
+      if (n2.type.name === "note") {
+        n++;
+        if (pos === getPos()) { résultat = n; trouvé = true; return false; }
+      }
+      return true;
     });
-  };
+    return résultat;
+  }, [editor.state.doc, getPos]);
 
-  const revérifierSegment = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment) return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      const résultat = await appelClaude(
-        "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_REVERIFICATION(texteBrut, segment.texte),
-        1024
-      );
-      const p = parserJSON(résultat);
-      const texteRenvoyé = p.texteCorrigé || p.texteCorrige || segment.texte;
-      const { texte: texteVérifié, vérifié } = localiserSegmentDansOriginal(texteRenvoyé, texteBrut);
-      modifierSegment(clé, { texte: texteVérifié, origineVérifiée: vérifié, score: vérifié ? 100 : scoreFidélité(texteRenvoyé, texteBrut) });
-    } catch {
-      setErreur("La revérification a échoué. Vous pouvez modifier le texte manuellement.");
-    } finally {
-      setActionEnCours(null);
-    }
-  };
+  return (
+    <NodeViewWrapper as="span" style={{ position: "relative", display: "inline" }}>
+      <sup
+        onClick={() => { setTexteTemp(node.attrs.texte || ""); setEnÉdition(true); }}
+        contentEditable={false}
+        style={{ color: "#7F77DD", cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "0 1px", userSelect: "none" }}
+        title={node.attrs.texte || "Cliquer pour rédiger la note"}
+      >
+        [{numéro}]
+      </sup>
+      {enÉdition && (
+        <span contentEditable={false} style={{
+          position: "absolute", top: "120%", left: 0, zIndex: 60,
+          background: "#fff", border: "0.5px solid #ddd", borderRadius: 8,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 8, width: 260,
+        }}>
+          <textarea
+            autoFocus
+            value={texteTemp}
+            onChange={(e) => setTexteTemp(e.target.value)}
+            placeholder="Texte de la note…"
+            rows={3}
+            style={{ width: "100%", fontSize: 12, fontFamily: "inherit", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 6, padding: 6, resize: "vertical" }}
+          />
+          <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "space-between" }}>
+            <button onClick={() => { deleteNode(); setEnÉdition(false); }}
+              style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              Supprimer
+            </button>
+            <button onClick={() => { updateAttributes({ texte: texteTemp }); setEnÉdition(false); }}
+              style={{ fontSize: 11, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 5, padding: "3px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+              OK
+            </button>
+          </div>
+        </span>
+      )}
+    </NodeViewWrapper>
+  );
+}
 
-  const proposerTransition = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment) return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      let contextePrécédent = "(début — rien ne précède)";
-      if (segment.typeDestination === "existant") {
-        const nœudCible = trouverNœudParId(structureActuelle, segment.idCible);
-        const blocs = nœudCible ? découperEnBlocs(nœudCible.texte) : [];
-        const position = segment.indexInsertion === null ? blocs.length : segment.indexInsertion;
-        if (position > 0 && blocs[position - 1]) contextePrécédent = texteBrutDuBloc(blocs[position - 1]).slice(-300);
-      } else {
-        const parent = trouverNœudParId(structureActuelle, segment.idCible);
-        const fratrie = parent?.enfants || [];
-        const position = segment.indexInsertion === null ? fratrie.length : segment.indexInsertion;
-        if (position > 0 && fratrie[position - 1]) contextePrécédent = `[Fin du chapitre/scène précédent : "${fratrie[position - 1].titre}"]`;
-        else if (parent) contextePrécédent = `[Début de "${parent.titre}", rien avant]`;
-      }
-      const résultat = await appelClaude(
-        "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_TRANSITION(contextePrécédent, segment.texte.slice(0, 300)),
-        512
-      );
-      const p = parserJSON(résultat);
-      modifierSegment(clé, { transition: p.transition || "" });
-    } catch {
-      setErreur("La proposition de transition a échoué. Vous pouvez l'écrire manuellement.");
-    } finally {
-      setActionEnCours(null);
-    }
-  };
+const Note = Node.create({
+  name: "note",
+  group: "inline",
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return { texte: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "span[data-note]" }];
+  },
+  renderHTML({ node, HTMLAttributes }) {
+    return ["span", mergeAttributes(HTMLAttributes, { "data-note": "true", "data-texte": node.attrs.texte || "" }), "[note]"];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ComposantNote);
+  },
+});
 
-  // Avis indicatif — ne modifie JAMAIS s.texte (le texte à insérer), stocke
-  // le résultat séparément dans s.avisCopilote pour affichage informatif.
-  const obtenirAvisCopilote = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment) return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      const résultat = await appelClaude(
-        "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_AVIS(segment.texte),
-        1536
-      );
-      const p = parserJSON(résultat);
-      modifierSegment(clé, { avisCopilote: p.suggestions || [] });
-    } catch {
-      setErreur("Impossible d'obtenir l'avis du co-pilote pour ce segment. Réessayez.");
-    } finally {
-      setActionEnCours(null);
-    }
-  };
+// ─── Styles globaux de l'éditeur (injectés une seule fois) ─────────────────────
 
-  // Prend le texte COMPLET du segment + les avis déjà obtenus, et demande
-  // une version amendée intégrale — jamais un remplacement partiel. Le
-  // résultat est proposé, jamais appliqué automatiquement.
-  const genererVersionEnrichie = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment || !segment.avisCopilote?.length) return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      const résultat = await appelClaude(
-        "Réponds en français. (Les clés JSON restent telles quelles.)",
-        PROMPT_VERSION_ENRICHIE(segment.texte, segment.avisCopilote),
-        3072
-      );
-      const p = parserJSON(résultat);
-      modifierSegment(clé, { versionEnrichie: p.versionEnrichie || null });
-    } catch {
-      setErreur("La génération de la version enrichie a échoué. Réessayez.");
-    } finally {
-      setActionEnCours(null);
-    }
-  };
+const STYLES_EDITEUR = `
+  .ProseMirror {
+    outline: none;
+    /* CORRECTIF TABLETTE 28/07/2026 : min-height abaissé de 400px à 240px.
+       Sur la Tab S8, la hauteur de fenêtre utile est nettement plus faible
+       que sur PC : les 400px réservés sous un chapitre de quelques lignes
+       produisaient une grande zone blanche sans contenu ni utilité
+       apparente (constaté sur l'avant-propos de 5 lignes). 240px suffisent
+       à offrir une cible de clic confortable sous le texte. */
+    min-height: 240px;
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--editeur-texte, #1a1a1a);
+    font-family: 'Georgia', 'Times New Roman', serif;
+    caret-color: #7F77DD;
+  }
+  .ProseMirror p { margin: 0 0 1em; }
+  .ProseMirror h1 { font-size: 1.6em; font-weight: 500; margin: 1.4em 0 0.5em; line-height: 1.3; }
+  .ProseMirror h2 { font-size: 1.3em; font-weight: 500; margin: 1.2em 0 0.4em; line-height: 1.3; }
+  .ProseMirror h3 { font-size: 1.1em; font-weight: 500; margin: 1em 0 0.3em; line-height: 1.3; }
+  .ProseMirror h4 { font-size: 1em; font-weight: 600; margin: 0.9em 0 0.3em; line-height: 1.3; }
+  .ProseMirror h5 { font-size: 0.95em; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.3; text-transform: uppercase; letter-spacing: 0.02em; }
+  .ProseMirror h6 { font-size: 0.9em; font-weight: 600; margin: 0.8em 0 0.3em; line-height: 1.3; color: #666; font-style: italic; }
+  .ProseMirror blockquote {
+    border-left: 3px solid #7F77DD;
+    margin: 1.2em 0;
+    padding: 0.5em 0 0.5em 1.2em;
+    color: #555;
+    font-style: italic;
+  }
+  .ProseMirror ul, .ProseMirror ol { padding-left: 1.5em; margin: 0.8em 0; }
+  .ProseMirror li { margin-bottom: 0.3em; }
+  .ProseMirror code {
+    background: #f0eefd;
+    color: #534AB7;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  .ProseMirror pre {
+    background: #f5f5f5;
+    padding: 1em;
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+  .ProseMirror mark { background: #faeeda; border-radius: 2px; padding: 0 2px; }
+  .ProseMirror hr { border: none; border-top: 1px solid #e5e5e5; margin: 2em 0; }
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: #bbb;
+    pointer-events: none;
+    float: left;
+    height: 0;
+  }
+  /* Mode focus */
+  .mode-focus .ProseMirror {
+    font-size: 18px;
+    line-height: 2;
+  }
+`;
 
-  const insérerSegment = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment || segment.statutInsertion === "insere") return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      const transitionHTML = segment.transition.trim() ? texteVersHTML(segment.transition.trim()) : "";
+// ─── Composant : Bouton de barre d'outils ────────────────────────────────────────
 
-      if (segment.typeDestination === "existant") {
-        const nœudCible = trouverNœudParId(structureActuelle, segment.idCible);
-        if (!nœudCible) throw new Error("Nœud cible introuvable — la structure a peut-être changé.");
-        const texteAvant = nœudCible.texte || "";
-        const blocs = découperEnBlocs(texteAvant);
-        const position = segment.indexInsertion === null ? blocs.length : Math.min(segment.indexInsertion, blocs.length);
-        const nouveauContenu = transitionHTML + texteVersHTML(segment.texte);
-        const texteAprès = blocs.slice(0, position).join("") + nouveauContenu + blocs.slice(position).join("");
+function BoutonOutil({ actif, désactivé, onClick, titre, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={désactivé}
+      title={titre}
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        width: 28, height: 28, borderRadius: 6,
+        border: "none", cursor: désactivé ? "default" : "pointer",
+        background: actif ? "#EEEDFE" : "transparent",
+        color: actif ? "#534AB7" : désactivé ? "#ccc" : "#555",
+        fontSize: 13, fontWeight: actif ? 600 : 400,
+        fontFamily: "inherit", transition: "all 0.1s",
+      }}
+      onMouseEnter={(e) => { if (!actif && !désactivé) e.target.style.background = "#f5f5f5"; }}
+      onMouseLeave={(e) => { if (!actif) e.target.style.background = "transparent"; }}
+    >
+      {children}
+    </button>
+  );
+}
 
-        const { error } = await nœudsAPI.sauvegarderTexte(segment.idCible, texteAprès);
-        if (error) throw error;
+// ─── Composant : Barre d'outils ──────────────────────────────────────────────────
 
-        setStructureActuelle((prev) => màjTexteLocal(prev, segment.idCible, texteAprès));
-        modifierSegment(clé, {
-          statutInsertion: "insere",
-          idNœudFinal: segment.idCible,
-          texteAvantInsertion: texteAvant,
-          texteAprèsInsertion: texteAprès,
-          typeDestinationInsérée: "existant",
-        });
-      } else {
-        const parent = trouverNœudParId(structureActuelle, segment.idCible);
-        if (!parent) throw new Error("Nœud parent introuvable — la structure a peut-être changé.");
-        const typeNouveau = TYPE_ENFANT[parent.type] || "scene";
-        const fratrie = parent.enfants || [];
-        const position = segment.indexInsertion === null ? fratrie.length : Math.min(segment.indexInsertion, fratrie.length);
+function BarreOutils({ editor, modeFocus, onToggleFocus }) {
+  if (!editor) return null;
 
-        // Renumérotation séquentielle de toute la fratrie avec le nouveau
-        // nœud inséré à la position choisie — plus sûr que de ne décaler
-        // qu'une partie de la liste. Le "avant" est conservé pour permettre
-        // une annulation propre (restauration exacte des numéros d'ordre).
-        const ordresAvant = fratrie.map((f) => ({ id: f.id, ordre: f.ordre ?? 0 }));
-        const fratrieAvecPlaceholder = [...fratrie];
-        fratrieAvecPlaceholder.splice(position, 0, { id: "__nouveau__" });
-        const nouvelOrdreParId = {};
-        let ordreDuNouveau = 1;
-        fratrieAvecPlaceholder.forEach((f, idx) => {
-          if (f.id === "__nouveau__") ordreDuNouveau = idx + 1;
-          else nouvelOrdreParId[f.id] = idx + 1;
-        });
-
-        if (Object.keys(nouvelOrdreParId).length > 0) {
-          const misÀJour = Object.entries(nouvelOrdreParId).map(([id, ordre]) => ({ id, ordre }));
-          const { error: erreurRéordre } = await nœudsAPI.réordonner(misÀJour);
-          if (erreurRéordre) throw erreurRéordre;
-        }
-
-        const { data, error } = await nœudsAPI.créer({
-          type: typeNouveau,
-          titre: segment.titreSuggere || "Sans titre",
-          ordre: ordreDuNouveau,
-          parentId: parent.id,
-          texte: "",
-        }, projet.id);
-        if (error || !data) throw error || new Error("Échec de création du nœud");
-
-        const contenuHTML = transitionHTML + texteVersHTML(segment.texte);
-        const { error: erreurTexte } = await nœudsAPI.sauvegarderTexte(data.id, contenuHTML);
-        if (erreurTexte) throw erreurTexte;
-
-        const nouveauNœud = { id: data.id, type: typeNouveau, titre: data.titre, texte: contenuHTML, ordre: ordreDuNouveau, zone: data.zone || "corps", enfants: [] };
-        setStructureActuelle((prev) => {
-          const avecOrdresMisÀJour = màjOrdresEnfantsLocal(prev, parent.id, nouvelOrdreParId);
-          return insérerNœudÀPositionLocal(avecOrdresMisÀJour, parent.id, position, nouveauNœud);
-        });
-        modifierSegment(clé, {
-          statutInsertion: "insere",
-          idNœudFinal: data.id,
-          texteAvantInsertion: null,
-          texteAprèsInsertion: contenuHTML,
-          typeDestinationInsérée: "nouveau",
-          ordresAvantInsertion: ordresAvant,
-        });
-      }
-      onStructureChangée?.();
-    } catch (err) {
-      journaliserErreur("IncorporerMatiere:insérerSegment", err.message || String(err), projet.id);
-      setErreur(`Échec de l'insertion de ce segment : ${err.message || "erreur inconnue"}.`);
-    } finally {
-      setActionEnCours(null);
-    }
-  };
-
-  const insérerTout = async () => {
-    const àInsérer = segments.filter((s) => s.inclus && s.statutInsertion === "propose");
-    for (const s of àInsérer) {
-      await insérerSegment(s.clé);
-    }
-  };
-
-  const annulerInsertion = async (clé) => {
-    const segment = segments.find((s) => s.clé === clé);
-    if (!segment || segment.statutInsertion !== "insere") return;
-    setActionEnCours(clé);
-    setErreur(null);
-    try {
-      if (segment.typeDestinationInsérée === "nouveau") {
-        const { error } = await nœudsAPI.supprimer(segment.idNœudFinal);
-        if (error) throw error;
-        setStructureActuelle((prev) => supprimerNœudLocal(prev, segment.idNœudFinal));
-
-        // Restaure la numérotation d'ordre des frères telle qu'avant l'insertion.
-        if (segment.ordresAvantInsertion?.length) {
-          const { error: erreurRéordre } = await nœudsAPI.réordonner(segment.ordresAvantInsertion);
-          if (erreurRéordre) throw erreurRéordre;
-          const ordresParId = {};
-          segment.ordresAvantInsertion.forEach((o) => { ordresParId[o.id] = o.ordre; });
-          const parent = trouverNœudParId(structureActuelle, segment.idCible);
-          if (parent) setStructureActuelle((prev) => màjOrdresEnfantsLocal(prev, parent.id, ordresParId));
-        }
-      } else {
-        const nœudActuel = trouverNœudParId(structureActuelle, segment.idNœudFinal);
-        if (nœudActuel?.texte !== segment.texteAprèsInsertion) {
-          setErreur("Ce chapitre a été modifié depuis l'insertion de ce segment (probablement par un autre segment inséré ensuite) — annulation automatique refusée pour ne pas risquer de perdre du contenu. Vérifiez et corrigez manuellement dans l'éditeur si besoin.");
-          setActionEnCours(null);
-          return;
-        }
-        const { error } = await nœudsAPI.sauvegarderTexte(segment.idNœudFinal, segment.texteAvantInsertion);
-        if (error) throw error;
-        setStructureActuelle((prev) => màjTexteLocal(prev, segment.idNœudFinal, segment.texteAvantInsertion));
-      }
-      modifierSegment(clé, {
-        statutInsertion: "propose",
-        idNœudFinal: null,
-        texteAvantInsertion: null,
-        texteAprèsInsertion: null,
-        typeDestinationInsérée: null,
-        ordresAvantInsertion: null,
-      });
-      onStructureChangée?.();
-    } catch (err) {
-      journaliserErreur("IncorporerMatiere:annulerInsertion", err.message || String(err), projet.id);
-      setErreur(`Échec de l'annulation : ${err.message || "erreur inconnue"}.`);
-    } finally {
-      setActionEnCours(null);
-    }
-  };
-
-  const trouverTitreNœud = (id) => nœudsPlats.find((n) => n.id === id)?.titre || "?";
-
-  const texteTropVolumineux = texteBrut.length > SEUIL_CARACTÈRES;
-  const auMoinsUnSegmentÀInsérer = segments?.some((s) => s.inclus && s.statutInsertion === "propose");
-
-  const statsDiff = diff ? {
-    supprimés: diff.filter((d) => d.type === "supprimé" && d.texte.trim() !== "").length,
-    ajoutés: diff.filter((d) => d.type === "ajouté" && d.texte.trim() !== "").length,
-  } : null;
+  const Sep = () => (
+    <div style={{ width: 0.5, height: 18, background: "#e5e5e5", margin: "0 4px" }} />
+  );
 
   return (
     <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+      display: "flex", alignItems: "center", gap: 2,
+      padding: "6px 16px",
+      borderBottom: "0.5px solid #e5e5e5",
+      background: "#fafafa",
+      flexWrap: "wrap",
+      transition: "opacity 0.3s",
+      opacity: modeFocus ? 0.3 : 1,
+    }}
+      onMouseEnter={(e) => { if (modeFocus) e.currentTarget.style.opacity = 1; }}
+      onMouseLeave={(e) => { if (modeFocus) e.currentTarget.style.opacity = 0.3; }}
+    >
+      {/* Titres */}
+      <BoutonOutil actif={editor.isActive("heading", { level: 1 })} titre="Titre 1"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>H1</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 2 })} titre="Titre 2"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 3 })} titre="Titre 3"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>H3</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 4 })} titre="Titre 4"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}>H4</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 5 })} titre="Titre 5"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}>H5</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("heading", { level: 6 })} titre="Titre 6"
+        onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}>H6</BoutonOutil>
+
+      <Sep />
+
+      {/* Formatage inline */}
+      <BoutonOutil actif={editor.isActive("bold")} titre="Gras (Ctrl+B)"
+        onClick={() => editor.chain().focus().toggleBold().run()}><b>G</b></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("italic")} titre="Italique (Ctrl+I)"
+        onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("underline")} titre="Souligné (Ctrl+U)"
+        onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner"
+        onClick={() => editor.chain().focus().toggleHighlight().run()}>✦</BoutonOutil>
+
+      <Sep />
+
+      {/* Listes */}
+      <BoutonOutil actif={editor.isActive("bulletList")} titre="Liste à puces"
+        onClick={() => editor.chain().focus().toggleBulletList().run()}>≡</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("orderedList")} titre="Liste numérotée"
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</BoutonOutil>
+
+      <Sep />
+
+      {/* Blocs */}
+      <BoutonOutil actif={editor.isActive("blockquote")} titre="Citation"
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</BoutonOutil>
+      <BoutonOutil actif={editor.isActive("code")} titre="Code inline"
+        onClick={() => editor.chain().focus().toggleCode().run()}>{"`"}</BoutonOutil>
+      <BoutonOutil actif={false} titre="Séparateur horizontal"
+        onClick={() => editor.chain().focus().setHorizontalRule().run()}>—</BoutonOutil>
+
+      <Sep />
+
+      {/* Alignement — extension TextAlign déjà installée mais jamais exposée
+          dans la barre d'outils jusqu'ici. Ajouté 24/07/2026. */}
+      <BoutonOutil actif={editor.isActive({ textAlign: "left" })} titre="Aligner à gauche"
+        onClick={() => editor.chain().focus().setTextAlign("left").run()}>⇤</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "center" })} titre="Centrer"
+        onClick={() => editor.chain().focus().setTextAlign("center").run()}>≡</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "right" })} titre="Aligner à droite"
+        onClick={() => editor.chain().focus().setTextAlign("right").run()}>⇥</BoutonOutil>
+      <BoutonOutil actif={editor.isActive({ textAlign: "justify" })} titre="Justifier (étiré)"
+        onClick={() => editor.chain().focus().setTextAlign("justify").run()}>☰</BoutonOutil>
+
+      <Sep />
+
+      <BoutonOutil actif={false} titre="Insérer une note de bas de page"
+        onClick={() => editor.chain().focus().insertContent({ type: "note", attrs: { texte: "" } }).run()}>
+        📝
+      </BoutonOutil>
+
+      <Sep />
+
+      {/* Historique */}
+      <BoutonOutil actif={false} titre="Annuler (Ctrl+Z)"
+        désactivé={!editor.can().undo()}
+        onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
+      <BoutonOutil actif={false} titre="Rétablir (Ctrl+Y)"
+        désactivé={!editor.can().redo()}
+        onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
+
+      <div style={{ flex: 1 }} />
+
+      {/* Mode focus */}
+      <BoutonOutil actif={modeFocus} titre={modeFocus ? "Quitter le mode focus" : "Mode focus (F11)"}
+        onClick={onToggleFocus}>
+        {modeFocus ? "⊡" : "⊞"}
+      </BoutonOutil>
+    </div>
+  );
+}
+
+// ─── Composant : Panneau objectifs ───────────────────────────────────────────────
+
+function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objectifChapitre, durée, couleur, onMàjObjectifs }) {
+  const [édition, setÉdition] = useState(false);
+  const [tempJ, setTempJ] = useState(objectifJournalier);
+  const [tempC, setTempC] = useState(objectifChapitre);
+
+  const rythme = durée > 60 ? Math.round((motsSession / (durée / 3600))) : null;
+  const pctJour = Math.min(100, Math.round((motsSession / objectifJournalier) * 100));
+  const pctChapitre = objectifChapitre > 0
+    ? Math.min(100, Math.round((motsChapitre / objectifChapitre) * 100))
+    : null;
+
+  return (
+    <div style={{
+      borderTop: "0.5px solid #e5e5e5",
+      padding: "8px 20px",
+      background: "#fafafa",
+      display: "flex", alignItems: "center", gap: 20,
+      fontSize: 12,
+    }}>
+      {/* CORRECTIF 28/07/2026 — l'étiquette "Session" laissait croire à un
+          cumul journalier, alors que le compteur repart à zéro à chaque
+          chapitre ouvert (constaté : 1137 affiché vs ~10 000 mots réels
+          dans la journée). Libellé retenu : "Depuis l'ouverture" plutôt
+          que "Ce chapitre" (option initialement envisagée), parce que la
+          jauge "Chapitre" juste à côté affiche déjà le total de mots DU
+          chapitre — deux étiquettes quasi identiques pour deux mesures
+          différentes auraient recréé la confusion qu'on corrige. Le vrai
+          cumul journalier viendra avec le chantier "suivi de sessions"
+          Supabase, toujours à programmer. Correctif minimal : aucun
+          changement de comportement, seulement d'honnêteté. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 120 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}
+          title="Mots tapés depuis l'ouverture de ce chapitre dans l'éditeur — pas un cumul de la journée">
+          <span style={{ color: "#999" }}>Depuis l'ouverture</span>
+          <span style={{ color: couleur, fontWeight: 500 }}>{motsSession} / {objectifJournalier} mots</span>
+        </div>
+        <div style={{ height: 3, background: "#e5e5e5", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ width: `${pctJour}%`, height: "100%", background: couleur, borderRadius: 4, transition: "width 0.5s" }} />
+        </div>
+      </div>
+
+      {/* Chapitre */}
+      {pctChapitre !== null && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 120 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#999" }}>Chapitre</span>
+            <span style={{ color: "#1D9E75", fontWeight: 500 }}>{motsChapitre} / {objectifChapitre}</span>
+          </div>
+          <div style={{ height: 3, background: "#e5e5e5", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ width: `${pctChapitre}%`, height: "100%", background: "#1D9E75", borderRadius: 4 }} />
+          </div>
+        </div>
+      )}
+
+      {/* Compteur de sélection façon Word — ajouté 28/07/2026, réordonné le
+          01/08/2026 à la demande de Joseph : les CARACTÈRES passent en
+          premier et en gras, car c'est le chiffre utile pour jauger une
+          sélection destinée à "Incorporer de la matière" (limite en
+          caractères, pas en mots) — les mots restent affichés en second,
+          à titre indicatif seulement. */}
+      {sélectionInfo && (
+        <div style={{ color: couleur, display: "flex", alignItems: "center", gap: 4 }} title="Nombre de caractères et de mots dans la sélection actuelle">
+          <span style={{ fontSize: 13 }}>✂️</span>
+          <strong>{sélectionInfo.caractères.toLocaleString("fr-FR")}</strong> caractère{sélectionInfo.caractères > 1 ? "s" : ""}
+          <span style={{ color: "#bbb" }}>·</span>
+          {sélectionInfo.mots.toLocaleString("fr-FR")} mot{sélectionInfo.mots > 1 ? "s" : ""}
+        </div>
+      )}
+
+      {/* Durée + rythme */}
+      <div style={{ color: "#999" }}>
+        ⏱ {formaterDurée(durée)}
+        {rythme && <span style={{ marginLeft: 8, color: "#bbb" }}>· {rythme.toLocaleString("fr-FR")} mots/h</span>}
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      {/* Édition objectifs */}
+      {édition ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label style={{ color: "#999" }}>Jour :</label>
+          <input type="number" value={tempJ} onChange={(e) => setTempJ(+e.target.value)}
+            style={{ width: 64, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
+          <label style={{ color: "#999" }}>Chapitre :</label>
+          <input type="number" value={tempC} onChange={(e) => setTempC(+e.target.value)}
+            style={{ width: 64, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
+          <button onClick={() => { onMàjObjectifs(tempJ, tempC); setÉdition(false); }}
+            style={{ fontSize: 11, color: "#fff", background: couleur, border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+            OK
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => setÉdition(true)}
+          style={{ fontSize: 11, color: "#999", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+          ⚙ Objectifs
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Composant : Panneau historique ──────────────────────────────────────────────
+// MODIF 21/07/2026 : "Historique de session" renommé "Historique des versions" —
+// ce n'est plus limité à la session en cours, c'est désormais permanent.
+
+function PanneauHistorique({ historique, chargement, onRestaurer, onFermer, couleur }) {
+  return (
+    <div style={{
+      width: 260, borderLeft: "0.5px solid #e5e5e5",
+      display: "flex", flexDirection: "column",
+      background: "#fafafa", overflowY: "auto",
     }}>
       <div style={{
-        background: "#fff", borderRadius: 12, width: "min(820px, 95vw)",
-        maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
+        padding: "12px 14px", borderBottom: "0.5px solid #e5e5e5",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <div style={{
-          padding: "16px 20px", borderBottom: "0.5px solid #e5e5e5",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 500 }}>📥 Incorporer de la matière</span>
-          <button onClick={onFermer} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#999" }}>×</button>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "#555" }}>Historique des versions</span>
+        <button onClick={onFermer} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999" }}>×</button>
+      </div>
+      {chargement ? (
+        <div style={{ padding: "20px 14px", color: "#bbb", fontSize: 12, textAlign: "center" }}>
+          Chargement…
         </div>
-
-        {segments !== null && (
-          <div style={{ padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5", flexShrink: 0 }}>
-            <div
-              onClick={() => setDétailComparatifOuvert(!détailComparatifOuvert)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer",
-                padding: "6px 10px", borderRadius: 8,
-                background: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#E1F5EE" : "#FAEEDA",
-                color: statsDiff.supprimés === 0 && statsDiff.ajoutés === 0 ? "#1D9E75" : "#854F0B",
-                fontSize: 12,
-              }}
-            >
-              <span>
-                <strong>Couverture du texte collé :</strong> {statsDiff.supprimés} mot{statsDiff.supprimés !== 1 ? "s" : ""} potentiellement omis,{" "}
-                {statsDiff.ajoutés} mot{statsDiff.ajoutés !== 1 ? "s" : ""} ajouté{statsDiff.ajoutés !== 1 ? "s" : ""}
-              </span>
-              <span>{détailComparatifOuvert ? "▲ Masquer le détail" : "▼ Voir le détail"}</span>
+      ) : historique.length === 0 ? (
+        <div style={{ padding: "20px 14px", color: "#bbb", fontSize: 12, textAlign: "center" }}>
+          Les versions apparaîtront ici au fil de l'écriture.
+        </div>
+      ) : (
+        <div style={{ padding: "8px" }}>
+          {historique.map((v) => (
+            <div key={v.id} style={{
+              padding: "8px 10px", borderRadius: 8, marginBottom: 4,
+              border: "0.5px solid #e5e5e5", background: "#fff",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: "#999" }}>{v.horodatage}</span>
+                <span style={{ fontSize: 11, color: couleur }}>{v.mots} mots</span>
+              </div>
+              <div style={{ fontSize: 11, color: "#777", marginBottom: 6, lineHeight: 1.4 }}>
+                {v.aperçu}
+              </div>
+              <button onClick={() => onRestaurer(v.contenu)}
+                style={{
+                  fontSize: 11, color: couleur, background: `${couleur}15`,
+                  border: "none", borderRadius: 6, padding: "3px 8px",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                Restaurer
+              </button>
             </div>
-            {détailComparatifOuvert && (
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Composant : Indicateur de sauvegarde ────────────────────────────────────────
+
+function IndicateurSauvegarde({ état }) {
+  const configs = {
+    sauvegardé: { couleur: "#1D9E75", label: "Sauvegardé", icone: "✓" },
+    en_cours: { couleur: "#BA7517", label: "Modification…", icone: "●" },
+    erreur: { couleur: "#E24B4A", label: "Erreur", icone: "✕" },
+  };
+  const c = configs[état] || configs.sauvegardé;
+  return (
+    <span style={{ fontSize: 11, color: c.couleur, display: "flex", alignItems: "center", gap: 4 }}>
+      {c.icone} {c.label}
+    </span>
+  );
+}
+
+// ─── Composant principal : Éditeur ───────────────────────────────────────────────
+
+export default function Editeur({
+  nœud,                    // { id, titre, type, texte } — nœud actif
+  projetCouleur = "#7F77DD",
+  projetTitre = "",
+  onSauvegarder,           // (nœudId, htmlContenu) => void — écrit en base, différé 2s
+  onTexteChange,           // (nœudId, htmlContenu) => void — état local uniquement,
+                           // immédiat, pour que le co-pilote IA voie le texte à jour
+                           // sans attendre la sauvegarde différée. Correctif 16/07/2026 :
+                           // avant, un texte tout juste collé pouvait déclencher à tort
+                           // "Écrivez au moins 20 mots" si on cliquait "Analyser" avant
+                           // la fin du délai de 2s de la sauvegarde.
+  onSelectionChange,       // (texteSélectionné: string) => void — transmet la sélection
+                           // de texte en cours dans l'éditeur, pour que le co-pilote IA
+                           // puisse analyser uniquement le passage surligné plutôt que
+                           // tout le chapitre. Ajouté le 16/07/2026.
+  onRetour,                // () => void
+}) {
+  const [modeFocus, setModeFocus] = useState(false);
+  const [formatRéférence, setFormatRéférence] = useState("a4");
+  const [voirHistorique, setVoirHistorique] = useState(false);
+  const [texteCopié, setTexteCopié] = useState(false);
+  const [historique, setHistorique] = useState([]);
+  const [chargementHistorique, setChargementHistorique] = useState(false);
+  const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
+  const [objectifJournalier, setObjectifJournalier] = useState(500);
+  const [objectifChapitre, setObjectifChapitre] = useState(0);
+  const [motsSession, setMotsSession] = useState(0);
+  // Compteur de sélection façon Word — ajouté 28/07/2026 à la demande de
+  // Joseph. null = pas de sélection active (rien à afficher dans la barre
+  // du bas). Calculé dans onSelectionUpdate ci-dessous, sur le même texte
+  // déjà extrait pour onSelectionChange (aucun calcul redondant).
+  const [sélectionInfo, setSélectionInfo] = useState(null);
+  const [duréeSession, setDuréeSession] = useState(0);
+  const motsInitiaux = useRef(compterMots(nœud?.texte || ""));
+  const timerSauvegarde = useRef(null);
+  const timerSession = useRef(null);
+  const contenuRef = useRef(nœud?.texte || "");
+  // Mots du dernier instantané connu pour CE nœud — sert à décider si un
+  // nouvel instantané mérite d'être créé (seuil de 50 mots de différence).
+  // Utilise une ref (pas un state) pour rester lisible de façon synchrone
+  // dans le callback différé de sauvegarde, sans dépendre d'une closure
+  // React potentiellement obsolète. Ajouté 21/07/2026.
+  const dernierMotsHistoriqueRef = useRef(null);
+  // Numéros de ligne — ajouté 24/07/2026.
+  const wrapperLigneRef = useRef(null);
+  const [numérosDeLigne, setNumérosDeLigne] = useState([]);
+  const [listeNotes, setListeNotes] = useState([]);
+  const [sautsDePage, setSautsDePage] = useState([]);
+
+  // Injecter les styles TipTap une seule fois
+  useEffect(() => {
+    if (!document.getElementById("atelier-editeur-styles")) {
+      const style = document.createElement("style");
+      style.id = "atelier-editeur-styles";
+      style.textContent = STYLES_EDITEUR;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // Chronomètre de session
+  useEffect(() => {
+    timerSession.current = setInterval(() => {
+      setDuréeSession((d) => d + 1);
+    }, 1000);
+    return () => clearInterval(timerSession.current);
+  }, []);
+
+  // Raccourci clavier F11 pour mode focus
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "F11") { e.preventDefault(); setModeFocus((f) => !f); } };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Charge l'historique de versions DEPUIS SUPABASE pour le nœud ouvert, et
+  // le recharge intégralement à chaque changement de chapitre — ce qui
+  // corrige au passage l'ancienne fuite où l'historique d'un chapitre
+  // précédent pouvait rester affiché en ouvrant un nouveau chapitre.
+  // Ajouté 21/07/2026 (remplace le useState local, perdu au rechargement).
+  useEffect(() => {
+    let annulé = false;
+    setHistorique([]);
+    dernierMotsHistoriqueRef.current = null;
+    if (!nœud?.id) return;
+
+    setChargementHistorique(true);
+    supabase
+      .from("versions_noeuds")
+      .select("id, contenu, mots, apercu, created_at")
+      .eq("noeud_id", nœud.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (annulé) return;
+        setChargementHistorique(false);
+        if (error) {
+          journaliserErreur("Editeur:chargerHistorique", error.message, nœud.id);
+          return;
+        }
+        const versions = (data || []).map((v) => ({
+          id: v.id,
+          contenu: v.contenu,
+          mots: v.mots,
+          aperçu: v.apercu,
+          horodatage: formaterDateHeure(v.created_at),
+        }));
+        setHistorique(versions);
+        dernierMotsHistoriqueRef.current = versions.length > 0 ? versions[0].mots : null;
+      });
+
+    return () => { annulé = true; };
+  }, [nœud?.id]);
+
+  // Initialisation de l'éditeur TipTap
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        history: { depth: 100 },
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
+      }),
+      Note,
+      Typography,
+      Underline,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Highlight.configure({ multicolor: false }),
+      CharacterCount,
+      Placeholder.configure({
+        placeholder: ({ node }) => {
+          if (node.type.name === "heading") return "Titre du chapitre…";
+          return "Commencez à écrire ici… (F11 pour le mode focus)";
+        },
+      }),
+    ],
+    content: nœud?.texte || "",
+    onSelectionUpdate: ({ editor }) => {
+      const { from, to } = editor.state.selection;
+      if (from === to) {
+        onSelectionChange?.("");
+        setSélectionInfo(null);
+      } else {
+        const texte = editor.state.doc.textBetween(from, to, " ");
+        onSelectionChange?.(texte);
+        // Compteur façon Word — ajouté 28/07/2026. Mots : découpage sur
+        // espaces/retours, filtré des chaînes vides (cohérent avec
+        // compterMots() utilisé partout ailleurs dans ce fichier).
+        // Caractères : longueur brute, espaces incluses (convention Word).
+        const mots = texte.trim() ? texte.trim().split(/\s+/).length : 0;
+        setSélectionInfo({ mots, caractères: texte.length });
+      }
+    },
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      contenuRef.current = html;
+
+      // Transmission immédiate au parent (état local, pas d'écriture en base) —
+      // pour que le co-pilote IA voie toujours le texte réel de l'éditeur,
+      // sans attendre les 2s de la sauvegarde différée ci-dessous.
+      onTexteChange?.(nœud.id, html);
+
+      // Mise à jour du compteur de mots de session
+      const motsTotaux = compterMots(html);
+      setMotsSession(Math.max(0, motsTotaux - motsInitiaux.current));
+
+      // Indicateur "modification en cours"
+      setStatutSauvegarde("en_cours");
+
+      // Sauvegarde différée (debounce 2s)
+      clearTimeout(timerSauvegarde.current);
+      timerSauvegarde.current = setTimeout(async () => {
+        onSauvegarder?.(nœud.id, html);
+        setStatutSauvegarde("sauvegardé");
+
+        // Instantané d'historique — MODIF 21/07/2026 : écrit désormais dans
+        // Supabase (table versions_noeuds) au lieu d'un simple état local.
+        // Seuil de 50 mots de différence conservé (évite de créer un
+        // instantané à chaque frappe), mais plus de plafond arbitraire à
+        // 20 versions : l'historique est désormais permanent, comme
+        // demandé.
+        const motsCourants = compterMots(html);
+        const dernierConnu = dernierMotsHistoriqueRef.current;
+        const diffMots = dernierConnu === null ? motsCourants : Math.abs(motsCourants - dernierConnu);
+        if (diffMots < 50 && dernierConnu !== null) return;
+
+        const apercu = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) + "…";
+        const { data, error } = await supabase
+          .from("versions_noeuds")
+          .insert({ noeud_id: nœud.id, contenu: html, mots: motsCourants, apercu })
+          .select()
+          .single();
+
+        if (error) {
+          journaliserErreur("Editeur:snapshotHistorique", error.message, nœud.id);
+          return; // le texte est déjà sauvegardé (onSauvegarder ci-dessus) ; seul l'instantané a échoué
+        }
+
+        dernierMotsHistoriqueRef.current = motsCourants;
+        setHistorique((prev) => [{
+          id: data.id,
+          contenu: data.contenu,
+          mots: data.mots,
+          aperçu: data.apercu,
+          horodatage: formaterDateHeure(data.created_at),
+        }, ...prev]);
+      }, 2000);
+    },
+  });
+
+  // Sauvegarde automatique forcée toutes les 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (contenuRef.current && editor) {
+        onSauvegarder?.(nœud?.id, contenuRef.current);
+        setStatutSauvegarde("sauvegardé");
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [editor, nœud?.id, onSauvegarder]);
+
+  // Réinitialise la sélection transmise au co-pilote quand on change de
+  // chapitre — sinon une sélection faite dans un chapitre précédent resterait
+  // affichée comme active dans le nouveau, à tort.
+  useEffect(() => {
+    onSelectionChange?.("");
+    return () => onSelectionChange?.("");
+  }, [nœud?.id]);
+
+  const motsChapitre = editor ? compterMots(editor.getHTML()) : 0;
+
+  // Recalcule les numéros de ligne — sur chaque modification du texte, à
+  // chaque redimensionnement de fenêtre (le retour à la ligne automatique
+  // change avec la largeur disponible), et au changement de mode focus
+  // (la taille de police change). Ajouté 24/07/2026.
+  const recalculerNumérosDeLigne = useCallback(() => {
+    if (!editor || !wrapperLigneRef.current) return;
+    const topWrapper = wrapperLigneRef.current.getBoundingClientRect().top;
+    const lignes = calculerNumérosDeLigne(editor.view.dom, topWrapper);
+    setNumérosDeLigne(lignes);
+
+    // Sauts de page — mêmes mesures que les lignes, divisées par la hauteur
+    // de page utile du format choisi (hauteur totale moins marges haut/bas).
+    // Ajouté 24/07/2026.
+    const hauteurPage = FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx;
+    const hauteurTotale = lignes.length ? lignes[lignes.length - 1].top + 30 : 0;
+    const nombrePages = hauteurTotale > 0 ? Math.ceil(hauteurTotale / hauteurPage) : 1;
+    const sauts = Array.from({ length: Math.max(0, nombrePages - 1) }, (_, i) => ({
+      top: (i + 1) * hauteurPage,
+      pageSuivante: i + 2,
+    }));
+    setSautsDePage(sauts);
+
+    // Liste des notes du chapitre, dans l'ordre d'apparition. Ajouté 24/07/2026.
+    const notes = [];
+    editor.state.doc.descendants((n) => {
+      if (n.type.name === "note") notes.push({ id: notes.length + 1, texte: n.attrs.texte });
+    });
+    setListeNotes(notes);
+  }, [editor, formatRéférence]);
+
+  useEffect(() => {
+    if (!editor) return;
+    recalculerNumérosDeLigne();
+    editor.on("update", recalculerNumérosDeLigne);
+    return () => editor.off("update", recalculerNumérosDeLigne);
+  }, [editor, recalculerNumérosDeLigne]);
+
+  useEffect(() => {
+    let timer;
+    const surRedimensionnement = () => {
+      clearTimeout(timer);
+      timer = setTimeout(recalculerNumérosDeLigne, 150);
+    };
+    window.addEventListener("resize", surRedimensionnement);
+    return () => { window.removeEventListener("resize", surRedimensionnement); clearTimeout(timer); };
+  }, [recalculerNumérosDeLigne]);
+
+  useEffect(() => {
+    const timer = setTimeout(recalculerNumérosDeLigne, 60);
+    return () => clearTimeout(timer);
+  }, [modeFocus, formatRéférence, recalculerNumérosDeLigne]);
+
+  const restaurerVersion = useCallback((contenu) => {
+    editor?.commands.setContent(contenu);
+    setVoirHistorique(false);
+  }, [editor]);
+
+  if (!nœud) return (
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 14 }}>
+      Sélectionnez un chapitre ou une scène dans la structure pour commencer à écrire.
+    </div>
+  );
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
+      background: modeFocus ? "#f7f6f1" : "#fff",
+      transition: "background 0.4s",
+    }}
+      className={modeFocus ? "mode-focus" : ""}
+    >
+      {/* ── En-tête ── */}
+      {!modeFocus && (
+        <div style={{
+          padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5",
+          display: "flex", alignItems: "center", gap: 10,
+          background: "#fafafa",
+          flexShrink: 0,
+        }}>
+          <button onClick={onRetour}
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999", fontFamily: "inherit" }}
+            title="Retour à la structure">←</button>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: projetCouleur }} />
+          <span style={{ fontSize: 13, color: "#999" }}>{projetTitre}</span>
+          <span style={{ fontSize: 13, color: "#ccc" }}>›</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>{nœud.titre}</span>
+          <div style={{ flex: 1 }} />
+          <IndicateurSauvegarde état={statutSauvegarde} />
+          <select
+            value={formatRéférence}
+            onChange={(e) => setFormatRéférence(e.target.value)}
+            title="Format de référence pour la largeur de colonne et les numéros de ligne — les numéros restent stables tant que ce choix ne change pas"
+            style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+          >
+            {Object.entries(FORMATS_RÉFÉRENCE).map(([clé, f]) => (
+              <option key={clé} value={clé}>{f.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => {
+              const texte = editor?.getText() || "";
+              navigator.clipboard?.writeText(texte);
+              setTexteCopié(true);
+              setTimeout(() => setTexteCopié(false), 2000);
+            }}
+            style={{
+              fontSize: 12, color: texteCopié ? "#1D9E75" : "#999",
+              background: texteCopié ? "#E1F5EE" : "none",
+              border: "none", cursor: "pointer", borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit",
+            }}
+            title="Copier tout le texte du chapitre"
+          >
+            {texteCopié ? "✓ Copié !" : "📋 Copier tout"}
+          </button>
+          <button
+            onClick={() => setVoirHistorique(!voirHistorique)}
+            style={{
+              fontSize: 12, color: voirHistorique ? projetCouleur : "#999",
+              background: voirHistorique ? `${projetCouleur}15` : "none",
+              border: "none", cursor: "pointer", borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit",
+            }}
+            title="Historique de versions"
+          >
+            ↺ Historique ({historique.length})
+          </button>
+        </div>
+      )}
+
+      {/* ── Barre d'outils ── */}
+      <BarreOutils editor={editor} modeFocus={modeFocus} onToggleFocus={() => setModeFocus(!modeFocus)} />
+
+      {/* ── Zone centrale : éditeur + historique ── */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
+
+        {/* Zone d'écriture */}
+        <div style={{
+          flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto",
+          padding: modeFocus ? "60px 0" : "32px 0",
+          display: "flex", justifyContent: "center",
+        }}>
+          <div style={{
+            width: "100%",
+            maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx,
+            padding: "0 40px",
+          }}>
+            {/* Titre du chapitre en mode focus */}
+            {modeFocus && (
               <div style={{
-                marginTop: 8, border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12,
-                fontSize: 12, lineHeight: 1.6, fontFamily: "Georgia, serif",
-                background: "#fafafa", maxHeight: 200, overflowY: "auto",
+                fontSize: 11, fontWeight: 500, color: `${projetCouleur}99`,
+                letterSpacing: "0.07em", textTransform: "uppercase",
+                marginBottom: 12,
               }}>
-                {diff.map((d, i) => {
-                  if (d.type === "égal") return <span key={i}>{d.texte}</span>;
-                  if (d.type === "supprimé") return (
-                    <span key={i} style={{ color: "#E24B4A", textDecoration: "line-through", background: "#FCEBEB" }}>{d.texte}</span>
-                  );
-                  return (
-                    <span key={i} style={{ color: "#7F77DD", background: "#EEEDFE", fontWeight: 600 }}>{d.texte}</span>
-                  );
-                })}
+                {projetTitre} · {nœud.titre}
+              </div>
+            )}
+
+            {/* Numéros de ligne + éditeur — la gouttière est un élément
+                totalement séparé du contenu éditable de ProseMirror : elle
+                ne peut donc jamais se retrouver dans editor.getText() ni
+                dans une sélection/copie faite dans le texte. */}
+            <div ref={wrapperLigneRef} style={{ position: "relative" }}>
+              <div style={{
+                position: "absolute", left: -34, top: 0, width: 28,
+                textAlign: "right", userSelect: "none", pointerEvents: "none",
+              }}>
+                {numérosDeLigne.map((l) => (
+                  <div key={l.numéro} style={{
+                    position: "absolute", top: l.top, right: 0,
+                    fontSize: 11, color: "#ccc", fontFamily: "Georgia, serif",
+                  }}>
+                    {l.numéro}
+                  </div>
+                ))}
+              </div>
+              {sautsDePage.map((s) => (
+                <div key={s.top} style={{
+                  position: "absolute", top: s.top, left: 0, right: 0,
+                  borderTop: "1px dashed #ddd", userSelect: "none", pointerEvents: "none",
+                }}>
+                  <span style={{
+                    position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
+                    background: "#fff", padding: "0 8px", fontSize: 10, color: "#bbb",
+                    fontFamily: "-apple-system, sans-serif",
+                  }}>
+                    Page {s.pageSuivante}
+                  </span>
+                </div>
+              ))}
+              <EditorContent editor={editor} />
+            </div>
+
+            {listeNotes.length > 0 && (
+              <div style={{
+                marginTop: 24, paddingTop: 12, borderTop: "0.5px solid #e5e5e5",
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                  Notes
+                </div>
+                {listeNotes.map((n) => (
+                  <div key={n.id} style={{ fontSize: 11.5, color: "#777", lineHeight: 1.6, marginBottom: 4, display: "flex", gap: 6 }}>
+                    <span style={{ color: "#7F77DD", fontWeight: 600, flexShrink: 0 }}>[{n.id}]</span>
+                    <span>{n.texte || <em style={{ color: "#bbb" }}>(note vide)</em>}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
+        </div>
+
+        {/* Panneau historique */}
+        {voirHistorique && !modeFocus && (
+          <PanneauHistorique
+            historique={historique}
+            chargement={chargementHistorique}
+            onRestaurer={restaurerVersion}
+            onFermer={() => setVoirHistorique(false)}
+            couleur={projetCouleur}
+          />
         )}
-
-        <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-          {segments === null ? (
-            <>
-              <p style={{ fontSize: 12.5, color: "#777", marginBottom: 10, lineHeight: 1.5 }}>
-                Collez un texte brut (notes, brouillon, transcription). Le co-pilote propose un découpage en
-                segments et une destination pour chacun ; chaque segment est ensuite retrouvé et vérifié
-                directement dans votre texte collé (pas retapé par l'IA) avant de vous être présenté — le texte
-                final utilisé est garanti identique à l'original quand cette vérification réussit.
-              </p>
-              <textarea
-                value={texteBrut}
-                onChange={(e) => setTexteBrut(e.target.value)}
-                placeholder="Collez votre texte ici…"
-                rows={14}
-                style={{
-                  width: "100%", padding: 10, border: "0.5px solid #ddd", borderRadius: 8,
-                  fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box",
-                  lineHeight: 1.5,
-                }}
-              />
-              <div style={{ fontSize: 11, color: texteTropVolumineux ? "#E24B4A" : "#999", marginTop: 6 }}>
-                {texteBrut.length.toLocaleString("fr-FR")} / {SEUIL_CARACTÈRES.toLocaleString("fr-FR")} caractères
-                {texteTropVolumineux && " — texte trop long, scindez-le en plusieurs passages plus courts"}
-              </div>
-              {erreur && (
-                <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 10 }}>
-                  {erreur}
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize: 12.5, color: "#777", marginBottom: 14, lineHeight: 1.5 }}>
-                {segments.length} segment{segments.length > 1 ? "s" : ""}. Modifiez, positionnez et insérez
-                chacun individuellement, ou tous ensemble en bas.
-              </p>
-              {erreur && (
-                <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 12 }}>
-                  {erreur}
-                </div>
-              )}
-              {segments.map((s) => {
-                const enCours = actionEnCours === s.clé;
-                const sc = couleurScore(s.score);
-                const nœudCibleExistant = s.typeDestination === "existant" ? trouverNœudParId(structureActuelle, s.idCible) : null;
-                const parentPourNouveau = s.typeDestination === "nouveau" ? trouverNœudParId(structureActuelle, s.idCible) : null;
-                const blocsParagraphes = nœudCibleExistant ? découperEnBlocs(nœudCibleExistant.texte) : [];
-                const fratrieNouveau = parentPourNouveau?.enfants || [];
-                const aperçuOuvert = aperçuOuvertPour === s.clé;
-                const nbRepères = s.typeDestination === "existant" ? blocsParagraphes.length : fratrieNouveau.length;
-                const positionEffective = s.indexInsertion === null ? nbRepères : s.indexInsertion;
-
-                return (
-                  <div key={s.clé} style={{
-                    border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 12, marginBottom: 10,
-                    background: s.statutInsertion === "insere" ? "#F0FAF6" : (s.inclus ? "#fff" : "#f7f7f7"),
-                    opacity: (s.inclus || s.statutInsertion === "insere") ? 1 : 0.6,
-                  }}>
-                    {s.statutInsertion === "insere" ? (
-                      <>
-                        <div style={{ fontSize: 12, color: "#1D9E75", fontWeight: 500, marginBottom: 6 }}>
-                          ✓ Inséré dans {ICONES_TYPE[trouverNœudParId(structureActuelle, s.idNœudFinal)?.type] || ""} {trouverTitreNœud(s.idNœudFinal)}
-                        </div>
-                        <div style={{
-                          fontSize: 12, color: "#555", lineHeight: 1.5, maxHeight: 60, overflowY: "auto",
-                          background: "#fafafa", borderRadius: 6, padding: 8, marginBottom: 8,
-                          fontFamily: "Georgia, serif",
-                        }}>
-                          {s.texte}
-                        </div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <button
-                            onClick={() => annulerInsertion(s.clé)}
-                            disabled={enCours}
-                            style={{ fontSize: 11, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                          >
-                            {enCours ? "…" : "↩ Annuler l'insertion"}
-                          </button>
-                          <button
-                            onClick={() => annulerInsertion(s.clé)}
-                            disabled={enCours}
-                            title="Annule l'insertion actuelle pour pouvoir choisir une autre destination"
-                            style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                          >
-                            ↷ Changer d'emplacement
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={s.inclus}
-                            onChange={(e) => modifierSegment(s.clé, { inclus: e.target.checked })}
-                            style={{ marginTop: 3 }}
-                            title="Inclure dans l'insertion groupée (bouton en bas)"
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                              {s.origineVérifiée ? (
-                                <span style={{ fontSize: 10.5, fontWeight: 600, color: "#1D9E75", background: "#E1F5EE", borderRadius: 20, padding: "2px 8px" }}>
-                                  ✓ Extrait vérifié — identique au texte original
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: 10.5, fontWeight: 600, color: sc.c, background: sc.bg, borderRadius: 20, padding: "2px 8px" }}>
-                                  ⚠️ Non retrouvé tel quel — {s.score}% de similarité estimée
-                                </span>
-                              )}
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                {!s.origineVérifiée && (
-                                  <button
-                                    onClick={() => revérifierSegment(s.clé)}
-                                    disabled={enCours}
-                                    style={{ fontSize: 10.5, color: "#BA7517", background: "#FAEEDA", border: "none", borderRadius: 5, padding: "2px 8px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                                  >
-                                    {enCours ? "…" : "🔍 Revérifier"}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            <textarea
-                              value={s.texte}
-                              onChange={(e) => {
-                                const { texte: v, vérifié } = localiserSegmentDansOriginal(e.target.value, texteBrut);
-                                modifierSegment(s.clé, { texte: e.target.value, origineVérifiée: e.target.value === v ? vérifié : false, score: vérifié && e.target.value === v ? 100 : scoreFidélité(e.target.value, texteBrut) });
-                              }}
-                              rows={3}
-                              style={{
-                                width: "100%", fontSize: 12, color: "#333", lineHeight: 1.5,
-                                background: "#fafafa", borderRadius: 6, padding: 8, marginBottom: 6,
-                                fontFamily: "Georgia, serif", border: "0.5px solid #e5e5e5", boxSizing: "border-box", resize: "vertical",
-                              }}
-                            />
-                            <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{s.justification}</div>
-                          </div>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 24, flexWrap: "wrap", marginBottom: 8 }}>
-                          <select
-                            value={`${s.typeDestination}::${s.idCible}`}
-                            onChange={(e) => {
-                              const [typeDestination, idCible] = e.target.value.split("::");
-                              modifierSegment(s.clé, { typeDestination, idCible, indexInsertion: null });
-                              setAperçuOuvertPour(null);
-                            }}
-                            style={{ fontSize: 11.5, padding: "3px 6px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit" }}
-                          >
-                            <optgroup label="Compléter un nœud existant">
-                              {nœudsPlats.map((n) => (
-                                <option key={n.id} value={`existant::${n.id}`}>
-                                  {"  ".repeat(n.profondeur)}{ICONES_TYPE[n.type]} {n.titre}
-                                </option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="Créer un nouveau nœud sous…">
-                              {nœudsPouvantRecevoirNouveau.map((n) => (
-                                <option key={n.id} value={`nouveau::${n.id}`}>
-                                  {"  ".repeat(n.profondeur)}{ICONES_TYPE[n.type]} {n.titre} → nouveau {TYPE_ENFANT[n.type]}
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
-                          {s.typeDestination === "nouveau" && (
-                            <input
-                              value={s.titreSuggere || ""}
-                              onChange={(e) => modifierSegment(s.clé, { titreSuggere: e.target.value })}
-                              placeholder="Titre du nouveau nœud"
-                              style={{ fontSize: 11.5, padding: "3px 6px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", flex: 1, minWidth: 140 }}
-                            />
-                          )}
-                          {nbRepères > 0 && (
-                            <button
-                              onClick={() => setAperçuOuvertPour(aperçuOuvert ? null : s.clé)}
-                              style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit" }}
-                            >
-                              📍 {aperçuOuvert ? "Fermer l'aperçu" : `Emplacement : ${s.indexInsertion === null ? "à la fin" : `position ${s.indexInsertion + 1}`}`}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => proposerTransition(s.clé)}
-                            disabled={enCours}
-                            style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", border: "none", borderRadius: 6, padding: "4px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                          >
-                            {enCours ? "…" : "🤖 Proposer une transition"}
-                          </button>
-                          <button
-                            onClick={() => obtenirAvisCopilote(s.clé)}
-                            disabled={enCours}
-                            style={{ fontSize: 11.5, fontWeight: 600, color: "#fff", background: "#D85A30", border: "none", borderRadius: 6, padding: "5px 12px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                          >
-                            {enCours ? "…" : "💬 Avis du co-pilote"}
-                          </button>
-                          <button
-                            onClick={() => insérerSegment(s.clé)}
-                            disabled={enCours}
-                            style={{
-                              fontSize: 11.5, color: "#fff", background: "#1D9E75", border: "none",
-                              borderRadius: 6, padding: "4px 12px", cursor: enCours ? "default" : "pointer",
-                              fontFamily: "inherit", marginLeft: "auto",
-                            }}
-                          >
-                            {enCours ? "…" : "Insérer ce segment"}
-                          </button>
-                        </div>
-
-                        {s.avisCopilote && (
-                          <div style={{ marginLeft: 24, marginBottom: 8, border: "0.5px solid #378ADD30", borderRadius: 8, padding: 10, background: "#F7FAFE" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                              <span style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                                💬 Avis indicatif — n'affecte pas le texte inséré ci-dessus
-                              </span>
-                              <button
-                                onClick={() => genererVersionEnrichie(s.clé)}
-                                disabled={enCours}
-                                title="Réécrit le passage ENTIER en intégrant les pistes ci-dessous, sans rien perdre"
-                                style={{ fontSize: 10.5, fontWeight: 600, color: "#fff", background: "#1D9E75", border: "none", borderRadius: 5, padding: "3px 10px", cursor: enCours ? "default" : "pointer", fontFamily: "inherit" }}
-                              >
-                                {enCours ? "…" : "✨ Générer une version enrichie"}
-                              </button>
-                            </div>
-                            {s.avisCopilote.map((av, i) => (
-                              <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < s.avisCopilote.length - 1 ? "0.5px solid #378ADD20" : "none" }}>
-                                <div style={{ fontSize: 10, color: "#185FA5", fontWeight: 600, textTransform: "uppercase", marginBottom: 2 }}>{av.type}</div>
-                                <div style={{ fontSize: 11.5, fontWeight: 500, color: "#1a1a1a", marginBottom: 2 }}>{av.titre}</div>
-                                <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.5 }}>{av.texte}</div>
-                              </div>
-                            ))}
-                            {s.versionEnrichie && (
-                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #1D9E7530" }}>
-                                <div style={{ fontSize: 10, color: "#1D9E75", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>
-                                  ✨ Version enrichie proposée (texte complet)
-                                </div>
-                                <div style={{
-                                  fontSize: 11.5, color: "#333", lineHeight: 1.6, fontFamily: "Georgia, serif",
-                                  background: "#fff", border: "0.5px solid #1D9E7540", borderRadius: 6, padding: 10,
-                                  marginBottom: 8, maxHeight: 240, overflowY: "auto",
-                                }}>
-                                  {s.versionEnrichie}
-                                </div>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                  <button
-                                    onClick={() => modifierSegment(s.clé, { texte: s.versionEnrichie, origineVérifiée: false, score: scoreFidélité(s.versionEnrichie, texteBrut), versionEnrichie: null, avisCopilote: null })}
-                                    style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: "#1D9E75", border: "none", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}
-                                  >
-                                    ↳ Remplacer le texte du segment par cette version
-                                  </button>
-                                  <button
-                                    onClick={() => modifierSegment(s.clé, { versionEnrichie: null })}
-                                    title="Ferme cette proposition sans l'appliquer — modifiez le texte ci-dessus puis relancez si besoin"
-                                    style={{ fontSize: 11, color: "#999", background: "none", border: "0.5px solid #ddd", borderRadius: 6, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}
-                                  >
-                                    ✕ Refuser cette proposition
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {(s.transition || aperçuOuvert) && (
-                          <div style={{ marginLeft: 24, marginBottom: 8 }}>
-                            <textarea
-                              value={s.transition}
-                              onChange={(e) => modifierSegment(s.clé, { transition: e.target.value })}
-                              placeholder="Phrase de transition (optionnelle) — laissez vide pour ne rien ajouter"
-                              rows={2}
-                              style={{
-                                width: "100%", fontSize: 11.5, color: "#534AB7", lineHeight: 1.5,
-                                background: "#F5F4FE", borderRadius: 6, padding: 6,
-                                fontFamily: "Georgia, serif", border: "0.5px dashed #7F77DD60", boxSizing: "border-box", resize: "vertical",
-                              }}
-                            />
-                            {s.transition.trim() && (
-                              <button
-                                onClick={() => {
-                                  const nouveauTexte = `${s.transition.trim()}\n\n${s.texte}`;
-                                  modifierSegment(s.clé, { texte: nouveauTexte, transition: "", origineVérifiée: false, score: scoreFidélité(nouveauTexte, texteBrut) });
-                                }}
-                                title="Intègre la transition directement dans le texte du segment, sans copier-coller manuel"
-                                style={{ fontSize: 10.5, color: "#534AB7", background: "#EEEDFE", border: "none", borderRadius: 5, padding: "3px 10px", marginTop: 4, cursor: "pointer", fontFamily: "inherit" }}
-                              >
-                                ⤵ Fusionner la transition dans le texte du segment
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {aperçuOuvert && s.typeDestination === "existant" && (
-                          <div style={{
-                            marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
-                            padding: 10, maxHeight: 320, overflowY: "auto", background: "#fcfcfc",
-                          }}>
-                            <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
-                              Cliquez sur une barre pour choisir où le segment (en violet) sera inséré parmi les paragraphes existants :
-                            </div>
-                            <BarreInsertion active={positionEffective === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
-                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.texte} transition={s.transition} />}
-                            {blocsParagraphes.map((bloc, i) => (
-                              <div key={i}>
-                                <div style={{
-                                  fontSize: 11.5, color: "#444", lineHeight: 1.5,
-                                  border: "0.5px solid #eee", borderRadius: 6,
-                                  padding: "6px 8px", background: "#fff",
-                                }}>
-                                  <span style={{ fontSize: 9.5, color: "#bbb", fontWeight: 600, marginRight: 6 }}>§{i + 1}</span>
-                                  {aperçuDébutFin(texteBrutDuBloc(bloc)) || "(bloc vide)"}
-                                </div>
-                                <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
-                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.texte} transition={s.transition} />}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {aperçuOuvert && s.typeDestination === "nouveau" && fratrieNouveau.length > 0 && (
-                          <div style={{
-                            marginLeft: 24, border: "0.5px solid #e5e5e5", borderRadius: 8,
-                            padding: 10, maxHeight: 320, overflowY: "auto", background: "#fcfcfc",
-                          }}>
-                            <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>
-                              Cliquez sur une barre pour choisir entre quels éléments déjà présents le nouveau {TYPE_ENFANT[parentPourNouveau?.type]} (en violet) viendra s'intercaler :
-                            </div>
-                            <BarreInsertion active={positionEffective === 0} onClick={() => modifierSegment(s.clé, { indexInsertion: 0 })} />
-                            {positionEffective === 0 && <AperçuSegmentInséré texte={s.titreSuggere || s.texte} estTitre={!!s.titreSuggere} transition={s.transition} />}
-                            {fratrieNouveau.map((frère, i) => (
-                              <div key={frère.id}>
-                                <div style={{
-                                  fontSize: 11.5, color: "#444", lineHeight: 1.5,
-                                  border: "0.5px solid #eee", borderRadius: 6,
-                                  padding: "6px 8px", background: "#fff",
-                                }}>
-                                  {ICONES_TYPE[frère.type]} {frère.titre}
-                                </div>
-                                <BarreInsertion active={positionEffective === i + 1} onClick={() => modifierSegment(s.clé, { indexInsertion: i + 1 })} />
-                                {positionEffective === i + 1 && <AperçuSegmentInséré texte={s.titreSuggere || s.texte} estTitre={!!s.titreSuggere} transition={s.transition} />}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-
-        <div style={{ padding: "12px 20px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0 }}>
-          {segments === null ? (
-            <>
-              <button onClick={onFermer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
-                Annuler
-              </button>
-              <button
-                onClick={analyser}
-                disabled={analyseEnCours || texteTropVolumineux || compterMotsMinimal(texteBrut)}
-                style={{
-                  fontSize: 13, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 8,
-                  padding: "8px 16px", cursor: (analyseEnCours || texteTropVolumineux) ? "default" : "pointer",
-                  fontFamily: "inherit", opacity: analyseEnCours ? 0.6 : 1,
-                }}
-              >
-                {analyseEnCours ? "Analyse en cours…" : "Analyser et proposer un découpage"}
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={recommencer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
-                ↩ Recommencer
-              </button>
-              <button onClick={onFermer} style={{ fontSize: 13, color: "#777", background: "none", border: "0.5px solid #ddd", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontFamily: "inherit" }}>
-                Fermer
-              </button>
-              <button
-                onClick={insérerTout}
-                disabled={!auMoinsUnSegmentÀInsérer || actionEnCours !== null}
-                style={{
-                  fontSize: 13, color: "#fff", background: "#1D9E75", border: "none", borderRadius: 8,
-                  padding: "8px 16px", cursor: auMoinsUnSegmentÀInsérer ? "pointer" : "default",
-                  fontFamily: "inherit", opacity: auMoinsUnSegmentÀInsérer ? 1 : 0.5,
-                }}
-              >
-                Insérer tous les segments cochés restants
-              </button>
-            </>
-          )}
-        </div>
       </div>
+
+      {/* ── Barre objectifs / stats ── */}
+      <PanneauObjectifs
+        motsSession={motsSession}
+        motsChapitre={motsChapitre}
+        objectifJournalier={objectifJournalier}
+        objectifChapitre={objectifChapitre}
+        durée={duréeSession}
+        couleur={projetCouleur}
+        onMàjObjectifs={(j, c) => { setObjectifJournalier(j); setObjectifChapitre(c); }}
+      />
     </div>
   );
-}
-
-function AperçuSegmentInséré({ texte, transition, estTitre }) {
-  return (
-    <div style={{
-      background: "#EEEDFE", border: "1px solid #7F77DD", borderRadius: 6,
-      padding: "8px 10px", margin: "4px 0", fontSize: 11.5, color: "#3d3580",
-      lineHeight: 1.5, fontFamily: "Georgia, serif",
-    }}>
-      <div style={{ fontSize: 9.5, fontWeight: 700, color: "#7F77DD", marginBottom: 3, fontFamily: "-apple-system, sans-serif" }}>
-        ↓ NOUVEAU {estTitre ? "CHAPITRE/SCÈNE" : "SEGMENT"} ↓
-      </div>
-      {transition && <div style={{ fontStyle: "italic", marginBottom: 4, opacity: 0.85 }}>{transition}</div>}
-      {estTitre ? <strong>{texte}</strong> : (<>{texte.slice(0, 220)}{texte.length > 220 && "…"}</>)}
-    </div>
-  );
-}
-
-function BarreInsertion({ active, onClick }) {
-  const [survol, setSurvol] = useState(false);
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setSurvol(true)}
-      onMouseLeave={() => setSurvol(false)}
-      style={{
-        display: "flex", alignItems: "center", gap: 6,
-        margin: "3px 0", padding: "3px 8px", borderRadius: 5, cursor: "pointer",
-        border: active ? "1px solid #7F77DD" : "1px dashed #ddd",
-        background: active ? "#EEEDFE" : (survol ? "#f5f5ff" : "transparent"),
-        transition: "all 0.1s",
-      }}
-      title="Cliquer pour insérer ici"
-    >
-      <span style={{ fontSize: 10, color: active ? "#534AB7" : "#aaa", fontWeight: active ? 600 : 400 }}>
-        {active ? "✓ Insertion ici" : "+ Insérer ici"}
-      </span>
-    </div>
-  );
-}
-
-function compterMotsMinimal(texte) {
-  return texte.trim().split(/\s+/).filter(Boolean).length < 20;
 }
 
