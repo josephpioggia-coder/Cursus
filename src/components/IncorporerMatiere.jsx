@@ -635,7 +635,7 @@ export default function IncorporerMatiere({ projet, onFermer, onStructureChangé
         const { error: erreurTexte } = await nœudsAPI.sauvegarderTexte(data.id, contenuHTML);
         if (erreurTexte) throw erreurTexte;
 
-        const nouveauNœud = { id: data.id, type: typeNouveau, titre: data.titre, texte: contenuHTML, ordre: ordreDuNouveau, enfants: [] };
+        const nouveauNœud = { id: data.id, type: typeNouveau, titre: data.titre, texte: contenuHTML, ordre: ordreDuNouveau, zone: data.zone || "corps", enfants: [] };
         setStructureActuelle((prev) => {
           const avecOrdresMisÀJour = màjOrdresEnfantsLocal(prev, parent.id, nouvelOrdreParId);
           return insérerNœudÀPositionLocal(avecOrdresMisÀJour, parent.id, position, nouveauNœud);
