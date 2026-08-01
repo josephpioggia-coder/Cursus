@@ -1,2402 +1,445 @@
 /**
- * CURSUS — App.jsx (version Supabase)
+ * ATELIER D'ÉCRIVAIN — Import Word
+ * Lit n'importe quel .docx et remplace le contenu
+ * des chapitres existants par correspondance de titre.
+ * Fonctionne pour tous les livres, pas seulement le Tome I.
  *
- * État global branché sur Supabase via src/lib/api.js
- * Authentification via src/lib/auth.jsx
- * Le localStorage n'est plus utilisé.
- *
- * Version i18n (chantier 04/07/2026) :
- * - Tous les textes d'interface statiques passent par t('common.xxx') / useTranslation
- * - GENRES et STATUTS restent en français (valeurs canoniques internes,
- *   voir note de fin de fichier)
- * - langueProjet propagée depuis projetActif.langue vers CopiloteIA et
- *   QuestionnaireIntention (colonne `langue` sur `projets`, défaut 'fr' —
- *   à confirmer que la migration existe déjà, sinon fallback sur 'fr' suffit)
- *
- * MODIF 20/07/2026 (a) : ajout de trouverContexteHiérarchique() — calcule,
- * pour le nœud ouvert dans l'éditeur, le titre de sa Partie parente et les
- * titres des chapitres frères déjà nommés. Transmis à CopiloteIA pour que
- * l'aide au démarrage d'un chapitre SANS TITRE s'appuie sur ce contexte réel.
- *
- * MODIF 21/07/2026 : la promotion d'un nœud (bouton ⬆) change désormais
- * AUSSI son type, pas seulement sa position. Une scène directement sous un
- * chapitre, une fois promue, devient elle-même un chapitre (frère de son
- * ancien parent) ; un chapitre promu devient une partie. Règle : le nœud
- * promu prend le type de son ANCIEN PARENT, puisqu'il devient son frère.
- * Corrige aussi un bug d'affichage du bouton ⬆ (voir NœudStructure).
+ * Création automatique des nœuds manquants — reconstruite le 01/08/2026
+ * (perdue lors du retour en arrière d'urgence de la nuit du 01/08, voir
+ * CLAUDE.md). Un chapitre du Word sans correspondance dans la structure
+ * existante n'oblige plus à créer le nœud à la main avant d'importer : il
+ * est créé automatiquement, positionné selon l'ordre du document source
+ * (nouvelle "partie" toujours à la racine, nouveau "chapitre" rattaché à la
+ * dernière "partie" rencontrée dans le document — existante ou tout juste
+ * créée). LIMITE CONNUE (jamais testée en conditions réelles) : le passage
+ * final de nœudsAPI.réordonner() ne renumérote que les nœuds CRÉÉS par cet
+ * import ; un frère préexistant en base, non touché par cet import, garde
+ * son ancien ordre — collision d'ordre possible dans ce cas.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useTranslation } from "react-i18next";
-import { useAuth, PageConnexion } from "./lib/auth.jsx";
-import { projetsAPI, nœudsAPI } from "./lib/api.js";
-import { supabase } from "./lib/supabase.js";
-import { journaliserErreur } from "./lib/journalErreurs.js";
-import Editeur from "./components/Editeur.jsx";
-import TableauDeBord from "./components/TableauDeBord.jsx";
-import Bibliotheque from "./components/Bibliotheque.jsx";
-import CarnetIdees from "./components/CarnetIdees.jsx";
-import CopiloteIA from "./components/CopiloteIA.jsx";
-import ImportDocx from "./components/ImportDocx.jsx";
-import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
-import Tarification from "./components/Tarification.jsx";
-import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
-import AideFAQ from "./components/AideFAQ.jsx";
-import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
+import { useState, useRef } from "react";
+import { nœudsAPI } from "../lib/api.js";
 
-// ─── Constantes ────────────────────────────────────────────────────────────────
-// Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
-// Genres + couleurs associées — proposition Joseph du 05/07/2026.
-// "Autre" ajouté par Claude (hors liste initiale) pour couvrir les cas
-// qui ne rentrent dans aucune des 10 catégories — gris neutre par défaut.
-// "Spiritualité" : deux couleurs proposées (blanc cassé / indigo) ; indigo
-// retenu car un blanc cassé serait quasi invisible en pastille/badge. À
-// confirmer avec Joseph si besoin.
-const GENRE_COULEURS = {
-  "Méthode":                        "#378ADD", // bleu — rigueur, structure, confiance
-  "Psychologie / Thérapie":         "#7A9B76", // vert sauge — croissance, équilibre, soin
-  "Philosophie":                    "#7F77DD", // violet — réflexion, profondeur
-  "Recherche / Sciences humaines":  "#3F4650", // gris anthracite — neutralité, sérieux
-  "Comparaison / Intégration":      "#D85A30", // orange — mise en relation, créativité
-  "Développement personnel":        "#BA7517", // ocre / jaune doré — évolution personnelle
-  "Spiritualité":                   "#4A4E9E", // indigo — intériorité, transcendance
-  "Roman / Témoignage":             "#8B2635", // bordeaux — émotion, vécu
-  "Guide pratique":                 "#0FA3A3", // turquoise — accessibilité, action
-  "Formation / Pédagogie":          "#5AAEDB", // bleu clair — apprentissage
-  "Autre":                          "#8A8A8A", // gris neutre — ajout Claude, hors liste initiale
-};
-const GENRES = Object.keys(GENRE_COULEURS);
-const STATUTS = ["En cours", "En pause", "Terminé", "Idée"];
-const COULEURS = Object.values(GENRE_COULEURS);
+// ─── Lecture du .docx via JSZip (chargé une fois) ────────────────────────────
 
-const STRUCTURE_TYPES_META = {
-  partie: { enfant: "chapitre", icone: "📂" },
-  chapitre: { enfant: "scene", icone: "📄" },
-  // Une scène peut désormais contenir d'autres scènes (18/07/2026) — permet
-  // d'ajouter un niveau sous "Pour aller plus loin" ou "Repères de lecture",
-  // et autant de niveaux supplémentaires que nécessaire ensuite, sans avoir
-  // à inventer un nouveau type à chaque fois.
-  scene: { enfant: "scene", icone: "✏️" },
-};
-
-// Zones de visibilité par nœud — chantier 28/07/2026. Un seul manuscrit,
-// plusieurs régimes de visibilité, plusieurs sorties possibles : scènes en
-// zone réservée (version intégrale vs version famille du témoignage),
-// notes méthodologiques du MAAT (édition praticiens vs grand public),
-// brouillons jamais exportés par défaut. La zone est stockée en base
-// (colonne `noeuds.zone`, DEFAULT 'corps') ; un nœud sans zone est traité
-// partout comme 'corps' — les projets existants se comportent strictement
-// comme avant tant qu'on ne touche à rien.
-// ⚠️ badge "🚧" (brouillon) et non "✏️", déjà pris par l'icône de scène.
-const ZONES_META = {
-  corps:     { label: "Corps du texte", badge: null, couleur: null },
-  reserve:   { label: "Réservé",        badge: "🔒", couleur: "#8B2635" },
-  methodo:   { label: "Méthodologique", badge: "📎", couleur: "#3F4650" },
-  brouillon: { label: "Brouillon",      badge: "🚧", couleur: "#BA7517" },
-};
-
-// ─── Utilitaires ────────────────────────────────────────────────────────────────
-
-const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-
-const dateAujourd = (langue = "fr") => new Date().toLocaleDateString(langue === "en" ? "en-GB" : "fr-BE", {
-  day: "numeric", month: "long", year: "numeric",
-});
-
-const compterMots = (texte = "") =>
-  texte.trim() === "" ? 0 : texte.trim().split(/\s+/).length;
-
-const totalMotsProjet = (nœuds = []) => {
-  let total = 0;
-  const parcourir = (liste) => {
-    for (const n of liste) {
-      total += compterMots(n.texte);
-      if (n.enfants?.length) parcourir(n.enfants);
-    }
-  };
-  parcourir(nœuds);
-  return total;
-};
-
-// ─── Composant : Badge statut ────────────────────────────────────────────────────
-// Le libellé affiché (statut) reste la valeur canonique française pour l'instant
-// (voir note de fin de fichier) ; seul le style est géré ici.
-
-function BadgeStatut({ statut }) {
-  const styles = {
-    "En cours":  { bg: "#EEEDFE", color: "#534AB7" },
-    "En pause":  { bg: "#FAEEDA", color: "#854F0B" },
-    "Terminé":   { bg: "#EAF3DE", color: "#3B6D11" },
-    "Idée":      { bg: "#F1EFE8", color: "#5F5E5A" },
-  };
-  const s = styles[statut] || styles["Idée"];
-  return (
-    <span style={{
-      background: s.bg, color: s.color,
-      fontSize: 11, fontWeight: 500,
-      padding: "2px 8px", borderRadius: 20,
-    }}>
-      {statut}
-    </span>
-  );
-}
-
-// ─── Composant : Barre de progression ───────────────────────────────────────────
-
-function BarreProgression({ valeur, max, couleur }) {
-  const pct = Math.min(100, Math.round((valeur / (max || 1)) * 100));
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{
-        flex: 1, height: 4,
-        background: "var(--border)", borderRadius: 4, overflow: "hidden",
-      }}>
-        <div style={{
-          width: `${pct}%`, height: "100%",
-          background: couleur, borderRadius: 4,
-          transition: "width 0.4s ease",
-        }} />
-      </div>
-      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", minWidth: 28, textAlign: "right" }}>
-        {pct}%
-      </span>
-    </div>
-  );
-}
-
-// ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
-
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées, nœudsRepliés, onBasculerRepli }) {
-  const { t } = useTranslation("common");
-  // Repli/dépli — état porté par le parent (VueProjet) via `nœudsRepliés`
-  // depuis le 01/08/2026, pour permettre un "Tout replier" global en plus du
-  // triangle individuel. Défaut : ouvert (comme avant ce chantier).
-  const ouvert = !nœudsRepliés?.has(nœud.id);
-  const [enRenommage, setEnRenommage] = useState(false);
-  const [nomTemp, setNomTemp] = useState(nœud.titre);
-  const [survol, setSurvol] = useState(false);
-
-  // Masquage visuel par zone — chantier 28/07/2026. Purement visuel :
-  // aucune suppression, aucun impact données. Un nœud masqué emporte
-  // visuellement ses enfants (le return est avant leur rendu récursif),
-  // cohérent avec la règle d'export "un nœud exclu exclut tout ce qu'il
-  // contient". Les hooks ci-dessus restent appelés avant ce return —
-  // obligatoire pour respecter les règles des hooks React.
-  const zoneNœud = nœud.zone || "corps";
-  if (zonesMasquées?.includes(zoneNœud)) return null;
-
-  const aDesEnfants = nœud.enfants?.length > 0;
-  const typeInfo = STRUCTURE_TYPES_META[nœud.type];
-  const peutAjouter = typeInfo.enfant !== null;
-  const labelType = t(`structureTypes.${nœud.type}`);
-  const labelEnfant = typeInfo.enfant ? t(`structureTypes.${typeInfo.enfant}`) : "";
-
-  const validerRenommage = () => {
-    if (nomTemp.trim()) onRenommer(nœud.id, nomTemp.trim());
-    setEnRenommage(false);
-  };
-
-  return (
-    <div style={{ marginLeft: profondeur * 16 }}>
-      <div
-        onMouseEnter={() => setSurvol(true)}
-        onMouseLeave={() => setSurvol(false)}
-        onClick={() => onSélectionner(nœud.id)}
-        style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "5px 8px", borderRadius: 6, cursor: "pointer",
-          background: sélectionné === nœud.id
-            ? `${projetCouleur}18`
-            : dernierNœudVisitéId === nœud.id
-              ? "var(--surface-hover)"
-              : survol ? "var(--surface-hover)" : "transparent",
-          borderLeft: sélectionné === nœud.id
-            ? `2px solid ${projetCouleur}`
-            : dernierNœudVisitéId === nœud.id
-              ? "2px solid #ccc"
-              : "2px solid transparent",
-          opacity: dernierNœudVisitéId === nœud.id && sélectionné !== nœud.id ? 0.65 : 1,
-          transition: "all 0.15s",
-        }}
-      >
-        {/* Chevron */}
-        {aDesEnfants ? (
-          <span
-            onClick={(e) => { e.stopPropagation(); onBasculerRepli?.(nœud.id); }}
-            style={{
-              fontSize: 10, color: "var(--texte-tertiaire)",
-              transform: ouvert ? "rotate(90deg)" : "rotate(0deg)",
-              transition: "transform 0.2s", userSelect: "none", width: 12,
-              flexShrink: 0,
-            }}
-          >▶</span>
-        ) : <span style={{ width: 12, flexShrink: 0 }} />}
-
-        {/* Icône type */}
-        <span style={{ fontSize: 13, flexShrink: 0 }}>{typeInfo.icone}</span>
-
-        {/* Titre ou champ renommage */}
-        {enRenommage ? (
-          <input
-            autoFocus
-            value={nomTemp}
-            onChange={(e) => setNomTemp(e.target.value)}
-            onBlur={validerRenommage}
-            onKeyDown={(e) => { if (e.key === "Enter") validerRenommage(); if (e.key === "Escape") setEnRenommage(false); }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              flex: 1, minWidth: 0, border: "none", background: "transparent",
-              fontSize: 13, color: "var(--texte-primaire)", outline: "none",
-              fontFamily: "inherit",
-            }}
-          />
-        ) : (
-          // CORRECTIF 21/07/2026 — BUG DU BOUTON ⬆ INVISIBLE : cette balise
-          // avait `flex: 1` mais pas `minWidth: 0`. En flexbox, un élément
-          // avec flex:1 ne peut par défaut jamais rétrécir sous la largeur
-          // de son propre contenu (min-width:auto implicite) — même avec
-          // "overflow: hidden, textOverflow: ellipsis" posés dessus. Avec
-          // beaucoup de boutons d'action affichés au survol (↑ ↓ + ⬆ menu
-          // ✎ ✕), la ligne entière devenait alors plus large que le
-          // panneau, et les derniers boutons (dont ⬆, souvent le plus à
-          // droite) se retrouvaient poussés hors de la zone visible, sans
-          // scroll horizontal évident pour l'utilisateur — d'où "invisible
-          // malgré un code correct". minWidth: 0 corrige ça en autorisant
-          // enfin le titre à rétrécir et l'ellipse à s'appliquer.
-          <span style={{
-            flex: 1, minWidth: 0, fontSize: 13,
-            color: sélectionné === nœud.id ? projetCouleur : "var(--texte-secondaire)",
-            fontWeight: sélectionné === nœud.id ? 500 : 400,
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {nœud.titre}
-          </span>
-        )}
-
-        {/* Badge de zone — discret, seulement pour les zones hors corps.
-            Chantier 28/07/2026. */}
-        {ZONES_META[zoneNœud]?.badge && (
-          <span
-            title={`Zone : ${ZONES_META[zoneNœud].label}`}
-            style={{ fontSize: 10, flexShrink: 0, opacity: 0.85 }}
-          >
-            {ZONES_META[zoneNœud].badge}
-          </span>
-        )}
-
-        {/* Mots du nœud */}
-        {compterMots(nœud.texte) > 0 && (
-          <span style={{ fontSize: 10, color: "var(--texte-tertiaire)", flexShrink: 0 }}>
-            {compterMots(nœud.texte).toLocaleString("fr-FR")}
-          </span>
-        )}
-
-        {/* Actions au survol */}
-        {survol && !enRenommage && (
-          <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-            {!estPremier && (
-              <button onClick={() => onDéplacer(nœud.id, "haut")} style={btnIconStyle} title={t("actions.monter")}>↑</button>
-            )}
-            {!estDernier && (
-              <button onClick={() => onDéplacer(nœud.id, "bas")} style={btnIconStyle} title={t("actions.descendre")}>↓</button>
-            )}
-            {peutAjouter && (
-              <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
-            )}
-            {!estRacine && (
-              <button onClick={() => onPromouvoir(nœud.id)} style={btnIconStyle} title="Faire remonter d'un niveau (devient frère de son parent actuel, et prend son type)">⬆</button>
-            )}
-            {!estPremier && (
-              <button onClick={() => onRétrograder(nœud.id)} style={btnIconStyle} title="Faire descendre d'un niveau (devient enfant du frère précédent, et prend son type)">⬇</button>
-            )}
-            <select
-              value={nœud.type}
-              onChange={(e) => onChangerType(nœud.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              title="Changer de niveau"
-              style={{ fontSize: 10, border: "0.5px solid #ddd", borderRadius: 4, background: "#fff", color: "#777", padding: "1px 2px", fontFamily: "inherit", cursor: "pointer" }}
-            >
-              <option value="partie">📂 Partie</option>
-              <option value="chapitre">📄 Chapitre</option>
-              <option value="scene">✏️ Scène</option>
-            </select>
-            {/* Sélecteur de zone de visibilité — chantier 28/07/2026.
-                Même facture que le sélecteur de type juste au-dessus. */}
-            <select
-              value={zoneNœud}
-              onChange={(e) => onChangerZone(nœud.id, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              title={`Zone de visibilité : ${ZONES_META[zoneNœud].label} — détermine dans quelles versions exportées ce nœud (et tout ce qu'il contient) apparaît`}
-              style={{ fontSize: 10, border: "0.5px solid #ddd", borderRadius: 4, background: "#fff", color: ZONES_META[zoneNœud].couleur || "#777", padding: "1px 2px", fontFamily: "inherit", cursor: "pointer" }}
-            >
-              <option value="corps">Corps</option>
-              <option value="reserve">🔒 Réservé</option>
-              <option value="methodo">📎 Méthodo</option>
-              <option value="brouillon">🚧 Brouillon</option>
-            </select>
-            <button onClick={() => setEnRenommage(true)} style={btnIconStyle} title={t("actions.renommer")}>✎</button>
-            <span style={{ width: 6 }} />
-            <button onClick={() => onSupprimer(nœud.id)} style={{ ...btnIconStyle, color: "#E24B4A" }} title={t("actions.supprimer")}>✕</button>
-          </div>
-        )}
-      </div>
-
-      {/* Enfants récursifs */}
-      {ouvert && nœud.enfants?.map((enfant, index) => (
-        <NœudStructure
-          key={enfant.id}
-          nœud={enfant}
-          profondeur={profondeur + 1}
-          projetCouleur={projetCouleur}
-          sélectionné={sélectionné}
-          onSélectionner={onSélectionner}
-          onAjouter={onAjouter}
-          onRenommer={onRenommer}
-          onSupprimer={onSupprimer}
-          onDéplacer={onDéplacer}
-          estPremier={index === 0}
-          estDernier={index === nœud.enfants.length - 1}
-          dernierNœudVisitéId={dernierNœudVisitéId}
-          onChangerType={onChangerType}
-          estRacine={false}
-          onPromouvoir={onPromouvoir}
-          onRétrograder={onRétrograder}
-          onChangerZone={onChangerZone}
-          zonesMasquées={zonesMasquées}
-          nœudsRepliés={nœudsRepliés}
-          onBasculerRepli={onBasculerRepli}
-        />
-      ))}
-    </div>
-  );
-}
-
-const btnIconStyle = {
-  background: "none", border: "none", cursor: "pointer",
-  fontSize: 12, color: "var(--texte-tertiaire)",
-  padding: "1px 4px", borderRadius: 4,
-  fontFamily: "inherit",
-};
-
-// ─── Composant : Carte projet (vue liste) ─────────────────────────────────────────
-
-function CarteProjet({ projet, onOuvrir, onSupprimer }) {
-  const { t } = useTranslation("common");
-  const [survol, setSurvol] = useState(false);
-  const mots = totalMotsProjet(projet.structure);
-
-  return (
-    <div
-      onMouseEnter={() => setSurvol(true)}
-      onMouseLeave={() => setSurvol(false)}
-      style={{
-        background: "var(--surface)",
-        border: `0.5px solid ${survol ? projet.couleur + "60" : "var(--border)"}`,
-        borderRadius: 12, padding: "1.25rem",
-        cursor: "pointer", transition: "all 0.2s",
-        transform: survol ? "translateY(-1px)" : "none",
-      }}
-      onClick={() => onOuvrir(projet.id)}
-    >
-      {/* En-tête */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: projet.couleur, flexShrink: 0,
-          }} />
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--texte-primaire)" }}>
-              {projet.titre}
-            </div>
-            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", marginTop: 2 }}>
-              {projet.genre}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <BadgeStatut statut={projet.statut} />
-          {survol && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onSupprimer(projet.id); }}
-              style={{ ...btnIconStyle, color: "#E24B4A", fontSize: 14 }}
-              title={t("carteProjet.supprimerTitre")}
-            >✕</button>
-          )}
-        </div>
-      </div>
-
-      {/* Description */}
-      {projet.description && (
-        <p style={{ fontSize: 13, color: "var(--texte-secondaire)", marginBottom: 12, lineHeight: 1.5 }}>
-          {projet.description}
-        </p>
-      )}
-
-      {/* Progression */}
-      <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
-
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
-        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-          {t("carteProjet.motsRediges", { count: mots })}
-        </span>
-        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-          {t("carteProjet.objectif", { count: projet.objectifMots })}
-        </span>
-        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginLeft: "auto" }}>
-          {t("parties", { count: projet.structure?.length || 0 })}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ─── Composant : Formulaire nouveau projet ────────────────────────────────────────
-
-function FormulaireProjet({ onCréer, onAnnuler }) {
-  const { t } = useTranslation("common");
-  const [form, setForm] = useState({
-    titre: "", genre: "Méthode", statut: "En cours",
-    couleur: GENRE_COULEURS["Méthode"], objectifMots: 80000, description: "",
+async function chargerJSZip() {
+  if (window.JSZip) return window.JSZip;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+    s.onload = () => resolve(window.JSZip);
+    s.onerror = reject;
+    document.head.appendChild(s);
   });
-  // Tant que l'auteur n'a pas choisi une couleur à la main, elle suit le genre
-  // sélectionné. Dès qu'il clique une pastille, la couleur devient indépendante.
-  const [couleurManuelle, setCouleurManuelle] = useState(false);
-
-  const màj = (champ, val) => {
-    if (champ === "genre" && !couleurManuelle) {
-      setForm((f) => ({ ...f, genre: val, couleur: GENRE_COULEURS[val] || f.couleur }));
-    } else {
-      setForm((f) => ({ ...f, [champ]: val }));
-    }
-  };
-
-  const choisirCouleur = (c) => {
-    setCouleurManuelle(true);
-    màj("couleur", c);
-  };
-
-  const valider = () => {
-    if (!form.titre.trim()) return;
-    onCréer({
-      id: genId(),
-      ...form,
-      objectifMots: Number(form.objectifMots) || 80000,
-      dateCreation: new Date().toISOString().slice(0, 10),
-      structure: [],
-    });
-  };
-
-  return (
-    <div style={{
-      background: "var(--surface)",
-      border: "0.5px solid var(--border)",
-      borderRadius: 12, padding: "1.5rem",
-    }}>
-      <h3 style={{ fontSize: 16, fontWeight: 500, marginBottom: 20, color: "var(--texte-primaire)" }}>
-        {t("formulaireProjet.titre")}
-      </h3>
-
-      <div style={{ display: "grid", gap: 14 }}>
-        {/* Titre */}
-        <div>
-          <label style={labelStyle}>{t("formulaireProjet.titreChamp")}</label>
-          <input
-            autoFocus
-            value={form.titre}
-            onChange={(e) => màj("titre", e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") valider(); }}
-            placeholder={t("formulaireProjet.titrePlaceholder")}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Genre + Statut */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={labelStyle}>{t("formulaireProjet.genre")}</label>
-            <select value={form.genre} onChange={(e) => màj("genre", e.target.value)} style={inputStyle}>
-              {GENRES.map((g) => <option key={g}>{g}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>{t("formulaireProjet.statut")}</label>
-            <select value={form.statut} onChange={(e) => màj("statut", e.target.value)} style={inputStyle}>
-              {STATUTS.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Objectif mots */}
-        <div>
-          <label style={labelStyle}>{t("formulaireProjet.objectifMots")}</label>
-          <input
-            type="number"
-            value={form.objectifMots}
-            onChange={(e) => màj("objectifMots", e.target.value)}
-            min={1000} max={500000} step={1000}
-            style={inputStyle}
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label style={labelStyle}>{t("formulaireProjet.description")}</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => màj("description", e.target.value)}
-            placeholder={t("formulaireProjet.descriptionPlaceholder")}
-            rows={2}
-            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
-          />
-        </div>
-
-        {/* Couleur */}
-        <div>
-          <label style={labelStyle}>{t("formulaireProjet.couleur")}</label>
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            {COULEURS.map((c) => (
-              <div
-                key={c}
-                onClick={() => choisirCouleur(c)}
-                style={{
-                  width: 28, height: 28, borderRadius: "50%",
-                  background: c, cursor: "pointer",
-                  border: form.couleur === c ? `3px solid var(--texte-primaire)` : "3px solid transparent",
-                  transition: "border 0.15s",
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-          <button onClick={valider} style={btnPrimaryStyle(form.couleur)}>
-            {t("formulaireProjet.creer")}
-          </button>
-          <button onClick={onAnnuler} style={btnSecondaryStyle}>
-            {t("formulaireProjet.annuler")}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
-// ─── Composant : Vue projet (structure du manuscrit) ─────────────────────────────
+// Niveau de titre Word ("Titre1".."Titre6") → rôle dans la structure Cursus.
+// Réglable à l'écran de sélection (par défaut Titre1 = partie, Titre2 =
+// chapitre, comme avant) — ajouté 01/08/2026 : certains manuscrits utilisent
+// d'autres niveaux (ex. Titre2 = partie, Titre3 = chapitre) selon la mise en
+// forme Word d'origine ; ce n'est pas le NOM du style qui doit décider, mais
+// le niveau choisi par l'auteur.
+async function extraireChapitres(fichier, niveauPartie = "Titre1", niveauChapitre = "Titre2") {
+  const JSZip = await chargerJSZip();
+  const zip = await JSZip.loadAsync(await fichier.arrayBuffer());
+  const xml = await zip.file("word/document.xml").async("string");
 
-function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernierNœudVisitéId }) {
-  const { t } = useTranslation("common");
-  const [sélectionné, setSélectionné] = useState(null);
-  // Zones actuellement masquées dans l'arborescence (visuel uniquement) —
-  // chantier 28/07/2026. Défaut : tout afficher.
-  const [zonesMasquées, setZonesMasquées] = useState([]);
-  // Nœuds actuellement repliés dans l'arborescence (visuel uniquement,
-  // ensemble d'ids) — ajouté 01/08/2026, à la demande de Joseph, pour éviter
-  // une liste sans fin de chapitres/sous-chapitres. Le triangle par nœud
-  // (existant) bascule un seul id ; les boutons "Tout replier"/"Tout
-  // déplier" ci-dessous agissent sur l'ensemble d'un coup. Défaut : tout
-  // déplié, comme avant ce chantier.
-  const [nœudsRepliés, setNœudsRepliés] = useState(() => new Set());
-  const basculerRepli = useCallback((id) => {
-    setNœudsRepliés((prev) => {
-      const suivant = new Set(prev);
-      if (suivant.has(id)) suivant.delete(id); else suivant.add(id);
-      return suivant;
-    });
-  }, []);
-  const toutReplier = useCallback(() => {
-    const avecEnfants = new Set();
-    const parcourir = (liste) => {
-      for (const n of liste || []) {
-        if (n.enfants?.length) { avecEnfants.add(n.id); parcourir(n.enfants); }
-      }
-    };
-    parcourir(projet.structure);
-    setNœudsRepliés(avecEnfants);
-  }, [projet.structure]);
-  const toutDéplier = useCallback(() => setNœudsRepliés(new Set()), []);
-  const mots = totalMotsProjet(projet.structure);
+  const doc = new DOMParser().parseFromString(xml, "text/xml");
+  const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const paras = doc.getElementsByTagNameNS(ns, "p");
 
-  // Zones (hors corps) réellement présentes dans le projet — les chips de
-  // masquage ne s'affichent que pour elles : un projet qui n'utilise pas
-  // les zones garde une interface strictement identique à avant.
-  const zonesPrésentes = (() => {
-    const trouvées = new Set();
-    const parcourir = (liste) => {
-      for (const n of liste || []) {
-        const z = n.zone || "corps";
-        if (z !== "corps") trouvées.add(z);
-        if (n.enfants?.length) parcourir(n.enfants);
-      }
-    };
-    parcourir(projet.structure);
-    return Object.keys(ZONES_META).filter((z) => trouvées.has(z));
-  })();
+  // Styles à ignorer (table des matières, métadonnées)
+  const IGNORER = new Set([
+    "TM1","TM2","TM3","TM4","TM5","TM6","TM7","TM8","TM9",
+    "EntryChap","EntryPart","EntryNormal","EntrySub",
+    "TomeTitle","Volume","En-ttedetabledesmatires","Sous-titre",
+  ]);
 
-  // Trouve un nœud dans l'arbre local (pour calculer l'ordre du prochain enfant)
-  const trouverNœudLocal = (liste, id) => {
-    for (const n of liste) {
-      if (n.id === id) return n;
-      const trouvé = trouverNœudLocal(n.enfants || [], id);
-      if (trouvé) return trouvé;
+  const chapitres = [];
+  let courant = null;
+  let lignes = [];
+
+  for (const p of paras) {
+    const pStyle = p.getElementsByTagNameNS(ns, "pStyle")[0];
+    const style = pStyle?.getAttribute("w:val") || "";
+    const texte = Array.from(p.getElementsByTagNameNS(ns, "t"))
+      .map(t => t.textContent).join("").trim();
+
+    if (!texte || IGNORER.has(style)) continue;
+
+    if (style === niveauPartie) {
+      if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
+      courant = { titre: texte, type: "partie" };
+      lignes = [];
+    } else if (style === niveauChapitre) {
+      if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
+      courant = { titre: texte, type: "chapitre" };
+      lignes = [];
+    } else if (courant) {
+      lignes.push(texte);
     }
-    return null;
-  };
+  }
+  if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
 
-  // CORRECTIF 16/07/2026 — CRITIQUE : cette fonction ne faisait auparavant
-  // qu'une mise à jour locale (setProjets), sans jamais appeler nœudsAPI.créer().
-  // Résultat : les parties/chapitres créés dans l'interface n'existaient QUE
-  // dans le navigateur, avec un identifiant local inventé (genId()) — jamais
-  // transmis à Supabase. Le texte qu'on y écrivait ensuite tentait de se
-  // sauvegarder sur un identifiant que le serveur ne connaissait pas, échouant
-  // silencieusement. Toute perte de contenu constatée sur les projets créés
-  // avant ce correctif vient de là : le texte n'a jamais été réellement
-  // enregistré, il n'a pas été "effacé" après coup.
-  const ajouterNœud = useCallback(async (parentId, type) => {
-    const estRacine = parentId === projet.id;
-    const typeRéel = estRacine ? "partie" : type;
-    const parentRéel = trouverNœudLocal(projet.structure, parentId);
-    const ordre = estRacine
-      ? (projet.structure?.length || 0) + 1
-      : (parentRéel?.enfants?.length || 0) + 1;
+  return chapitres.filter(c => c.mots > 0);
+}
 
-    const { data, error } = await nœudsAPI.créer({
-      type: typeRéel,
-      titre: `${t(`structureTypes.${typeRéel}`)} sans titre`,
-      ordre,
-      parentId: estRacine ? null : parentId,
-      texte: "",
-    }, projet.id);
+const NIVEAUX_TITRE = ["Titre1", "Titre2", "Titre3", "Titre4", "Titre5", "Titre6"];
+const LIBELLÉ_NIVEAU = { Titre1: "Titre 1", Titre2: "Titre 2", Titre3: "Titre 3", Titre4: "Titre 4", Titre5: "Titre 5", Titre6: "Titre 6" };
 
-    if (error || !data) {
-      journaliserErreur("VueProjet:ajouterNœud", error?.message || "Échec de création sans erreur explicite", projet.id);
-      window.alert(t("erreur.creationNoeud") || "Impossible de créer cet élément. Réessayez ou contactez le support.");
-      return;
+// Normalise un titre pour la comparaison.
+// CORRECTIF 28/07/2026 — BUG DE COLLISION : l'ancienne version EFFAÇAIT le
+// numéro ("Chapitre 1", "Chapitre 2"… devenaient tous "chapitre "), si bien
+// que la "correspondance exacte" renvoyait le PREMIER nœud "Chapitre N" de
+// la liste pour TOUS les chapitres du Word. À l'import, les six textes
+// s'écrivaient successivement dans ce même nœud (le dernier écrasant les
+// autres) et les nœuds suivants restaient vides. Le numéro est désormais
+// CONSERVÉ dans la forme normalisée ("chapitre 1" ≠ "chapitre 2") ; seule
+// la ponctuation qui le suit est unifiée. Même correctif pour les parties
+// ("Partie I" / "Partie II", chiffres romains ou arabes).
+function normaliser(titre) {
+  return titre.toLowerCase()
+    .replace(/chapitre\s+(\d+)[\.\-—\s]*/gi, "chapitre $1 ")
+    .replace(/partie\s+([ivxlcdm\d]+)[\.\-—\s]*/gi, "partie $1 ")
+    .replace(/[^a-z0-9àâäéèêëîïôùûüç\s]/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+
+// Trouve le meilleur nœud existant pour un chapitre importé
+function trouverCorrespondance(chapitreImporté, nœuds) {
+  const titreN = normaliser(chapitreImporté.titre);
+  const motsN = titreN.split(" ").filter(m => m.length > 3);
+
+  let meilleurScore = 0;
+  let meilleur = null;
+
+  for (const n of nœuds) {
+    const titreEx = normaliser(n.titre);
+    
+    // Correspondance exacte après normalisation
+    if (titreEx === titreN) return n;
+
+    // Score par mots communs
+    const motsEx = titreEx.split(" ").filter(m => m.length > 3);
+    const communs = motsEx.filter(m => motsN.includes(m)).length;
+    const score = communs / Math.max(motsN.length, motsEx.length, 1);
+
+    if (score > meilleurScore) {
+      meilleurScore = score;
+      meilleur = n;
     }
+  }
 
-    const nouveauNœud = { id: data.id, type: data.type, titre: data.titre, texte: data.texte || "", zone: data.zone || "corps", enfants: [] };
+  return meilleurScore >= 0.3 ? meilleur : null;
+}
 
-    if (estRacine) {
-      onMàjStructure(projet.id, [...(projet.structure || []), nouveauNœud]);
-    } else {
-      const insérer = (liste) =>
-        liste.map((n) => {
-          if (n.id === parentId) {
-            return { ...n, enfants: [...(n.enfants || []), nouveauNœud] };
-          }
-          return { ...n, enfants: insérer(n.enfants || []) };
-        });
-      onMàjStructure(projet.id, insérer(projet.structure || []));
-    }
-  }, [projet, onMàjStructure, t]);
+// ─── Composant ────────────────────────────────────────────────────────────────
 
-  // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
-  const renommerNœud = useCallback(async (nœudId, nouveauTitre) => {
-    const { error } = await nœudsAPI.renommer(nœudId, nouveauTitre);
-    if (error) {
-      journaliserErreur("VueProjet:renommerNœud", error.message, projet.id);
-      window.alert(t("erreur.renommageNoeud") || "Impossible de renommer cet élément.");
-      return;
-    }
-    const renommer = (liste) =>
-      liste.map((n) =>
-        n.id === nœudId
-          ? { ...n, titre: nouveauTitre }
-          : { ...n, enfants: renommer(n.enfants || []) }
-      );
-    onMàjStructure(projet.id, renommer(projet.structure || []));
-  }, [projet, onMàjStructure, t]);
+export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, onFermer }) {
+  const [étape, setÉtape] = useState("sélection");
+  const [chapitres, setChapitres] = useState([]);
+  // index → { statut: "existant" | "nouveau" | "ignoré", nœudId: id | null }
+  // "existant" : correspondance trouvée dans la structure, texte remplacé.
+  // "nouveau"  : aucune correspondance, le nœud sera créé à l'import (par
+  //              défaut) — nœudId est renseigné une fois créé.
+  // "ignoré"   : aucune correspondance, l'auteur a choisi de ne pas créer ce
+  //              nœud (bascule manuelle depuis "nouveau").
+  const [associations, setAssociations] = useState({});
+  const [progression, setProgression] = useState(0);
+  const [erreur, setErreur] = useState(null);
+  const [nomFichier, setNomFichier] = useState("");
+  // Niveaux de titre Word à utiliser pour les Parties et les Chapitres —
+  // réglables avant l'analyse (par défaut Titre 1 / Titre 2, comme avant).
+  const [niveauPartie, setNiveauPartie] = useState("Titre1");
+  const [niveauChapitre, setNiveauChapitre] = useState("Titre2");
+  const inputRef = useRef(null);
+  const couleur = projet?.couleur || "#7F77DD";
 
-  // Change le niveau d'un nœud (partie / chapitre / scène) sans changer sa
-  // position dans l'arbre — ajouté 18/07/2026.
-  const changerTypeNœud = useCallback(async (nœudId, nouveauType) => {
-    const { error } = await nœudsAPI.changerType(nœudId, nouveauType);
-    if (error) {
-      journaliserErreur("VueProjet:changerTypeNœud", error.message, projet.id);
-      window.alert("Impossible de changer le niveau de cet élément.");
-      return;
-    }
-    const changer = (liste) =>
-      liste.map((n) =>
-        n.id === nœudId
-          ? { ...n, type: nouveauType }
-          : { ...n, enfants: changer(n.enfants || []) }
-      );
-    onMàjStructure(projet.id, changer(projet.structure || []));
-  }, [projet, onMàjStructure]);
+  const analyser = async (fichier) => {
+    if (!fichier?.name.endsWith(".docx")) { setErreur("Fichier .docx requis"); return; }
+    setNomFichier(fichier.name);
+    setÉtape("analyse");
+    setErreur(null);
+    try {
+      const résultat = await extraireChapitres(fichier, niveauPartie, niveauChapitre);
+      if (!résultat.length) { setErreur(`Aucun chapitre détecté. Vérifiez les styles ${LIBELLÉ_NIVEAU[niveauPartie]} / ${LIBELLÉ_NIVEAU[niveauChapitre]} dans Word.`); setÉtape("sélection"); return; }
 
-  // Change la zone de visibilité d'un nœud — chantier 28/07/2026.
-  // Contrairement à la promotion/rétrogradation, la zone ne cascade PAS
-  // automatiquement sur les enfants : elle le PROPOSE. Deux raisons :
-  // 1) pour l'export, marquer le seul nœud parent suffit déjà à emporter
-  //    tout son contenu (règle "un nœud exclu exclut tout ce qu'il
-  //    contient" dans exportWord.js) ;
-  // 2) mais cascader rend les badges 🔒 visibles sur chaque enfant dans
-  //    l'arborescence, ce qui peut être voulu (cartographie d'un coup
-  //    d'œil) ou non (bruit visuel). L'auteur décide.
-  // Si la cascade est acceptée, elle s'applique à TOUS les descendants
-  // (pas seulement les enfants directs) — une demi-cascade laisserait des
-  // petits-enfants incohérents avec la zone de leur sous-arbre.
-  const changerZoneNœud = useCallback(async (nœudId, nouvelleZone) => {
-    const nœudCible = trouverNœudLocal(projet.structure, nœudId);
-    if (!nœudCible) return;
-
-    const descendants = [];
-    const collecter = (n) => (n.enfants || []).forEach((e) => { descendants.push(e); collecter(e); });
-    collecter(nœudCible);
-
-    let appliquerAuxDescendants = false;
-    if (descendants.length > 0) {
-      appliquerAuxDescendants = window.confirm(
-        `Appliquer aussi la zone « ${ZONES_META[nouvelleZone].label} » aux ${descendants.length} élément(s) contenus dans « ${nœudCible.titre} » ?\n\n` +
-        `OK — oui, tout le contenu porte la même zone (badges visibles partout).\n` +
-        `Annuler — seulement « ${nœudCible.titre} » (à l'export, son contenu suivra de toute façon son sort).`
-      );
-    }
-
-    const ids = [nœudId, ...(appliquerAuxDescendants ? descendants.map((d) => d.id) : [])];
-    const résultats = await Promise.all(ids.map((id) => nœudsAPI.changerZone(id, nouvelleZone)));
-    const échec = résultats.find((r) => r.error);
-    if (échec) {
-      journaliserErreur("VueProjet:changerZoneNœud", échec.error.message, projet.id);
-      window.alert("Impossible de changer la zone de cet élément. Vérifiez que la migration Supabase du 28/07/2026 (colonne zone) a bien été exécutée.");
-      return;
-    }
-
-    const idsModifiés = new Set(ids);
-    const màj = (liste) =>
-      liste.map((n) => ({
-        ...n,
-        zone: idsModifiés.has(n.id) ? nouvelleZone : (n.zone || "corps"),
-        enfants: màj(n.enfants || []),
-      }));
-    onMàjStructure(projet.id, màj(projet.structure || []));
-  }, [projet, onMàjStructure]);
-
-  // Fait sortir un nœud de son parent actuel pour qu'il devienne le frère de
-  // ce parent (remonte d'un niveau dans la hiérarchie). Ajouté 18/07/2026,
-  // en réponse au constat que ni le sélecteur de type ni les flèches
-  // monter/descendre ne permettaient ce changement de niveau réel.
-  //
-  // MODIF 21/07/2026 — la promotion change désormais AUSSI le type du nœud,
-  // pas seulement sa position. Règle : le nœud promu prend le type de son
-  // ANCIEN PARENT, puisqu'il devient son frère (une scène directement sous
-  // un chapitre devient elle-même un chapitre une fois promue ; un chapitre
-  // promu devient une partie). Cette règle reste correcte même pour des
-  // scènes imbriquées à plusieurs niveaux (scène dans scène dans chapitre) :
-  // promouvoir la scène la plus profonde la fait juste devenir sœur de sa
-  // scène-parente immédiate, donc son type reste "scene" — inchangé, et
-  // c'est le comportement voulu.
-  const trouverContextePourPromotion = (liste, id, parentCourant = null, grandParentCourant = null) => {
-    for (const n of liste) {
-      if (n.id === id) {
-        return {
-          idParentActuel: parentCourant ? parentCourant.id : null,
-          typeParentActuel: parentCourant ? parentCourant.type : null,
-          idNouveauParent: grandParentCourant ? grandParentCourant.id : null,
-        };
-      }
-      if (n.enfants?.length) {
-        const résultat = trouverContextePourPromotion(n.enfants, id, n, parentCourant);
-        if (résultat) return résultat;
-      }
-    }
-    return null;
-  };
-
-  const promouvoirNœud = useCallback(async (nœudId) => {
-    const contexte = trouverContextePourPromotion(projet.structure || [], nœudId);
-    if (!contexte || !contexte.idParentActuel) return; // déjà à la racine
-
-    // Le nœud promu prend le type de son ancien parent (voir note ci-dessus).
-    // Si l'ancien parent n'a pas de type identifiable (cas normalement
-    // impossible ici puisqu'on vient de vérifier idParentActuel), on
-    // retombe sur "partie" par prudence plutôt que de planter.
-    const nouveauType = contexte.typeParentActuel || "partie";
-
-    const { error: erreurParent } = await nœudsAPI.changerParent(nœudId, contexte.idNouveauParent);
-    if (erreurParent) {
-      journaliserErreur("VueProjet:promouvoirNœud", erreurParent.message, projet.id);
-      window.alert("Impossible de déplacer cet élément vers un niveau supérieur.");
-      return;
-    }
-
-    // Deuxième appel, séparé : si celui-ci échoue, la position a quand même
-    // changé (le plus important) — on prévient sans tout annuler, l'auteur
-    // peut ajuster le type manuellement via le menu déroulant.
-    if (nouveauType !== undefined) {
-      const { error: erreurType } = await nœudsAPI.changerType(nœudId, nouveauType);
-      if (erreurType) {
-        journaliserErreur("VueProjet:promouvoirNœud (type)", erreurType.message, projet.id);
-        window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
-      }
-    }
-
-    // CASCADE 21/07/2026 — sans ça, promouvoir un chapitre en partie laissait
-    // ses scènes directes au type "scene", incohérent sous une partie (dont
-    // le type d'enfant attendu est "chapitre") : il fallait alors les
-    // reclasser une par une manuellement. Un seul niveau de cascade suffit —
-    // les petits-enfants restent cohérents automatiquement grâce à
-    // l'auto-imbrication des scènes (l'enfant d'une scène est une scène).
-    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
-    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
-    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
-    if (nouveauTypeEnfants) {
-      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
-      if (enfantsÀCorriger.length > 0) {
-        const résultats = await Promise.all(
-          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
-        );
-        const échec = résultats.find((r) => r.error);
-        if (échec) {
-          journaliserErreur("VueProjet:promouvoirNœud (cascade enfants)", échec.error.message, projet.id);
-          window.alert("L'élément a été promu, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
+      // Associer automatiquement chaque chapitre au nœud correspondant, ou
+      // le proposer comme nouveau nœud à créer à l'import s'il n'a pas de
+      // correspondance.
+      //
+      // CORRECTIF 01/08/2026 — un chapitre ("Titre2") sans AUCUNE partie
+      // ("Titre1") avant lui dans le document n'a pas de parent où
+      // l'accrocher : le créer quand même le place à la racine, EXACTEMENT
+      // au même niveau que les vraies parties (constaté en conditions
+      // réelles : 20 premiers chapitres d'un manuscrit sans partie
+      // introductive, tous créés comme s'ils étaient des parties). Ces
+      // chapitres "orphelins" sont désormais exclus par défaut (statut
+      // "ignoré", marqués `orphelin: true`) — l'auteur voit pourquoi et doit
+      // les inclure explicitement s'il veut vraiment les créer à la racine.
+      const assoc = {};
+      let auMoinsUnePartieVue = false;
+      résultat.forEach((ch, i) => {
+        const match = trouverCorrespondance(ch, nœudsExistants);
+        if (match) {
+          assoc[i] = { statut: "existant", nœudId: match.id };
+          if (ch.type === "partie") auMoinsUnePartieVue = true;
+          return;
         }
-        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
-        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
-      }
-    }
-
-    let nœudExtrait = null;
-    const extraire = (liste) =>
-      liste
-        .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
-          return true;
-        })
-        .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
-
-    const structureSansNœud = extraire(projet.structure || []);
-
-    const insérerAprèsAncienParent = (liste) => {
-      const idx = liste.findIndex((n) => n.id === contexte.idParentActuel);
-      if (idx !== -1) {
-        const copie = [...liste];
-        copie.splice(idx + 1, 0, nœudExtrait);
-        return copie;
-      }
-      return liste.map((n) => ({ ...n, enfants: insérerAprèsAncienParent(n.enfants || []) }));
-    };
-
-    onMàjStructure(projet.id, insérerAprèsAncienParent(structureSansNœud));
-  }, [projet, onMàjStructure]);
-
-  // Fait entrer un nœud comme dernier enfant de son frère précédent —
-  // descend d'un niveau dans la hiérarchie. Symétrique de promouvoirNœud
-  // ci-dessus. Ajouté le 21/07/2026, à la demande de Joseph : "si on monte
-  // on doit pouvoir descendre de niveau".
-  // Règle : le nœud rétrogradé prend le type ENFANT de son nouveau parent
-  // (le frère qui le précède) — une partie rétrogradée sous une autre
-  // partie devient un chapitre ; un chapitre rétrogradé sous un autre
-  // chapitre devient une scène ; une scène rétrogradée sous une autre
-  // scène reste une scène (imbrication).
-  const rétrograderNœud = useCallback(async (nœudId) => {
-    const trouverFratrieEtIndexPourRétrogradation = (liste) => {
-      const index = liste.findIndex((n) => n.id === nœudId);
-      if (index !== -1) return { fratrie: liste, index };
-      for (const n of liste) {
-        const trouvé = trouverFratrieEtIndexPourRétrogradation(n.enfants || []);
-        if (trouvé) return trouvé;
-      }
-      return null;
-    };
-
-    const résultat = trouverFratrieEtIndexPourRétrogradation(projet.structure || []);
-    if (!résultat) return;
-    const { fratrie, index } = résultat;
-    if (index === 0) return; // pas de frère précédent pour devenir son nouveau parent
-
-    const nouveauParent = fratrie[index - 1];
-    const nouveauType = STRUCTURE_TYPES_META[nouveauParent.type]?.enfant;
-    if (!nouveauType) return; // sécurité : ne devrait jamais arriver (tous les types ont un enfant défini)
-
-    const { error: erreurParent } = await nœudsAPI.changerParent(nœudId, nouveauParent.id);
-    if (erreurParent) {
-      journaliserErreur("VueProjet:rétrograderNœud", erreurParent.message, projet.id);
-      window.alert("Impossible de déplacer cet élément vers un niveau inférieur.");
-      return;
-    }
-
-    const { error: erreurType } = await nœudsAPI.changerType(nœudId, nouveauType);
-    if (erreurType) {
-      journaliserErreur("VueProjet:rétrograderNœud (type)", erreurType.message, projet.id);
-      window.alert("L'élément a été déplacé, mais son niveau (icône) n'a pas pu être mis à jour automatiquement. Vous pouvez le corriger via le menu déroulant à côté de son titre.");
-    }
-
-    // CASCADE 21/07/2026 — symétrique de celle de promouvoirNœud : une
-    // partie rétrogradée en chapitre doit voir ses chapitres directs
-    // devenir des scènes, sinon la hiérarchie reste incohérente.
-    const nœudAvantExtraction = trouverNœudLocal(projet.structure, nœudId);
-    const nouveauTypeEnfants = STRUCTURE_TYPES_META[nouveauType]?.enfant;
-    let enfantsMisÀJour = nœudAvantExtraction?.enfants || [];
-    if (nouveauTypeEnfants) {
-      const enfantsÀCorriger = enfantsMisÀJour.filter((e) => e.type !== nouveauTypeEnfants);
-      if (enfantsÀCorriger.length > 0) {
-        const résultats = await Promise.all(
-          enfantsÀCorriger.map((e) => nœudsAPI.changerType(e.id, nouveauTypeEnfants))
-        );
-        const échec = résultats.find((r) => r.error);
-        if (échec) {
-          journaliserErreur("VueProjet:rétrograderNœud (cascade enfants)", échec.error.message, projet.id);
-          window.alert("L'élément a été rétrogradé, mais certains de ses éléments enfants directs n'ont pas pu être reclassés automatiquement. Vérifiez leur niveau via le menu déroulant si besoin.");
+        if (ch.type === "partie") {
+          assoc[i] = { statut: "nouveau", nœudId: null };
+          auMoinsUnePartieVue = true;
+          return;
         }
-        const idsCorrigés = new Set(enfantsÀCorriger.map((e) => e.id));
-        enfantsMisÀJour = enfantsMisÀJour.map((e) => idsCorrigés.has(e.id) ? { ...e, type: nouveauTypeEnfants } : e);
-      }
-    }
-
-    let nœudExtrait = null;
-    const extraire = (liste) =>
-      liste
-        .filter((n) => {
-          if (n.id === nœudId) { nœudExtrait = { ...n, type: nouveauType, enfants: enfantsMisÀJour }; return false; }
-          return true;
-        })
-        .map((n) => ({ ...n, enfants: extraire(n.enfants || []) }));
-
-    const structureSansNœud = extraire(projet.structure || []);
-
-    const insérerCommeDernierEnfant = (liste) =>
-      liste.map((n) => {
-        if (n.id === nouveauParent.id) {
-          return { ...n, enfants: [...(n.enfants || []), nœudExtrait] };
-        }
-        return { ...n, enfants: insérerCommeDernierEnfant(n.enfants || []) };
+        assoc[i] = auMoinsUnePartieVue
+          ? { statut: "nouveau", nœudId: null }
+          : { statut: "ignoré", nœudId: null, orphelin: true };
       });
 
-    onMàjStructure(projet.id, insérerCommeDernierEnfant(structureSansNœud));
-  }, [projet, onMàjStructure]);
-
-  // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
-  // Trouve le titre d'un nœud dans l'arbre, pour l'afficher dans la
-  // confirmation de suppression — pour que l'auteur sache précisément ce
-  // qu'il s'apprête à effacer, pas juste "cet élément".
-  const trouverTitreNœud = (liste, id) => {
-    for (const n of liste) {
-      if (n.id === id) return n.titre;
-      const trouvé = trouverTitreNœud(n.enfants || [], id);
-      if (trouvé) return trouvé;
+      setChapitres(résultat);
+      setAssociations(assoc);
+      setÉtape("confirmation");
+    } catch(e) {
+      setErreur("Erreur de lecture : " + e.message);
+      setÉtape("sélection");
     }
-    return null;
   };
 
-  // Trouve un nœud complet (pas juste son titre) pour pouvoir compter ses
-  // descendants avant suppression.
-  const trouverNœudComplet = (liste, id) => {
-    for (const n of liste) {
-      if (n.id === id) return n;
-      const trouvé = trouverNœudComplet(n.enfants || [], id);
-      if (trouvé) return trouvé;
-    }
-    return null;
+  // Bascule un chapitre sans correspondance entre "nouveau" (sera créé) et
+  // "ignoré" (laissé de côté) — sans effet sur les chapitres déjà associés
+  // à un nœud existant.
+  const basculerStatut = (i) => {
+    setAssociations((prev) => {
+      const courant = prev[i];
+      if (!courant || courant.statut === "existant") return prev;
+      return { ...prev, [i]: { ...courant, statut: courant.statut === "nouveau" ? "ignoré" : "nouveau" } };
+    });
   };
 
-  const compterDescendants = (nœud) => {
-    let total = 0;
-    for (const enfant of nœud.enfants || []) {
-      total += 1 + compterDescendants(enfant);
-    }
-    return total;
-  };
+  const importer = async () => {
+    setÉtape("import");
+    setProgression(0);
+    setErreur(null);
 
-  // CORRECTIF 18/07/2026 — CRITIQUE : la suppression n'exigeait auparavant
-  // aucune confirmation, alors que les boutons "renommer" (✎) et "supprimer"
-  // (✕) sont très proches l'un de l'autre. Un chapitre entier a été perdu
-  // par un clic accidentel. La suppression en base est définitive (pas de
-  // corbeille) — la confirmation est donc la seule protection réelle tant
-  // qu'il n'existe pas de corbeille ou d'historique permanent (voir mémoire
-  // sur le chantier d'historique daté, toujours en attente).
-  //
-  // CORRECTIF 18/07/2026 (bis) — la confirmation ci-dessus ne prévenait pas
-  // que la suppression est en CASCADE : supprimer un chapitre supprime aussi
-  // silencieusement tout ce qu'il contient. Un second chapitre a été perdu
-  // de cette façon le jour même. Le message indique désormais explicitement
-  // le nombre d'éléments enfants qui seront supprimés avec.
-  const supprimerNœud = useCallback(async (nœudId) => {
-    const nœudCible = trouverNœudComplet(projet.structure || [], nœudId);
-    const titre = nœudCible?.titre || "cet élément";
-    const nbDescendants = nœudCible ? compterDescendants(nœudCible) : 0;
+    const àFaire = chapitres
+      .map((ch, i) => ({ ch, i, décision: associations[i] }))
+      .filter(({ décision }) => décision && décision.statut !== "ignoré");
+    let fait = 0;
 
-    const message = nbDescendants > 0
-      ? (t("confirmations.supprimerNoeudAvecEnfants", { titre, count: nbDescendants }) ||
-         `Supprimer « ${titre} » ET ses ${nbDescendants} éléments enfants (sous-parties, notes, bibliographie) ? Cette action est définitive et ne peut pas être annulée.`)
-      : (t("confirmations.supprimerNoeud", { titre }) ||
-         `Supprimer « ${titre} » ? Cette action est définitive et ne peut pas être annulée.`);
+    // Nœuds CRÉÉS par cet import, groupés par parent — pour le passage
+    // unique de réordonnancement en fin d'import (voir note en tête de
+    // fichier sur la limite connue de ce renumérotage).
+    const groupesParParent = {};
+    let dernièrePartieId = null;
 
-    const confirmé = window.confirm(message);
-    if (!confirmé) return;
-
-    const { error } = await nœudsAPI.supprimer(nœudId);
-    if (error) {
-      journaliserErreur("VueProjet:supprimerNœud", error.message, projet.id);
-      window.alert(t("erreur.suppressionNoeud") || "Impossible de supprimer cet élément.");
-      return;
-    }
-    const supprimer = (liste) =>
-      liste
-        .filter((n) => n.id !== nœudId)
-        .map((n) => ({ ...n, enfants: supprimer(n.enfants || []) }));
-    onMàjStructure(projet.id, supprimer(projet.structure || []));
-    if (sélectionné === nœudId) setSélectionné(null);
-  }, [projet, onMàjStructure, sélectionné, t]);
-
-  // Échange l'ordre d'un nœud avec son frère adjacent (haut ou bas), au même
-  // niveau de la hiérarchie. Utilise nœudsAPI.réordonner(), déjà présente
-  // côté API mais jamais branchée à une interface jusqu'au 17/07/2026.
-  const déplacerNœud = useCallback(async (nœudId, direction) => {
-    // Trouve la liste des frères (même parent) contenant ce nœud, à
-    // n'importe quel niveau de l'arbre.
-    const trouverFratrieEtIndex = (liste) => {
-      const index = liste.findIndex((n) => n.id === nœudId);
-      if (index !== -1) return { fratrie: liste, index };
-      for (const n of liste) {
-        const trouvé = trouverFratrieEtIndex(n.enfants || []);
-        if (trouvé) return trouvé;
-      }
-      return null;
-    };
-
-    const résultat = trouverFratrieEtIndex(projet.structure || []);
-    if (!résultat) return;
-    const { fratrie, index } = résultat;
-    const indexCible = direction === "haut" ? index - 1 : index + 1;
-    if (indexCible < 0 || indexCible >= fratrie.length) return;
-
-    const nœudA = fratrie[index];
-    const nœudB = fratrie[indexCible];
-    const ordreA = nœudA.ordre ?? index;
-    const ordreB = nœudB.ordre ?? indexCible;
-
-    const { error } = await nœudsAPI.réordonner([
-      { id: nœudA.id, ordre: ordreB },
-      { id: nœudB.id, ordre: ordreA },
-    ]);
-    if (error) {
-      journaliserErreur("VueProjet:déplacerNœud", error.message, projet.id);
-      window.alert(t("erreur.deplacementNoeud") || "Impossible de déplacer cet élément.");
-      return;
-    }
-
-    // Reconstruit localement la structure avec les deux nœuds échangés et
-    // les ordres mis à jour, sans attendre un rechargement complet.
-    const échanger = (liste) => {
-      const idx = liste.findIndex((n) => n.id === nœudId);
-      if (idx !== -1) {
-        const idxCible = direction === "haut" ? idx - 1 : idx + 1;
-        const copie = [...liste];
-        [copie[idx], copie[idxCible]] = [
-          { ...copie[idxCible], ordre: ordreA },
-          { ...copie[idx], ordre: ordreB },
-        ];
-        return copie;
-      }
-      return liste.map((n) => ({ ...n, enfants: échanger(n.enfants || []) }));
-    };
-    onMàjStructure(projet.id, échanger(projet.structure || []));
-  }, [projet, onMàjStructure, t]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* En-tête projet */}
-      <div style={{
-        padding: "16px 20px",
-        borderBottom: "0.5px solid var(--border)",
-        display: "flex", alignItems: "center", gap: 12,
-      }}>
-        <button onClick={onRetour} style={{ ...btnIconStyle, fontSize: 18 }} title={t("actions.retourAuxProjets")}>←</button>
-        <div style={{ width: 10, height: 10, borderRadius: "50%", background: projet.couleur }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: "var(--texte-primaire)" }}>{projet.titre}</div>
-          <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-            {t("mots", { count: mots })} · {projet.genre} · <BadgeStatut statut={projet.statut} />
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: projet.couleur }}>
-            {Math.min(100, Math.round((mots / projet.objectifMots) * 100))}%
-          </div>
-          <div style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-            / {projet.objectifMots.toLocaleString("fr-FR")} {t("mots", { count: projet.objectifMots }).replace(/^\S+\s/, "")}
-          </div>
-        </div>
-      </div>
-
-      {/* Barre de progression */}
-      <div style={{ padding: "8px 20px", borderBottom: "0.5px solid var(--border)" }}>
-        <BarreProgression valeur={mots} max={projet.objectifMots} couleur={projet.couleur} />
-      </div>
-
-      {/* Structure — liste scrollable */}
-      <div style={{ overflowY: "auto", padding: "12px 12px", maxHeight: sélectionné ? "40%" : "100%" }}>
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          marginBottom: 8, padding: "0 8px",
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: "var(--texte-tertiaire)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-            {t("vueProjet.structureManuscrit")}
-          </span>
-          {/* Chips de masquage par zone — chantier 28/07/2026. Visibles
-              uniquement si le projet contient des nœuds hors corps. Cliquer
-              une chip masque/réaffiche visuellement la zone (aucun impact
-              données). */}
-          {zonesPrésentes.length > 0 && (
-            <div style={{ display: "flex", gap: 4 }}>
-              {zonesPrésentes.map((z) => {
-                const masquée = zonesMasquées.includes(z);
-                return (
-                  <button
-                    key={z}
-                    onClick={() =>
-                      setZonesMasquées((prev) =>
-                        masquée ? prev.filter((x) => x !== z) : [...prev, z]
-                      )
-                    }
-                    title={masquée
-                      ? `Réafficher les nœuds « ${ZONES_META[z].label} »`
-                      : `Masquer visuellement les nœuds « ${ZONES_META[z].label} » (aucune suppression)`}
-                    style={{
-                      fontSize: 10, padding: "1px 6px", borderRadius: 10,
-                      border: `0.5px solid ${ZONES_META[z].couleur}40`,
-                      background: masquée ? "transparent" : `${ZONES_META[z].couleur}12`,
-                      color: ZONES_META[z].couleur,
-                      opacity: masquée ? 0.45 : 1,
-                      cursor: "pointer", fontFamily: "inherit",
-                      textDecoration: masquée ? "line-through" : "none",
-                    }}
-                  >
-                    {ZONES_META[z].badge} {ZONES_META[z].label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {nœudsRepliés.size > 0 ? (
-              <button
-                onClick={toutDéplier}
-                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                title="Déplier toute la structure"
-              >
-                ▾ Tout déplier
-              </button>
-            ) : (
-              <button
-                onClick={toutReplier}
-                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                title="Replier toute la structure (parties et chapitres visibles, contenu masqué)"
-              >
-                ▸ Tout replier
-              </button>
-            )}
-            <button
-              onClick={() => ajouterNœud(projet.id, "partie")}
-              style={{
-                fontSize: 11, color: projet.couleur,
-                background: "none", border: "none", cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-              title={t("vueProjet.ajouterPartieTitre")}
-            >
-              {t("vueProjet.ajouterPartie")}
-            </button>
-          </div>
-        </div>
-
-        {projet.structure?.length === 0 ? (
-          <div style={{
-            textAlign: "center", padding: "32px 16px",
-            color: "var(--texte-tertiaire)", fontSize: 13,
-          }}>
-            <div style={{ fontSize: 32, marginBottom: 10 }}>📄</div>
-            <div style={{ marginBottom: 8 }}>{t("vueProjet.aucuneStructure")}</div>
-            <button
-              onClick={() => ajouterNœud(projet.id, "partie")}
-              style={btnPrimaryStyle(projet.couleur)}
-            >
-              {t("vueProjet.ajouterPremierePartie")}
-            </button>
-          </div>
-        ) : (
-          projet.structure.map((nœud, index) => (
-            <NœudStructure
-              key={nœud.id}
-              nœud={nœud}
-              profondeur={0}
-              projetCouleur={projet.couleur}
-              sélectionné={sélectionné}
-              onSélectionner={setSélectionné}
-              onAjouter={ajouterNœud}
-              onRenommer={renommerNœud}
-              onSupprimer={supprimerNœud}
-              onDéplacer={déplacerNœud}
-              estPremier={index === 0}
-              estDernier={index === projet.structure.length - 1}
-              dernierNœudVisitéId={dernierNœudVisitéId}
-              onChangerType={changerTypeNœud}
-              estRacine={true}
-              onPromouvoir={promouvoirNœud}
-              onRétrograder={rétrograderNœud}
-              onChangerZone={changerZoneNœud}
-              zonesMasquées={zonesMasquées}
-              nœudsRepliés={nœudsRepliés}
-              onBasculerRepli={basculerRepli}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Panneau : aperçu du nœud sélectionné */}
-      {sélectionné && (
-        <PanneauNœud
-          nœudId={sélectionné}
-          structure={projet.structure}
-          couleur={projet.couleur}
-          onOuvrirÉditeur={(id) => onOuvrirÉditeur(projet.id, id)}
-          onMàjTexte={(id, texte) => {
-            const màj = (liste) =>
-              liste.map((n) =>
-                n.id === id ? { ...n, texte } : { ...n, enfants: màj(n.enfants || []) }
-              );
-            onMàjStructure(projet.id, màj(projet.structure));
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// ─── Composant : Panneau du nœud sélectionné ─────────────────────────────────────
-
-function PanneauNœud({ nœudId, structure, couleur, onMàjTexte, onOuvrirÉditeur }) {
-  const { t } = useTranslation("common");
-  const trouver = (liste, id) => {
-    for (const n of liste) {
-      if (n.id === id) return n;
-      const trouvé = trouver(n.enfants || [], id);
-      if (trouvé) return trouvé;
-    }
-    return null;
-  };
-
-  const nœud = trouver(structure, nœudId);
-  if (!nœud) return null;
-
-  const mots = compterMots(nœud.texte);
-  const aContenu = nœud.texte && nœud.texte.length > 0;
-
-  return (
-    <div style={{
-      borderTop: `2px solid ${couleur}30`,
-      display: "flex", flexDirection: "column",
-      flex: 1, minHeight: 0, overflow: "hidden",
-      background: `${couleur}04`,
-    }}>
-      {/* En-tête du panneau */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 16px", borderBottom: `0.5px solid ${couleur}20`,
-        flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: couleur }}>
-          {STRUCTURE_TYPES_META[nœud.type]?.icone} {nœud.titre}
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {mots > 0 && (
-            <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>
-              {t("mots", { count: mots })}
-            </span>
-          )}
-          <button
-            onClick={() => onOuvrirÉditeur(nœud.id)}
-            style={{
-              fontSize: 11, color: "#fff",
-              background: couleur, border: "none",
-              borderRadius: 6, padding: "5px 12px",
-              cursor: "pointer", fontFamily: "inherit", fontWeight: 500,
-            }}
-          >
-            {t("panneauNoeud.ouvrirEditeur")}
-          </button>
-        </div>
-      </div>
-
-      {/* Aperçu du contenu */}
-      <div style={{
-        flex: 1, overflowY: "auto",
-        padding: "16px 20px",
-        fontFamily: "Georgia, 'Times New Roman', serif",
-        fontSize: 14, lineHeight: 1.8,
-        color: "var(--texte-primaire)",
-      }}>
-        {aContenu ? (
-          <div dangerouslySetInnerHTML={{ __html: nœud.texte }} />
-        ) : (
-          <div style={{
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            height: "100%", gap: 12, color: "var(--texte-tertiaire)",
-            textAlign: "center", padding: "24px",
-          }}>
-            <div style={{ fontSize: 28 }}>✍️</div>
-            <div style={{ fontSize: 13 }}>{t("panneauNoeud.chapitreVide")}</div>
-            <button
-              onClick={() => onOuvrirÉditeur(nœud.id)}
-              style={{
-                background: couleur, color: "#fff", border: "none",
-                borderRadius: 8, padding: "8px 16px", fontSize: 13,
-                fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              {t("panneauNoeud.commencerAEcrire")}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Styles réutilisables ─────────────────────────────────────────────────────────
-
-const labelStyle = {
-  display: "block", fontSize: 12, fontWeight: 500,
-  color: "var(--texte-secondaire)", marginBottom: 5,
-};
-
-const inputStyle = {
-  width: "100%", padding: "8px 10px",
-  border: "0.5px solid var(--border)", borderRadius: 8,
-  fontSize: 13, color: "var(--texte-primaire)",
-  background: "var(--surface)", fontFamily: "inherit",
-  outline: "none", boxSizing: "border-box",
-};
-
-const btnPrimaryStyle = (couleur) => ({
-  background: couleur, color: "#fff",
-  border: "none", borderRadius: 8,
-  padding: "8px 16px", fontSize: 13,
-  fontWeight: 500, cursor: "pointer",
-  fontFamily: "inherit",
-});
-
-const btnSecondaryStyle = {
-  background: "transparent",
-  border: "0.5px solid var(--border)",
-  borderRadius: 8, padding: "8px 16px",
-  fontSize: 13, color: "var(--texte-secondaire)",
-  cursor: "pointer", fontFamily: "inherit",
-};
-
-// ─── Composant principal : App ────────────────────────────────────────────────────
-
-export default function App() {
-  const { t } = useTranslation("common");
-  const { user, chargement: authChargement, déconnecter } = useAuth();
-
-  if (authChargement) return (
-    <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui", color: "#999", fontSize: 14 }}>
-      {t("chargement")}
-    </div>
-  );
-  if (!user) return <PageConnexion />;
-
-  return <AppConnectée user={user} déconnecter={déconnecter} />;
-}
-
-// ─── Composant : App connectée (après auth) ───────────────────────────────────
-
-function AppConnectée({ user, déconnecter }) {
-  const { t, i18n } = useTranslation("common");
-  const [projets, setProjets]   = useState([]);
-  const [chargement, setChargement] = useState(true);
-  const [vue, setVue]           = useState("tableau");
-  const [projetActifId, setProjetActifId] = useState(null);
-  // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
-  // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
-  // pour permettre la mise en garde en rouge demandée par Joseph.
-  const [confirmationSuppression, setConfirmationSuppression] = useState(null);
-  const [nœudActifId, setNœudActifId]     = useState(null);
-  const [importOuvert, setImportOuvert]   = useState(false);
-  const [incorporerOuvert, setIncorporerOuvert] = useState(false);
-  const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
-  const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
-  const [aideOuverte, setAideOuverte]                     = useState(false);
-  const [exportEnCours, setExportEnCours]                 = useState(false);
-  const [formatExport, setFormatExport]                   = useState("a4");
-  // Zones de visibilité incluses à l'export Word — chantier 28/07/2026.
-  // Défaut : corps seul. Le dernier choix est mémorisé PAR PROJET dans
-  // localStorage — simple préférence d'interface, pas une donnée du
-  // manuscrit (la règle "le localStorage n'est plus utilisé" de l'en-tête
-  // vise les données de projet, perdues jadis faute de Supabase ; une
-  // préférence d'affichage re-déductible en deux clics n'en fait pas
-  // partie). Confort visé : la "version famille" et la "version
-  // praticiens" se ré-exportent à l'identique sans recocher à chaque fois.
-  const [zonesExport, setZonesExport]                     = useState(["corps"]);
-
-  useEffect(() => {
-    if (!projetActifId) return;
     try {
-      const mémo = localStorage.getItem(`cursus-zones-export-${projetActifId}`);
-      const parsé = mémo ? JSON.parse(mémo) : null;
-      setZonesExport(Array.isArray(parsé) && parsé.length > 0 ? parsé : ["corps"]);
-    } catch {
-      setZonesExport(["corps"]);
-    }
-  }, [projetActifId]);
+      for (const { ch, i, décision } of àFaire) {
+        let nœudId = décision.nœudId;
 
-  const basculerZoneExport = (clé) => {
-    setZonesExport((prev) => {
-      const suivant = prev.includes(clé) ? prev.filter((z) => z !== clé) : [...prev, clé];
-      if (suivant.length === 0) return prev; // au moins une zone incluse
-      try {
-        localStorage.setItem(`cursus-zones-export-${projetActifId}`, JSON.stringify(suivant));
-      } catch { /* stockage indisponible : le choix vaut pour la session en cours */ }
-      return suivant;
-    });
-  };
+        if (décision.statut === "nouveau") {
+          const parentId = ch.type === "partie" ? null : dernièrePartieId;
+          const { data, error } = await nœudsAPI.créer({
+            type: ch.type,
+            titre: ch.titre,
+            parentId,
+            texte: ch.html,
+          }, projet.id);
+          if (error || !data) throw error || new Error("Échec de création du nœud « " + ch.titre + " »");
+          nœudId = data.id;
 
-  // ── Largeur redimensionnable du panneau Co-pilote IA ──
-  const [largeurPanneau, setLargeurPanneau] = useState(280);
-  const [texteSélectionné, setTexteSélectionné] = useState("");
-  const redimensionnementActif = useRef(false);
-  const positionDépart = useRef({ x: 0, largeur: 280 });
-
-  const démarrerRedimensionnement = useCallback((e) => {
-    e.preventDefault();
-    redimensionnementActif.current = true;
-    positionDépart.current = { x: e.clientX, largeur: largeurPanneau };
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }, [largeurPanneau]);
-
-  useEffect(() => {
-    const surDéplacement = (e) => {
-      if (!redimensionnementActif.current) return;
-      const delta = positionDépart.current.x - e.clientX;
-      const nouvelleLargeur = positionDépart.current.largeur + delta;
-      setLargeurPanneau(Math.min(560, Math.max(220, nouvelleLargeur)));
-    };
-    const surRelâchement = () => {
-      if (redimensionnementActif.current) {
-        redimensionnementActif.current = false;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      }
-    };
-    window.addEventListener("mousemove", surDéplacement);
-    window.addEventListener("mouseup", surRelâchement);
-    return () => {
-      window.removeEventListener("mousemove", surDéplacement);
-      window.removeEventListener("mouseup", surRelâchement);
-    };
-  }, []);
-
-  // L'ADN du projet (10 questions de niveau 1) — socle de démarrage, présenté
-  // comme rassurant, pas comme une contrainte juridique. Tant qu'il n'est pas
-  // complet, un rappel discret réapparaît à l'ouverture du projet.
-  useEffect(() => {
-    if (!projetActifId || projetVenantDêtreCréé) return;
-
-    const vérifier = async () => {
-      const { data: adn } = await supabase
-        .from("banque_questions")
-        .select("id")
-        .eq("niveau", 1);
-
-      const { data: réponses } = await supabase
-        .from("reponses_questionnaire")
-        .select("question_id")
-        .eq("projet_id", projetActifId);
-
-      const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
-      const toutComplet = (adn || []).every((q) => idsRépondus.has(q.id));
-
-      setRappelIntentionPour(toutComplet ? null : projetActifId);
-    };
-    vérifier();
-  }, [projetActifId, projetVenantDêtreCréé]);
-
-  // Chargement initial des projets depuis Supabase
-  useEffect(() => {
-    const init = async () => {
-      setChargement(true);
-      const { data, error } = await projetsAPI.lister();
-      if (!error && data) {
-        const projetsAvecStructure = await Promise.all(
-          data.map(async (p) => {
-            const { data: noeuds } = await nœudsAPI.listerParProjet(p.id);
-            return { ...normaliserProjet(p), structure: construireArbre(noeuds || []) };
-          })
-        );
-        setProjets(projetsAvecStructure);
-      }
-      setChargement(false);
-    };
-    init();
-  }, []);
-
-  // Normalise les noms de colonnes Supabase → noms React (camelCase)
-  const normaliserProjet = (p) => ({
-    id:           p.id,
-    titre:        p.titre,
-    genre:        p.genre,
-    statut:       p.statut,
-    couleur:      p.couleur,
-    objectifMots: p.objectif_mots,
-    description:  p.description,
-    dateCreation: p.date_creation,
-    // langue : colonne à confirmer sur `projets` (chantier i18n) — fallback 'fr'
-    // tant que la migration n'est pas confirmée exécutée.
-    langue:       p.langue || "fr",
-    structure:    p.structure || [],
-  });
-
-  const construireArbre = (nœudsPlats) => {
-    const map = {};
-    nœudsPlats.forEach((n) => {
-      map[n.id] = { ...n, enfants: [] };
-    });
-    const racines = [];
-    nœudsPlats.forEach((n) => {
-      if (n.parent_id && map[n.parent_id]) {
-        map[n.parent_id].enfants.push(map[n.id]);
-      } else {
-        racines.push(map[n.id]);
-      }
-    });
-    racines.forEach((r) => trierEnfants(r));
-    return racines;
-  };
-
-  const trierEnfants = (nœud) => {
-    nœud.enfants?.sort((a, b) => a.ordre - b.ordre);
-    nœud.enfants?.forEach(trierEnfants);
-  };
-
-  const projetActif = projets.find((p) => p.id === projetActifId);
-
-  // Le projet actif contient-il au moins un nœud hors zone "corps" ?
-  // Si non, le sélecteur de zones à l'export ne s'affiche pas du tout :
-  // un projet qui n'utilise pas les zones garde une barre d'actions
-  // strictement identique à avant le chantier. Chantier 28/07/2026.
-  const projetActifUtiliseZones = (() => {
-    if (!projetActif) return false;
-    const parcourir = (liste) => {
-      for (const n of liste || []) {
-        if ((n.zone || "corps") !== "corps") return true;
-        if (n.enfants?.length && parcourir(n.enfants)) return true;
-      }
-      return false;
-    };
-    return parcourir(projetActif.structure);
-  })();
-
-  // Synchronise la langue de l'interface i18next sur la langue DU PROJET actif
-  // (règle du chantier : la langue est par projet, pas par compte).
-  useEffect(() => {
-    const langueCible = projetActif?.langue || "fr";
-    if (i18n.language !== langueCible) i18n.changeLanguage(langueCible);
-  }, [projetActif?.langue, i18n]);
-
-  const trouverNœud = (structure = [], id) => {
-    for (const n of structure) {
-      if (n.id === id) return n;
-      const trouvé = trouverNœud(n.enfants || [], id);
-      if (trouvé) return trouvé;
-    }
-    return null;
-  };
-
-  const nœudActif = projetActif ? trouverNœud(projetActif.structure, nœudActifId) : null;
-
-  // Calcule le contexte hiérarchique d'un nœud (titre de la partie parente,
-  // titres des chapitres frères déjà nommés) — utilisé par le co-pilote pour
-  // l'aide au démarrage d'un chapitre SANS TITRE. Ajouté le 20/07/2026.
-  const trouverContexteHiérarchique = (structure, id) => {
-    const chercherChemin = (liste, cible, chemin) => {
-      for (const n of liste) {
-        if (n.id === cible) return [...chemin, n];
-        if (n.enfants?.length) {
-          const trouvé = chercherChemin(n.enfants, cible, [...chemin, n]);
-          if (trouvé) return trouvé;
+          const clé = parentId || "__racine__";
+          (groupesParParent[clé] ||= []).push(nœudId);
+        } else {
+          await nœudsAPI.sauvegarderTexte(nœudId, ch.html);
         }
+
+        if (ch.type === "partie") dernièrePartieId = nœudId;
+
+        fait++;
+        setProgression(Math.round((fait / àFaire.length) * 100));
       }
-      return null;
-    };
-    const chemin = chercherChemin(structure || [], id, []);
-    if (!chemin) return { titrePartieParente: null, titresChapitresVoisins: [] };
 
-    const nœudCible = chemin[chemin.length - 1];
-    const parentDirect = chemin.length >= 2 ? chemin[chemin.length - 2] : null;
+      const misÀJour = Object.values(groupesParParent).flatMap((ids) => ids.map((id, ordre) => ({ id, ordre })));
+      if (misÀJour.length > 0) {
+        const { error } = await nœudsAPI.réordonner(misÀJour);
+        if (error) throw error;
+      }
 
-    // Remonte le chemin pour trouver l'ancêtre le plus proche de type "partie"
-    const partieAncêtre = [...chemin].reverse().find((n) => n.type === "partie" && n.id !== nœudCible.id);
-    const titrePartieParente = partieAncêtre?.titre || null;
-
-    // Frères du même niveau (même parent direct, ou racine du projet si le
-    // nœud est lui-même une partie), limités aux chapitres déjà nommés
-    // (on exclut les autres chapitres eux-mêmes encore "sans titre").
-    const fratrie = parentDirect ? (parentDirect.enfants || []) : (structure || []);
-    const titresChapitresVoisins = fratrie
-      .filter((n) => n.id !== nœudCible.id && n.type === "chapitre" && n.titre && !/sans titre|untitled/i.test(n.titre))
-      .map((n) => n.titre);
-
-    return { titrePartieParente, titresChapitresVoisins };
-  };
-
-  const contexteHiérarchiqueActif = (projetActif && nœudActif)
-    ? trouverContexteHiérarchique(projetActif.structure, nœudActif.id)
-    : { titrePartieParente: null, titresChapitresVoisins: [] };
-
-  // ── Actions projets ──
-
-  const créerProjet = async (données) => {
-    const { data, error } = await projetsAPI.créer(données);
-    if (!error && data) {
-      const nouveau = { ...normaliserProjet(data), structure: [] };
-      setProjets((prev) => [nouveau, ...prev]);
-      setProjetActifId(nouveau.id);
-      setProjetVenantDêtreCréé(nouveau);
-      setVue("projet");
+      setÉtape("terminé");
+      setTimeout(() => onTerminé?.(), 1500);
+    } catch (e) {
+      setErreur("Erreur pendant l'import : " + (e.message || String(e)));
+      setÉtape("confirmation");
     }
   };
 
-  const ouvrirProjet = (id) => { setProjetActifId(id); setVue("projet"); };
-
-  const ouvrirÉditeur = (projetId, nœudId) => {
-    setProjetActifId(projetId);
-    setNœudActifId(nœudId);
-    setVue("editeur");
-  };
-
-  // Suppression de projet — ajouté 28/07/2026, remplacé le même jour par une
-  // VRAIE modale (plutôt que window.confirm) suite au retour de Joseph :
-  // "peux-tu mettre le texte de mise en garde en rouge". window.confirm()
-  // est une fenêtre NATIVE du navigateur — aucun CSS de Cursus ne peut
-  // l'atteindre, donc aucune couleur n'y est possible. Cette fonction ne
-  // fait plus que PRÉPARER la modale ; la suppression réelle se fait dans
-  // confirmerSuppressionProjet ci-dessous, déclenchée par le bouton rouge.
-  const supprimerProjet = (id) => {
-    const projetCible = projets.find((p) => p.id === id);
-    if (!projetCible) return;
-    setConfirmationSuppression({
-      id,
-      titre: projetCible.titre,
-      mots: totalMotsProjet(projetCible.structure),
-      caseCochée: false,
-    });
-  };
-
-  // Exécute la suppression réelle, une fois la modale confirmée.
-  const confirmerSuppressionProjet = async () => {
-    if (!confirmationSuppression) return;
-    const { id } = confirmationSuppression;
-    const { error } = await projetsAPI.supprimer(id);
-    if (!error) {
-      setProjets((prev) => prev.filter((p) => p.id !== id));
-      if (projetActifId === id) { setVue("liste"); setProjetActifId(null); }
-    }
-    setConfirmationSuppression(null);
-  };
-
-  // ── Actions nœuds ──
-
-  const màjStructure = useCallback(async (projetId, nouvelleStructure) => {
-    setProjets((prev) =>
-      prev.map((p) => p.id === projetId ? { ...p, structure: nouvelleStructure } : p)
-    );
-  }, []);
-
-  // Met à jour uniquement l'état local (pas d'appel Supabase) — appelé à chaque
-  // frappe/collage dans l'éditeur, pour que le co-pilote IA (et tout ce qui lit
-  // nœudActif.texte) voie le texte réel immédiatement, sans attendre les 2s de
-  // la sauvegarde différée. Correctif 16/07/2026.
-  const màjTexteLocal = useCallback((nœudId, html) => {
-    setProjets((prev) =>
-      prev.map((p) => {
-        if (p.id !== projetActifId) return p;
-        const màj = (liste) =>
-          liste.map((n) =>
-            n.id === nœudId ? { ...n, texte: html } : { ...n, enfants: màj(n.enfants || []) }
-          );
-        return { ...p, structure: màj(p.structure) };
-      })
-    );
-  }, [projetActifId]);
-
-  const sauvegarderNœud = useCallback(async (nœudId, html) => {
-    setProjets((prev) =>
-      prev.map((p) => {
-        if (p.id !== projetActifId) return p;
-        const màj = (liste) =>
-          liste.map((n) =>
-            n.id === nœudId ? { ...n, texte: html } : { ...n, enfants: màj(n.enfants || []) }
-          );
-        return { ...p, structure: màj(p.structure) };
-      })
-    );
-    await nœudsAPI.sauvegarderTexte(nœudId, html);
-  }, [projetActifId]);
-
-  const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
+  const statutsÉligibles = (d) => d?.statut === "existant" || d?.statut === "nouveau";
+  const totalÉligibles = Object.values(associations).filter(statutsÉligibles).length;
+  const totalExistants = Object.values(associations).filter((d) => d?.statut === "existant").length;
+  const totalNouveaux = Object.values(associations).filter((d) => d?.statut === "nouveau").length;
+  const totalOrphelins = Object.values(associations).filter((d) => d?.orphelin).length;
+  const totalMots = chapitres.filter((_, i) => statutsÉligibles(associations[i])).reduce((a, c) => a + c.mots, 0);
 
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: "220px 1fr",
-      gridTemplateRows: "48px minmax(0, 1fr)",
-      // CORRECTIF TABLETTE 28/07/2026 : 100dvh (dynamic viewport height) au
-      // lieu de 100vh. Sur les navigateurs mobiles/tablettes, 100vh est
-      // calculé barre d'adresse MASQUÉE : quand elle est visible, la page
-      // est plus haute que l'écran réel et la mise en page déborde ou
-      // laisse des zones mortes. 100dvh suit la hauteur réellement
-      // disponible à chaque instant. Supporté par tous les navigateurs
-      // depuis fin 2022 (Chrome 108+, Safari 15.4+, Samsung Internet 21+) —
-      // aucun risque sur les PC de Joseph ni sur la Tab S8.
-      height: "100dvh",
-      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--surface": "#ffffff",
-      "--surface-hover": "#f5f5f5",
-      "--border": "#e5e5e5",
-      "--texte-primaire": "#1a1a1a",
-      "--texte-secondaire": "#555",
-      "--texte-tertiaire": "#999",
-      background: "#f8f8f8",
-    }}>
-      {/* ── Barre supérieure ── */}
-      <div style={{
-        gridColumn: "1 / -1",
-        display: "flex", alignItems: "center",
-        padding: "0 20px", gap: 16,
-        borderBottom: "0.5px solid var(--border)",
-        background: "var(--surface)",
-      }}>
-        <img
-          src="/logo-cursus.png"
-          alt={t("marque")}
-          title={t("marque")}
-          style={{ height: 30, width: 30, borderRadius: 6, flexShrink: 0 }}
-        />
-        <div style={{ flex: 1 }} />
-        {chargement ? (
-          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>{t("chargement")}</span>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            {t("mots", { count: totalMots })} · {t("projets", { count: projets.length })}
-          </span>
-        )}
-        <span style={{ fontSize: 11, color: "var(--texte-tertiaire)" }}>{user.email}</span>
-        <button onClick={() => setAideOuverte(true)}
-          style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
-          {t("aide.bouton")}
-        </button>
-        <button onClick={déconnecter}
-          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
-          {t("deconnexion")}
-        </button>
-      </div>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+      <div style={{ background: "#fff", borderRadius: 16, width: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden" }}>
 
-      {/* ── Sidebar ── */}
-      <div style={{
-        borderRight: "0.5px solid var(--border)",
-        background: "#fafafa",
-        display: "flex", flexDirection: "column",
-        overflowY: "auto",
-      }}>
-        {/* Navigation principale */}
-        <div style={{ padding: "16px 12px 8px" }}>
-          <div style={sectionLabelStyle}>{t("navigation.titre")}</div>
-          {[
-            { id: "tableau",      label: t("navigation.tableauDeBord"),  icone: "⊞" },
-            // "Mes projets" — ajouté 28/07/2026 : la vue "liste" (cartes de
-            // projets, avec suppression au survol) existait mais n'était
-            // reliée à AUCUNE entrée de navigation — on n'y accédait que par
-            // détour (après suppression du projet actif, notamment). C'est
-            // désormais l'accès officiel à la gestion des projets.
-            { id: "liste",        label: t("vues.mesProjets"),           icone: "📚" },
-            { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
-            { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
-            { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
-            { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
-          ].map((item) => (
-            <div
-              key={item.id}
-              onClick={() => {
-                if (item.id === "editeur" && projetActif && nœudActif) {
-                  setVue("editeur");
-                } else if (item.id === "editeur" && projetActif) {
-                  setVue("projet");
-                } else if (item.id !== "editeur") {
-                  setVue(item.id);
-                  if (item.id !== "projet") setProjetActifId(null);
-                }
-              }}
-              style={navItemStyle(
-                (vue === item.id) ||
-                (item.id === "editeur" && (vue === "projet" || vue === "editeur"))
-              )}
-            >
-              <span style={{ fontSize: 14 }}>{item.icone}</span>
-              <span>{item.label}</span>
-            </div>
-          ))}
+        {/* En-tête */}
+        <div style={{ padding: "20px 24px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 500 }}>Importer un fichier Word</div>
+            <div style={{ fontSize: 12, color: "#999", marginTop: 2 }}>{projet?.titre}</div>
+          </div>
+          <button onClick={onFermer} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#999" }}>×</button>
         </div>
 
-        <div style={{ height: 0.5, background: "var(--border)", margin: "4px 12px" }} />
+        <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
 
-        {/* Projets actifs avec barres de progression */}
-        <div style={{ padding: "8px 12px", flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <div style={sectionLabelStyle}>{t("sidebarProjets.titre")}</div>
-            <button
-              onClick={() => setVue("nouveau")}
-              style={{
-                fontSize: 12, fontWeight: 600, color: "#fff",
-                background: "#7F77DD", border: "none", borderRadius: 8,
-                padding: "6px 14px", cursor: "pointer", fontFamily: "inherit",
-                boxShadow: "0 1px 4px rgba(127,119,221,0.4)",
-              }}
-              title={t("sidebarProjets.nouveauTitre")}
-            >{t("sidebarProjets.nouveau")}</button>
-          </div>
-          {projets.length === 0 && (
-            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", padding: "8px 4px" }}>
-              {t("sidebarProjets.aucun")}
+          {/* Sélection */}
+          {étape === "sélection" && (
+            <div>
+              <div style={{ display: "flex", gap: 12, marginBottom: 16, fontSize: 12.5, color: "#555" }}>
+                <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                  Niveau des Parties
+                  <select
+                    value={niveauPartie}
+                    onChange={(e) => setNiveauPartie(e.target.value)}
+                    style={{ padding: "6px 8px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", fontSize: 13 }}
+                  >
+                    {NIVEAUX_TITRE.map((n) => <option key={n} value={n}>{LIBELLÉ_NIVEAU[n]}</option>)}
+                  </select>
+                </label>
+                <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+                  Niveau des Chapitres
+                  <select
+                    value={niveauChapitre}
+                    onChange={(e) => setNiveauChapitre(e.target.value)}
+                    style={{ padding: "6px 8px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", fontSize: 13 }}
+                  >
+                    {NIVEAUX_TITRE.map((n) => <option key={n} value={n}>{LIBELLÉ_NIVEAU[n]}</option>)}
+                  </select>
+                </label>
+              </div>
+              {niveauPartie === niveauChapitre && (
+                <div style={{ marginBottom: 14, padding: "8px 12px", background: "#FAEEDA", borderRadius: 8, fontSize: 12, color: "#854F0B" }}>
+                  Les Parties et les Chapitres utilisent le même niveau de titre — tout sera importé comme Partie.
+                </div>
+              )}
+              <div onClick={() => inputRef.current?.click()}
+                onDragOver={e => e.preventDefault()}
+                onDrop={e => { e.preventDefault(); analyser(e.dataTransfer.files[0]); }}
+                style={{ border: `2px dashed ${couleur}60`, borderRadius: 12, padding: "48px 24px", textAlign: "center", cursor: "pointer", background: `${couleur}06` }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>📄</div>
+                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>Cliquez ou glissez votre fichier Word ici</div>
+                <div style={{ fontSize: 12, color: "#999" }}>Format .docx — {LIBELLÉ_NIVEAU[niveauPartie]} = Parties, {LIBELLÉ_NIVEAU[niveauChapitre]} = Chapitres</div>
+                <input ref={inputRef} type="file" accept=".docx" style={{ display: "none" }} onChange={e => analyser(e.target.files[0])} />
+              </div>
+              {erreur && <div style={{ marginTop: 14, padding: "10px 14px", background: "#FCEBEB", borderRadius: 8, fontSize: 13, color: "#A32D2D" }}>{erreur}</div>}
             </div>
           )}
-          {projets.map((p) => {
-            const mots = totalMotsProjet(p.structure);
-            const pct = Math.min(100, Math.round((mots / (p.objectifMots || 1)) * 100));
-            const actif = projetActifId === p.id;
-            return (
-              <div key={p.id} style={{ marginBottom: 8 }}>
-                <div
-                  onClick={() => { setProjetActifId(p.id); setVue("projet"); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    padding: "6px 8px", borderRadius: 8, cursor: "pointer",
-                    background: actif ? `${p.couleur}15` : "transparent",
-                    borderLeft: actif ? `2px solid ${p.couleur}` : "2px solid transparent",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.couleur, flexShrink: 0 }} />
-                  <span style={{
-                    fontSize: 12, flex: 1, fontWeight: actif ? 500 : 400,
-                    color: actif ? "var(--texte-primaire)" : "var(--texte-secondaire)",
-                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  }}>{p.titre}</span>
-                  <span style={{ fontSize: 10, color: actif ? p.couleur : "var(--texte-tertiaire)", fontWeight: actif ? 500 : 400 }}>{pct}%</span>
-                </div>
-                <div style={{ margin: "3px 8px 0 30px", height: 3, background: "var(--border)", borderRadius: 4, overflow: "hidden" }}>
-                  <div style={{ width: `${pct}%`, height: "100%", background: p.couleur, borderRadius: 4, transition: "width 0.4s" }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
 
-        {/* Bibliothèque stats */}
-        <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid var(--border)" }}>
-          <div style={sectionLabelStyle}>{t("sidebarBibliotheque.titre")}</div>
-          {[
-            { label: t("sidebarBibliotheque.enCoursLecture"), icone: "📖", onClick: () => setVue("bibliotheque") },
-            { label: t("sidebarBibliotheque.citations"),      icone: "❝",  onClick: () => setVue("bibliotheque") },
-            { label: t("sidebarBibliotheque.carnetIdees"),    icone: "💡", onClick: () => setVue("carnet") },
-          ].map((item) => (
-            <div key={item.label}
-              onClick={item.onClick}
-              style={{ ...navItemStyle(false), fontSize: 12, cursor: "pointer" }}
-            >
-              <span>{item.icone}</span>
-              <span>{item.label}</span>
+          {/* Analyse */}
+          {étape === "analyse" && (
+            <div style={{ textAlign: "center", padding: "48px 0" }}>
+              <div style={{ width: 40, height: 40, border: `3px solid ${couleur}30`, borderTopColor: couleur, borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+              <div style={{ fontSize: 14, color: "#555" }}>Analyse de {nomFichier}…</div>
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      {/* ── Zone principale ── */}
-      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
-
-        {/* Vue : tableau de bord */}
-        {vue === "tableau" && (
-          <TableauDeBord
-            projets={projets}
-            onOuvrirProjet={(id) => { setProjetActifId(id); setVue("projet"); }}
-          />
-        )}
-
-        {/* Vue : carnet d'idées */}
-        {vue === "carnet" && (
-          <CarnetIdees projets={projets} />
-        )}
-
-        {/* Vue : bibliothèque */}
-        {vue === "bibliotheque" && (
-          <Bibliotheque projets={projets} />
-        )}
-
-        {/* Vue : tarification */}
-        {vue === "tarification" && (
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            <Tarification />
-          </div>
-        )}
-
-        {/* Vue : liste des projets */}
-        {vue === "liste" && (
-          <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto" }}>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 24 }}>
-              <div>
-                <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>
-                  {t("vues.mesProjets")}
-                </h1>
-                <p style={{ fontSize: 13, color: "var(--texte-tertiaire)" }}>
-                  {dateAujourd(i18n.language)}
-                </p>
+          {/* Confirmation */}
+          {étape === "confirmation" && (
+            <div>
+              {erreur && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FCEBEB", borderRadius: 8, fontSize: 13, color: "#A32D2D" }}>{erreur}</div>}
+              <div style={{ background: `${couleur}10`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#333" }}>
+                <strong>{totalExistants}</strong> chapitre{totalExistants !== 1 ? "s" : ""} associé{totalExistants !== 1 ? "s" : ""} à des nœuds existants
+                {totalNouveaux > 0 && <> · <strong>{totalNouveaux}</strong> nouveau{totalNouveaux > 1 ? "x" : ""} nœud{totalNouveaux > 1 ? "s" : ""} à créer</>}
+                {" · "}<strong>{totalMots.toLocaleString("fr-FR")}</strong> mots à importer
               </div>
-              <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
-                {t("vues.nouveauProjetBtn")}
+              {totalOrphelins > 0 && (
+                <div style={{ background: "#FAEEDA", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 12.5, color: "#854F0B", lineHeight: 1.5 }}>
+                  ⚠️ <strong>{totalOrphelins}</strong> chapitre{totalOrphelins > 1 ? "s" : ""} n'{totalOrphelins > 1 ? "ont" : "a"} aucune partie avant {totalOrphelins > 1 ? "eux" : "lui"} dans le document — les créer les placerait à la racine du projet, au même niveau que des parties. Laissés de côté par défaut ; cliquez sur leur badge si vous voulez vraiment les créer ainsi.
+                </div>
+              )}
+
+              <div style={{ display: "grid", gap: 6 }}>
+                {chapitres.map((ch, i) => {
+                  const décision = associations[i];
+                  const nœud = décision?.statut === "existant" ? nœudsExistants.find(n => n.id === décision.nœudId) : null;
+                  const éligible = statutsÉligibles(décision);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: éligible ? `${couleur}08` : "#fafafa", border: `0.5px solid ${éligible ? couleur + "30" : "#e5e5e5"}` }}>
+                      <span style={{ fontSize: 13, flex: 1, color: "#1a1a1a" }}>
+                        {ch.type === "partie" ? "📂" : "📄"} {ch.titre.slice(0, 45)}
+                      </span>
+                      <span style={{ fontSize: 11, color: "#999", marginRight: 8 }}>{ch.mots} mots</span>
+                      {décision?.statut === "existant" ? (
+                        <span style={{ fontSize: 11, color: couleur, background: `${couleur}15`, padding: "2px 8px", borderRadius: 20 }}>
+                          → {nœud?.titre?.slice(0, 25) || "?"}
+                        </span>
+                      ) : décision?.statut === "nouveau" ? (
+                        <button
+                          onClick={() => basculerStatut(i)}
+                          title={décision.orphelin ? "Sans partie parente — sera créé à la racine du projet. Cliquer pour ne pas le créer" : "Ce nœud sera créé à l'import — cliquer pour ne pas le créer"}
+                          style={décision.orphelin
+                            ? { fontSize: 11, fontWeight: 500, color: "#BA7517", background: "#FAEEDA", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }
+                            : { fontSize: 11, fontWeight: 500, color: "#1D9E75", background: "#E1F5EE", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          {décision.orphelin ? "⚠️ Nouveau nœud (à la racine)" : "✨ Nouveau nœud"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => basculerStatut(i)}
+                          title={décision?.orphelin ? "Sans partie parente dans le document — cliquer pour le créer quand même à la racine" : "Ce chapitre ne sera pas importé — cliquer pour créer le nœud finalement"}
+                          style={{ fontSize: 11, color: "#999", background: "#f0f0f0", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          {décision?.orphelin ? "Ignoré — sans partie" : "Ignoré"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Import */}
+          {étape === "import" && (
+            <div style={{ textAlign: "center", padding: "48px 0" }}>
+              <div style={{ fontSize: 36, marginBottom: 16 }}>📥</div>
+              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Import en cours…</div>
+              <div style={{ height: 6, background: "#e5e5e5", borderRadius: 4, overflow: "hidden", margin: "0 48px" }}>
+                <div style={{ width: `${progression}%`, height: "100%", background: couleur, transition: "width .3s" }} />
+              </div>
+              <div style={{ fontSize: 12, color: "#999", marginTop: 8 }}>{progression}%</div>
+            </div>
+          )}
+
+          {/* Terminé */}
+          {étape === "terminé" && (
+            <div style={{ textAlign: "center", padding: "48px 0" }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 15, fontWeight: 500 }}>Import terminé !</div>
+              <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>Le texte est dans vos chapitres.</div>
+            </div>
+          )}
+        </div>
+
+        {/* Pied */}
+        {(étape === "sélection" || étape === "confirmation") && (
+          <div style={{ padding: "16px 24px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button onClick={onFermer} style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}>
+              Annuler
+            </button>
+            {étape === "confirmation" && totalÉligibles > 0 && (
+              <button onClick={importer} style={{ background: couleur, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                Importer {totalÉligibles} chapitre{totalÉligibles > 1 ? "s" : ""}
               </button>
-            </div>
-            {projets.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--texte-tertiaire)" }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>✍️</div>
-                <div style={{ fontSize: 16, marginBottom: 8 }}>{t("vues.aucunProjetTitre")}</div>
-                <button onClick={() => setVue("nouveau")} style={btnPrimaryStyle("#7F77DD")}>
-                  {t("vues.creerPremierProjet")}
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
-                {projets.map((p) => (
-                  <CarteProjet key={p.id} projet={p} onOuvrir={ouvrirProjet} onSupprimer={supprimerProjet} />
-                ))}
-              </div>
             )}
           </div>
         )}
-
-        {/* Vue : nouveau projet */}
-        {vue === "nouveau" && (
-          <div style={{ padding: "28px 32px", maxWidth: 560, overflowY: "auto" }}>
-            <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 24 }}>
-              {t("formulaireProjet.titre")}
-            </h1>
-            <FormulaireProjet
-              onCréer={créerProjet}
-              onAnnuler={() => setVue(projets.length > 0 ? "tableau" : "liste")}
-            />
-          </div>
-        )}
-
-        {/* Vue : structure du projet (avec panneau éditeur+IA intégré) */}
-        {vue === "projet" && projetActif && (
-          <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-            {/* Barre d'actions projet — réorganisée 28/07/2026 à la demande
-                de Joseph : tout ce qui EXPORTE regroupé à gauche (zones +
-                format + bouton rouge), les ENTRÉES de contenu à droite
-                (Incorporer en vert, Importer en bleu), et un code couleur
-                stable par fonction — rouge = sortie, vert = incorporation,
-                bleu = import — au lieu de la couleur du projet, qui variait
-                d'un livre à l'autre et ne signifiait rien. */}
-            <div style={{
-              padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
-              background: "#fafafa",
-            }}>
-              {/* ── Groupe gauche : export ── Ordre validé sur maquette de
-                  Joseph (28/07) : le bouton rouge D'ABORD, tout à gauche,
-                  puis les cases de zones (boîte teintée rose pour signer
-                  l'appartenance au même groupe), puis le format. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={async () => {
-                  setExportEnCours(true);
-                  try {
-                    await exporterProjetWord(projetActif, formatExport, zonesExport);
-                  } catch (err) {
-                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
-                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
-                  } finally {
-                    setExportEnCours(false);
-                  }
-                }}
-                disabled={exportEnCours}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#C0392B", color: "#fff",
-                  border: "none", borderRadius: 8, padding: "6px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
-                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
-                }}
-              >
-                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
-              </button>
-              {/* Sélecteur des zones à inclure dans l'export Word — chantier
-                  28/07/2026. "Un nœud exclu exclut tout ce qu'il contient."
-                  Affiché seulement si le projet utilise réellement les
-                  zones — sinon la barre reste identique à avant. */}
-              {projetActifUtiliseZones && (
-              <div
-                title="Zones de visibilité incluses dans l'export Word. Un nœud exclu exclut tout ce qu'il contient."
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  fontSize: 11, color: "#777",
-                  border: "0.5px solid #C0392B30", borderRadius: 8,
-                  padding: "5px 10px", background: "#C0392B0D",
-                }}
-              >
-                <span style={{ color: "#999" }}>Exporter :</span>
-                {Object.entries(ZONES_META).map(([clé, z]) => (
-                  <label key={clé} style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer", color: zonesExport.includes(clé) ? (z.couleur || "#555") : "#bbb" }}>
-                    <input
-                      type="checkbox"
-                      checked={zonesExport.includes(clé)}
-                      onChange={() => basculerZoneExport(clé)}
-                      style={{ cursor: "pointer", margin: 0 }}
-                    />
-                    {z.badge ? `${z.badge} ` : ""}{clé === "corps" ? "Corps" : z.label}
-                  </label>
-                ))}
-              </div>
-              )}
-              <select
-                value={formatExport}
-                onChange={(e) => setFormatExport(e.target.value)}
-                title="Format de page pour l'export Word"
-                style={{
-                  fontSize: 12, color: "#3B6D4F", background: "#EAF6EF",
-                  border: "0.5px solid #9CCDB0", borderRadius: 8, padding: "6px 8px",
-                  fontFamily: "inherit", cursor: "pointer",
-                }}
-              >
-                {Object.entries(FORMATS_PAGE).map(([clé, f]) => (
-                  <option key={clé} value={clé}>{f.label}</option>
-                ))}
-              </select>
-              </div>
-
-              {/* ── Groupe droit : entrées de contenu + suppression ── */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                onClick={() => setIncorporerOuvert(true)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#2AA7B8", color: "#fff",
-                  border: "none", borderRadius: 8, padding: "6px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                📥 Incorporer de la matière
-              </button>
-              <button
-                onClick={() => setImportOuvert(true)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#2F6FDE", color: "#fff",
-                  border: "none", borderRadius: 8, padding: "6px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                {t("vues.importerWord")}
-              </button>
-              {/* Suppression du projet — ajouté 28/07/2026, AGRANDI le même
-                  jour suite au retour de Joseph ("le bouton est vraiment
-                  trop petit, je ne l'avais pas vu") : l'icône seule à 12px
-                  sur fond blanc était quasi invisible dans la barre. Passage
-                  à un bouton plein (fond rouge), icône plus grande, texte
-                  explicite "Supprimer le projet" — même gabarit que les
-                  autres boutons de la barre, plus de doute possible. */}
-              <button
-                onClick={() => supprimerProjet(projetActif.id)}
-                title="Supprimer définitivement ce projet et tout son contenu"
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  background: "#E24B4A", color: "#fff",
-                  border: "none", borderRadius: 8, padding: "8px 16px",
-                  fontSize: 13, fontWeight: 500, cursor: "pointer",
-                  fontFamily: "inherit", whiteSpace: "nowrap",
-                }}
-              >
-                <span style={{ fontSize: 16 }}>🗑</span> Supprimer le projet
-              </button>
-              </div>
-            </div>
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <VueProjet
-                projet={projetActif}
-                onMàjStructure={màjStructure}
-                onRetour={() => setVue("tableau")}
-                onOuvrirÉditeur={ouvrirÉditeur}
-                dernierNœudVisitéId={nœudActifId}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
-        {vue === "editeur" && projetActif && nœudActif && (
-          <div style={{ display: "grid", gridTemplateColumns: `minmax(0, 1fr) ${largeurPanneau}px`, height: "100%", overflow: "hidden" }}>
-            {/* Éditeur central */}
-            <Editeur
-              nœud={nœudActif}
-              projetCouleur={projetActif.couleur}
-              projetTitre={projetActif.titre}
-              onSauvegarder={sauvegarderNœud}
-              onTexteChange={màjTexteLocal}
-              onSelectionChange={setTexteSélectionné}
-              onRetour={() => setVue("projet")}
-            />
-            {/* Panneau contextuel droit : Citations / IA / Idées */}
-            <div style={{
-              position: "relative",
-              borderLeft: "0.5px solid #e5e5e5",
-              display: "flex", flexDirection: "column",
-              minHeight: 0,
-              overflow: "hidden", background: "#fafafa",
-            }}>
-              {/* Poignée de redimensionnement */}
-              <div
-                onMouseDown={démarrerRedimensionnement}
-                title="Glisser pour redimensionner le panneau"
-                style={{
-                  position: "absolute", left: -4, top: 0, bottom: 0, width: 8,
-                  cursor: "col-resize", zIndex: 20,
-                }}
-              />
-              <CopiloteIA
-                texteActif={nœudActif.texte || ""}
-                texteSélectionné={texteSélectionné}
-                typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
-                couleurProjet={projetActif.couleur}
-                projetTitre={projetActif.titre}
-                titreNœud={nœudActif.titre || ""}
-                typeNœud={nœudActif.type || "chapitre"}
-                titresEnfants={(nœudActif.enfants || []).map((e) => e.titre)}
-                titrePartieParente={contexteHiérarchiqueActif.titrePartieParente}
-                titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
-                langueProjet={projetActif.langue || "fr"}
-                projetId={projetActif.id}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Fallback : si éditeur demandé sans nœud sélectionné */}
-        {vue === "editeur" && projetActif && !nœudActif && (
-          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "var(--texte-tertiaire)" }}>
-            <div style={{ fontSize: 32 }}>📄</div>
-            <div style={{ fontSize: 14 }}>{t("vues.selectionnerChapitre")}</div>
-            <button onClick={() => setVue("projet")} style={btnPrimaryStyle(projetActif.couleur)}>
-              {t("vues.voirStructure")}
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Centre d'aide — accessible depuis n'importe quel écran */}
-      {aideOuverte && <AideFAQ onFermer={() => setAideOuverte(false)} />}
-
-      {/* Modal import Word */}
-      {importOuvert && projetActif && (
-        <ImportDocx
-          projet={projetActif}
-          nœudsExistants={(() => {
-            const flat = [];
-            const aplatir = (noeuds) => noeuds.forEach(n => { flat.push(n); if (n.enfants?.length) aplatir(n.enfants); });
-            aplatir(projetActif.structure || []);
-            return flat;
-          })()}
-          onTerminé={() => {
-            setImportOuvert(false);
-            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
-              if (data) {
-                setProjets(prev => prev.map(p =>
-                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
-                ));
-              }
-            });
-          }}
-          onFermer={() => setImportOuvert(false)}
-        />
-      )}
-
-      {/* Modal Incorporer de la matière — même mécanisme de rafraîchissement que ImportDocx ci-dessus */}
-      {incorporerOuvert && projetActif && (
-        <IncorporerMatiere
-          projet={projetActif}
-          onStructureChangée={() => {
-            // Rafraîchit la structure du projet dans App.jsx SANS fermer la
-            // fenêtre — pour que la vue "Structure du manuscrit" en arrière-plan
-            // reste à jour au fil des insertions/annulations, sans interrompre
-            // le travail en cours dans la fenêtre Incorporer de la matière.
-            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
-              if (data) {
-                setProjets(prev => prev.map(p =>
-                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
-                ));
-              }
-            });
-          }}
-          onFermer={() => {
-            setIncorporerOuvert(false);
-            nœudsAPI.listerParProjet(projetActif.id).then(({ data }) => {
-              if (data) {
-                setProjets(prev => prev.map(p =>
-                  p.id === projetActif.id ? { ...p, structure: construireArbre(data) } : p
-                ));
-              }
-            });
-          }}
-        />
-      )}
-
-      {/* Modale de confirmation de suppression de projet — ajoutée 28/07/2026
-          en remplacement de window.confirm, pour permettre la mise en garde
-          en rouge demandée par Joseph. Double sécurité : le bouton rouge
-          final ne devient cliquable qu'après avoir coché explicitement la
-          case de confirmation — un clic accidentel sur la modale elle-même
-          ne peut donc jamais déclencher la suppression. */}
-      {confirmationSuppression && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-          <div style={{ background: "#fff", borderRadius: 16, width: 480, boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden" }}>
-            <div style={{ padding: "24px 28px 8px" }}>
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                Supprimer « {confirmationSuppression.titre} » ?
-              </div>
-              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
-                {confirmationSuppression.mots.toLocaleString("fr-FR")} mots dans ce projet
-              </div>
-
-              {/* La mise en garde — en rouge, but demandé par Joseph */}
-              <div style={{
-                background: "#FCEBEB", border: "0.5px solid #E24B4A40", borderRadius: 10,
-                padding: "14px 16px", marginBottom: 16,
-              }}>
-                <div style={{ color: "#A32D2D", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
-                  ⚠️ Action définitive et irréversible
-                </div>
-                <div style={{ color: "#A32D2D", fontSize: 13, lineHeight: 1.5 }}>
-                  Seront perdus : tous les chapitres et leur texte, l'historique
-                  de versions (lui aussi supprimé en cascade), les réponses au
-                  questionnaire, les zones de visibilité et les notes de bas de
-                  page. Un réimport Word ultérieur ne restaurera que le texte
-                  brut — rien d'autre.
-                </div>
-              </div>
-
-              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
-                Pour un livre terminé plutôt qu'à supprimer, le statut « Terminé »
-                (menu du projet) conserve tout sans l'effacer.
-              </div>
-
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#333", cursor: "pointer", marginBottom: 20 }}>
-                <input
-                  type="checkbox"
-                  checked={confirmationSuppression.caseCochée}
-                  onChange={(e) => setConfirmationSuppression((c) => ({ ...c, caseCochée: e.target.checked }))}
-                  style={{ marginTop: 2, cursor: "pointer" }}
-                />
-                Je comprends que cette suppression est définitive et ne peut pas être annulée.
-              </label>
-            </div>
-
-            <div style={{ padding: "16px 28px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <button
-                onClick={() => setConfirmationSuppression(null)}
-                style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={confirmerSuppressionProjet}
-                disabled={!confirmationSuppression.caseCochée}
-                style={{
-                  background: confirmationSuppression.caseCochée ? "#E24B4A" : "#F0B8B6",
-                  color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
-                  fontSize: 13, fontWeight: 500, fontFamily: "inherit",
-                  cursor: confirmationSuppression.caseCochée ? "pointer" : "not-allowed",
-                }}
-              >
-                🗑 Supprimer définitivement
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal questionnaire d'intention — affiché obligatoirement après création d'un projet */}
-      {projetVenantDêtreCréé && (
-        <QuestionnaireIntention
-          projetId={projetVenantDêtreCréé.id}
-          projetTitre={projetVenantDêtreCréé.titre}
-          onTerminé={() => setProjetVenantDêtreCréé(null)}
-        />
-      )}
-
-      {/* Rappel persistant — le cap du projet n'est pas suffisamment rempli.
-          Réapparaît à chaque ouverture du projet tant que les champs essentiels manquent. */}
-      {rappelIntentionPour && !projetVenantDêtreCréé && (
-        <QuestionnaireIntention
-          projetId={rappelIntentionPour}
-          projetTitre={projets.find((p) => p.id === rappelIntentionPour)?.titre || ""}
-          onTerminé={() => setRappelIntentionPour(null)}
-          onFermer={() => setRappelIntentionPour(null)}
-        />
-      )}
     </div>
   );
 }
-
-const sectionLabelStyle = {
-  fontSize: 10, fontWeight: 500,
-  color: "var(--texte-tertiaire)",
-  letterSpacing: "0.07em", textTransform: "uppercase",
-  marginBottom: 6, padding: "0 4px",
-};
-
-const navItemStyle = (actif) => ({
-  display: "flex", alignItems: "center", gap: 8,
-  padding: "6px 8px", borderRadius: 8, cursor: "pointer",
-  fontSize: 13,
-  color: actif ? "var(--texte-primaire)" : "var(--texte-secondaire)",
-  fontWeight: actif ? 500 : 400,
-  background: actif ? "var(--surface)" : "transparent",
-  marginBottom: 2,
-});
-
-/**
- * NOTE POUR JOSEPH — GENRES / STATUTS non traduits (rappel, mis à jour 05/07) :
- *
- * `GENRES` (désormais les 10 catégories + couleurs associées, cf. GENRE_COULEURS)
- * et `STATUTS` sont utilisés à deux endroits différents :
- *   1. Comme libellés affichés dans les formulaires et badges
- *   2. Comme valeurs de comparaison logique (ex. la ligne qui détermine
- *      typeProjet="fiction" compare projetActif.genre à "Roman / Témoignage")
- *
- * Les traduire changerait la valeur stockée en base (`projets.genre`,
- * `projets.statut`) pour les nouveaux projets créés en anglais, cassant
- * silencieusement toute logique qui compare cette valeur à une chaîne
- * française codée en dur (comme la ligne CopiloteIA plus haut).
- *
- * MIGRATION DE DONNÉES À PRÉVOIR : les projets déjà créés avec l'ancienne
- * liste ("Roman", "Non-fiction", "Essai", "Biographie"...) ont une valeur
- * `genre` qui ne correspond plus à aucune entrée du nouveau menu déroulant.
- * Ça n'empêche pas l'affichage (le badge montre la valeur stockée telle
- * quelle), mais rouvrir le formulaire d'un vieux projet affichera un genre
- * vide ou incohérent tant qu'il n'aura pas été réassigné manuellement.
- *
- * Recommandation, au moment de basculer l'anglais en production :
- *   - Introduire un code stable ("methode", "psychologie"...) stocké en base
- *   - Un mapping code → libellé traduit pour l'affichage uniquement
- *   - Remplacer les comparaisons directes sur le libellé français par des
- *     comparaisons sur le code stable
- * Non urgent tant que l'interface reste 100% française.
- */
 
