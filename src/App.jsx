@@ -166,9 +166,12 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées, nœudsRepliés, onBasculerRepli }) {
   const { t } = useTranslation("common");
-  const [ouvert, setOuvert] = useState(true);
+  // Repli/dépli — état porté par le parent (VueProjet) via `nœudsRepliés`
+  // depuis le 01/08/2026, pour permettre un "Tout replier" global en plus du
+  // triangle individuel. Défaut : ouvert (comme avant ce chantier).
+  const ouvert = !nœudsRepliés?.has(nœud.id);
   const [enRenommage, setEnRenommage] = useState(false);
   const [nomTemp, setNomTemp] = useState(nœud.titre);
   const [survol, setSurvol] = useState(false);
@@ -219,7 +222,7 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
         {/* Chevron */}
         {aDesEnfants ? (
           <span
-            onClick={(e) => { e.stopPropagation(); setOuvert(!ouvert); }}
+            onClick={(e) => { e.stopPropagation(); onBasculerRepli?.(nœud.id); }}
             style={{
               fontSize: 10, color: "var(--texte-tertiaire)",
               transform: ouvert ? "rotate(90deg)" : "rotate(0deg)",
@@ -360,6 +363,8 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           onRétrograder={onRétrograder}
           onChangerZone={onChangerZone}
           zonesMasquées={zonesMasquées}
+          nœudsRepliés={nœudsRepliés}
+          onBasculerRepli={onBasculerRepli}
         />
       ))}
     </div>
@@ -588,6 +593,31 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // Zones actuellement masquées dans l'arborescence (visuel uniquement) —
   // chantier 28/07/2026. Défaut : tout afficher.
   const [zonesMasquées, setZonesMasquées] = useState([]);
+  // Nœuds actuellement repliés dans l'arborescence (visuel uniquement,
+  // ensemble d'ids) — ajouté 01/08/2026, à la demande de Joseph, pour éviter
+  // une liste sans fin de chapitres/sous-chapitres. Le triangle par nœud
+  // (existant) bascule un seul id ; les boutons "Tout replier"/"Tout
+  // déplier" ci-dessous agissent sur l'ensemble d'un coup. Défaut : tout
+  // déplié, comme avant ce chantier.
+  const [nœudsRepliés, setNœudsRepliés] = useState(() => new Set());
+  const basculerRepli = useCallback((id) => {
+    setNœudsRepliés((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id); else suivant.add(id);
+      return suivant;
+    });
+  }, []);
+  const toutReplier = useCallback(() => {
+    const avecEnfants = new Set();
+    const parcourir = (liste) => {
+      for (const n of liste || []) {
+        if (n.enfants?.length) { avecEnfants.add(n.id); parcourir(n.enfants); }
+      }
+    };
+    parcourir(projet.structure);
+    setNœudsRepliés(avecEnfants);
+  }, [projet.structure]);
+  const toutDéplier = useCallback(() => setNœudsRepliés(new Set()), []);
   const mots = totalMotsProjet(projet.structure);
 
   // Zones (hors corps) réellement présentes dans le projet — les chips de
@@ -1143,17 +1173,36 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               })}
             </div>
           )}
-          <button
-            onClick={() => ajouterNœud(projet.id, "partie")}
-            style={{
-              fontSize: 11, color: projet.couleur,
-              background: "none", border: "none", cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-            title={t("vueProjet.ajouterPartieTitre")}
-          >
-            {t("vueProjet.ajouterPartie")}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {nœudsRepliés.size > 0 ? (
+              <button
+                onClick={toutDéplier}
+                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                title="Déplier toute la structure"
+              >
+                ▾ Tout déplier
+              </button>
+            ) : (
+              <button
+                onClick={toutReplier}
+                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                title="Replier toute la structure (parties et chapitres visibles, contenu masqué)"
+              >
+                ▸ Tout replier
+              </button>
+            )}
+            <button
+              onClick={() => ajouterNœud(projet.id, "partie")}
+              style={{
+                fontSize: 11, color: projet.couleur,
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+              title={t("vueProjet.ajouterPartieTitre")}
+            >
+              {t("vueProjet.ajouterPartie")}
+            </button>
+          </div>
         </div>
 
         {projet.structure?.length === 0 ? (
@@ -1192,6 +1241,8 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               onRétrograder={rétrograderNœud}
               onChangerZone={changerZoneNœud}
               zonesMasquées={zonesMasquées}
+              nœudsRepliés={nœudsRepliés}
+              onBasculerRepli={basculerRepli}
             />
           ))
         )}
@@ -1363,6 +1414,10 @@ function AppConnectée({ user, déconnecter }) {
   const [chargement, setChargement] = useState(true);
   const [vue, setVue]           = useState("tableau");
   const [projetActifId, setProjetActifId] = useState(null);
+  // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
+  // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
+  // pour permettre la mise en garde en rouge demandée par Joseph.
+  const [confirmationSuppression, setConfirmationSuppression] = useState(null);
   const [nœudActifId, setNœudActifId]     = useState(null);
   const [importOuvert, setImportOuvert]   = useState(false);
   const [incorporerOuvert, setIncorporerOuvert] = useState(false);
@@ -1617,13 +1672,34 @@ function AppConnectée({ user, déconnecter }) {
     setVue("editeur");
   };
 
-  const supprimerProjet = async (id) => {
-    if (!window.confirm(t("confirmations.supprimerProjet"))) return;
+  // Suppression de projet — ajouté 28/07/2026, remplacé le même jour par une
+  // VRAIE modale (plutôt que window.confirm) suite au retour de Joseph :
+  // "peux-tu mettre le texte de mise en garde en rouge". window.confirm()
+  // est une fenêtre NATIVE du navigateur — aucun CSS de Cursus ne peut
+  // l'atteindre, donc aucune couleur n'y est possible. Cette fonction ne
+  // fait plus que PRÉPARER la modale ; la suppression réelle se fait dans
+  // confirmerSuppressionProjet ci-dessous, déclenchée par le bouton rouge.
+  const supprimerProjet = (id) => {
+    const projetCible = projets.find((p) => p.id === id);
+    if (!projetCible) return;
+    setConfirmationSuppression({
+      id,
+      titre: projetCible.titre,
+      mots: totalMotsProjet(projetCible.structure),
+      caseCochée: false,
+    });
+  };
+
+  // Exécute la suppression réelle, une fois la modale confirmée.
+  const confirmerSuppressionProjet = async () => {
+    if (!confirmationSuppression) return;
+    const { id } = confirmationSuppression;
     const { error } = await projetsAPI.supprimer(id);
     if (!error) {
       setProjets((prev) => prev.filter((p) => p.id !== id));
       if (projetActifId === id) { setVue("liste"); setProjetActifId(null); }
     }
+    setConfirmationSuppression(null);
   };
 
   // ── Actions nœuds ──
@@ -1735,6 +1811,12 @@ function AppConnectée({ user, déconnecter }) {
           <div style={sectionLabelStyle}>{t("navigation.titre")}</div>
           {[
             { id: "tableau",      label: t("navigation.tableauDeBord"),  icone: "⊞" },
+            // "Mes projets" — ajouté 28/07/2026 : la vue "liste" (cartes de
+            // projets, avec suppression au survol) existait mais n'était
+            // reliée à AUCUNE entrée de navigation — on n'y accédait que par
+            // détour (après suppression du projet actif, notamment). C'est
+            // désormais l'accès officiel à la gestion des projets.
+            { id: "liste",        label: t("vues.mesProjets"),           icone: "📚" },
             { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
@@ -1914,12 +1996,46 @@ function AppConnectée({ user, déconnecter }) {
         {/* Vue : structure du projet (avec panneau éditeur+IA intégré) */}
         {vue === "projet" && projetActif && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-            {/* Barre d'actions projet */}
+            {/* Barre d'actions projet — réorganisée 28/07/2026 à la demande
+                de Joseph : tout ce qui EXPORTE regroupé à gauche (zones +
+                format + bouton rouge), les ENTRÉES de contenu à droite
+                (Incorporer en vert, Importer en bleu), et un code couleur
+                stable par fonction — rouge = sortie, vert = incorporation,
+                bleu = import — au lieu de la couleur du projet, qui variait
+                d'un livre à l'autre et ne signifiait rien. */}
             <div style={{
               padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
-              display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
               background: "#fafafa",
             }}>
+              {/* ── Groupe gauche : export ── Ordre validé sur maquette de
+                  Joseph (28/07) : le bouton rouge D'ABORD, tout à gauche,
+                  puis les cases de zones (boîte teintée rose pour signer
+                  l'appartenance au même groupe), puis le format. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <button
+                onClick={async () => {
+                  setExportEnCours(true);
+                  try {
+                    await exporterProjetWord(projetActif, formatExport, zonesExport);
+                  } catch (err) {
+                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
+                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
+                  } finally {
+                    setExportEnCours(false);
+                  }
+                }}
+                disabled={exportEnCours}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#C0392B", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
+                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
+                }}
+              >
+                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
               {/* Sélecteur des zones à inclure dans l'export Word — chantier
                   28/07/2026. "Un nœud exclu exclut tout ce qu'il contient."
                   Affiché seulement si le projet utilise réellement les
@@ -1930,8 +2046,8 @@ function AppConnectée({ user, déconnecter }) {
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
                   fontSize: 11, color: "#777",
-                  border: "0.5px solid #ddd", borderRadius: 8,
-                  padding: "5px 10px", background: "#fff",
+                  border: "0.5px solid #C0392B30", borderRadius: 8,
+                  padding: "5px 10px", background: "#C0392B0D",
                 }}
               >
                 <span style={{ color: "#999" }}>Exporter :</span>
@@ -1953,8 +2069,8 @@ function AppConnectée({ user, déconnecter }) {
                 onChange={(e) => setFormatExport(e.target.value)}
                 title="Format de page pour l'export Word"
                 style={{
-                  fontSize: 12, color: "#555", background: "#fff",
-                  border: "0.5px solid #ddd", borderRadius: 8, padding: "6px 8px",
+                  fontSize: 12, color: "#3B6D4F", background: "#EAF6EF",
+                  border: "0.5px solid #9CCDB0", borderRadius: 8, padding: "6px 8px",
                   fontFamily: "inherit", cursor: "pointer",
                 }}
               >
@@ -1962,35 +2078,16 @@ function AppConnectée({ user, déconnecter }) {
                   <option key={clé} value={clé}>{f.label}</option>
                 ))}
               </select>
-              <button
-                onClick={async () => {
-                  setExportEnCours(true);
-                  try {
-                    await exporterProjetWord(projetActif, formatExport, zonesExport);
-                  } catch (err) {
-                    journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
-                    window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");
-                  } finally {
-                    setExportEnCours(false);
-                  }
-                }}
-                disabled={exportEnCours}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  background: "#fff", color: projetActif.couleur,
-                  border: `0.5px solid ${projetActif.couleur}40`, borderRadius: 8, padding: "6px 14px",
-                  fontSize: 12, fontWeight: 500, cursor: exportEnCours ? "default" : "pointer",
-                  fontFamily: "inherit", opacity: exportEnCours ? 0.6 : 1,
-                }}
-              >
-                {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
-              </button>
+              </div>
+
+              {/* ── Groupe droit : entrées de contenu + suppression ── */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <button
                 onClick={() => setIncorporerOuvert(true)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: "#fff", color: "#7F77DD",
-                  border: "0.5px solid #7F77DD40", borderRadius: 8, padding: "6px 14px",
+                  background: "#2AA7B8", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "6px 14px",
                   fontSize: 12, fontWeight: 500, cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -2001,7 +2098,7 @@ function AppConnectée({ user, déconnecter }) {
                 onClick={() => setImportOuvert(true)}
                 style={{
                   display: "flex", alignItems: "center", gap: 6,
-                  background: projetActif.couleur, color: "#fff",
+                  background: "#2F6FDE", color: "#fff",
                   border: "none", borderRadius: 8, padding: "6px 14px",
                   fontSize: 12, fontWeight: 500, cursor: "pointer",
                   fontFamily: "inherit",
@@ -2009,6 +2106,27 @@ function AppConnectée({ user, déconnecter }) {
               >
                 {t("vues.importerWord")}
               </button>
+              {/* Suppression du projet — ajouté 28/07/2026, AGRANDI le même
+                  jour suite au retour de Joseph ("le bouton est vraiment
+                  trop petit, je ne l'avais pas vu") : l'icône seule à 12px
+                  sur fond blanc était quasi invisible dans la barre. Passage
+                  à un bouton plein (fond rouge), icône plus grande, texte
+                  explicite "Supprimer le projet" — même gabarit que les
+                  autres boutons de la barre, plus de doute possible. */}
+              <button
+                onClick={() => supprimerProjet(projetActif.id)}
+                title="Supprimer définitivement ce projet et tout son contenu"
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  background: "#E24B4A", color: "#fff",
+                  border: "none", borderRadius: 8, padding: "8px 16px",
+                  fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit", whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ fontSize: 16 }}>🗑</span> Supprimer le projet
+              </button>
+              </div>
             </div>
             <div style={{ flex: 1, overflow: "hidden" }}>
               <VueProjet
@@ -2139,6 +2257,80 @@ function AppConnectée({ user, déconnecter }) {
         />
       )}
 
+      {/* Modale de confirmation de suppression de projet — ajoutée 28/07/2026
+          en remplacement de window.confirm, pour permettre la mise en garde
+          en rouge demandée par Joseph. Double sécurité : le bouton rouge
+          final ne devient cliquable qu'après avoir coché explicitement la
+          case de confirmation — un clic accidentel sur la modale elle-même
+          ne peut donc jamais déclencher la suppression. */}
+      {confirmationSuppression && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: 480, boxShadow: "0 24px 80px rgba(0,0,0,0.2)", overflow: "hidden" }}>
+            <div style={{ padding: "24px 28px 8px" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
+                Supprimer « {confirmationSuppression.titre} » ?
+              </div>
+              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+                {confirmationSuppression.mots.toLocaleString("fr-FR")} mots dans ce projet
+              </div>
+
+              {/* La mise en garde — en rouge, but demandé par Joseph */}
+              <div style={{
+                background: "#FCEBEB", border: "0.5px solid #E24B4A40", borderRadius: 10,
+                padding: "14px 16px", marginBottom: 16,
+              }}>
+                <div style={{ color: "#A32D2D", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  ⚠️ Action définitive et irréversible
+                </div>
+                <div style={{ color: "#A32D2D", fontSize: 13, lineHeight: 1.5 }}>
+                  Seront perdus : tous les chapitres et leur texte, l'historique
+                  de versions (lui aussi supprimé en cascade), les réponses au
+                  questionnaire, les zones de visibilité et les notes de bas de
+                  page. Un réimport Word ultérieur ne restaurera que le texte
+                  brut — rien d'autre.
+                </div>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#999", marginBottom: 16 }}>
+                Pour un livre terminé plutôt qu'à supprimer, le statut « Terminé »
+                (menu du projet) conserve tout sans l'effacer.
+              </div>
+
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#333", cursor: "pointer", marginBottom: 20 }}>
+                <input
+                  type="checkbox"
+                  checked={confirmationSuppression.caseCochée}
+                  onChange={(e) => setConfirmationSuppression((c) => ({ ...c, caseCochée: e.target.checked }))}
+                  style={{ marginTop: 2, cursor: "pointer" }}
+                />
+                Je comprends que cette suppression est définitive et ne peut pas être annulée.
+              </label>
+            </div>
+
+            <div style={{ padding: "16px 28px", borderTop: "0.5px solid #e5e5e5", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setConfirmationSuppression(null)}
+                style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmerSuppressionProjet}
+                disabled={!confirmationSuppression.caseCochée}
+                style={{
+                  background: confirmationSuppression.caseCochée ? "#E24B4A" : "#F0B8B6",
+                  color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px",
+                  fontSize: 13, fontWeight: 500, fontFamily: "inherit",
+                  cursor: confirmationSuppression.caseCochée ? "pointer" : "not-allowed",
+                }}
+              >
+                🗑 Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal questionnaire d'intention — affiché obligatoirement après création d'un projet */}
       {projetVenantDêtreCréé && (
         <QuestionnaireIntention
@@ -2207,3 +2399,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
+
