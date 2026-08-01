@@ -3,6 +3,18 @@
  * Lit n'importe quel .docx et remplace le contenu
  * des chapitres existants par correspondance de titre.
  * Fonctionne pour tous les livres, pas seulement le Tome I.
+ *
+ * Création automatique des nœuds manquants — reconstruite le 01/08/2026
+ * (perdue lors du retour en arrière d'urgence de la nuit du 01/08, voir
+ * CLAUDE.md). Un chapitre du Word sans correspondance dans la structure
+ * existante n'oblige plus à créer le nœud à la main avant d'importer : il
+ * est créé automatiquement, positionné selon l'ordre du document source
+ * (nouvelle "partie" toujours à la racine, nouveau "chapitre" rattaché à la
+ * dernière "partie" rencontrée dans le document — existante ou tout juste
+ * créée). LIMITE CONNUE (jamais testée en conditions réelles) : le passage
+ * final de nœudsAPI.réordonner() ne renumérote que les nœuds CRÉÉS par cet
+ * import ; un frère préexistant en base, non touché par cet import, garde
+ * son ancien ordre — collision d'ordre possible dans ce cas.
  */
 
 import { useState, useRef } from "react";
@@ -117,7 +129,13 @@ function trouverCorrespondance(chapitreImporté, nœuds) {
 export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, onFermer }) {
   const [étape, setÉtape] = useState("sélection");
   const [chapitres, setChapitres] = useState([]);
-  const [associations, setAssociations] = useState({}); // index → nœud.id
+  // index → { statut: "existant" | "nouveau" | "ignoré", nœudId: id | null }
+  // "existant" : correspondance trouvée dans la structure, texte remplacé.
+  // "nouveau"  : aucune correspondance, le nœud sera créé à l'import (par
+  //              défaut) — nœudId est renseigné une fois créé.
+  // "ignoré"   : aucune correspondance, l'auteur a choisi de ne pas créer ce
+  //              nœud (bascule manuelle depuis "nouveau").
+  const [associations, setAssociations] = useState({});
   const [progression, setProgression] = useState(0);
   const [erreur, setErreur] = useState(null);
   const [nomFichier, setNomFichier] = useState("");
@@ -133,11 +151,13 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
       const résultat = await extraireChapitres(fichier);
       if (!résultat.length) { setErreur("Aucun chapitre détecté. Vérifiez les styles Titre 1 / Titre 2 dans Word."); setÉtape("sélection"); return; }
 
-      // Associer automatiquement chaque chapitre au nœud correspondant
+      // Associer automatiquement chaque chapitre au nœud correspondant, ou
+      // le proposer comme nouveau nœud à créer à l'import s'il n'a pas de
+      // correspondance.
       const assoc = {};
       résultat.forEach((ch, i) => {
         const match = trouverCorrespondance(ch, nœudsExistants);
-        if (match) assoc[i] = match.id;
+        assoc[i] = match ? { statut: "existant", nœudId: match.id } : { statut: "nouveau", nœudId: null };
       });
 
       setChapitres(résultat);
@@ -149,25 +169,79 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
     }
   };
 
+  // Bascule un chapitre sans correspondance entre "nouveau" (sera créé) et
+  // "ignoré" (laissé de côté) — sans effet sur les chapitres déjà associés
+  // à un nœud existant.
+  const basculerStatut = (i) => {
+    setAssociations((prev) => {
+      const courant = prev[i];
+      if (!courant || courant.statut === "existant") return prev;
+      return { ...prev, [i]: { ...courant, statut: courant.statut === "nouveau" ? "ignoré" : "nouveau" } };
+    });
+  };
+
   const importer = async () => {
     setÉtape("import");
     setProgression(0);
-    const àFaire = Object.entries(associations).filter(([, id]) => id);
+    setErreur(null);
+
+    const àFaire = chapitres
+      .map((ch, i) => ({ ch, i, décision: associations[i] }))
+      .filter(({ décision }) => décision && décision.statut !== "ignoré");
     let fait = 0;
 
-    for (const [idx, nœudId] of àFaire) {
-      const ch = chapitres[parseInt(idx)];
-      await nœudsAPI.sauvegarderTexte(nœudId, ch.html);
-      fait++;
-      setProgression(Math.round((fait / àFaire.length) * 100));
-    }
+    // Nœuds CRÉÉS par cet import, groupés par parent — pour le passage
+    // unique de réordonnancement en fin d'import (voir note en tête de
+    // fichier sur la limite connue de ce renumérotage).
+    const groupesParParent = {};
+    let dernièrePartieId = null;
 
-    setÉtape("terminé");
-    setTimeout(() => onTerminé?.(), 1500);
+    try {
+      for (const { ch, i, décision } of àFaire) {
+        let nœudId = décision.nœudId;
+
+        if (décision.statut === "nouveau") {
+          const parentId = ch.type === "partie" ? null : dernièrePartieId;
+          const { data, error } = await nœudsAPI.créer({
+            type: ch.type,
+            titre: ch.titre,
+            parentId,
+            texte: ch.html,
+          }, projet.id);
+          if (error || !data) throw error || new Error("Échec de création du nœud « " + ch.titre + " »");
+          nœudId = data.id;
+
+          const clé = parentId || "__racine__";
+          (groupesParParent[clé] ||= []).push(nœudId);
+        } else {
+          await nœudsAPI.sauvegarderTexte(nœudId, ch.html);
+        }
+
+        if (ch.type === "partie") dernièrePartieId = nœudId;
+
+        fait++;
+        setProgression(Math.round((fait / àFaire.length) * 100));
+      }
+
+      const misÀJour = Object.values(groupesParParent).flatMap((ids) => ids.map((id, ordre) => ({ id, ordre })));
+      if (misÀJour.length > 0) {
+        const { error } = await nœudsAPI.réordonner(misÀJour);
+        if (error) throw error;
+      }
+
+      setÉtape("terminé");
+      setTimeout(() => onTerminé?.(), 1500);
+    } catch (e) {
+      setErreur("Erreur pendant l'import : " + (e.message || String(e)));
+      setÉtape("confirmation");
+    }
   };
 
-  const totalAssociés = Object.values(associations).filter(Boolean).length;
-  const totalMots = chapitres.filter((_, i) => associations[i]).reduce((a, c) => a + c.mots, 0);
+  const statutsÉligibles = (d) => d?.statut === "existant" || d?.statut === "nouveau";
+  const totalÉligibles = Object.values(associations).filter(statutsÉligibles).length;
+  const totalExistants = Object.values(associations).filter((d) => d?.statut === "existant").length;
+  const totalNouveaux = Object.values(associations).filter((d) => d?.statut === "nouveau").length;
+  const totalMots = chapitres.filter((_, i) => statutsÉligibles(associations[i])).reduce((a, c) => a + c.mots, 0);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -212,27 +286,44 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
           {/* Confirmation */}
           {étape === "confirmation" && (
             <div>
+              {erreur && <div style={{ marginBottom: 14, padding: "10px 14px", background: "#FCEBEB", borderRadius: 8, fontSize: 13, color: "#A32D2D" }}>{erreur}</div>}
               <div style={{ background: `${couleur}10`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#333" }}>
-                <strong>{totalAssociés}</strong> chapitres associés automatiquement · <strong>{totalMots.toLocaleString("fr-FR")}</strong> mots à importer
+                <strong>{totalExistants}</strong> chapitre{totalExistants !== 1 ? "s" : ""} associé{totalExistants !== 1 ? "s" : ""} à des nœuds existants
+                {totalNouveaux > 0 && <> · <strong>{totalNouveaux}</strong> nouveau{totalNouveaux > 1 ? "x" : ""} nœud{totalNouveaux > 1 ? "s" : ""} à créer</>}
+                {" · "}<strong>{totalMots.toLocaleString("fr-FR")}</strong> mots à importer
               </div>
 
               <div style={{ display: "grid", gap: 6 }}>
                 {chapitres.map((ch, i) => {
-                  const nœud = nœudsExistants.find(n => n.id === associations[i]);
+                  const décision = associations[i];
+                  const nœud = décision?.statut === "existant" ? nœudsExistants.find(n => n.id === décision.nœudId) : null;
+                  const éligible = statutsÉligibles(décision);
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: associations[i] ? `${couleur}08` : "#fafafa", border: `0.5px solid ${associations[i] ? couleur + "30" : "#e5e5e5"}` }}>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: éligible ? `${couleur}08` : "#fafafa", border: `0.5px solid ${éligible ? couleur + "30" : "#e5e5e5"}` }}>
                       <span style={{ fontSize: 13, flex: 1, color: "#1a1a1a" }}>
                         {ch.type === "partie" ? "📂" : "📄"} {ch.titre.slice(0, 45)}
                       </span>
                       <span style={{ fontSize: 11, color: "#999", marginRight: 8 }}>{ch.mots} mots</span>
-                      {associations[i] ? (
+                      {décision?.statut === "existant" ? (
                         <span style={{ fontSize: 11, color: couleur, background: `${couleur}15`, padding: "2px 8px", borderRadius: 20 }}>
                           → {nœud?.titre?.slice(0, 25) || "?"}
                         </span>
+                      ) : décision?.statut === "nouveau" ? (
+                        <button
+                          onClick={() => basculerStatut(i)}
+                          title="Ce nœud sera créé à l'import — cliquer pour ne pas le créer"
+                          style={{ fontSize: 11, fontWeight: 500, color: "#1D9E75", background: "#E1F5EE", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          ✨ Nouveau nœud
+                        </button>
                       ) : (
-                        <span style={{ fontSize: 11, color: "#BA7517", background: "#FAEEDA", padding: "2px 8px", borderRadius: 20 }}>
-                          Sans correspondance
-                        </span>
+                        <button
+                          onClick={() => basculerStatut(i)}
+                          title="Ce chapitre ne sera pas importé — cliquer pour créer le nœud finalement"
+                          style={{ fontSize: 11, color: "#999", background: "#f0f0f0", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Ignoré
+                        </button>
                       )}
                     </div>
                   );
@@ -269,9 +360,9 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
             <button onClick={onFermer} style={{ background: "transparent", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "8px 18px", fontSize: 13, color: "#555", cursor: "pointer", fontFamily: "inherit" }}>
               Annuler
             </button>
-            {étape === "confirmation" && totalAssociés > 0 && (
+            {étape === "confirmation" && totalÉligibles > 0 && (
               <button onClick={importer} style={{ background: couleur, color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
-                Importer {totalAssociés} chapitre{totalAssociés > 1 ? "s" : ""}
+                Importer {totalÉligibles} chapitre{totalÉligibles > 1 ? "s" : ""}
               </button>
             )}
           </div>
@@ -280,3 +371,4 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
     </div>
   );
 }
+
