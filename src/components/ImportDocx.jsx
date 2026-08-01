@@ -216,11 +216,17 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
       const résultat = await extraireChapitres(fichier);
       if (!résultat.length) { setErreur("Aucun chapitre détecté. Vérifiez les styles Titre 1 / Titre 2 dans Word."); setÉtape("sélection"); return; }
 
-      // Associer automatiquement chaque chapitre au nœud correspondant
+      // Association automatique — étendue le 28/07/2026 (soir) : les
+      // chapitres SANS correspondance ne sont plus laissés de côté ("Sans
+      // correspondance", obligeant Joseph à créer les dossiers à la main
+      // avant d'importer) — ils sont désormais marqués "__CREER__" par
+      // défaut. Le nœud sera créé automatiquement au bon endroit lors de
+      // l'import (voir importer() plus bas). L'auteur peut désactiver la
+      // création au cas par cas dans l'écran de confirmation.
       const assoc = {};
       résultat.forEach((ch, i) => {
         const match = trouverCorrespondance(ch, nœudsExistants);
-        if (match) assoc[i] = match.id;
+        assoc[i] = match ? match.id : "__CREER__";
       });
 
       setChapitres(résultat);
@@ -232,18 +238,73 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
     }
   };
 
+  // Import — étendu le 28/07/2026 (soir), chantier "création automatique
+  // des nœuds manquants" (fiche du 28/07). Pour chaque chapitre :
+  //   - associations[i] = un id réel  → nœud existant, texte écrasé
+  //     (comportement inchangé depuis toujours — pas de confirmation
+  //     d'écrasement individuelle ce soir, portée volontairement limitée ;
+  //     voir la fiche de chantier pour ce raffinement futur).
+  //   - associations[i] === "__CREER__" → nouveau nœud créé. Le PARENT est
+  //     déterminé en suivant l'ordre du document : un nouveau "chapitre"
+  //     est rattaché à la dernière "partie" rencontrée dans le fichier
+  //     Word (existante ou elle-même tout juste créée) ; une nouvelle
+  //     "partie" est toujours créée à la racine.
+  //   - associations[i] === undefined → ignoré, comme avant.
+  // Une fois tous les nœuds touchés (existants + créés) identifiés par
+  // parent, un seul passage de réordonnancement (nœudsAPI.réordonner) leur
+  // donne un ordre 0..n-1 reflétant fidèlement l'ordre du document source.
+  // ⚠️ LIMITE CONNUE, non résolue ce soir faute de temps : ce
+  // réordonnancement ne renumérote QUE les nœuds touchés par CET import ;
+  // un frère préexistant non mentionné dans le Word (ajouté manuellement
+  // par ailleurs) garde son ancien numéro d'ordre et pourrait se retrouver
+  // mal intercalé. Cas à tester à la prochaine session sur un projet réel
+  // mêlant nœuds manuels et import.
   const importer = async () => {
     setÉtape("import");
     setProgression(0);
-    const àFaire = Object.entries(associations).filter(([, id]) => id);
+    const àFaire = Object.entries(associations).filter(([, v]) => v);
     let fait = 0;
 
-    for (const [idx, nœudId] of àFaire) {
-      const ch = chapitres[parseInt(idx)];
-      await nœudsAPI.sauvegarderTexte(nœudId, ch.html);
+    let parentCourantId = null; // racine, jusqu'à la première "partie" créée/associée
+    const frèresParParent = new Map(); // clé parent ("__racine__" ou id) → [ids dans l'ordre du document]
+    const enregistrer = (clé, id) => {
+      if (!frèresParParent.has(clé)) frèresParParent.set(clé, []);
+      frèresParParent.get(clé).push(id);
+    };
+
+    for (const [idxStr, valeur] of àFaire) {
+      const idx = parseInt(idxStr, 10);
+      const ch = chapitres[idx];
+      let idRéel = null;
+
+      if (valeur === "__CREER__") {
+        const parentPourCeNœud = ch.type === "partie" ? null : parentCourantId;
+        const { data, error } = await nœudsAPI.créer(
+          { parentId: parentPourCeNœud, type: ch.type, titre: ch.titre, texte: ch.html, ordre: 0 },
+          projet.id
+        );
+        if (error || !data) { fait++; continue; } // échec isolé : on continue le reste de l'import
+        idRéel = data.id;
+      } else {
+        idRéel = valeur;
+        await nœudsAPI.sauvegarderTexte(idRéel, ch.html);
+      }
+
+      const cléParent = ch.type === "partie" ? "__racine__" : (parentCourantId || "__racine__");
+      enregistrer(cléParent, idRéel);
+      if (ch.type === "partie") parentCourantId = idRéel;
+
       fait++;
       setProgression(Math.round((fait / àFaire.length) * 100));
     }
+
+    // Renumérotation finale, par groupe de frères touchés — reflète
+    // exactement l'ordre du document Word, pas l'ordre d'écriture en base.
+    const misesÀJour = [];
+    for (const idsOrdonnés of frèresParParent.values()) {
+      idsOrdonnés.forEach((id, ordre) => misesÀJour.push({ id, ordre }));
+    }
+    if (misesÀJour.length) await nœudsAPI.réordonner(misesÀJour);
 
     setÉtape("terminé");
     setTimeout(() => onTerminé?.(), 1500);
@@ -296,26 +357,51 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
           {étape === "confirmation" && (
             <div>
               <div style={{ background: `${couleur}10`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#333" }}>
-                <strong>{totalAssociés}</strong> chapitres associés automatiquement · <strong>{totalMots.toLocaleString("fr-FR")}</strong> mots à importer
+                <strong>{Object.values(associations).filter(v => v && v !== "__CREER__").length}</strong> nœud{Object.values(associations).filter(v => v && v !== "__CREER__").length > 1 ? "s" : ""} existant{Object.values(associations).filter(v => v && v !== "__CREER__").length > 1 ? "s" : ""} rempli{Object.values(associations).filter(v => v && v !== "__CREER__").length > 1 ? "s" : ""}
+                {" · "}
+                <strong>{Object.values(associations).filter(v => v === "__CREER__").length}</strong> nouveau{Object.values(associations).filter(v => v === "__CREER__").length > 1 ? "x" : ""} nœud{Object.values(associations).filter(v => v === "__CREER__").length > 1 ? "s" : ""} à créer
+                {" · "}
+                <strong>{totalMots.toLocaleString("fr-FR")}</strong> mots à importer
               </div>
 
               <div style={{ display: "grid", gap: 6 }}>
                 {chapitres.map((ch, i) => {
-                  const nœud = nœudsExistants.find(n => n.id === associations[i]);
+                  const valeur = associations[i];
+                  const estCréation = valeur === "__CREER__";
+                  const estExistant = valeur && !estCréation;
+                  const nœud = estExistant ? nœudsExistants.find(n => n.id === valeur) : null;
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: associations[i] ? `${couleur}08` : "#fafafa", border: `0.5px solid ${associations[i] ? couleur + "30" : "#e5e5e5"}` }}>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: valeur ? `${couleur}08` : "#fafafa", border: `0.5px solid ${valeur ? couleur + "30" : "#e5e5e5"}` }}>
                       <span style={{ fontSize: 13, flex: 1, color: "#1a1a1a" }}>
                         {ch.type === "partie" ? "📂" : "📄"} {ch.titre.slice(0, 45)}
                       </span>
                       <span style={{ fontSize: 11, color: "#999", marginRight: 8 }}>{ch.mots} mots</span>
-                      {associations[i] ? (
+                      {estExistant && (
                         <span style={{ fontSize: 11, color: couleur, background: `${couleur}15`, padding: "2px 8px", borderRadius: 20 }}>
                           → {nœud?.titre?.slice(0, 25) || "?"}
                         </span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: "#BA7517", background: "#FAEEDA", padding: "2px 8px", borderRadius: 20 }}>
-                          Sans correspondance
-                        </span>
+                      )}
+                      {estCréation && (
+                        // Nouveau nœud à créer — chantier 28/07/2026 (soir).
+                        // Cliquable : bascule vers "ignoré" si l'auteur ne
+                        // veut PAS créer ce nœud automatiquement (ex. un
+                        // chapitre déjà volontairement laissé de côté).
+                        <button
+                          onClick={() => setAssociations(a => ({ ...a, [i]: undefined }))}
+                          title="Cliquer pour ne PAS créer ce nœud automatiquement"
+                          style={{ fontSize: 11, color: "#1D9E75", background: "#1D9E7515", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          ✨ Nouveau nœud
+                        </button>
+                      )}
+                      {!valeur && (
+                        <button
+                          onClick={() => setAssociations(a => ({ ...a, [i]: "__CREER__" }))}
+                          title="Cliquer pour créer ce nœud automatiquement"
+                          style={{ fontSize: 11, color: "#999", background: "#eee", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Ignoré — cliquer pour créer
+                        </button>
                       )}
                     </div>
                   );
