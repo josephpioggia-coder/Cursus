@@ -33,22 +33,83 @@ async function chargerJSZip() {
   });
 }
 
-// Niveau de titre Word ("Titre1".."Titre6") → rôle dans la structure Cursus.
-// Réglable à l'écran de sélection (par défaut Titre1 = partie, Titre2 =
-// chapitre, comme avant) — ajouté 01/08/2026 : certains manuscrits utilisent
-// d'autres niveaux (ex. Titre2 = partie, Titre3 = chapitre) selon la mise en
-// forme Word d'origine ; ce n'est pas le NOM du style qui doit décider, mais
-// le niveau choisi par l'auteur.
-async function extraireChapitres(fichier, niveauPartie = "Titre1", niveauChapitre = "Titre2") {
+// Résout, pour chaque styleId défini dans word/styles.xml, son NIVEAU DE
+// TITRE RÉEL (0 = niveau 1, 1 = niveau 2, … 5 = niveau 6) — ajouté
+// 01/08/2026, en remplacement d'une comparaison sur le NOM du style qui
+// s'est révélée peu fiable en conditions réelles : un passage de texte
+// collé depuis un autre document Word peut dupliquer un style avec un nom
+// interne différent ("Titre21" au lieu de "Titre2", par exemple), alors que
+// Word l'affiche de façon identique et au même niveau visuel. Le niveau réel
+// (balise <w:outlineLvl>) est en revanche fiable : c'est lui qui détermine
+// le niveau affiché dans le volet Plan de Word, indépendamment du nom du
+// style. Un style sans <w:outlineLvl> propre hérite de celui de son style de
+// base (<w:basedOn>), remonté récursivement.
+function résoudreNiveauxStyles(stylesXml) {
+  if (!stylesXml) return {};
+  const doc = new DOMParser().parseFromString(stylesXml, "text/xml");
+  const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const styleEls = Array.from(doc.getElementsByTagNameNS(ns, "style"));
+
+  const parentDe = {};
+  const niveauDirect = {};
+  for (const s of styleEls) {
+    const styleId = s.getAttribute("w:styleId");
+    if (!styleId) continue;
+    const basedOn = s.getElementsByTagNameNS(ns, "basedOn")[0]?.getAttribute("w:val");
+    if (basedOn) parentDe[styleId] = basedOn;
+    const outlineLvl = s.getElementsByTagNameNS(ns, "outlineLvl")[0]?.getAttribute("w:val");
+    if (outlineLvl !== undefined && outlineLvl !== null) niveauDirect[styleId] = parseInt(outlineLvl, 10);
+  }
+
+  const résolu = {};
+  const résoudre = (styleId, vus) => {
+    if (résolu[styleId] !== undefined) return résolu[styleId];
+    if (vus.has(styleId)) return undefined; // chaîne basedOn circulaire — sécurité
+    vus.add(styleId);
+    if (niveauDirect[styleId] !== undefined) { résolu[styleId] = niveauDirect[styleId]; return résolu[styleId]; }
+    const parent = parentDe[styleId];
+    const n = parent ? résoudre(parent, vus) : undefined;
+    if (n !== undefined) résolu[styleId] = n;
+    return n;
+  };
+
+  for (const styleId of new Set([...Object.keys(parentDe), ...Object.keys(niveauDirect)])) {
+    résoudre(styleId, new Set());
+  }
+  return résolu;
+}
+
+// Repli si le niveau n'a pas pu être résolu via styles.xml (style
+// entièrement dépourvu d'<w:outlineLvl>, même dans sa chaîne basedOn) :
+// extrait le chiffre du nom du style lui-même ("Titre21" → niveau 2), utile
+// justement dans le cas des styles dupliqués/renommés par Word au
+// copier-coller — leur nom garde presque toujours le chiffre d'origine en
+// préfixe.
+function niveauDepuisNomStyle(styleId) {
+  const m = /^(?:titre|heading)\s*(\d)/i.exec(styleId || "");
+  return m ? parseInt(m[1], 10) - 1 : undefined;
+}
+
+// niveauPartie / niveauChapitre : niveaux de titre (1 à 6) choisis à l'écran
+// de sélection pour représenter les Parties et les Chapitres — ajouté
+// 01/08/2026. Détection par NIVEAU RÉEL (voir résoudreNiveauxStyles
+// ci-dessus), plus par nom de style : deux paragraphes au même niveau
+// visuel dans Word sont désormais toujours reconnus comme tels, même si
+// leurs styles internes portent des noms différents.
+async function extraireChapitres(fichier, niveauPartie = 1, niveauChapitre = 2) {
   const JSZip = await chargerJSZip();
   const zip = await JSZip.loadAsync(await fichier.arrayBuffer());
   const xml = await zip.file("word/document.xml").async("string");
+  const stylesXml = await zip.file("word/styles.xml")?.async("string");
+  const niveauxParStyle = résoudreNiveauxStyles(stylesXml);
 
   const doc = new DOMParser().parseFromString(xml, "text/xml");
   const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const paras = doc.getElementsByTagNameNS(ns, "p");
 
-  // Styles à ignorer (table des matières, métadonnées)
+  // Styles à ignorer (table des matières, métadonnées) — toujours exclus
+  // même s'ils portent un niveau de titre (une entrée de table des matières
+  // a souvent le même niveau que le titre qu'elle recopie).
   const IGNORER = new Set([
     "TM1","TM2","TM3","TM4","TM5","TM6","TM7","TM8","TM9",
     "EntryChap","EntryPart","EntryNormal","EntrySub",
@@ -67,11 +128,21 @@ async function extraireChapitres(fichier, niveauPartie = "Titre1", niveauChapitr
 
     if (!texte || IGNORER.has(style)) continue;
 
-    if (style === niveauPartie) {
+    // Surcharge directe sur le paragraphe (rare, mais prioritaire sur le
+    // niveau du style s'il est présent), puis niveau résolu du style, puis
+    // repli sur le nom du style. Niveau 1-based (niveau 1 = <w:outlineLvl> 0).
+    const niveauParagraphe = p.getElementsByTagNameNS(ns, "pPr")[0]
+      ?.getElementsByTagNameNS(ns, "outlineLvl")[0]?.getAttribute("w:val");
+    const niveau0Based = niveauParagraphe !== undefined && niveauParagraphe !== null
+      ? parseInt(niveauParagraphe, 10)
+      : (niveauxParStyle[style] !== undefined ? niveauxParStyle[style] : niveauDepuisNomStyle(style));
+    const niveau = niveau0Based !== undefined ? niveau0Based + 1 : undefined;
+
+    if (niveau === niveauPartie) {
       if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
       courant = { titre: texte, type: "partie" };
       lignes = [];
-    } else if (style === niveauChapitre) {
+    } else if (niveau === niveauChapitre) {
       if (courant) chapitres.push({ ...courant, html: lignes.map(l => `<p>${l}</p>`).join(""), mots: lignes.join(" ").split(/\s+/).filter(Boolean).length });
       courant = { titre: texte, type: "chapitre" };
       lignes = [];
@@ -84,8 +155,8 @@ async function extraireChapitres(fichier, niveauPartie = "Titre1", niveauChapitr
   return chapitres.filter(c => c.mots > 0);
 }
 
-const NIVEAUX_TITRE = ["Titre1", "Titre2", "Titre3", "Titre4", "Titre5", "Titre6"];
-const LIBELLÉ_NIVEAU = { Titre1: "Titre 1", Titre2: "Titre 2", Titre3: "Titre 3", Titre4: "Titre 4", Titre5: "Titre 5", Titre6: "Titre 6" };
+const NIVEAUX_TITRE = [1, 2, 3, 4, 5, 6];
+const LIBELLÉ_NIVEAU = { 1: "Niveau 1 (Titre 1)", 2: "Niveau 2 (Titre 2)", 3: "Niveau 3 (Titre 3)", 4: "Niveau 4 (Titre 4)", 5: "Niveau 5 (Titre 5)", 6: "Niveau 6 (Titre 6)" };
 
 // Normalise un titre pour la comparaison.
 // CORRECTIF 28/07/2026 — BUG DE COLLISION : l'ancienne version EFFAÇAIT le
@@ -150,8 +221,8 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
   const [nomFichier, setNomFichier] = useState("");
   // Niveaux de titre Word à utiliser pour les Parties et les Chapitres —
   // réglables avant l'analyse (par défaut Titre 1 / Titre 2, comme avant).
-  const [niveauPartie, setNiveauPartie] = useState("Titre1");
-  const [niveauChapitre, setNiveauChapitre] = useState("Titre2");
+  const [niveauPartie, setNiveauPartie] = useState(1);
+  const [niveauChapitre, setNiveauChapitre] = useState(2);
   const inputRef = useRef(null);
   const couleur = projet?.couleur || "#7F77DD";
 
@@ -303,7 +374,7 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   Niveau des Parties
                   <select
                     value={niveauPartie}
-                    onChange={(e) => setNiveauPartie(e.target.value)}
+                    onChange={(e) => setNiveauPartie(Number(e.target.value))}
                     style={{ padding: "6px 8px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", fontSize: 13 }}
                   >
                     {NIVEAUX_TITRE.map((n) => <option key={n} value={n}>{LIBELLÉ_NIVEAU[n]}</option>)}
@@ -313,7 +384,7 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   Niveau des Chapitres
                   <select
                     value={niveauChapitre}
-                    onChange={(e) => setNiveauChapitre(e.target.value)}
+                    onChange={(e) => setNiveauChapitre(Number(e.target.value))}
                     style={{ padding: "6px 8px", border: "0.5px solid #ddd", borderRadius: 6, fontFamily: "inherit", fontSize: 13 }}
                   >
                     {NIVEAUX_TITRE.map((n) => <option key={n} value={n}>{LIBELLÉ_NIVEAU[n]}</option>)}
