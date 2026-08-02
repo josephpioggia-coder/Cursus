@@ -47,82 +47,6 @@ const formatAPACitation = (livre, page, paragraphe) => {
   return loc ? `(${auteur}, ${année}, ${loc})` : `(${auteur}, ${année})`;
 };
 
-// ─── Données de démo ────────────────────────────────────────────────────────────
-
-const DEMO_LIVRES = [
-  {
-    id: genId(),
-    titre: "L'Esprit, le soi et la société",
-    auteur: "George Herbert Mead",
-    année: "1934",
-    éditeur: "PUF",
-    ville: "Paris",
-    genre: "Sociologie",
-    statut: "Lu",
-    note: "Fondamental pour la construction identitaire et le regard de l'autre.",
-    tags: ["identité", "regard", "social"],
-    couverture: null,
-    citations: [
-      {
-        id: genId(),
-        texte: "Le soi est une construction sociale — il émerge dans l'interaction avec autrui, jamais en dehors d'elle.",
-        page: "138",
-        paragraphe: "2",
-        projetId: null,
-        tags: ["identité", "regard"],
-        dateAjout: "2025-11-12",
-      },
-      {
-        id: genId(),
-        texte: "L'individu se voit lui-même uniquement en prenant la perspective d'autrui pour se regarder.",
-        page: "152",
-        paragraphe: "1",
-        projetId: null,
-        tags: ["perspective", "autrui"],
-        dateAjout: "2025-11-14",
-      },
-    ],
-  },
-  {
-    id: genId(),
-    titre: "Resolving Social Conflicts",
-    auteur: "Kurt Lewin",
-    année: "1948",
-    éditeur: "Harper & Row",
-    ville: "New York",
-    genre: "Psychologie",
-    statut: "Lu",
-    note: "Lewin pose les bases du changement par le contexte, pas par la volonté.",
-    tags: ["changement", "contexte", "groupe"],
-    couverture: null,
-    citations: [
-      {
-        id: genId(),
-        texte: "Ce n'est pas l'individu qu'il faut changer, mais le champ psychologique dans lequel il évolue.",
-        page: "59",
-        paragraphe: "3",
-        projetId: null,
-        tags: ["changement", "contexte"],
-        dateAjout: "2025-10-03",
-      },
-    ],
-  },
-  {
-    id: genId(),
-    titre: "Thinking, Fast and Slow",
-    auteur: "Daniel Kahneman",
-    année: "2011",
-    éditeur: "Farrar, Straus and Giroux",
-    ville: "New York",
-    genre: "Psychologie",
-    statut: "En cours",
-    note: "Système 1 / Système 2 — utile pour la partie décision dans la méthode.",
-    tags: ["cognition", "décision", "biais"],
-    couverture: null,
-    citations: [],
-  },
-];
-
 // ─── Composant : Badge ─────────────────────────────────────────────────────────
 
 function Badge({ label, couleur = "#7F77DD", small = false }) {
@@ -518,11 +442,17 @@ function FicheLivre({ livre, projets, onMàj, onSupprimer }) {
 // ─── Composant principal : Bibliothèque ──────────────────────────────────────────
 
 export default function Bibliotheque({ projets = [] }) {
+  // CORRECTIF 02/08/2026 — la bibliothèque se préchargeait avec 3 livres de
+  // démonstration factices (Mead, Lewin, Kahneman) dès que le localStorage
+  // était vide, sans lien avec le contenu réel de l'auteur ni indication
+  // qu'il s'agissait d'exemples — repéré en conditions réelles ("j'ignore
+  // d'où elles viennent"). Un projet vide affiche désormais un vrai état
+  // vide, avec une invitation à ajouter le premier livre (voir plus bas).
   const [livres, setLivres] = useState(() => {
     try {
       const s = localStorage.getItem("atelier-bibliotheque");
-      return s ? JSON.parse(s) : DEMO_LIVRES;
-    } catch { return DEMO_LIVRES; }
+      return s ? JSON.parse(s) : [];
+    } catch { return []; }
   });
   const [livreActifId, setLivreActifId] = useState(livres[0]?.id || null);
   const [ajouterLivre, setAjouterLivre] = useState(false);
@@ -597,7 +527,7 @@ export default function Bibliotheque({ projets = [] }) {
         <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
           {livresFiltré.length === 0 ? (
             <div style={{ textAlign: "center", padding: "24px", color: "var(--color-text-tertiary)", fontSize: 12 }}>
-              Aucun résultat.
+              {livres.length === 0 ? "Aucun livre pour l'instant." : "Aucun résultat."}
             </div>
           ) : (
             livresFiltré.map((l) => (
@@ -638,6 +568,15 @@ export default function Bibliotheque({ projets = [] }) {
               setLivreActifId(livres.find((l) => l.id !== id)?.id || null);
             }}
           />
+        ) : livres.length === 0 ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "var(--color-text-tertiary)", fontSize: 13, textAlign: "center", padding: 24 }}>
+            <div style={{ fontSize: 28 }}>📚</div>
+            <div>Votre bibliothèque est vide. Ajoutez un premier livre pour commencer à y attacher des citations.</div>
+            <button onClick={() => setAjouterLivre(true)}
+              style={{ background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+              + Ajouter un livre
+            </button>
+          </div>
         ) : (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-tertiary)", fontSize: 13 }}>
             Sélectionnez un livre pour voir sa fiche.
@@ -647,3 +586,4 @@ export default function Bibliotheque({ projets = [] }) {
     </div>
   );
 }
+
