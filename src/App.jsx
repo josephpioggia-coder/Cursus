@@ -213,21 +213,27 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "5px 8px", borderRadius: 6, cursor: "pointer",
+          // Marqueur "dernier nœud visité" — rendu plus visible le
+          // 02/08/2026 à la demande de Joseph (le fond gris uni #ccc
+          // passait inaperçu) : trame diagonale dans la couleur du
+          // projet (celle choisie au lancement du livre), au lieu d'un
+          // gris neutre — reconnaissable même en un coup d'œil rapide
+          // dans une longue structure.
           background: enMultiSélection
             ? `${projetCouleur}28`
             : sélectionné === nœud.id
               ? `${projetCouleur}18`
               : dernierNœudVisitéId === nœud.id
-                ? "var(--surface-hover)"
+                ? `repeating-linear-gradient(45deg, ${projetCouleur}26, ${projetCouleur}26 5px, ${projetCouleur}0a 5px, ${projetCouleur}0a 10px)`
                 : survol ? "var(--surface-hover)" : "transparent",
           borderLeft: sélectionné === nœud.id || enMultiSélection
             ? `2px solid ${projetCouleur}`
             : dernierNœudVisitéId === nœud.id
-              ? "2px solid #ccc"
+              ? `3px solid ${projetCouleur}`
               : "2px solid transparent",
           outline: enMultiSélection ? `1px solid ${projetCouleur}60` : "none",
           outlineOffset: -1,
-          opacity: estCoupé ? 0.5 : (dernierNœudVisitéId === nœud.id && sélectionné !== nœud.id ? 0.65 : 1),
+          opacity: estCoupé ? 0.5 : 1,
           borderStyle: estCoupé ? "dashed" : undefined,
           transition: "all 0.15s",
         }}
@@ -1737,22 +1743,53 @@ function AppConnectée({ user, déconnecter }) {
   // L'ADN du projet (10 questions de niveau 1) — socle de démarrage, présenté
   // comme rassurant, pas comme une contrainte juridique. Tant qu'il n'est pas
   // complet, un rappel discret réapparaît à l'ouverture du projet.
+  //
+  // CORRECTIF 02/08/2026 — BUG SILENCIEUX : ni `adn` ni `réponses` n'étaient
+  // vérifiés pour une erreur. Si la requête sur `banque_questions` échoue
+  // (ex. policy RLS bloquant la lecture côté client, alors que la table
+  // contient bien des lignes vues depuis l'éditeur SQL qui contourne RLS),
+  // `data` revient `null` → `(adn || [])` devient un tableau VIDE →
+  // `[].every(...)` renvoie `true` par défaut (vrai sur un ensemble vide) →
+  // le code croit le questionnaire déjà complet et ne l'affiche JAMAIS,
+  // sans la moindre trace d'erreur. Constaté en conditions réelles : la
+  // table contenait bien 11 questions de niveau 1 (vérifié par SQL direct),
+  // mais le rappel ne s'est jamais affiché sur aucun projet. Toute erreur
+  // est désormais journalisée et bloque le calcul plutôt que d'être
+  // interprétée à tort comme "rien à répondre".
   useEffect(() => {
     if (!projetActifId || projetVenantDêtreCréé) return;
 
     const vérifier = async () => {
-      const { data: adn } = await supabase
+      const { data: adn, error: erreurAdn } = await supabase
         .from("banque_questions")
         .select("id")
         .eq("niveau", 1);
+      if (erreurAdn) {
+        journaliserErreur("App:vérifierQuestionnaire (banque_questions)", erreurAdn.message, projetActifId);
+        return;
+      }
 
-      const { data: réponses } = await supabase
+      const { data: réponses, error: erreurRéponses } = await supabase
         .from("reponses_questionnaire")
         .select("question_id")
         .eq("projet_id", projetActifId);
+      if (erreurRéponses) {
+        journaliserErreur("App:vérifierQuestionnaire (reponses_questionnaire)", erreurRéponses.message, projetActifId);
+        return;
+      }
+
+      if (!adn || adn.length === 0) {
+        // Aucune question trouvée pour ce niveau — soit la table est
+        // réellement vide, soit une policy RLS bloque la lecture sans
+        // renvoyer d'erreur explicite. Dans le doute, on N'AFFICHE PAS le
+        // rappel (rien à répondre serait pire qu'un faux positif), mais on
+        // le journalise pour que ce cas ne reste plus invisible.
+        journaliserErreur("App:vérifierQuestionnaire", "banque_questions renvoie 0 ligne pour niveau=1 côté client — vérifier les policies RLS si la table n'est pourtant pas vide en base.", projetActifId);
+        return;
+      }
 
       const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
-      const toutComplet = (adn || []).every((q) => idsRépondus.has(q.id));
+      const toutComplet = adn.every((q) => idsRépondus.has(q.id));
 
       setRappelIntentionPour(toutComplet ? null : projetActifId);
     };
@@ -2345,6 +2382,26 @@ function AppConnectée({ user, déconnecter }) {
                 }}
               >
                 {t("vues.importerWord")}
+              </button>
+              {/* Accès permanent au questionnaire d'intention — ajouté
+                  02/08/2026, à la demande de Joseph. Jusqu'ici, il n'était
+                  accessible qu'automatiquement (à la création d'un projet,
+                  ou en rappel tant qu'il n'était pas complet) : aucun moyen
+                  d'y revenir volontairement, ni de consulter/ajuster des
+                  réponses déjà données. Réutilise `rappelIntentionPour` —
+                  ouvrir le questionnaire, qu'il soit complet ou non. */}
+              <button
+                onClick={() => setRappelIntentionPour(projetActif.id)}
+                title="Consulter ou compléter le questionnaire d'intention (ligne de conduite du co-pilote IA)"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: "#534AB7",
+                  border: "0.5px solid #7F77DD50", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit", whiteSpace: "nowrap",
+                }}
+              >
+                🧭 Questionnaire de démarrage
               </button>
               {/* Suppression du projet — ajouté 28/07/2026, AGRANDI le même
                   jour suite au retour de Joseph ("le bouton est vraiment
