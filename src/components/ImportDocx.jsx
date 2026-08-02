@@ -180,8 +180,19 @@ function normaliser(titre) {
 // le CONTENU d'un chapitre indépendamment de sa mise en forme (le HTML de
 // Cursus vient de TipTap, celui extrait du Word est construit ici même :
 // les deux diffèrent toujours en balises même quand le texte est identique).
+// CORRECTIF 02/08/2026 — un chapitre au contenu identique à l'œil était
+// parfois signalé en conflit : Word remplace automatiquement les guillemets
+// et apostrophes droits par leurs équivalents courbes (' → ’, " → « ») à la
+// frappe, ce que Cursus ne fait pas forcément — le texte affiché est le
+// même, mais diffère caractère par caractère. Les deux formes sont
+// désormais unifiées avant comparaison.
 function texteBrutDe(html) {
-  return (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return (html || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟«»]/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function compterMotsHtml(html) {
