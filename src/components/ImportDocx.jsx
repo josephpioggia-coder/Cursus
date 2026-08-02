@@ -176,6 +176,32 @@ function normaliser(titre) {
     .replace(/\s+/g, " ").trim();
 }
 
+// Texte brut d'un HTML — tags retirés, espaces normalisés — pour comparer
+// le CONTENU d'un chapitre indépendamment de sa mise en forme (le HTML de
+// Cursus vient de TipTap, celui extrait du Word est construit ici même :
+// les deux diffèrent toujours en balises même quand le texte est identique).
+function texteBrutDe(html) {
+  return (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function compterMotsHtml(html) {
+  const brut = texteBrutDe(html);
+  return brut === "" ? 0 : brut.split(" ").length;
+}
+
+// Formate la date de dernière modification d'un nœud existant — ajouté
+// 02/08/2026, à la demande de Joseph : en cas de conflit de contenu, le
+// badge se contentait de dire "Garder Cursus" sans montrer POURQUOI —
+// aucun moyen de juger laquelle des deux versions garder sans rouvrir le
+// chapitre dans l'éditeur.
+function formaterDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " à " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
 // Trouve le meilleur nœud existant pour un chapitre importé
 function trouverCorrespondance(chapitreImporté, nœuds) {
   const titreN = normaliser(chapitreImporté.titre);
@@ -248,18 +274,54 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
       // chapitres "orphelins" sont désormais exclus par défaut (statut
       // "ignoré", marqués `orphelin: true`) — l'auteur voit pourquoi et doit
       // les inclure explicitement s'il veut vraiment les créer à la racine.
+      // CORRECTIF 02/08/2026 — un chapitre déjà associé à un nœud existant
+      // écrasait silencieusement son contenu Cursus, même si celui-ci avait
+      // été modifié depuis (dans l'éditeur, par exemple) et différait
+      // désormais du Word. Comparaison en texte brut (indépendante de la
+      // mise en forme HTML, qui diffère toujours entre TipTap et l'extrait
+      // Word même à contenu identique) : si les deux versions divergent
+      // réellement, l'auteur doit choisir laquelle garder — par défaut,
+      // rien n'est écrasé (`choixConflit: "cursus"`).
+      //
+      // CORRECTIF 02/08/2026 (bis) — BUG RÉEL, PAS UN DÉTAIL : trouverCorrespondance()
+      // cherchait un titre dans TOUTE la liste des nœuds du projet, sans
+      // tenir compte du chapitre parent. Un titre de sous-section générique
+      // et répété ("Enjeux", "Questions ouvertes", "Introduction"…) apparaît
+      // dans PRESQUE CHAQUE chapitre du document — la recherche globale
+      // retournait alors le premier "Enjeux" trouvé n'importe où dans le
+      // projet, jamais forcément celui du bon chapitre. Conséquence
+      // constatée en conditions réelles : le "Enjeux" du chapitre 12 du Word
+      // (55 mots) associé et écrasé sur le "Enjeux" d'un AUTRE chapitre en
+      // base (244 mots), sans qu'aucun conflit ne soit détecté — la
+      // comparaison de contenu du correctif précédent comparait déjà les
+      // deux mauvais textes entre eux, donc parfois "par chance" identiques,
+      // parfois pas, mais toujours sur le mauvais nœud.
+      // La recherche est désormais restreinte aux enfants du VRAI parent en
+      // cours (la dernière "partie" du document déjà associée à un nœud
+      // existant) — jamais à l'ensemble du projet. Un chapitre sans parent
+      // existant (partie elle-même nouvelle, ou pas encore rencontrée) n'a
+      // par construction aucun candidat possible : il devient "nouveau".
       const assoc = {};
       let auMoinsUnePartieVue = false;
+      let partieActuelleExistante = null; // nœud EXISTANT de la dernière "partie" du Word déjà rencontrée
+      const partiesRacines = nœudsExistants.filter((n) => !n.parent_id);
+
       résultat.forEach((ch, i) => {
-        const match = trouverCorrespondance(ch, nœudsExistants);
+        const candidats = ch.type === "partie"
+          ? partiesRacines
+          : (partieActuelleExistante ? nœudsExistants.filter((n) => n.parent_id === partieActuelleExistante.id) : []);
+        const match = trouverCorrespondance(ch, candidats);
+
         if (match) {
-          assoc[i] = { statut: "existant", nœudId: match.id };
-          if (ch.type === "partie") auMoinsUnePartieVue = true;
+          const conflit = !!match.texte && texteBrutDe(match.texte) !== texteBrutDe(ch.html);
+          assoc[i] = { statut: "existant", nœudId: match.id, conflit, choixConflit: conflit ? "cursus" : null };
+          if (ch.type === "partie") { auMoinsUnePartieVue = true; partieActuelleExistante = match; }
           return;
         }
         if (ch.type === "partie") {
           assoc[i] = { statut: "nouveau", nœudId: null };
           auMoinsUnePartieVue = true;
+          partieActuelleExistante = null; // partie à créer : pas encore d'id, donc pas de scope de recherche pour ses futurs enfants
           return;
         }
         assoc[i] = auMoinsUnePartieVue
@@ -284,6 +346,18 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
       const courant = prev[i];
       if (!courant || courant.statut === "existant") return prev;
       return { ...prev, [i]: { ...courant, statut: courant.statut === "nouveau" ? "ignoré" : "nouveau" } };
+    });
+  };
+
+  // Choix de version pour un chapitre en conflit (contenu différent entre
+  // Cursus et le Word) — bascule entre garder la version Cursus (par
+  // défaut, rien n'est écrasé) et utiliser la version Word (écrase à
+  // l'import, comme le comportement d'avant ce correctif).
+  const basculerChoixConflit = (i) => {
+    setAssociations((prev) => {
+      const courant = prev[i];
+      if (!courant?.conflit) return prev;
+      return { ...prev, [i]: { ...courant, choixConflit: courant.choixConflit === "cursus" ? "word" : "cursus" } };
     });
   };
 
@@ -320,9 +394,11 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
 
           const clé = parentId || "__racine__";
           (groupesParParent[clé] ||= []).push(nœudId);
-        } else {
+        } else if (!décision.conflit || décision.choixConflit === "word") {
           await nœudsAPI.sauvegarderTexte(nœudId, ch.html);
         }
+        // Sinon (conflit + "Garder Cursus") : le nœud est compté comme
+        // traité mais son texte n'est volontairement pas touché.
 
         if (ch.type === "partie") dernièrePartieId = nœudId;
 
@@ -345,11 +421,15 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
   };
 
   const statutsÉligibles = (d) => d?.statut === "existant" || d?.statut === "nouveau";
+  // Le texte sera réellement écrit sauf en cas de conflit non résolu vers
+  // "word" (choix par défaut : garder la version Cursus, rien n'est écrit).
+  const seraÉcrit = (d) => d?.statut === "nouveau" || (d?.statut === "existant" && (!d.conflit || d.choixConflit === "word"));
   const totalÉligibles = Object.values(associations).filter(statutsÉligibles).length;
   const totalExistants = Object.values(associations).filter((d) => d?.statut === "existant").length;
   const totalNouveaux = Object.values(associations).filter((d) => d?.statut === "nouveau").length;
   const totalOrphelins = Object.values(associations).filter((d) => d?.orphelin).length;
-  const totalMots = chapitres.filter((_, i) => statutsÉligibles(associations[i])).reduce((a, c) => a + c.mots, 0);
+  const totalConflits = Object.values(associations).filter((d) => d?.conflit).length;
+  const totalMots = chapitres.filter((_, i) => seraÉcrit(associations[i])).reduce((a, c) => a + c.mots, 0);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
@@ -432,6 +512,11 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   ⚠️ <strong>{totalOrphelins}</strong> chapitre{totalOrphelins > 1 ? "s" : ""} n'{totalOrphelins > 1 ? "ont" : "a"} aucune partie avant {totalOrphelins > 1 ? "eux" : "lui"} dans le document — les créer les placerait à la racine du projet, au même niveau que des parties. Laissés de côté par défaut ; cliquez sur leur badge si vous voulez vraiment les créer ainsi.
                 </div>
               )}
+              {totalConflits > 0 && (
+                <div style={{ background: "#FCEBEB", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 12.5, color: "#A32D2D", lineHeight: 1.5 }}>
+                  ⚠️ <strong>{totalConflits}</strong> chapitre{totalConflits > 1 ? "s" : ""} déjà présent{totalConflits > 1 ? "s" : ""} dans Cursus {totalConflits > 1 ? "ont" : "a"} un contenu différent du Word — la version Cursus est gardée par défaut pour chacun. Cliquez sur leur badge « Garder Cursus » pour basculer vers « Utiliser Word » si vous voulez écraser.
+                </div>
+              )}
 
               <div style={{ display: "grid", gap: 6 }}>
                 {chapitres.map((ch, i) => {
@@ -439,33 +524,79 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   const nœud = décision?.statut === "existant" ? nœudsExistants.find(n => n.id === décision.nœudId) : null;
                   const éligible = statutsÉligibles(décision);
                   return (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: éligible ? `${couleur}08` : "#fafafa", border: `0.5px solid ${éligible ? couleur + "30" : "#e5e5e5"}` }}>
-                      <span style={{ fontSize: 13, flex: 1, color: "#1a1a1a" }}>
-                        {ch.type === "partie" ? "📂" : "📄"} {ch.titre.slice(0, 45)}
-                      </span>
-                      <span style={{ fontSize: 11, color: "#999", marginRight: 8 }}>{ch.mots} mots</span>
-                      {décision?.statut === "existant" ? (
-                        <span style={{ fontSize: 11, color: couleur, background: `${couleur}15`, padding: "2px 8px", borderRadius: 20 }}>
-                          → {nœud?.titre?.slice(0, 25) || "?"}
+                    <div key={i} style={{ padding: "10px 12px", borderRadius: 8, background: éligible ? `${couleur}08` : "#fafafa", border: `0.5px solid ${éligible ? couleur + "30" : "#e5e5e5"}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 13, flex: 1, color: "#1a1a1a" }}>
+                          {ch.type === "partie" ? "📂" : "📄"} {ch.titre.slice(0, 45)}
                         </span>
-                      ) : décision?.statut === "nouveau" ? (
-                        <button
-                          onClick={() => basculerStatut(i)}
-                          title={décision.orphelin ? "Sans partie parente — sera créé à la racine du projet. Cliquer pour ne pas le créer" : "Ce nœud sera créé à l'import — cliquer pour ne pas le créer"}
-                          style={décision.orphelin
-                            ? { fontSize: 11, fontWeight: 500, color: "#BA7517", background: "#FAEEDA", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }
-                            : { fontSize: 11, fontWeight: 500, color: "#1D9E75", background: "#E1F5EE", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
-                        >
-                          {décision.orphelin ? "⚠️ Nouveau nœud (à la racine)" : "✨ Nouveau nœud"}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => basculerStatut(i)}
-                          title={décision?.orphelin ? "Sans partie parente dans le document — cliquer pour le créer quand même à la racine" : "Ce chapitre ne sera pas importé — cliquer pour créer le nœud finalement"}
-                          style={{ fontSize: 11, color: "#999", background: "#f0f0f0", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
-                        >
-                          {décision?.orphelin ? "Ignoré — sans partie" : "Ignoré"}
-                        </button>
+                        <span style={{ fontSize: 11, color: "#999", marginRight: 8 }}>{ch.mots} mots</span>
+                        {décision?.statut === "existant" && décision.conflit ? (
+                          <button
+                            onClick={() => basculerChoixConflit(i)}
+                            title="Contenu différent entre Cursus et le Word — cliquer pour changer quelle version garder"
+                            style={décision.choixConflit === "word"
+                              ? { fontSize: 11, fontWeight: 500, color: "#A32D2D", background: "#FCEBEB", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }
+                              : { fontSize: 11, fontWeight: 500, color: "#777", background: "#f0f0f0", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            {décision.choixConflit === "word" ? "⚠️ Utiliser Word (écrase Cursus)" : "⚠️ Garder Cursus"}
+                          </button>
+                        ) : décision?.statut === "existant" ? (
+                          <span style={{ fontSize: 11, color: couleur, background: `${couleur}15`, padding: "2px 8px", borderRadius: 20 }}>
+                            → {nœud?.titre?.slice(0, 25) || "?"}
+                          </span>
+                        ) : décision?.statut === "nouveau" ? (
+                          <button
+                            onClick={() => basculerStatut(i)}
+                            title={décision.orphelin ? "Sans partie parente — sera créé à la racine du projet. Cliquer pour ne pas le créer" : "Ce nœud sera créé à l'import — cliquer pour ne pas le créer"}
+                            style={décision.orphelin
+                              ? { fontSize: 11, fontWeight: 500, color: "#BA7517", background: "#FAEEDA", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }
+                              : { fontSize: 11, fontWeight: 500, color: "#1D9E75", background: "#E1F5EE", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            {décision.orphelin ? "⚠️ Nouveau nœud (à la racine)" : "✨ Nouveau nœud"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => basculerStatut(i)}
+                            title={décision?.orphelin ? "Sans partie parente dans le document — cliquer pour le créer quand même à la racine" : "Ce chapitre ne sera pas importé — cliquer pour créer le nœud finalement"}
+                            style={{ fontSize: 11, color: "#999", background: "#f0f0f0", border: "none", padding: "2px 8px", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            {décision?.orphelin ? "Ignoré — sans partie" : "Ignoré"}
+                          </button>
+                        )}
+                      </div>
+                      {/* Comparaison des deux versions — ajoutée 02/08/2026, à la
+                          demande de Joseph : le badge seul ne disait pas POURQUOI
+                          il fallait choisir entre les deux versions. Mots + date
+                          de dernière modification, faute de pouvoir afficher un
+                          vrai diff dans cet espace restreint.
+                          CORRECTIF 02/08/2026 (ter) : n'était affichée qu'en cas
+                          de conflit détecté — impossible de vérifier À L'ŒIL si
+                          une correspondance SANS conflit signalé était la bonne
+                          (ou si le "aucun conflit" cachait en fait un nœud vide,
+                          par exemple). Affichée désormais pour TOUTE correspondance
+                          existante, conflit ou non — chemin complet du nœud
+                          (parent → titre) inclus, pour vérifier que la correspondance
+                          pointe vers le bon chapitre et pas un homonyme ailleurs
+                          dans le projet. */}
+                      {décision?.statut === "existant" && (
+                        <div style={{ marginTop: 6, paddingTop: 6, borderTop: "0.5px dashed #e5e5e5", display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#777" }}>
+                          <span>
+                            <strong style={{ color: "#555" }}>Chemin Cursus</strong> : {(() => {
+                              const parent = nœud?.parent_id ? nœudsExistants.find(n => n.id === nœud.parent_id) : null;
+                              return parent ? `${parent.titre} → ${nœud?.titre || "?"}` : (nœud?.titre || "?");
+                            })()}
+                          </span>
+                          <div style={{ display: "flex", gap: 16 }}>
+                            <span>
+                              <strong style={{ color: "#555" }}>Cursus</strong> : {compterMotsHtml(nœud?.texte)} mots
+                              {formaterDate(nœud?.mis_a_jour) && <> · modifié le {formaterDate(nœud.mis_a_jour)}</>}
+                            </span>
+                            <span>
+                              <strong style={{ color: "#555" }}>Word</strong> : {ch.mots} mots
+                            </span>
+                            {!décision.conflit && <span style={{ color: "#1D9E75" }}>✓ contenu identique</span>}
+                          </div>
+                        </div>
                       )}
                     </div>
                   );
