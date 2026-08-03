@@ -84,7 +84,10 @@ const CONTENU_PALIERS = {
   },
 };
 
-async function demarrerCheckout(priceId, nomPalier) {
+// codePromo (60803-02) : optionnel, transmis tel quel à l'Edge Function
+// qui vérifie sa signature — jamais validé côté client (le secret n'y
+// est pas exposé), seulement transmis.
+async function demarrerCheckout(priceId, nomPalier, codePromo) {
   // Appelle directement la Edge Function Supabase déployée (creer-session-checkout),
   // qui crée la session Stripe Checkout côté serveur.
   const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/creer-session-checkout";
@@ -98,11 +101,11 @@ async function demarrerCheckout(priceId, nomPalier) {
         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
         "apikey": SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ priceId, nomPalier }),
+      body: JSON.stringify({ priceId, nomPalier, ...(codePromo ? { codePromo } : {}) }),
     });
     const data = await réponse.json();
     if (!réponse.ok) {
-      console.error("Erreur lors de la création de session Checkout :", data);
+      alert(data.error || "Ce code promo n'a pas pu être appliqué.");
       return;
     }
     if (data.url) {
@@ -117,6 +120,7 @@ async function demarrerCheckout(priceId, nomPalier) {
 
 export default function Tarification() {
   const [periode, setPeriode] = useState("mensuel"); // "mensuel" | "annuel"
+  const [codePromo, setCodePromo] = useState(""); // 60803-02
 
   return (
     <div style={{ background: COULEURS.fond, padding: "60px 24px", fontFamily: "Inter, sans-serif" }}>
@@ -173,6 +177,22 @@ export default function Tarification() {
               </span>
             </button>
           </div>
+        </div>
+
+        {/* Code promotionnel (60803-02) — optionnel, appliqué au moment du
+            paiement, vérifié côté serveur (jamais côté client). */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 32 }}>
+          <input
+            type="text"
+            value={codePromo}
+            onChange={(e) => setCodePromo(e.target.value)}
+            placeholder="Code promotionnel (optionnel)"
+            style={{
+              padding: "9px 14px", borderRadius: 8, border: `1px solid ${COULEURS.bordeaux}30`,
+              fontFamily: "inherit", fontSize: 13, width: 260, textAlign: "center",
+              textTransform: "uppercase", letterSpacing: 0.5,
+            }}
+          />
         </div>
 
         {/* Grille des 5 cartes */}
@@ -234,7 +254,7 @@ export default function Tarification() {
                 </ul>
 
                 <button
-                  onClick={() => demarrerCheckout(priceIdActuel, palier.nom)}
+                  onClick={() => demarrerCheckout(priceIdActuel, cle, codePromo)}
                   style={{
                     padding: "10px",
                     borderRadius: 8,
@@ -261,3 +281,4 @@ export default function Tarification() {
     </div>
   );
 }
+
