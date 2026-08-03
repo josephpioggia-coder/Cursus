@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+/**
+ * CURSUS — Génération d'un code promo (60803-02)
+ * =================================================
+ * Usage :
+ *   PROMO_CODE_SECRET="ta-clé-secrète" node scripts/generer-code-promo.mjs "Nom Client" initie 20 1
+ *
+ * Arguments : nomClient  palier  remisePourcent  dureeMois
+ *   palier         : decouverte | essentiel | initie | auteur | studio | tous
+ *   remisePourcent : 5 à 100
+ *   dureeMois      : 0 = usage unique, 1-98 = remise répétée N mois, 99 = à vie
+ *
+ * La clé secrète (PROMO_CODE_SECRET) doit être IDENTIQUE à celle
+ * configurée dans Supabase → Edge Functions → Secrets pour
+ * creer-session-checkout — sinon les codes générés ici ne seront jamais
+ * reconnus valides au moment du paiement.
+ */
+
+import { genererCodePromo } from "../src/lib/codePromo.mjs";
+
+const [nomClient, palier, remise, duree] = process.argv.slice(2);
+const secret = process.env.PROMO_CODE_SECRET;
+
+if (!secret) {
+  console.error("Variable d'environnement PROMO_CODE_SECRET manquante.");
+  console.error('Définis-la avant de lancer le script, ex. : export PROMO_CODE_SECRET="ta-clé-secrète"');
+  process.exit(1);
+}
+if (!nomClient || !palier || remise === undefined || duree === undefined) {
+  console.error('Usage : node scripts/generer-code-promo.mjs "Nom Client" <palier> <remise%> <durée_mois>');
+  console.error("  palier      : decouverte | essentiel | initie | auteur | studio | tous");
+  console.error("  durée_mois  : 0 = usage unique, 1-98 = N mois, 99 = à vie");
+  process.exit(1);
+}
+
+const code = await genererCodePromo(
+  { nomClient, palier, remisePourcent: Number(remise), dureeMois: Number(duree) },
+  secret
+);
+console.log(code);
+
