@@ -383,3 +383,71 @@ export const sessionsAPI = {
     return { data, error };
   },
 };
+
+// ─── USAGE IA (60803-03) ──────────────────────────────────────────────────────
+// Comptage réel de la consommation IA d'un compte, comparé au quota de
+// tokens du palier actif (quotas_paliers) plus les crédits éventuellement
+// achetés (credits_ia). `usage_ia` est alimentée par l'Edge Function
+// claude-prox à chaque appel — jamais écrite depuis le client.
+
+export const usageIAAPI = {
+
+  // Retourne { palier, quotaMensuel, credits, consomme, disponible, pourcentage }
+  // pour le mois en cours (calendaire, du 1er du mois à aujourd'hui).
+  async recupererConsommation() {
+    const uid = await userId();
+    if (!uid) return { data: null, error: new Error("Non connecté") };
+
+    const { data: abonnement, error: erreurAbonnement } = await supabase
+      .from("abonnements")
+      .select("palier")
+      .eq("user_id", uid)
+      .eq("statut", "actif")
+      .maybeSingle();
+    if (erreurAbonnement) return { data: null, error: erreurAbonnement };
+    if (!abonnement) return { data: null, error: new Error("Aucun abonnement actif") };
+
+    const { data: quota, error: erreurQuota } = await supabase
+      .from("quotas_paliers")
+      .select("tokens_mensuels")
+      .eq("palier", abonnement.palier)
+      .maybeSingle();
+    if (erreurQuota) return { data: null, error: erreurQuota };
+
+    const débutMois = new Date();
+    débutMois.setDate(1);
+    débutMois.setHours(0, 0, 0, 0);
+
+    const { data: lignesUsage, error: erreurUsage } = await supabase
+      .from("usage_ia")
+      .select("tokens_entree, tokens_sortie")
+      .eq("user_id", uid)
+      .gte("created_at", débutMois.toISOString());
+    if (erreurUsage) return { data: null, error: erreurUsage };
+
+    const consomme = (lignesUsage || []).reduce(
+      (total, ligne) => total + (ligne.tokens_entree || 0) + (ligne.tokens_sortie || 0), 0
+    );
+
+    const { data: lignesCredits, error: erreurCredits } = await supabase
+      .from("credits_ia")
+      .select("tokens_offerts")
+      .eq("user_id", uid);
+    if (erreurCredits) return { data: null, error: erreurCredits };
+
+    const credits = (lignesCredits || []).reduce((total, l) => total + (l.tokens_offerts || 0), 0);
+
+    const quotaMensuel = quota?.tokens_mensuels || 0;
+    const totalDisponibleAvantConso = quotaMensuel + credits;
+    const disponible = Math.max(0, totalDisponibleAvantConso - consomme);
+    const pourcentage = totalDisponibleAvantConso > 0
+      ? Math.min(100, Math.round((consomme / totalDisponibleAvantConso) * 100))
+      : 0;
+
+    return {
+      data: { palier: abonnement.palier, quotaMensuel, credits, consomme, disponible, pourcentage },
+      error: null,
+    };
+  },
+};
+
