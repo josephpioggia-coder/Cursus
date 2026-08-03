@@ -1,4 +1,3 @@
-
 /**
  * EDGE FUNCTION SUPABASE — creer-session-checkout
  * ==================================================
