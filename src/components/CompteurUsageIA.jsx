@@ -57,7 +57,7 @@ async function démarrerRechargeCheckout() {
         "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
         "apikey": SUPABASE_ANON_KEY,
       },
-      body: JSON.stringify({ priceId: RECHARGE_PRICE_ID, nomPalier: "recharge_tokens" }),
+      body: JSON.stringify({ priceId: RECHARGE_PRICE_ID, nomPalier: "recharge_tokens", mode: "payment" }),
     });
     const { url } = await réponse.json();
     if (url) window.location.href = url;
