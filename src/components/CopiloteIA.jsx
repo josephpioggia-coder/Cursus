@@ -29,6 +29,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
+import CompteurUsageIA from "./CompteurUsageIA.jsx";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
 // la seule limite est ce que l'auteur choisit lui-même — la sélection
@@ -50,13 +51,37 @@ const compterMots = (html = "") =>
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-async function appelClaude(system, user, signal, maxTokens = 1000) {
+// Outil de recherche web natif de Claude — ajouté 02/08/2026, à la demande
+// de Joseph : les références bibliographiques proposées par le co-pilote
+// n'étaient vérifiées par AUCUN outil réel, seulement par une instruction de
+// prompt ("vérifie que l'édition est exacte") — donc pas de vérification du
+// tout, juste une consigne que le modèle peut suivre ou halluciner malgré
+// tout. `claude-prox` (l'Edge Function Supabase) transmet le corps de la
+// requête tel quel à l'API Anthropic (voir son code : `JSON.stringify(body)`
+// sans en interpréter le contenu) — ce tableau suffit donc à activer une
+// vraie recherche web exécutée côté Anthropic, sans toucher à la fonction
+// Edge elle-même. NON TESTÉ EN CONDITIONS RÉELLES : `max_uses`, le format
+// exact des citations renvoyées, et la compatibilité avec le header
+// `anthropic-version: 2023-06-01` fixé en dur côté serveur restent à
+// valider au premier usage réel — si l'appel échoue avec une erreur liée à
+// l'outil, c'est ce header, dans claude-prox, qu'il faudra mettre à jour.
+const OUTIL_RECHERCHE_WEB = [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
+
+async function appelClaude(system, user, signal, maxTokens = 1000, tools = null) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
   if (!token) {
     throw new Error("SESSION_EXPIREE");
   }
+
+  const corpsRequête = {
+    model: "claude-sonnet-4-6",
+    max_tokens: maxTokens,
+    system,
+    messages: [{ role: "user", content: user }],
+  };
+  if (tools) corpsRequête.tools = tools;
 
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
@@ -66,17 +91,16 @@ async function appelClaude(system, user, signal, maxTokens = 1000) {
       "Authorization": `Bearer ${token}`,
       "apikey": SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
+    body: JSON.stringify(corpsRequête),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
   if (data.error) throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error);
-  return data.content?.[0]?.text || "";
+  // Avec un outil comme la recherche web, la réponse peut contenir plusieurs
+  // blocs (server_tool_use, web_search_tool_result, text) avant le texte
+  // final — content[0] n'est donc plus fiable pour l'extraire. On concatène
+  // tous les blocs de type "text", dans l'ordre.
+  return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
 }
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
@@ -142,8 +166,22 @@ const PROMPTS = {
     const biais = langueProjet === "fr"
       ? "Le texte analysé est rédigé en français : privilégie les publications francophones (auteurs de langue française, ou traductions françaises officielles d'ouvrages étrangers) chaque fois qu'une référence équivalente sérieuse existe. Ne cite un ouvrage non traduit en français que s'il n'existe aucun équivalent francophone valable sur ce concept précis — indique-le alors explicitement dans le champ \"pertinence\" (ex. \"aucun équivalent francophone identifié\")."
       : "Privilégie la littérature scientifique de langue anglaise, norme académique dominante pour ce type d'ouvrage.";
-    return `Tu es assistant de recherche académique. Identifie les concepts qui méritent des références scientifiques ou historiques. ${biais} Propose des références réelles en format APA 7e — vérifie que l'édition citée (traducteur, éditeur, année) est exacte, pas approximative. Réponds UNIQUEMENT en JSON valide :
-{"références":[{"concept":"...","apa":"...","page":"...","pertinence":"..."}]}`;
+    return `Tu es assistant de recherche académique. Identifie les concepts qui méritent des références scientifiques ou historiques. ${biais}
+
+RÈGLE DE VÉRIFICATION DES RÉFÉRENCES — NON NÉGOCIABLE :
+Avant de proposer toute référence (livre, article, auteur), tu dois d'abord la chercher via l'outil de recherche disponible pour la vérifier. Ne produis JAMAIS une référence directement depuis ta mémoire sans tentative de vérification préalable, même si tu es certain de la connaître.
+
+Procédure, dans l'ordre, pour CHAQUE concept qui appelle une référence :
+1. Recherche obligatoire (titre + auteur pressenti, ou thème + mots-clés si tu n'as pas de titre précis en tête). Ne saute jamais cette étape.
+2. Si la recherche confirme la référence : cite-la normalement avec les détails confirmés. statut = "vérifié".
+3. Si la recherche confirme l'ouvrage mais pas un détail précis (page, chapitre, édition) : cite l'ouvrage SANS ce détail — n'invente jamais un numéro pour "compléter" une citation qui semblerait incomplète. statut = "détail_non_confirmé", champ "page" laissé vide.
+4. Si la recherche ne confirme rien : ne fabrique aucune référence de remplacement. statut = "non_trouvé", champ "apa" laissé vide, champ "pertinence" limité à une piste thématique générale SANS nom d'auteur ni titre précis (ex. "des travaux en thérapie systémique traitent de ce mécanisme, référence à identifier").
+5. Ne mélange jamais, dans la même liste, un statut "vérifié" et une référence non vérifiée présentés avec le même niveau de détail — le statut doit toujours accompagner la référence, jamais être omis.
+6. En cas de nom d'auteur proche d'un autre auteur du même champ, vérifie spécifiquement que le nom ET le titre vont ensemble — un auteur réel associé à un titre qui n'est pas le sien est aussi grave qu'une référence entièrement inventée.
+
+Réponds UNIQUEMENT en JSON valide :
+{"références":[{"concept":"...","apa":"...","statut":"vérifié","page":"...","pertinence":"..."}]}
+Le champ "statut" vaut exactement "vérifié", "détail_non_confirmé" ou "non_trouvé".`;
   },
 
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
@@ -346,19 +384,42 @@ function CartePersonnage({ p }) {
   );
 }
 
+// Statut de vérification — ajouté 02/08/2026, à la demande de Joseph : une
+// référence ne doit JAMAIS être affichée avec le même niveau de confiance
+// visuelle selon qu'elle a été réellement vérifiée par recherche web ou
+// non. Le badge est toujours visible sur la carte elle-même, jamais relégué
+// en petite note — un statut inconnu (données plus anciennes, avant ce
+// chantier) retombe sur "non vérifié" plutôt que d'être traité comme fiable
+// par défaut.
+const STATUT_RÉFÉRENCE = {
+  vérifié: { c: "#1D9E75", bg: "#E1F5EE", label: "✓ Vérifié" },
+  détail_non_confirmé: { c: "#BA7517", bg: "#FAEEDA", label: "◐ Ouvrage vérifié, détail non confirmé" },
+  non_trouvé: { c: "#A32D2D", bg: "#FCEBEB", label: "✕ Non trouvé — piste seulement" },
+};
+const STATUT_PAR_DÉFAUT = { c: "#888", bg: "#f0f0f0", label: "? Non vérifié" };
+
 function CarteRéférence({ r }) {
   const { t } = useTranslation("copilote");
   const [copié, setCopié] = useState(false);
+  const s = STATUT_RÉFÉRENCE[r.statut] || STATUT_PAR_DÉFAUT;
+  const nonTrouvée = r.statut === "non_trouvé";
   return (
-    <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderLeft: "3px solid #378ADD", borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: "#185FA5", textTransform: "uppercase", marginBottom: 4 }}>{r.concept}</div>
-      <div style={{ background: "#E6F1FB", borderRadius: 6, padding: "8px 10px", marginBottom: 6, fontSize: 12, color: "#0C447C", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{r.apa}</div>
-      {r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>{t("references.pageSuggeree", { page: r.page })}</div>}
+    <div style={{ background: "#fff", border: "0.5px solid #e5e5e5", borderLeft: `3px solid ${s.c}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#185FA5", textTransform: "uppercase" }}>{r.concept}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, whiteSpace: "nowrap" }}>{s.label}</span>
+      </div>
+      {!nonTrouvée && r.apa && (
+        <div style={{ background: "#E6F1FB", borderRadius: 6, padding: "8px 10px", marginBottom: 6, fontSize: 12, color: "#0C447C", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{r.apa}</div>
+      )}
+      {r.statut === "vérifié" && r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>{t("references.pageSuggeree", { page: r.page })}</div>}
       <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>{r.pertinence}</div>
-      <button onClick={() => { navigator.clipboard?.writeText(r.apa); setCopié(true); setTimeout(() => setCopié(false), 2000); }}
-        style={{ fontSize: 11, color: copié ? "#1D9E75" : "#185FA5", background: copié ? "#E1F5EE" : "#E6F1FB", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
-        {copié ? t("references.copie") : t("references.copier")}
-      </button>
+      {!nonTrouvée && r.apa && (
+        <button onClick={() => { navigator.clipboard?.writeText(r.apa); setCopié(true); setTimeout(() => setCopié(false), 2000); }}
+          style={{ fontSize: 11, color: copié ? "#1D9E75" : "#185FA5", background: copié ? "#E1F5EE" : "#E6F1FB", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+          {copié ? t("references.copie") : t("references.copier")}
+        </button>
+      )}
     </div>
   );
 }
@@ -387,9 +448,15 @@ function CarteCoherence({ p }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, onDemanderUpgrade = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
+  // Consommation IA réelle du compte (60803-03) — remontée par
+  // CompteurUsageIA, sert à désactiver le bouton d'analyse une fois le
+  // quota du palier épuisé (le compteur affiche lui-même l'avertissement
+  // et le recouvrement bloquant, pas besoin de les dupliquer ici).
+  const [usageIA, setUsageIA] = useState(null);
+  const usageBloqué = usageIA ? usageIA.disponible <= 0 : false;
   // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
   // S'active automatiquement dès qu'une sélection substantielle apparaît (pour
   // que le comportement par défaut soit intuitif), mais reste modifiable par
@@ -451,7 +518,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
       } else if (ongletCible === "références") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 4096);
+        // maxTokens relevé 4096 → 6144 : les blocs de résultats de recherche
+        // web (server_tool_use / web_search_tool_result) consomment de la
+        // place dans la réponse en plus du JSON final attendu.
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 6144, OUTIL_RECHERCHE_WEB);
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
@@ -572,6 +642,18 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         </div>
 
+        {/* Compteur d'usage IA réel (60803-03) — jauge + avertissement à 90%
+            + recouvrement bloquant à 100%, calculés sur le vrai quota du
+            palier (quotas_paliers) et la vraie consommation (usage_ia). */}
+        <div style={{ marginBottom: 8 }}>
+          <CompteurUsageIA
+            onÉtatChange={setUsageIA}
+            onDemanderUpgrade={onDemanderUpgrade}
+            rafraîchirDepuis={dernièreAnalyse}
+            compact
+          />
+        </div>
+
         {modeAuto && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${couleurProjet}12`, border: `0.5px solid ${couleurProjet}30`, borderRadius: 6, padding: "5px 8px", marginBottom: 8, fontSize: 10.5, color: couleurProjet, lineHeight: 1.4 }}>
             <span>🔄</span>
@@ -594,6 +676,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
         {texteSélectionné && texteSélectionné.trim().length > 20 && (
           <>
+            {/* CORRECTIF 02/08/2026 — le bouton affichait un nombre de MOTS
+                alors que c'est un seuil en CARACTÈRES (texteTropVolumineux,
+                juste en dessous) qui décide si l'analyse sera bloquée :
+                aucun moyen de savoir si on s'en approche avant de cliquer.
+                Affiche désormais le nombre de caractères, la seule unité
+                pertinente ici. */}
             <div style={{
               display: "flex", gap: 6, marginBottom: 4,
               background: "#f5f5f5", borderRadius: 7, padding: 3,
@@ -609,7 +697,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                   boxShadow: analyserSélection ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
                 }}
               >
-                {t("selection.analyserSelection", { count: compterMots(texteSélectionné) })}
+                {t("selection.analyserSelection", { count: texteSélectionné.length })}
               </button>
               <button
                 onClick={() => setAnalyserSélection(false)}
@@ -637,8 +725,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         )}
 
-        <button onClick={() => analyser(onglet)} disabled={enChargement || texteTropVolumineux}
-          style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: (enChargement || texteTropVolumineux) ? "default" : "pointer", fontFamily: "inherit", opacity: texteTropVolumineux ? 0.5 : 1 }}>
+        <button onClick={() => analyser(onglet)} disabled={enChargement || texteTropVolumineux || usageBloqué}
+          style={{ width: "100%", padding: "7px", marginBottom: 10, background: `${couleurProjet}15`, color: couleurProjet, border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: (enChargement || texteTropVolumineux || usageBloqué) ? "default" : "pointer", fontFamily: "inherit", opacity: (texteTropVolumineux || usageBloqué) ? 0.5 : 1 }}>
           {enChargement ? t("bouton.enCours") : modeAuto ? t("bouton.forcerAnalyse") : t("bouton.analyser")}
         </button>
 
@@ -697,4 +785,5 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     </div>
   );
 }
+
 
