@@ -166,9 +166,12 @@ function BarreProgression({ valeur, max, couleur }) {
 
 // ─── Composant : Nœud de structure (récursif) ────────────────────────────────────
 
-function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées }) {
+function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, onSélectionner, onAjouter, onRenommer, onSupprimer, onDéplacer, estPremier, estDernier, dernierNœudVisitéId, onChangerType, estRacine, onPromouvoir, onRétrograder, onChangerZone, zonesMasquées, nœudsRepliés, onBasculerRepli, multiSélection, onClicNœud, presseGardé }) {
   const { t } = useTranslation("common");
-  const [ouvert, setOuvert] = useState(true);
+  // Repli/dépli — état porté par le parent (VueProjet) via `nœudsRepliés`
+  // depuis le 01/08/2026, pour permettre un "Tout replier" global en plus du
+  // triangle individuel. Défaut : ouvert (comme avant ce chantier).
+  const ouvert = !nœudsRepliés?.has(nœud.id);
   const [enRenommage, setEnRenommage] = useState(false);
   const [nomTemp, setNomTemp] = useState(nœud.titre);
   const [survol, setSurvol] = useState(false);
@@ -193,33 +196,52 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
     setEnRenommage(false);
   };
 
+  // Sélection multiple (Ctrl/Shift-clic) — chantier 02/08/2026. Distincte de
+  // `sélectionné` (aperçu simple) : un nœud peut être dans les deux à la
+  // fois, ou dans aucun. `presseGardé` marque les nœuds actuellement coupés
+  // (en attente d'un "Coller" ailleurs) — style pointillé, comme dans un
+  // explorateur de fichiers classique.
+  const enMultiSélection = multiSélection?.has(nœud.id);
+  const estCoupé = presseGardé?.includes(nœud.id);
+
   return (
     <div style={{ marginLeft: profondeur * 16 }}>
       <div
         onMouseEnter={() => setSurvol(true)}
         onMouseLeave={() => setSurvol(false)}
-        onClick={() => onSélectionner(nœud.id)}
+        onClick={(e) => onClicNœud ? onClicNœud(nœud.id, e) : onSélectionner(nœud.id)}
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "5px 8px", borderRadius: 6, cursor: "pointer",
-          background: sélectionné === nœud.id
-            ? `${projetCouleur}18`
-            : dernierNœudVisitéId === nœud.id
-              ? "var(--surface-hover)"
-              : survol ? "var(--surface-hover)" : "transparent",
-          borderLeft: sélectionné === nœud.id
+          // Marqueur "dernier nœud visité" — rendu plus visible le
+          // 02/08/2026 à la demande de Joseph (le fond gris uni #ccc
+          // passait inaperçu) : trame diagonale dans la couleur du
+          // projet (celle choisie au lancement du livre), au lieu d'un
+          // gris neutre — reconnaissable même en un coup d'œil rapide
+          // dans une longue structure.
+          background: enMultiSélection
+            ? `${projetCouleur}28`
+            : sélectionné === nœud.id
+              ? `${projetCouleur}18`
+              : dernierNœudVisitéId === nœud.id
+                ? `repeating-linear-gradient(45deg, ${projetCouleur}26, ${projetCouleur}26 5px, ${projetCouleur}0a 5px, ${projetCouleur}0a 10px)`
+                : survol ? "var(--surface-hover)" : "transparent",
+          borderLeft: sélectionné === nœud.id || enMultiSélection
             ? `2px solid ${projetCouleur}`
             : dernierNœudVisitéId === nœud.id
-              ? "2px solid #ccc"
+              ? `3px solid ${projetCouleur}`
               : "2px solid transparent",
-          opacity: dernierNœudVisitéId === nœud.id && sélectionné !== nœud.id ? 0.65 : 1,
+          outline: enMultiSélection ? `1px solid ${projetCouleur}60` : "none",
+          outlineOffset: -1,
+          opacity: estCoupé ? 0.5 : 1,
+          borderStyle: estCoupé ? "dashed" : undefined,
           transition: "all 0.15s",
         }}
       >
         {/* Chevron */}
         {aDesEnfants ? (
           <span
-            onClick={(e) => { e.stopPropagation(); setOuvert(!ouvert); }}
+            onClick={(e) => { e.stopPropagation(); onBasculerRepli?.(nœud.id); }}
             style={{
               fontSize: 10, color: "var(--texte-tertiaire)",
               transform: ouvert ? "rotate(90deg)" : "rotate(0deg)",
@@ -360,6 +382,11 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           onRétrograder={onRétrograder}
           onChangerZone={onChangerZone}
           zonesMasquées={zonesMasquées}
+          nœudsRepliés={nœudsRepliés}
+          onBasculerRepli={onBasculerRepli}
+          multiSélection={multiSélection}
+          onClicNœud={onClicNœud}
+          presseGardé={presseGardé}
         />
       ))}
     </div>
@@ -588,6 +615,31 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
   // Zones actuellement masquées dans l'arborescence (visuel uniquement) —
   // chantier 28/07/2026. Défaut : tout afficher.
   const [zonesMasquées, setZonesMasquées] = useState([]);
+  // Nœuds actuellement repliés dans l'arborescence (visuel uniquement,
+  // ensemble d'ids) — ajouté 01/08/2026, à la demande de Joseph, pour éviter
+  // une liste sans fin de chapitres/sous-chapitres. Le triangle par nœud
+  // (existant) bascule un seul id ; les boutons "Tout replier"/"Tout
+  // déplier" ci-dessous agissent sur l'ensemble d'un coup. Défaut : tout
+  // déplié, comme avant ce chantier.
+  const [nœudsRepliés, setNœudsRepliés] = useState(() => new Set());
+  const basculerRepli = useCallback((id) => {
+    setNœudsRepliés((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.has(id)) suivant.delete(id); else suivant.add(id);
+      return suivant;
+    });
+  }, []);
+  const toutReplier = useCallback(() => {
+    const avecEnfants = new Set();
+    const parcourir = (liste) => {
+      for (const n of liste || []) {
+        if (n.enfants?.length) { avecEnfants.add(n.id); parcourir(n.enfants); }
+      }
+    };
+    parcourir(projet.structure);
+    setNœudsRepliés(avecEnfants);
+  }, [projet.structure]);
+  const toutDéplier = useCallback(() => setNœudsRepliés(new Set()), []);
   const mots = totalMotsProjet(projet.structure);
 
   // Zones (hors corps) réellement présentes dans le projet — les chips de
@@ -1068,6 +1120,179 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     onMàjStructure(projet.id, échanger(projet.structure || []));
   }, [projet, onMàjStructure, t]);
 
+  // ── Sélection multiple, couper/coller et suppression groupée ──
+  // Ajouté 02/08/2026, à la demande de Joseph : pouvoir regrouper plusieurs
+  // titres pour les couper/déplacer/effacer ensemble, au lieu d'agir un par
+  // un. Distinct de `sélectionné` (aperçu simple, inchangé) : Ctrl-clic
+  // ajoute/retire un nœud de la sélection multiple, Shift-clic sélectionne
+  // la plage visible entre le dernier nœud simplement sélectionné et la
+  // cible. Un clic simple (sans touche) vide la sélection multiple et
+  // retombe sur le comportement d'avant ce chantier.
+  const [multiSélection, setMultiSélection] = useState(() => new Set());
+  // Nœuds actuellement "coupés" — en attente d'un "Coller" sur une autre
+  // destination. Tant que ce tableau n'est pas vide, aucune suppression
+  // Supabase n'a encore eu lieu : c'est un déplacement, pas une copie.
+  const [presseGardé, setPresseGardé] = useState([]);
+
+  // Liste des ids VISIBLES dans l'ordre d'affichage actuel (respecte les
+  // nœuds repliés) — nécessaire pour calculer une plage Shift-clic de façon
+  // cohérente avec ce que l'auteur voit réellement à l'écran.
+  const aplatirVisibles = useCallback((liste, profondeur = 0) => {
+    const résultat = [];
+    for (const n of liste || []) {
+      résultat.push(n.id);
+      if (n.enfants?.length && !nœudsRepliés.has(n.id)) {
+        résultat.push(...aplatirVisibles(n.enfants, profondeur + 1));
+      }
+    }
+    return résultat;
+  }, [nœudsRepliés]);
+
+  // `id` est-il un descendant (à n'importe quelle profondeur) de `ancêtreId` ?
+  // Sécurité anti-cycle pour le collage (impossible de coller un nœud dans
+  // lui-même ou dans l'un de ses propres descendants).
+  const estDescendantDe = useCallback((id, ancêtreId) => {
+    const ancêtre = trouverNœudLocal(projet.structure, ancêtreId);
+    if (!ancêtre) return false;
+    const chercher = (n) => (n.enfants || []).some((e) => e.id === id || chercher(e));
+    return chercher(ancêtre);
+  }, [projet.structure]);
+
+  const basculerMultiSélection = useCallback((id) => {
+    setMultiSélection((prev) => {
+      const suivant = new Set(prev);
+      if (suivant.size === 0 && sélectionné && sélectionné !== id) suivant.add(sélectionné);
+      if (suivant.has(id)) suivant.delete(id); else suivant.add(id);
+      return suivant;
+    });
+  }, [sélectionné]);
+
+  const sélectionnerPlage = useCallback((id) => {
+    const visibles = aplatirVisibles(projet.structure);
+    const ancre = sélectionné || id;
+    const iAncre = visibles.indexOf(ancre);
+    const iCible = visibles.indexOf(id);
+    if (iAncre === -1 || iCible === -1) { setMultiSélection(new Set([id])); return; }
+    const [début, fin] = iAncre < iCible ? [iAncre, iCible] : [iCible, iAncre];
+    setMultiSélection(new Set(visibles.slice(début, fin + 1)));
+  }, [aplatirVisibles, projet.structure, sélectionné]);
+
+  // Point d'entrée unique du clic sur un nœud — répartit selon la touche
+  // enfoncée. Un clic simple vide toujours la sélection multiple, y compris
+  // celle en cours d'une éventuelle plage précédente.
+  const onClicNœud = useCallback((id, e) => {
+    if (e.shiftKey) { sélectionnerPlage(id); return; }
+    if (e.ctrlKey || e.metaKey) { basculerMultiSélection(id); return; }
+    setMultiSélection(new Set());
+    setSélectionné(id);
+  }, [sélectionnerPlage, basculerMultiSélection]);
+
+  const annulerSélectionMultiple = useCallback(() => setMultiSélection(new Set()), []);
+  const annulerCoupe = useCallback(() => setPresseGardé([]), []);
+
+  // "Couper" ne supprime rien tout de suite : il met de côté les ids
+  // sélectionnés, en attente d'un "Coller" sur une destination choisie
+  // ensuite par un clic simple. Rien n'est envoyé à Supabase à ce stade.
+  const couper = useCallback(() => {
+    if (multiSélection.size === 0) return;
+    setPresseGardé([...multiSélection]);
+    setMultiSélection(new Set());
+  }, [multiSélection]);
+
+  // Colle les nœuds coupés comme derniers enfants du nœud actuellement
+  // sélectionné (aperçu simple). Un seul passage de réordonnancement pour
+  // tous les nœuds collés, à la suite des enfants déjà présents.
+  const coller = useCallback(async () => {
+    if (presseGardé.length === 0 || !sélectionné) return;
+    const destinationId = sélectionné;
+
+    if (presseGardé.includes(destinationId) || presseGardé.some((id) => estDescendantDe(destinationId, id))) {
+      window.alert("Impossible de coller un élément dans lui-même ou dans l'un de ses propres descendants.");
+      return;
+    }
+
+    const destination = trouverNœudLocal(projet.structure, destinationId);
+    let ordreSuivant = (destination?.enfants?.length || 0) + 1;
+    const misÀJour = [];
+    for (const id of presseGardé) {
+      const { error } = await nœudsAPI.changerParent(id, destinationId);
+      if (error) {
+        journaliserErreur("VueProjet:coller", error.message, projet.id);
+        window.alert("Le déplacement a échoué pour un des éléments coupés. Vérifiez la structure et réessayez.");
+        continue;
+      }
+      misÀJour.push({ id, ordre: ordreSuivant });
+      ordreSuivant++;
+    }
+    if (misÀJour.length > 0) {
+      const { error: erreurRéordre } = await nœudsAPI.réordonner(misÀJour);
+      if (erreurRéordre) journaliserErreur("VueProjet:coller (réordre)", erreurRéordre.message, projet.id);
+    }
+
+    const idsCollés = new Set(misÀJour.map((m) => m.id));
+    const nœudsDéplacés = [];
+    const retirer = (liste) =>
+      liste
+        .filter((n) => {
+          if (idsCollés.has(n.id)) { nœudsDéplacés.push(n); return false; }
+          return true;
+        })
+        .map((n) => ({ ...n, enfants: retirer(n.enfants || []) }));
+    const structureSansNœuds = retirer(projet.structure || []);
+
+    const ordresParId = Object.fromEntries(misÀJour.map((m) => [m.id, m.ordre]));
+    const nœudsAvecOrdre = nœudsDéplacés
+      .map((n) => ({ ...n, ordre: ordresParId[n.id] ?? n.ordre }))
+      .sort((a, b) => a.ordre - b.ordre);
+
+    const insérer = (liste) =>
+      liste.map((n) => n.id === destinationId
+        ? { ...n, enfants: [...(n.enfants || []), ...nœudsAvecOrdre] }
+        : { ...n, enfants: insérer(n.enfants || []) });
+
+    onMàjStructure(projet.id, insérer(structureSansNœuds));
+    setPresseGardé([]);
+  }, [presseGardé, sélectionné, projet, onMàjStructure, estDescendantDe]);
+
+  // Suppression groupée — même principe de confirmation que la suppression
+  // individuelle (voir supprimerNœud plus haut), étendue à plusieurs nœuds.
+  // Ne garde que les nœuds sélectionnés qui ne sont pas déjà descendants
+  // d'un AUTRE nœud sélectionné (la suppression cascade déjà sur les
+  // enfants — supprimer aussi le descendant provoquerait un appel inutile,
+  // potentiellement en erreur sur un id déjà supprimé).
+  const supprimerSélectionMultiple = useCallback(async () => {
+    const ids = [...multiSélection];
+    if (ids.length === 0) return;
+    const idsRacines = ids.filter((id) => !ids.some((autre) => autre !== id && estDescendantDe(id, autre)));
+
+    const nœudsRacines = idsRacines.map((id) => trouverNœudLocal(projet.structure, id)).filter(Boolean);
+    const compterDescendantsLocal = (n) => (n.enfants || []).reduce((acc, e) => acc + 1 + compterDescendantsLocal(e), 0);
+    const totalDescendants = nœudsRacines.reduce((acc, n) => acc + compterDescendantsLocal(n), 0);
+    const titres = nœudsRacines.map((n) => `« ${n.titre} »`).join(", ");
+
+    const message = totalDescendants > 0
+      ? `Supprimer ${nœudsRacines.length} élément(s) sélectionné(s) (${titres}) ET leurs ${totalDescendants} éléments enfants au total ? Cette action est définitive et ne peut pas être annulée.`
+      : `Supprimer ${nœudsRacines.length} élément(s) sélectionné(s) (${titres}) ? Cette action est définitive et ne peut pas être annulée.`;
+
+    if (!window.confirm(message)) return;
+
+    const résultats = await Promise.all(idsRacines.map((id) => nœudsAPI.supprimer(id)));
+    const échec = résultats.find((r) => r.error);
+    if (échec) {
+      journaliserErreur("VueProjet:supprimerSélectionMultiple", échec.error.message, projet.id);
+      window.alert("La suppression a échoué pour au moins un élément. Vérifiez la structure.");
+    }
+
+    const idsRacinesSet = new Set(idsRacines);
+    const supprimer = (liste) =>
+      liste
+        .filter((n) => !idsRacinesSet.has(n.id))
+        .map((n) => ({ ...n, enfants: supprimer(n.enfants || []) }));
+    onMàjStructure(projet.id, supprimer(projet.structure || []));
+    setMultiSélection(new Set());
+    if (idsRacinesSet.has(sélectionné)) setSélectionné(null);
+  }, [multiSélection, projet, onMàjStructure, estDescendantDe, sélectionné]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* En-tête projet */}
@@ -1143,18 +1368,85 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               })}
             </div>
           )}
-          <button
-            onClick={() => ajouterNœud(projet.id, "partie")}
-            style={{
-              fontSize: 11, color: projet.couleur,
-              background: "none", border: "none", cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-            title={t("vueProjet.ajouterPartieTitre")}
-          >
-            {t("vueProjet.ajouterPartie")}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {nœudsRepliés.size > 0 ? (
+              <button
+                onClick={toutDéplier}
+                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                title="Déplier toute la structure"
+              >
+                ▾ Tout déplier
+              </button>
+            ) : (
+              <button
+                onClick={toutReplier}
+                style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                title="Replier toute la structure (parties et chapitres visibles, contenu masqué)"
+              >
+                ▸ Tout replier
+              </button>
+            )}
+            <button
+              onClick={() => ajouterNœud(projet.id, "partie")}
+              style={{
+                fontSize: 11, color: projet.couleur,
+                background: "none", border: "none", cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+              title={t("vueProjet.ajouterPartieTitre")}
+            >
+              {t("vueProjet.ajouterPartie")}
+            </button>
+          </div>
         </div>
+
+        {/* Barre d'action — sélection multiple / couper / coller / suppression
+            groupée. Ajoutée 02/08/2026. Visible seulement quand pertinente,
+            pour ne rien changer à l'écran habituel sinon. */}
+        {(multiSélection.size > 0 || presseGardé.length > 0) && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "6px 10px", marginBottom: 8, borderRadius: 8,
+            background: presseGardé.length > 0 ? "#EEEDFE" : `${projet.couleur}12`,
+            border: `0.5px solid ${presseGardé.length > 0 ? "#7F77DD40" : projet.couleur + "40"}`,
+            fontSize: 12,
+          }}>
+            {multiSélection.size > 0 && (
+              <>
+                <span style={{ color: "var(--texte-secondaire)" }}>
+                  {multiSélection.size} sélectionné{multiSélection.size > 1 ? "s" : ""}
+                </span>
+                <button onClick={couper} style={{ fontSize: 11.5, color: "#534AB7", background: "#fff", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+                  ✂️ Couper
+                </button>
+                <button onClick={supprimerSélectionMultiple} style={{ fontSize: 11.5, color: "#E24B4A", background: "#fff", border: "0.5px solid #E24B4A40", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
+                  🗑 Supprimer
+                </button>
+                <button onClick={annulerSélectionMultiple} style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", marginLeft: "auto" }}>
+                  Annuler la sélection
+                </button>
+              </>
+            )}
+            {presseGardé.length > 0 && (
+              <>
+                <span style={{ color: "#534AB7" }}>
+                  ✂️ {presseGardé.length} coupé{presseGardé.length > 1 ? "s" : ""} — cliquez une destination puis « Coller »
+                </span>
+                <button
+                  onClick={coller}
+                  disabled={!sélectionné}
+                  title={sélectionné ? "Coller ici" : "Cliquez d'abord sur un titre de destination"}
+                  style={{ fontSize: 11.5, fontWeight: 600, color: "#fff", background: sélectionné ? "#7F77DD" : "#c9c6f0", border: "none", borderRadius: 6, padding: "3px 12px", cursor: sélectionné ? "pointer" : "default", fontFamily: "inherit" }}
+                >
+                  📋 Coller {sélectionné ? `dans « ${trouverNœudLocal(projet.structure, sélectionné)?.titre?.slice(0, 20) || "?"} »` : ""}
+                </button>
+                <button onClick={annulerCoupe} style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", marginLeft: "auto" }}>
+                  Annuler
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {projet.structure?.length === 0 ? (
           <div style={{
@@ -1192,6 +1484,11 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
               onRétrograder={rétrograderNœud}
               onChangerZone={changerZoneNœud}
               zonesMasquées={zonesMasquées}
+              nœudsRepliés={nœudsRepliés}
+              onBasculerRepli={basculerRepli}
+              multiSélection={multiSélection}
+              onClicNœud={onClicNœud}
+              presseGardé={presseGardé}
             />
           ))
         )}
@@ -1446,22 +1743,53 @@ function AppConnectée({ user, déconnecter }) {
   // L'ADN du projet (10 questions de niveau 1) — socle de démarrage, présenté
   // comme rassurant, pas comme une contrainte juridique. Tant qu'il n'est pas
   // complet, un rappel discret réapparaît à l'ouverture du projet.
+  //
+  // CORRECTIF 02/08/2026 — BUG SILENCIEUX : ni `adn` ni `réponses` n'étaient
+  // vérifiés pour une erreur. Si la requête sur `banque_questions` échoue
+  // (ex. policy RLS bloquant la lecture côté client, alors que la table
+  // contient bien des lignes vues depuis l'éditeur SQL qui contourne RLS),
+  // `data` revient `null` → `(adn || [])` devient un tableau VIDE →
+  // `[].every(...)` renvoie `true` par défaut (vrai sur un ensemble vide) →
+  // le code croit le questionnaire déjà complet et ne l'affiche JAMAIS,
+  // sans la moindre trace d'erreur. Constaté en conditions réelles : la
+  // table contenait bien 11 questions de niveau 1 (vérifié par SQL direct),
+  // mais le rappel ne s'est jamais affiché sur aucun projet. Toute erreur
+  // est désormais journalisée et bloque le calcul plutôt que d'être
+  // interprétée à tort comme "rien à répondre".
   useEffect(() => {
     if (!projetActifId || projetVenantDêtreCréé) return;
 
     const vérifier = async () => {
-      const { data: adn } = await supabase
+      const { data: adn, error: erreurAdn } = await supabase
         .from("banque_questions")
         .select("id")
         .eq("niveau", 1);
+      if (erreurAdn) {
+        journaliserErreur("App:vérifierQuestionnaire (banque_questions)", erreurAdn.message, projetActifId);
+        return;
+      }
 
-      const { data: réponses } = await supabase
+      const { data: réponses, error: erreurRéponses } = await supabase
         .from("reponses_questionnaire")
         .select("question_id")
         .eq("projet_id", projetActifId);
+      if (erreurRéponses) {
+        journaliserErreur("App:vérifierQuestionnaire (reponses_questionnaire)", erreurRéponses.message, projetActifId);
+        return;
+      }
+
+      if (!adn || adn.length === 0) {
+        // Aucune question trouvée pour ce niveau — soit la table est
+        // réellement vide, soit une policy RLS bloque la lecture sans
+        // renvoyer d'erreur explicite. Dans le doute, on N'AFFICHE PAS le
+        // rappel (rien à répondre serait pire qu'un faux positif), mais on
+        // le journalise pour que ce cas ne reste plus invisible.
+        journaliserErreur("App:vérifierQuestionnaire", "banque_questions renvoie 0 ligne pour niveau=1 côté client — vérifier les policies RLS si la table n'est pourtant pas vide en base.", projetActifId);
+        return;
+      }
 
       const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
-      const toutComplet = (adn || []).every((q) => idsRépondus.has(q.id));
+      const toutComplet = adn.every((q) => idsRépondus.has(q.id));
 
       setRappelIntentionPour(toutComplet ? null : projetActifId);
     };
@@ -2055,6 +2383,26 @@ function AppConnectée({ user, déconnecter }) {
               >
                 {t("vues.importerWord")}
               </button>
+              {/* Accès permanent au questionnaire d'intention — ajouté
+                  02/08/2026, à la demande de Joseph. Jusqu'ici, il n'était
+                  accessible qu'automatiquement (à la création d'un projet,
+                  ou en rappel tant qu'il n'était pas complet) : aucun moyen
+                  d'y revenir volontairement, ni de consulter/ajuster des
+                  réponses déjà données. Réutilise `rappelIntentionPour` —
+                  ouvrir le questionnaire, qu'il soit complet ou non. */}
+              <button
+                onClick={() => setRappelIntentionPour(projetActif.id)}
+                title="Consulter ou compléter le questionnaire d'intention (ligne de conduite du co-pilote IA)"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#fff", color: "#534AB7",
+                  border: "0.5px solid #7F77DD50", borderRadius: 8, padding: "6px 14px",
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "inherit", whiteSpace: "nowrap",
+                }}
+              >
+                🧭 Questionnaire de démarrage
+              </button>
               {/* Suppression du projet — ajouté 28/07/2026, AGRANDI le même
                   jour suite au retour de Joseph ("le bouton est vraiment
                   trop petit, je ne l'avais pas vu") : l'icône seule à 12px
@@ -2132,6 +2480,7 @@ function AppConnectée({ user, déconnecter }) {
                 titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
+                onDemanderUpgrade={() => setVue("tarification")}
               />
             </div>
           </div>
@@ -2348,3 +2697,4 @@ const navItemStyle = (actif) => ({
  *     comparaisons sur le code stable
  * Non urgent tant que l'interface reste 100% française.
  */
+
