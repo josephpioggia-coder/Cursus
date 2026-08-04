@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { PRIX_STRIPE, ORDRE_PALIERS } from "../lib/prix-stripe-config.mjs";
+import { supabase } from "../lib/supabase.js";
 
 const COULEURS = {
   bordeaux: "#8B2635",
@@ -84,21 +85,32 @@ const CONTENU_PALIERS = {
   },
 };
 
-// codePromo (60803-02) : optionnel, transmis tel quel à l'Edge Function
-// qui vérifie sa signature — jamais validé côté client (le secret n'y
-// est pas exposé), seulement transmis.
+// codePromo (60804-02) : optionnel, transmis tel quel à l'Edge Function,
+// jamais validé côté client (la vraie règle vit dans la table Supabase
+// codes_promo, lue uniquement côté serveur).
 async function demarrerCheckout(priceId, nomPalier, codePromo) {
   // Appelle directement la Edge Function Supabase déployée (creer-session-checkout),
   // qui crée la session Stripe Checkout côté serveur.
   const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/creer-session-checkout";
   const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+  // 60804-02 : le jeton de la session utilisateur (pas la clé anonyme) est
+  // transmis en Authorization, pour que creer-session-checkout puisse
+  // vérifier l'identité réelle de l'appelant (supabase.auth.getUser(token))
+  // et contrôler codes_promo.client_email sur un email qui ne peut pas
+  // être falsifié depuis le client. Sans session active (ne devrait pas
+  // arriver sur cet écran, protégé par connexion), on retombe sur la clé
+  // anonyme : le ciblage par email sera alors simplement refusé côté
+  // serveur, jamais accepté à l'aveugle.
+  const { data: { session } } = await supabase.auth.getSession();
+  const jetonAppelant = session?.access_token || SUPABASE_ANON_KEY;
+
   try {
     const réponse = await fetch(EDGE_FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "Authorization": `Bearer ${jetonAppelant}`,
         "apikey": SUPABASE_ANON_KEY,
       },
       body: JSON.stringify({ priceId, nomPalier, ...(codePromo ? { codePromo } : {}) }),

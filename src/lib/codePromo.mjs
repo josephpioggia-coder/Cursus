@@ -46,29 +46,16 @@ export async function genererCodePromo({ nomClient, palier, remisePourcent, dure
   return `${payload}-${signature}`;
 }
 
-// Retourne { valide: true, nomSlug, palier, remisePourcent, dureeMois } ou { valide: false }
-export async function verifierCodePromo(code, secret) {
-  const parties = (code || "").trim().toUpperCase().split("-");
-  if (parties.length !== 2) return { valide: false };
-  const [payload, signatureFournie] = parties;
-  if (payload.length < 7) return { valide: false };
-
-  const signatureAttendue = await signer(payload, secret);
-  if (signatureFournie !== signatureAttendue) return { valide: false };
-
-  const duree2 = payload.slice(-2);
-  const remise3 = payload.slice(-5, -2);
-  const palierLettre = payload.slice(-6, -5);
-  const nomSlug = payload.slice(0, -6);
-
-  const palierInverse = Object.entries(PALIERS).find(([, l]) => l === palierLettre)?.[0] || "tous";
-
-  return {
-    valide: true,
-    nomSlug,
-    palier: palierInverse,
-    remisePourcent: parseInt(remise3, 10),
-    dureeMois: parseInt(duree2, 10),
-  };
+// NEUTRALISÉE (60804-02) — l'ancien système auto-vérifiant par signature
+// est remplacé par la table Supabase `codes_promo` : la vraie règle vit en
+// base, jamais dans le texte du code. La vérification réelle se fait
+// désormais côté serveur dans creer-session-checkout, par lecture directe
+// de cette table (actif / dates / palier / email / limite), et la
+// consommation atomique dans stripe-webhook via la fonction Postgres
+// consommer_code_promo(). Cette fonction reste ici, désactivée, pour
+// qu'aucun code applicatif ne puisse par erreur s'y fier comme source de
+// vérité concurrente — elle ne doit plus jamais être appelée.
+export async function verifierCodePromo() {
+  return { valide: false };
 }
 
