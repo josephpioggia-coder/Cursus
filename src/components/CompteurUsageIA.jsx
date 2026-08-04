@@ -74,7 +74,13 @@ export default function CompteurUsageIA({ onDemanderUpgrade, onÉtatChange, rafr
 
   const rafraîchir = useCallback(async () => {
     const { data, error } = await usageIAAPI.recupererConsommation();
-    if (error) { setErreur(error.message); return; }
+    if (error) {
+      // Visible en console pour le diagnostic — le composant lui-même reste
+      // silencieux dans l'interface (ne bloque jamais le co-pilote).
+      console.error("CompteurUsageIA :", error.message);
+      setErreur(error.message);
+      return;
+    }
     setÉtat(data);
   }, []);
 
