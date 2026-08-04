@@ -33,6 +33,22 @@ create table codes_promo (
 
 create index idx_codes_promo_actif on codes_promo(actif) where actif = true;
 
+-- ── Trigger : modifie_le suit automatiquement chaque UPDATE ──────────
+create or replace function set_codes_promo_modifie_le()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.modifie_le := now();
+  return new;
+end;
+$$;
+
+create trigger trg_codes_promo_modifie_le
+before update on codes_promo
+for each row
+execute function set_codes_promo_modifie_le();
+
 -- ── Table des utilisations réelles (posées par stripe-webhook, jamais
 --    par creer-session-checkout) ─────────────────────────────────────
 create table utilisations_codes_promo (
