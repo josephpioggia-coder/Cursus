@@ -507,10 +507,10 @@ function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier
       {/* Édition objectifs */}
       {édition ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label style={{ color: "#999" }} title="En caractères, pas en mots">Jour (caractères) :</label>
+          <label style={{ color: "#999" }} title="Caractères ajoutés depuis que vous avez ouvert ce chapitre — pas un vrai jour calendaire">Cette session (caractères) :</label>
           <input type="number" value={tempJ} onChange={(e) => setTempJ(+e.target.value)}
             style={{ width: 74, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
-          <label style={{ color: "#999" }}>Chapitre (mots) :</label>
+          <label style={{ color: "#999" }}>Mots dans ce chapitre :</label>
           <input type="number" value={tempC} onChange={(e) => setTempC(+e.target.value)}
             style={{ width: 64, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
           <button onClick={() => { onMàjObjectifs(tempJ, tempC); setÉdition(false); }}
