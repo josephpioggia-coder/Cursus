@@ -71,15 +71,23 @@ alter table utilisations_codes_promo enable row level security;
 -- ── Fonction atomique de consommation ────────────────────────────────
 -- Appelée UNIQUEMENT par stripe-webhook, sur checkout.session.completed.
 --
--- Ordre des contrôles (corrigé) :
---   1. Rejeu webhook (stripe_session_id déjà enregistré) → true immédiat,
---      SANS vérifier la limite : un webhook Stripe rejoué après que la
---      limite a été atteinte par d'autres paiements ne doit pas se voir
---      refusé rétroactivement pour un paiement déjà compté.
---   2. Code inexistant (p_code_promo_id ne correspond à aucune ligne)
+-- Ordre des contrôles (corrigé — double vérification stripe_session_id) :
+--   1. Premier test d'existence de stripe_session_id, avant tout verrou
+--      (rapide, évite de verrouiller pour rien dans le cas courant).
+--   2. Verrouille la ligne du code (FOR UPDATE) : deux webhooks
+--      concurrents sur le MÊME code s'exécutent en série à partir d'ici.
+--   3. Code inexistant (p_code_promo_id ne correspond à aucune ligne)
 --      → false proprement (FOUND reste faux après le SELECT ... FOR UPDATE).
---   3. Limite atteinte → false, rien n'est inséré.
---   4. Sinon → insertion, true.
+--   4. Second test d'existence de stripe_session_id, APRÈS le verrou :
+--      couvre le cas où deux webhooks identiques arrivent en parallèle —
+--      le second a pu passer le premier test avant que le premier
+--      n'insère sa ligne, puis attendre le verrou ; une fois le verrou
+--      obtenu, il doit revérifier plutôt que recompter une limite déjà
+--      franchie par le jumeau qu'il vient de laisser passer devant lui.
+--   5. Limite d'utilisations → false si atteinte, rien n'est inséré.
+--   6. Insertion, avec ON CONFLICT DO NOTHING comme filet de sécurité
+--      final (la contrainte unique sur stripe_session_id est la garantie
+--      ultime, même si un cas non prévu contournait les tests ci-dessus).
 create or replace function consommer_code_promo(
   p_code_promo_id     uuid,
   p_user_id           uuid,
@@ -92,7 +100,7 @@ declare
   v_max   integer;
   v_count integer;
 begin
-  -- 1. Idempotence : ce paiement a déjà été compté (webhook rejoué).
+  -- 1. Premier test d'existence (avant verrou).
   if exists (
     select 1 from utilisations_codes_promo
     where stripe_session_id = p_stripe_session_id
@@ -100,8 +108,7 @@ begin
     return true;
   end if;
 
-  -- 2. Verrouille la ligne du code : deux webhooks concurrents sur le
-  --    MÊME code s'exécutent en série à partir d'ici, pas en parallèle.
+  -- 2. Verrouille la ligne du code.
   select utilisations_max into v_max
   from codes_promo where id = p_code_promo_id for update;
 
@@ -109,7 +116,15 @@ begin
     return false;  -- code_promo_id inconnu
   end if;
 
-  -- 3. Limite d'utilisations.
+  -- 3. Second test d'existence, après obtention du verrou.
+  if exists (
+    select 1 from utilisations_codes_promo
+    where stripe_session_id = p_stripe_session_id
+  ) then
+    return true;
+  end if;
+
+  -- 4. Limite d'utilisations.
   select count(*) into v_count
   from utilisations_codes_promo where code_promo_id = p_code_promo_id;
 
@@ -117,9 +132,10 @@ begin
     return false;
   end if;
 
-  -- 4. Enregistrement.
+  -- 5. Enregistrement, ON CONFLICT comme filet de sécurité supplémentaire.
   insert into utilisations_codes_promo (code_promo_id, user_id, email_utilise, stripe_session_id)
-  values (p_code_promo_id, p_user_id, p_email, p_stripe_session_id);
+  values (p_code_promo_id, p_user_id, p_email, p_stripe_session_id)
+  on conflict (stripe_session_id) do nothing;
 
   return true;
 end;
