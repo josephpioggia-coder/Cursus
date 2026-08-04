@@ -644,13 +644,15 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
         {/* Compteur d'usage IA réel (60803-03) — jauge + avertissement à 90%
             + recouvrement bloquant à 100%, calculés sur le vrai quota du
-            palier (quotas_paliers) et la vraie consommation (usage_ia). */}
+            palier (quotas_paliers) et la vraie consommation (usage_ia).
+            CORRECTIF 03/08/2026 : le mode "compact" (barre colorée sans
+            texte) rendait le compteur illisible — impossible de savoir ce
+            qu'on regardait sans légende. Texte toujours affiché désormais. */}
         <div style={{ marginBottom: 8 }}>
           <CompteurUsageIA
             onÉtatChange={setUsageIA}
             onDemanderUpgrade={onDemanderUpgrade}
             rafraîchirDepuis={dernièreAnalyse}
-            compact
           />
         </div>
 
@@ -714,6 +716,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
               </button>
             </div>
           </>
+        )}
+
+        {/* CORRECTIF 03/08/2026 — avant, rien n'indiquait où on se situait
+            par rapport à la limite tant qu'on n'avait pas cliqué "Analyser"
+            et essuyé le refus. Indicateur permanent désormais, dès qu'il y a
+            un texte à analyser (sélection ou chapitre entier) : combien de
+            caractères, et la marge restante avant la limite. */}
+        {sourceActuelleNettoyée.length > 0 && (
+          <div style={{
+            fontSize: 11, color: texteTropVolumineux ? "#A32D2D" : "#1D9E75",
+            marginBottom: 6, display: "flex", justifyContent: "space-between",
+          }}>
+            <span>{sourceActuelleNettoyée.length.toLocaleString("fr-FR")} / {SEUIL_AVERTISSEMENT.toLocaleString("fr-FR")} caractères</span>
+            <span>{texteTropVolumineux ? "au-dessus de la limite" : `${(SEUIL_AVERTISSEMENT - sourceActuelleNettoyée.length).toLocaleString("fr-FR")} restants`}</span>
+          </div>
         )}
 
         {texteTropVolumineux && (
