@@ -53,6 +53,14 @@ const compterMots = (html = "") => {
   return texte === "" ? 0 : texte.split(" ").length;
 };
 
+// Ajouté 03/08/2026, à la demande de Joseph : "Depuis l'ouverture" comptait
+// en mots, alors que c'est le nombre de CARACTÈRES produits qui a du sens
+// pour juger si un passage tient dans les seuils d'analyse du co-pilote
+// (qui raisonnent tous en caractères, pas en mots).
+const compterCaractères = (html = "") => {
+  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().length;
+};
+
 const formaterDurée = (secondes) => {
   const h = Math.floor(secondes / 3600);
   const m = Math.floor((secondes % 3600) / 60);
@@ -429,13 +437,13 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
 
 // ─── Composant : Panneau objectifs ───────────────────────────────────────────────
 
-function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objectifChapitre, durée, couleur, onMàjObjectifs }) {
+function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier, objectifChapitre, durée, couleur, onMàjObjectifs }) {
   const [édition, setÉdition] = useState(false);
   const [tempJ, setTempJ] = useState(objectifJournalier);
   const [tempC, setTempC] = useState(objectifChapitre);
 
-  const rythme = durée > 60 ? Math.round((motsSession / (durée / 3600))) : null;
-  const pctJour = Math.min(100, Math.round((motsSession / objectifJournalier) * 100));
+  const rythme = durée > 60 ? Math.round((caractèresSession / (durée / 3600))) : null;
+  const pctJour = Math.min(100, Math.round((caractèresSession / objectifJournalier) * 100));
   const pctChapitre = objectifChapitre > 0
     ? Math.min(100, Math.round((motsChapitre / objectifChapitre) * 100))
     : null;
@@ -459,11 +467,16 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
           cumul journalier viendra avec le chantier "suivi de sessions"
           Supabase, toujours à programmer. Correctif minimal : aucun
           changement de comportement, seulement d'honnêteté. */}
+      {/* CORRECTIF 03/08/2026 — comptait en mots, alors que les seuils
+          d'analyse du co-pilote (et la question "puis-je lancer une analyse
+          maintenant ?") raisonnent tous en caractères. Bascule complète en
+          caractères, objectif inclus (défaut 3000, ajustable via ⚙ Objectifs
+          comme avant). */}
       <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 120 }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}
-          title="Mots tapés depuis l'ouverture de ce chapitre dans l'éditeur — pas un cumul de la journée">
+          title="Caractères tapés depuis l'ouverture de ce chapitre dans l'éditeur — pas un cumul de la journée">
           <span style={{ color: "#999" }}>Depuis l'ouverture</span>
-          <span style={{ color: couleur, fontWeight: 500 }}>{motsSession} / {objectifJournalier} mots</span>
+          <span style={{ color: couleur, fontWeight: 500 }}>{caractèresSession.toLocaleString("fr-FR")} / {objectifJournalier.toLocaleString("fr-FR")} caractères</span>
         </div>
         <div style={{ height: 3, background: "#e5e5e5", borderRadius: 4, overflow: "hidden" }}>
           <div style={{ width: `${pctJour}%`, height: "100%", background: couleur, borderRadius: 4, transition: "width 0.5s" }} />
@@ -486,7 +499,7 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
       {/* Durée + rythme */}
       <div style={{ color: "#999" }}>
         ⏱ {formaterDurée(durée)}
-        {rythme && <span style={{ marginLeft: 8, color: "#bbb" }}>· {rythme.toLocaleString("fr-FR")} mots/h</span>}
+        {rythme && <span style={{ marginLeft: 8, color: "#bbb" }}>· {rythme.toLocaleString("fr-FR")} caractères/h</span>}
       </div>
 
       <div style={{ flex: 1 }} />
@@ -494,10 +507,10 @@ function PanneauObjectifs({ motsSession, motsChapitre, objectifJournalier, objec
       {/* Édition objectifs */}
       {édition ? (
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <label style={{ color: "#999" }}>Jour :</label>
+          <label style={{ color: "#999" }} title="En caractères, pas en mots">Jour (caractères) :</label>
           <input type="number" value={tempJ} onChange={(e) => setTempJ(+e.target.value)}
-            style={{ width: 64, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
-          <label style={{ color: "#999" }}>Chapitre :</label>
+            style={{ width: 74, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
+          <label style={{ color: "#999" }}>Chapitre (mots) :</label>
           <input type="number" value={tempC} onChange={(e) => setTempC(+e.target.value)}
             style={{ width: 64, padding: "2px 6px", border: "0.5px solid #e5e5e5", borderRadius: 6, fontSize: 12, fontFamily: "inherit" }} />
           <button onClick={() => { onMàjObjectifs(tempJ, tempC); setÉdition(false); }}
@@ -613,11 +626,16 @@ export default function Editeur({
   const [historique, setHistorique] = useState([]);
   const [chargementHistorique, setChargementHistorique] = useState(false);
   const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
-  const [objectifJournalier, setObjectifJournalier] = useState(500);
+  // CORRECTIF 03/08/2026 : objectif journalier repensé en CARACTÈRES (avant :
+  // mots) — "Depuis l'ouverture" suit désormais la même unité. Défaut
+  // approximatif équivalent (500 mots ≈ 3000 caractères en français).
+  const [objectifJournalier, setObjectifJournalier] = useState(3000);
   const [objectifChapitre, setObjectifChapitre] = useState(0);
   const [motsSession, setMotsSession] = useState(0);
+  const [caractèresSession, setCaractèresSession] = useState(0);
   const [duréeSession, setDuréeSession] = useState(0);
   const motsInitiaux = useRef(compterMots(nœud?.texte || ""));
+  const caractèresInitiaux = useRef(compterCaractères(nœud?.texte || ""));
   const timerSauvegarde = useRef(null);
   const timerSession = useRef(null);
   const contenuRef = useRef(nœud?.texte || "");
@@ -738,6 +756,8 @@ export default function Editeur({
       // Mise à jour du compteur de mots de session
       const motsTotaux = compterMots(html);
       setMotsSession(Math.max(0, motsTotaux - motsInitiaux.current));
+      const caractèresTotaux = compterCaractères(html);
+      setCaractèresSession(Math.max(0, caractèresTotaux - caractèresInitiaux.current));
 
       // Indicateur "modification en cours"
       setStatutSauvegarde("en_cours");
@@ -1029,7 +1049,7 @@ export default function Editeur({
 
       {/* ── Barre objectifs / stats ── */}
       <PanneauObjectifs
-        motsSession={motsSession}
+        caractèresSession={caractèresSession}
         motsChapitre={motsChapitre}
         objectifJournalier={objectifJournalier}
         objectifChapitre={objectifChapitre}
@@ -1040,3 +1060,4 @@ export default function Editeur({
     </div>
   );
 }
+
