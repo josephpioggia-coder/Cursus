@@ -40,6 +40,7 @@ import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
+import Administration from "./components/Administration.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
@@ -2098,6 +2099,13 @@ function AppConnectée({ user, déconnecter }) {
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
             { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
+            // Administration (60804-03) — visible seulement pour le
+            // propriétaire du logiciel. Purement cosmétique : la vraie
+            // sécurité est vérifiée côté serveur dans admin-codes-promo,
+            // pas ici (masquer un lien n'empêche personne de deviner l'URL).
+            ...(user?.email === "joseph.pioggia@gmail.com"
+              ? [{ id: "administration", label: "Administration", icone: "🛠️" }]
+              : []),
           ].map((item) => (
             <div
               key={item.id}
@@ -2220,6 +2228,17 @@ function AppConnectée({ user, déconnecter }) {
         {vue === "tarification" && (
           <div style={{ flex: 1, overflowY: "auto" }}>
             <Tarification />
+          </div>
+        )}
+
+        {/* Vue : administration (60804-03) — le lien n'apparaît que pour
+            le propriétaire, mais le rendu ici reste aussi protégé : même
+            atteint directement, l'écran n'affiche rien sans l'email admin
+            (la sécurité réelle reste côté serveur, ceci évite juste une
+            confusion visuelle). */}
+        {vue === "administration" && user?.email === "joseph.pioggia@gmail.com" && (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <Administration />
           </div>
         )}
 

@@ -17,3 +17,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/stripe-webhook/deno.json"
 entrypoint = "./functions/stripe-webhook/index.ts"
+
+[functions.admin-codes-promo]
+enabled = true
+# false : la vérification d'identité (admin ou non) est faite dans le
+# code lui-même (supabase.auth.getUser + table admins), pas au niveau
+# de la passerelle Supabase.
+verify_jwt = false
+import_map = "./functions/admin-codes-promo/deno.json"
+entrypoint = "./functions/admin-codes-promo/index.ts"
