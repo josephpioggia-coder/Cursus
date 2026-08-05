@@ -26,6 +26,31 @@ l'autrice s'est révélée être une vraie citation, correctement faite... trois
 chapitres plus loin. Le protocole ci-dessous existe pour empêcher que ça se
 reproduise.
 
+**Second principe central, découvert en fin de test réel du 05/08/2026** :
+Cursus s'adresse d'abord à des manuscrits **en cours d'écriture**, pas à des
+livres finis et publiés. Sur un livre complet, l'outil peut nommer un motif
+précisément (« telle citation exacte, étendue à tort à telle pratique non
+couverte »), parce qu'il a accès à la trajectoire entière. Sur un manuscrit
+encore ouvert, il ne peut pas savoir si l'autrice va, plus loin, ajouter
+exactement la nuance qui semble manquer à ce stade — présenter un verdict
+définitif serait alors une fausse certitude.
+
+**Règle qui en découle** : le registre du message à l'auteur·e doit dépendre
+de l'état du manuscrit :
+- **Manuscrit complet/publié** : verdict précis et nommé, motif identifié
+  explicitement (ex. citer les auteurs concernés et ce que leurs travaux
+  couvrent réellement).
+- **Manuscrit en cours d'écriture** (usage réel et principal de Cursus) :
+  **mise en garde préventive**, formulée en termes généraux sur le risque
+  émergent (ex. « veillez à distinguer le statut de reconnaissance de
+  chaque approche que vous mentionnez ») — jamais un verdict qui présume de
+  ce que l'auteur·e n'a pas encore écrit. L'objectif est de permettre une
+  correction de trajectoire, pas de sanctionner un texte inachevé comme
+  s'il était figé.
+
+Le dossier de contexte (étape 0) doit donc porter un champ `etat_manuscrit`
+(`en_cours` / `complet`) qui détermine lequel des deux registres appliquer.
+
 ---
 
 ## Étape 0 — Cartographie contextuelle obligatoire
