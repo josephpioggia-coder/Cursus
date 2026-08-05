@@ -205,6 +205,16 @@ de l'auteur·e, vérifier que le texte distingue clairement récit personnel,
 méthode proposée, et offre professionnelle — pas juger si l'auteur·e est de
 bonne foi.
 
+**Préface ou avant-propos externe** : vérifier systématiquement qui l'a
+écrit, et si cette personne a une relation financière avec l'auteur·e
+(formatrice ou formateur payé, coach, partenaire commercial, employeur).
+S'appuyer uniquement sur des informations publiques et auto-divulguées par
+les personnes concernées (leur propre site, leurs propres réseaux sociaux),
+jamais sur des informations privées ou non vérifiables. Si une telle
+relation existe, elle doit être signalée explicitement comme un signal de
+non-neutralité potentielle — jamais présumée neutre par défaut, jamais
+présentée comme une accusation ou une preuve de mauvaise foi.
+
 **Domaines réglementés ou à fort enjeu** (juridique, médical, thérapeutique,
 financier, diagnostic, promesse de guérison) : Cursus ne rend jamais de
 verdict d'expertise automatisé. Il signale une **zone sous expertise
@@ -249,6 +259,25 @@ local, et un verdict sur la thèse portée par le livre dans son ensemble —
 les deux peuvent diverger légitimement (exemple vécu : passage local
 recevable tel quel, thèse du livre recevable après vérification globale
 avec une réserve mineure de citation).
+
+**Hiérarchisation obligatoire des remarques en sortie finale** (ajouté après
+un test réel du 05/08/2026, article de revue) : la sortie ne doit jamais
+être une liste plate mélangeant tout au même niveau. Cursus range chaque
+remarque dans une catégorie distincte, jamais fusionnée :
+- `valeur_ajoutee_editoriale` — angle mort réel repéré dans le texte
+  (question qu'un lecteur expert poserait, qu'un correcteur ordinaire ne
+  verrait pas) ; c'est le niveau le plus utile, à mettre en avant, pas noyé
+  parmi les corrections mineures ;
+- `corrections_probables` — répétitions, transitions manquantes, densité
+  lexicale, ce que le dialogue a confirmé avec un bon niveau de confiance ;
+- `alertes_a_verifier_sur_source` — anomalie possible (mot, accord, coupure)
+  qui peut provenir d'un artefact de numérisation ou de découpe (OCR,
+  extraction d'image) plutôt que d'une erreur réelle de l'auteur·e : ne
+  **jamais** présenter comme faute certaine ce qui dépend du document
+  source original — formuler comme "à vérifier sur l'original", pas comme
+  correction ;
+- `remarques_non_bloquantes` — préférence stylistique ou flottement mineur
+  (registre, pronoms), qui reste au choix de l'auteur·e.
 
 ---
 
