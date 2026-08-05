@@ -65,6 +65,29 @@ dire *"aucune occurrence trouvée dans les passages consultés"*, jamais *"le
 livre ne le dit jamais"* — sauf si le manuscrit complet a réellement été
 parcouru.
 
+**Règle non négociable, ajoutée après un test réel du 05/08/2026** : aucun
+modèle ne doit construire lui-même le contexte officiel destiné à l'autre.
+Le dossier de contexte est produit par Cursus, transmis identiquement aux
+deux IA, et versionné avec l'analyse. Ni Claude ni GPT ne transmettent le
+contexte à l'autre — chacun le reçoit séparément, depuis Cursus.
+
+**Un modèle peut contester le dossier de contexte, jamais le remplacer
+silencieusement par ses propres suppositions.** S'il estime le contexte
+insuffisant pour conclure, il lève un signal explicite plutôt que
+d'improviser :
+```json
+{
+  "alerte_contexte": true,
+  "message": "Le dossier de contexte ne contient pas les passages où cette notion est reprise ailleurs. Verdict définitif impossible."
+}
+```
+**Réaction de Cursus à une `alerte_contexte`** : une seule relance ciblée de
+l'étape 0 sur exactement le manque signalé dans `message` (jamais une
+relecture complète), puis reprise du tour avec le dossier complété. Si
+l'alerte persiste après cette unique relance, Cursus s'arrête et signale à
+l'auteur·e un contexte insuffisant — pas de boucle ouverte, une seule
+tentative de complément.
+
 ---
 
 ## Règles de fond
@@ -142,6 +165,63 @@ avec une réserve mineure de citation).
 
 ---
 
+## Contrats d'appel par rôle
+
+Cursus appelle chaque moteur avec un rôle explicite, jamais un prompt
+générique bricolé à la volée.
+
+**Appel à Claude (tour 1 et révisions)** :
+```json
+{
+  "role": "analyseur_initial",
+  "texte_selectionne": "...",
+  "dossier_contexte": {},
+  "consigne": "Analyse les affirmations précises du passage en tenant compte du dossier de contexte. Ne produis pas de verdict définitif si contexte_suffisant est faux."
+}
+```
+Réponse attendue :
+```json
+{
+  "tour": "A1",
+  "claims": [],
+  "analyse": "...",
+  "corrections_bloquantes": [],
+  "corrections_non_bloquantes": [],
+  "alerte_contexte": false,
+  "peut_arreter": false,
+  "reponse_optimale_auteur": null
+}
+```
+
+**Appel à GPT (critique)** :
+```json
+{
+  "role": "critique_adversarial",
+  "texte_selectionne": "...",
+  "dossier_contexte": {},
+  "tour_precedent": {}
+}
+```
+Réponse attendue :
+```json
+{
+  "tour": "B1",
+  "statut": "accord | accord_avec_nuances | desaccord_partiel | desaccord_majeur",
+  "corrections_bloquantes": [],
+  "corrections_non_bloquantes": [],
+  "alerte_contexte": false,
+  "peut_arreter": true,
+  "verdict": "recevable | recevable_avec_reserves | correction_recommandee | verdict_provisoire",
+  "reponse_optimale_auteur": "..."
+}
+```
+
+`dossier_contexte` est **identique** dans les deux appels — copié depuis le
+dossier officiel produit à l'étape 0, jamais reconstruit ou résumé par l'un
+des deux modèles pour l'autre.
+
+---
+
 ## Schéma d'ensemble
 
 ```json
@@ -195,11 +275,16 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
    → tour 2 (critique ciblée). GPT reçoit le dossier directement de
    Cursus, pas de Claude — même source, symétrique.
         ↓
-5. CURSUS lit le champ "peut_arreter" de la sortie structurée de GPT.
+5. CURSUS lit la sortie structurée de GPT.
         │
-        ├── oui → passe directement à l'étape 7.
+        ├── alerte_contexte = true → une seule relance ciblée de
+        │   l'étape 0 sur le manque signalé, puis reprise du tour.
+        │   Si l'alerte persiste après cette relance → arrêt,
+        │   contexte insuffisant signalé à l'auteur·e.
         │
-        └── non → renvoie à CLAUDE : { tour 1 + tour 2 }
+        ├── peut_arreter = true → passe directement à l'étape 7.
+        │
+        └── peut_arreter = false → renvoie à CLAUDE : { tour 1 + tour 2 }
                    → tour 3 (révision ou défense).
                        ↓
 6. CURSUS relit "peut_arreter".
