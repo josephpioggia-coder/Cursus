@@ -21,8 +21,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase.js";
 import { ORDRE_PALIERS, PRIX_STRIPE } from "../lib/prix-stripe-config.mjs";
 
-const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/admin-codes-promo";
-
 const COULEURS = {
   bordeaux: "#8B2635",
   or: "#C4973A",
@@ -57,52 +55,49 @@ export default function Administration() {
     setJournal((j) => [...j, ligne]);
   }, []);
 
+  // 05/08/2026 — cause identifiée : en cas de session momentanément
+  // absente/mal relue, le code retombait sur la clé publishable
+  // (VITE_SUPABASE_ANON_KEY, format sb_publishable_...) envoyée en
+  // Authorization. Or cette clé n'est PAS un JWT depuis la migration
+  // Supabase vers les nouvelles clés publishable/secret — l'API attend
+  // un vrai JWT utilisateur dans Authorization, la clé publishable ne va
+  // que dans apikey. Une clé publishable en Authorization peut être
+  // rejetée avant même que la fonction Edge ne s'exécute, silencieusement.
+  // Correctif : ne plus jamais utiliser la clé publishable comme repli en
+  // Authorization ; échouer clairement si aucune session n'existe ; et
+  // utiliser supabase.functions.invoke() (qui gère lui-même les bons
+  // en-têtes) plutôt qu'un fetch manuel.
   const appellerAdmin = useCallback(async (action, params = {}) => {
     noter(`Action "${action}" — récupération de la session…`);
-    let session = null;
-    try {
-      const résultat = await supabase.auth.getSession();
-      session = résultat.data?.session || null;
-      if (résultat.error) noter(`⚠ Erreur session : ${résultat.error.message}`);
-    } catch (e) {
-      noter(`⚠ Exception pendant getSession() : ${e.message}`);
-    }
-    noter(session ? `Session trouvée, expire à ${new Date(session.expires_at * 1000).toLocaleTimeString("fr-FR")}.` : "⚠ Aucune session trouvée.");
 
-    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const jeton = session?.access_token || SUPABASE_ANON_KEY;
-
-    noter(`Envoi de la requête vers admin-codes-promo…`);
-    let réponse;
-    try {
-      réponse = await fetch(EDGE_FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${jeton}`,
-          "apikey": SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ action, ...params }),
-      });
-    } catch (e) {
-      noter(`⚠ La requête réseau elle-même a échoué : ${e.message}`);
-      throw e;
+    const { data, error: erreurSession } = await supabase.auth.getSession();
+    if (erreurSession) {
+      noter(`⚠ Erreur session : ${erreurSession.message}`);
+      throw new Error(`Erreur session : ${erreurSession.message}`);
     }
-    noter(`Réponse reçue — statut HTTP ${réponse.status}.`);
 
-    let données;
-    try {
-      données = await réponse.json();
-    } catch (e) {
-      noter(`⚠ Réponse reçue mais pas en JSON valide : ${e.message}`);
-      throw new Error("Réponse du serveur illisible.");
+    const session = data?.session || null;
+    if (!session?.access_token) {
+      noter("⚠ Aucune session utilisateur active. Appel admin annulé (pas de repli sur la clé publishable).");
+      throw new Error("Session administrateur absente. Recharge la page et reconnecte-toi.");
     }
-    noter(`Corps de la réponse : ${JSON.stringify(données).slice(0, 200)}`);
+    noter(`Session trouvée, expire à ${new Date(session.expires_at * 1000).toLocaleTimeString("fr-FR")}.`);
 
-    if (!réponse.ok) {
-      throw new Error(données.error || "Erreur inconnue.");
+    noter(`Appel supabase.functions.invoke("admin-codes-promo", { action: "${action}" })…`);
+    const { data: réponse, error } = await supabase.functions.invoke("admin-codes-promo", {
+      body: { action, ...params },
+    });
+
+    if (error) {
+      noter(`⚠ Erreur Edge Function : ${error.message}`);
+      throw new Error(error.message || "Erreur Edge Function.");
     }
-    return données;
+    noter(`Réponse fonction : ${JSON.stringify(réponse).slice(0, 300)}`);
+
+    if (réponse?.error) {
+      throw new Error(réponse.error);
+    }
+    return réponse;
   }, [noter]);
 
   const rafraîchir = useCallback(async () => {
@@ -177,9 +172,12 @@ export default function Administration() {
       <h1 style={{ fontFamily: "Georgia, serif", fontSize: 22, color: COULEURS.bordeaux, marginBottom: 4 }}>
         Administration
       </h1>
-      <p style={{ fontSize: 13, color: COULEURS.texteClair, marginBottom: 16 }}>
+      <p style={{ fontSize: 13, color: COULEURS.texteClair, marginBottom: 4 }}>
         Codes promotionnels — création et gestion.
       </p>
+      <div style={{ fontSize: 12, color: "#8B2635", marginBottom: 16 }}>
+        ADMIN BUILD 60805-SESSION-INVOKE
+      </div>
 
       {/* Panneau de diagnostic permanent — à retirer une fois le problème résolu */}
       <div style={{
@@ -247,7 +245,7 @@ export default function Administration() {
                  onChange={(e) => majChamp("utilisationsMax", e.target.value)} placeholder="illimité si vide" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <button type="button" onClick={créerCode} disabled={envoiEnCours} style={{
+          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); créerCode(); }} disabled={envoiEnCours} style={{
             background: COULEURS.bordeaux, color: "#fff", border: "none", borderRadius: 6,
             padding: "10px 20px", fontSize: 13, cursor: envoiEnCours ? "default" : "pointer",
             opacity: envoiEnCours ? 0.6 : 1,
