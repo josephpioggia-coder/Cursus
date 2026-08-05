@@ -79,8 +79,7 @@ export default function Administration() {
 
   const majChamp = (champ, valeur) => setFormulaire((f) => ({ ...f, [champ]: valeur }));
 
-  const créerCode = async (e) => {
-    e.preventDefault();
+  const créerCode = async () => {
     setEnvoiEnCours(true);
     setErreur("");
     try {
@@ -137,7 +136,7 @@ export default function Administration() {
         </div>
       )}
 
-      <form onSubmit={créerCode} style={{
+      <div style={{
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12,
         background: COULEURS.fond, padding: 20, borderRadius: 8, marginBottom: 28,
       }}>
@@ -186,7 +185,7 @@ export default function Administration() {
                  onChange={(e) => majChamp("utilisationsMax", e.target.value)} placeholder="illimité si vide" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <button type="submit" disabled={envoiEnCours} style={{
+          <button type="button" onClick={créerCode} disabled={envoiEnCours} style={{
             background: COULEURS.bordeaux, color: "#fff", border: "none", borderRadius: 6,
             padding: "10px 20px", fontSize: 13, cursor: envoiEnCours ? "default" : "pointer",
             opacity: envoiEnCours ? 0.6 : 1,
@@ -194,7 +193,7 @@ export default function Administration() {
             {envoiEnCours ? "Création…" : "Créer le code"}
           </button>
         </div>
-      </form>
+      </div>
 
       <h2 style={{ fontSize: 15, color: COULEURS.texte, marginBottom: 12 }}>Codes existants</h2>
       {chargement ? (
