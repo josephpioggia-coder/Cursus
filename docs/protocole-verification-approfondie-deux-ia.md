@@ -35,12 +35,22 @@ encore ouvert, il ne peut pas savoir si l'autrice va, plus loin, ajouter
 exactement la nuance qui semble manquer à ce stade — présenter un verdict
 définitif serait alors une fausse certitude.
 
-**Règle qui en découle** : le registre du message à l'auteur·e doit dépendre
-de l'état du manuscrit :
-- **Manuscrit complet/publié** : verdict précis et nommé, motif identifié
-  explicitement (ex. citer les auteurs concernés et ce que leurs travaux
-  couvrent réellement).
-- **Manuscrit en cours d'écriture** (usage réel et principal de Cursus) :
+**Précision, ajoutée après discussion** : ce qui détermine le registre n'est
+pas un statut de projet déclaré ("en cours" / "terminé" dans Cursus), mais
+**la quantité de matière réellement enregistrée dans les nœuds au moment de
+la demande**. Un avant-propos rédigé après coup, une fois le reste du livre
+achevé (pratique d'écriture courante), donne accès à beaucoup de matière
+même si le projet Cursus n'est pas formellement clôturé. À l'inverse, un
+projet marqué "terminé" mais peu rempli ne donne pas plus de matière pour
+autant. C'est la couverture réelle du manuscrit disponible qui compte, pas
+une étiquette.
+
+**Règle qui en découle** : le registre du message à l'auteur·e dépend de
+cette couverture réelle :
+- **Matière disponible large** (proche de l'intégralité du projet) : verdict
+  précis et nommé, motif identifié explicitement (ex. citer les auteurs
+  concernés et ce que leurs travaux couvrent réellement).
+- **Matière disponible partielle** (le cas normal en cours d'écriture) :
   **mise en garde préventive**, formulée en termes généraux sur le risque
   émergent (ex. « veillez à distinguer le statut de reconnaissance de
   chaque approche que vous mentionnez ») — jamais un verdict qui présume de
@@ -48,8 +58,16 @@ de l'état du manuscrit :
   correction de trajectoire, pas de sanctionner un texte inachevé comme
   s'il était figé.
 
-Le dossier de contexte (étape 0) doit donc porter un champ `etat_manuscrit`
-(`en_cours` / `complet`) qui détermine lequel des deux registres appliquer.
+Le dossier de contexte (étape 0) doit donc porter une mesure de couverture
+réelle (proportion du projet effectivement indexée), pas un simple statut
+déclaré.
+
+**Lien avec CursAudit** (chantier séparé, même soirée) : le même mécanisme
+de dialogue à deux IA sert aux deux produits. CursAudit part du principe
+qu'un document est déjà terminé ou suffisamment avancé — c'est donc le cas
+"matière large" par défaut. Cursus Édition, à l'inverse, doit traiter le cas
+"matière partielle" comme le cas normal, pas comme une exception — c'est la
+situation la plus fréquente pour un manuscrit encore en écriture.
 
 ---
 
