@@ -74,19 +74,46 @@ contexte à l'autre — chacun le reçoit séparément, depuis Cursus.
 **Un modèle peut contester le dossier de contexte, jamais le remplacer
 silencieusement par ses propres suppositions.** S'il estime le contexte
 insuffisant pour conclure, il lève un signal explicite plutôt que
-d'improviser :
+d'improviser — en précisant ce qui manque, pas seulement qu'il manque
+quelque chose :
 ```json
 {
   "alerte_contexte": true,
-  "message": "Le dossier de contexte ne contient pas les passages où cette notion est reprise ailleurs. Verdict définitif impossible."
+  "type_contexte_manquant": "occurrences_aval | contexte_amont | definition_theorique | intention_auteur | passage_pedagogique | offre_commerciale",
+  "theme_a_rechercher": "trauma transgénérationnel",
+  "raison": "Le dossier ne montre pas si cette idée est reprise plus loin comme hypothèse, croyance ou affirmation générale.",
+  "requete_ciblee": ["transgénérationnel", "lignée", "descendants", "trauma hérité", "épigénétique"]
 }
 ```
-**Réaction de Cursus à une `alerte_contexte`** : une seule relance ciblée de
-l'étape 0 sur exactement le manque signalé dans `message` (jamais une
-relecture complète), puis reprise du tour avec le dossier complété. Si
-l'alerte persiste après cette unique relance, Cursus s'arrête et signale à
-l'auteur·e un contexte insuffisant — pas de boucle ouverte, une seule
-tentative de complément.
+
+**Réaction de Cursus à une `alerte_contexte`, décidée le 05/08/2026 (option
+choisie : relance bornée, pas arrêt immédiat ni boucle ouverte)** :
+1. Reçoit `alerte_contexte: true`.
+2. Lit `theme_a_rechercher` et `requete_ciblee`.
+3. Relance une recherche dans les nœuds du projet, ciblée sur cette requête
+   précise — jamais une relecture complète.
+4. Ajoute les passages trouvés au dossier de contexte.
+5. Incrémente `contexte_relance_count`.
+6. Reprend le tour interrompu avec le dossier enrichi.
+
+Plafond strict :
+```json
+{ "max_relances_contexte": 1, "si_contexte_toujours_insuffisant": "arret_verdict_provisoire" }
+```
+Si une nouvelle `alerte_contexte` apparaît après cette unique relance,
+Cursus arrête et retourne :
+```json
+{
+  "verdict": "verdict_provisoire",
+  "raison": "Contexte interne insuffisant malgré une relance ciblée.",
+  "analyse_locale": "possible",
+  "analyse_globale": "non_conclusive",
+  "contexte_manquant": "...",
+  "recommandation": "Fournir ou indexer les sections concernées avant de conclure."
+}
+```
+Une seule tentative de complément, jamais plus — sinon on recrée, pour le
+contexte, la boucle ouverte qu'on a interdite pour le dialogue lui-même.
 
 ---
 
@@ -277,10 +304,13 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
         ↓
 5. CURSUS lit la sortie structurée de GPT.
         │
-        ├── alerte_contexte = true → une seule relance ciblée de
-        │   l'étape 0 sur le manque signalé, puis reprise du tour.
-        │   Si l'alerte persiste après cette relance → arrêt,
-        │   contexte insuffisant signalé à l'auteur·e.
+        ├── alerte_contexte = true et contexte_relance_count < 1 →
+        │   recherche ciblée Cursus sur requete_ciblee, dossier enrichi,
+        │   contexte_relance_count += 1, reprise du tour.
+        │
+        ├── alerte_contexte = true et contexte_relance_count = 1 →
+        │   arrêt : verdict_provisoire, contexte insuffisant signalé
+        │   à l'auteur·e (pas de deuxième relance).
         │
         ├── peut_arreter = true → passe directement à l'étape 7.
         │
