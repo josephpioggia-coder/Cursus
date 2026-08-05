@@ -65,6 +65,23 @@ dire *"aucune occurrence trouvée dans les passages consultés"*, jamais *"le
 livre ne le dit jamais"* — sauf si le manuscrit complet a réellement été
 parcouru.
 
+**Règle sur la forme des `occurrences_pertinentes`, ajoutée après un test
+réel du 05/08/2026** : un résumé de Cursus n'est pas plus vérifiable par un
+modèle qu'un résumé d'un autre modèle — même faille, un niveau plus haut.
+Chaque occurrence doit donc être un objet structuré, pas une phrase de
+synthèse :
+```json
+{
+  "theme": "Peter Levine / Somatic Experiencing",
+  "node_id": "chapitre_1",
+  "extrait": "je m'ouvre à l'approche de Peter Levine en « somatic experiencing »",
+  "fonction": "confirme que la notion est sourcée ailleurs dans le manuscrit"
+}
+```
+Un extrait verbatim et son `node_id` d'origine — jamais seulement une
+caractérisation ("Levine cité nommément (x2)") que le modèle destinataire
+ne peut pas auditer lui-même.
+
 **Règle non négociable, ajoutée après un test réel du 05/08/2026** : aucun
 modèle ne doit construire lui-même le contexte officiel destiné à l'autre.
 Le dossier de contexte est produit par Cursus, transmis identiquement aux
