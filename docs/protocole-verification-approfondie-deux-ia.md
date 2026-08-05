@@ -167,6 +167,52 @@ avec une réserve mineure de citation).
 }
 ```
 
+---
+
+## Logigramme d'orchestration (qui parle à qui, et dans quel ordre)
+
+**Principe central, ajouté après un test réel du 05/08/2026** : l'étape 0
+n'est jamais exécutée par une IA, jamais dupliquée une fois par moteur — elle
+est exécutée **une seule fois, par Cursus lui-même** (recherche mécanique
+dans sa propre base, pas un jugement d'IA), et le dossier de contexte
+résultant est envoyé **identique** aux deux moteurs. Ni Claude ni GPT ne se
+transmettent le contexte l'un à l'autre — chacun le reçoit séparément mais
+identique, depuis Cursus. C'est ce qui garantit que les deux partent de la
+même base, sans que l'un doive faire confiance au résumé de l'autre.
+
+```
+1. DÉCLENCHEUR
+   L'auteur·e sélectionne une zone et demande une vérification approfondie.
+        ↓
+2. CURSUS exécute l'étape 0 — une seule fois, mécaniquement
+   (métadonnées, intention déclarée, recherche des thèmes dans les
+   autres nœuds du projet) → produit le dossier de contexte.
+        ↓
+3. CURSUS envoie à CLAUDE : { passage + dossier de contexte }
+   → tour 1 (analyse).
+        ↓
+4. CURSUS envoie à GPT : { passage + dossier de contexte + tour 1 }
+   → tour 2 (critique ciblée). GPT reçoit le dossier directement de
+   Cursus, pas de Claude — même source, symétrique.
+        ↓
+5. CURSUS lit le champ "peut_arreter" de la sortie structurée de GPT.
+        │
+        ├── oui → passe directement à l'étape 7.
+        │
+        └── non → renvoie à CLAUDE : { tour 1 + tour 2 }
+                   → tour 3 (révision ou défense).
+                       ↓
+6. CURSUS relit "peut_arreter".
+        │
+        ├── oui → étape 7.
+        │
+        └── non → un dernier tour GPT (validation courte),
+                   puis arrêt obligatoire (plafond de profondeur atteint).
+        ↓
+7. CURSUS produit la sortie finale : verdict sur le passage +
+   verdict sur la thèse du livre (si applicable) → transmis à l'auteur·e.
+```
+
 ## Ce qui reste à faire (hors périmètre de ce document)
 
 - Migration SQL des tables nécessaires (job de fond, dossier de contexte,
