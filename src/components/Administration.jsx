@@ -9,9 +9,15 @@
  * l'appelant est un administrateur — cet écran n'est qu'une commodité,
  * pas la sécurité. Si quelqu'un d'autre que le propriétaire atteint cet
  * écran (lien deviné, etc.), toute action échoue côté serveur.
+ *
+ * DIAGNOSTIC PERMANENT (temporaire, 04-05/08/2026) — un panneau "Journal"
+ * toujours visible en haut de la page trace chaque étape réelle (session,
+ * requête envoyée, réponse reçue) en texte brut. Objectif : une simple
+ * capture d'écran de la page suffit à voir où le processus s'arrête,
+ * sans avoir besoin d'ouvrir la console du navigateur.
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase.js";
 import { ORDRE_PALIERS, PRIX_STRIPE } from "../lib/prix-stripe-config.mjs";
 
@@ -36,56 +42,68 @@ const FORMULAIRE_VIDE = {
   utilisationsMax: "",
 };
 
-// DIAGNOSTIC TEMPORAIRE (60804-03) — capture toute erreur non gérée, même
-// celles qui surviennent en dehors des try/catch de ce composant (ex. une
-// exception pendant un re-rendu), pour qu'elle s'affiche à l'écran au lieu
-// de simplement faire disparaître/réinitialiser la page sans laisser de
-// trace. Bloquant volontairement (alert), pour qu'un message reste visible
-// même si React réinitialise l'affichage juste après.
-if (typeof window !== "undefined" && !window.__cursusDiagnosticAdminInstallé) {
-  window.__cursusDiagnosticAdminInstallé = true;
-  window.addEventListener("error", (évt) => {
-    alert("ERREUR JS NON GÉRÉE : " + (évt.error?.message || évt.message));
-  });
-  window.addEventListener("unhandledrejection", (évt) => {
-    alert("PROMESSE REJETÉE NON GÉRÉE : " + (évt.reason?.message || évt.reason));
-  });
-}
-
-async function appellerAdmin(action, params = {}) {
-  const { data: { session }, error: erreurSession } = await supabase.auth.getSession();
-  if (erreurSession) {
-    alert("Erreur de session : " + erreurSession.message);
-  }
-  if (!session) {
-    alert("Aucune session active — reconnecte-toi avant de réessayer.");
-  }
-  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const jeton = session?.access_token || SUPABASE_ANON_KEY;
-
-  const réponse = await fetch(EDGE_FUNCTION_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${jeton}`,
-      "apikey": SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify({ action, ...params }),
-  });
-  const données = await réponse.json();
-  if (!réponse.ok) {
-    alert(`Réponse serveur (${réponse.status}) : ${données.error || "Erreur inconnue."}`);
-    throw new Error(données.error || "Erreur inconnue.");
-  }
-  return données;
-}
-
 export default function Administration() {
   const [codes, setCodes] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [formulaire, setFormulaire] = useState(FORMULAIRE_VIDE);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [journal, setJournal] = useState([]);
+  const compteurLigne = useRef(0);
+
+  const noter = useCallback((message) => {
+    compteurLigne.current += 1;
+    const ligne = `${compteurLigne.current}. [${new Date().toLocaleTimeString("fr-FR")}] ${message}`;
+    setJournal((j) => [...j, ligne]);
+  }, []);
+
+  const appellerAdmin = useCallback(async (action, params = {}) => {
+    noter(`Action "${action}" — récupération de la session…`);
+    let session = null;
+    try {
+      const résultat = await supabase.auth.getSession();
+      session = résultat.data?.session || null;
+      if (résultat.error) noter(`⚠ Erreur session : ${résultat.error.message}`);
+    } catch (e) {
+      noter(`⚠ Exception pendant getSession() : ${e.message}`);
+    }
+    noter(session ? `Session trouvée, expire à ${new Date(session.expires_at * 1000).toLocaleTimeString("fr-FR")}.` : "⚠ Aucune session trouvée.");
+
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const jeton = session?.access_token || SUPABASE_ANON_KEY;
+
+    noter(`Envoi de la requête vers admin-codes-promo…`);
+    let réponse;
+    try {
+      réponse = await fetch(EDGE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${jeton}`,
+          "apikey": SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ action, ...params }),
+      });
+    } catch (e) {
+      noter(`⚠ La requête réseau elle-même a échoué : ${e.message}`);
+      throw e;
+    }
+    noter(`Réponse reçue — statut HTTP ${réponse.status}.`);
+
+    let données;
+    try {
+      données = await réponse.json();
+    } catch (e) {
+      noter(`⚠ Réponse reçue mais pas en JSON valide : ${e.message}`);
+      throw new Error("Réponse du serveur illisible.");
+    }
+    noter(`Corps de la réponse : ${JSON.stringify(données).slice(0, 200)}`);
+
+    if (!réponse.ok) {
+      throw new Error(données.error || "Erreur inconnue.");
+    }
+    return données;
+  }, [noter]);
 
   const rafraîchir = useCallback(async () => {
     setChargement(true);
@@ -93,20 +111,26 @@ export default function Administration() {
       const { codes } = await appellerAdmin("lister");
       setCodes(codes || []);
       setErreur("");
+      noter(`Liste mise à jour : ${(codes || []).length} code(s).`);
     } catch (e) {
       setErreur(e.message);
     } finally {
       setChargement(false);
     }
-  }, []);
+  }, [appellerAdmin, noter]);
 
-  useEffect(() => { rafraîchir(); }, [rafraîchir]);
+  useEffect(() => {
+    noter("Composant Administration monté — chargement initial.");
+    rafraîchir();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const majChamp = (champ, valeur) => setFormulaire((f) => ({ ...f, [champ]: valeur }));
 
   const créerCode = async () => {
     setEnvoiEnCours(true);
     setErreur("");
+    noter("— Clic sur « Créer le code » —");
     try {
       await appellerAdmin("creer", {
         code: formulaire.code,
@@ -118,9 +142,11 @@ export default function Administration() {
         dateFin: formulaire.dateFin || null,
         utilisationsMax: formulaire.utilisationsMax ? Number(formulaire.utilisationsMax) : null,
       });
+      noter("Création confirmée par le serveur, rafraîchissement de la liste…");
       setFormulaire(FORMULAIRE_VIDE);
       await rafraîchir();
     } catch (e) {
+      noter(`⚠ Échec final : ${e.message}`);
       setErreur(e.message);
     } finally {
       setEnvoiEnCours(false);
@@ -151,9 +177,20 @@ export default function Administration() {
       <h1 style={{ fontFamily: "Georgia, serif", fontSize: 22, color: COULEURS.bordeaux, marginBottom: 4 }}>
         Administration
       </h1>
-      <p style={{ fontSize: 13, color: COULEURS.texteClair, marginBottom: 24 }}>
+      <p style={{ fontSize: 13, color: COULEURS.texteClair, marginBottom: 16 }}>
         Codes promotionnels — création et gestion.
       </p>
+
+      {/* Panneau de diagnostic permanent — à retirer une fois le problème résolu */}
+      <div style={{
+        background: "#1E1E1E", color: "#D4D4D4", fontFamily: "monospace", fontSize: 11.5,
+        padding: 14, borderRadius: 8, marginBottom: 20, maxHeight: 260, overflowY: "auto",
+      }}>
+        <div style={{ color: "#4EC9B0", marginBottom: 6 }}>JOURNAL DE DIAGNOSTIC (temporaire)</div>
+        {journal.length === 0
+          ? <div>(rien encore)</div>
+          : journal.map((ligne, i) => <div key={i}>{ligne}</div>)}
+      </div>
 
       {erreur && (
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13, marginBottom: 16 }}>
