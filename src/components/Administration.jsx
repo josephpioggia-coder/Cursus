@@ -36,8 +36,30 @@ const FORMULAIRE_VIDE = {
   utilisationsMax: "",
 };
 
+// DIAGNOSTIC TEMPORAIRE (60804-03) — capture toute erreur non gérée, même
+// celles qui surviennent en dehors des try/catch de ce composant (ex. une
+// exception pendant un re-rendu), pour qu'elle s'affiche à l'écran au lieu
+// de simplement faire disparaître/réinitialiser la page sans laisser de
+// trace. Bloquant volontairement (alert), pour qu'un message reste visible
+// même si React réinitialise l'affichage juste après.
+if (typeof window !== "undefined" && !window.__cursusDiagnosticAdminInstallé) {
+  window.__cursusDiagnosticAdminInstallé = true;
+  window.addEventListener("error", (évt) => {
+    alert("ERREUR JS NON GÉRÉE : " + (évt.error?.message || évt.message));
+  });
+  window.addEventListener("unhandledrejection", (évt) => {
+    alert("PROMESSE REJETÉE NON GÉRÉE : " + (évt.reason?.message || évt.reason));
+  });
+}
+
 async function appellerAdmin(action, params = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error: erreurSession } = await supabase.auth.getSession();
+  if (erreurSession) {
+    alert("Erreur de session : " + erreurSession.message);
+  }
+  if (!session) {
+    alert("Aucune session active — reconnecte-toi avant de réessayer.");
+  }
   const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
   const jeton = session?.access_token || SUPABASE_ANON_KEY;
 
@@ -51,7 +73,10 @@ async function appellerAdmin(action, params = {}) {
     body: JSON.stringify({ action, ...params }),
   });
   const données = await réponse.json();
-  if (!réponse.ok) throw new Error(données.error || "Erreur inconnue.");
+  if (!réponse.ok) {
+    alert(`Réponse serveur (${réponse.status}) : ${données.error || "Erreur inconnue."}`);
+    throw new Error(données.error || "Erreur inconnue.");
+  }
   return données;
 }
 
