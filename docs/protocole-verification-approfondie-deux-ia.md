@@ -103,6 +103,36 @@ Exécution concrète :
 7. Marquer explicitement le contexte comme suffisant, partiel, ou
    insuffisant — jamais l'omettre.
 
+**Questionnaire d'intention (interface), ajouté après un test réel du
+06/08/2026** : aujourd'hui, cliquer sur "Analyse" ne propose aucune
+contextualisation — l'IA reçoit le texte seul, sans savoir ce qu'il est
+censé être. C'est une faiblesse identifiée sur un cas limite réel (des
+messages WhatsApp personnels soumis comme "scène" indépendante) : sans cette
+information, une analyse peut optimiser pour la cohérence littéraire au prix
+d'une fonction réelle du texte (par exemple rassurer un destinataire réel)
+que rien ne signale à l'IA. Avant de lancer l'analyse, l'interface doit donc
+poser explicitement la question du statut du texte, à choix fermé plus une
+option libre :
+- correspondance intime envoyée (destinataire réel, fonction relationnelle
+  à préserver) ;
+- matériau littéraire à intégrer dans un livre (optimisation stylistique
+  pleinement légitime) ;
+- fragment poétique autonome ;
+- trace relationnelle à préserver dans sa spontanéité (ne pas lisser) ;
+- autre — champ libre, traité comme une vraie question adressée à l'IA, pas
+  comme une case parmi d'autres.
+
+Cette réponse entre dans le dossier de contexte comme `intention_auteur`
+déclarée (voir l'objet à l'étape 6) et prime sur toute déduction que l'IA
+ferait seule du genre du texte. Un texte déclaré comme correspondance ou
+trace à préserver ne doit jamais recevoir de suggestion de reformulation qui
+sacrifie sa fonction relationnelle à la seule cohérence esthétique.
+
+*Piste secondaire, non tranchée* : personnaliser la relation
+auteur·e/IA (tutoiement ou vouvoiement, éventuellement d'autres préférences)
+via ce même questionnaire — hors périmètre de la contextualisation
+elle-même, à traiter séparément si retenu.
+
 **Distinction obligatoire** : une recherche ciblée qui ne trouve rien doit
 dire *"aucune occurrence trouvée dans les passages consultés"*, jamais *"le
 livre ne le dit jamais"* — sauf si le manuscrit complet a réellement été
