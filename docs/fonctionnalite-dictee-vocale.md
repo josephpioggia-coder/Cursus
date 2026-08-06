@@ -68,12 +68,28 @@ utilisatrices et utilisateurs de Cursus sans limite : à ce moment-là, prévoir
 soit un quota inclus par palier d'abonnement, soit une facturation à l'usage
 au-delà d'un seuil.
 
-## Prochaine étape (non commencée)
+## État — option B choisie et codée (06/08/2026)
 
-Décider : prototype rapide en option A (gratuit, qualité limitée) pour
-valider l'ergonomie, ou aller directement à l'option B (petit coût, qualité
-nettement meilleure, cohérent avec l'infrastructure GPT déjà en place) ?
-Aucun code écrit à ce stade.
+Code écrit, buildé sans erreur, pas encore déployé ni testé en réel :
+- `supabase/functions/transcrire-audio/index.ts` — fonction Edge qui reçoit
+  l'audio (FormData), vérifie l'authentification (même schéma que
+  `admin-codes-promo`), l'envoie à `gpt-4o-mini-transcribe` (OpenAI), renvoie
+  `{ texte }`.
+- `src/components/Editeur.jsx` — bouton 🎙 dans la barre d'outils
+  (`BoutonDictee`) : démarre l'enregistrement (`MediaRecorder`), l'arrête,
+  envoie l'audio à `transcrire-audio` via `supabase.functions.invoke`,
+  affiche le texte transcrit dans un champ éditable, insertion dans le texte
+  seulement après clic explicite sur "Insérer" (jamais automatique).
+
+**Reste à faire avant de pouvoir tester réellement** :
+1. Créer une clé API sur https://platform.openai.com (compte OpenAI).
+2. La déposer dans Supabase → Settings → Edge Functions → Secrets, sous le
+   nom `OPENAI_API_KEY`.
+3. Déployer la fonction `transcrire-audio` (même procédure que les
+   précédentes fois — coller le code dans le dashboard Supabase, ou CLI).
+4. Tester en réel dans le navigateur (permission micro, enregistrement,
+   qualité de la transcription en français) avant de considérer la
+   fonctionnalité terminée.
 
 ---
 

@@ -328,6 +328,142 @@ function BoutonOutil({ actif, désactivé, onClick, titre, children }) {
   );
 }
 
+// ─── Composant : Dictée vocale (60805-xx, ajouté 06/08/2026) ─────────────────────
+// Micro → enregistrement → transcription via la fonction Edge
+// `transcrire-audio` (OpenAI) → relecture obligatoire dans un champ éditable
+// → insertion dans l'éditeur seulement après validation explicite. La
+// transcription brute n'est jamais injectée automatiquement (voir
+// docs/fonctionnalite-dictee-vocale.md) : sur un texte dicté à voix haute,
+// une erreur de reconnaissance non relue serait bien plus difficile à
+// repérer qu'une faute de frappe.
+
+function BoutonDictee({ editor }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [statut, setStatut] = useState("idle"); // idle | enregistrement | transcription | relecture | erreur
+  const [texte, setTexte] = useState("");
+  const [erreur, setErreur] = useState(null);
+  const enregistreurRef = useRef(null);
+  const morceauxRef = useRef([]);
+
+  const transcrire = useCallback(async (blob) => {
+    setStatut("transcription");
+    try {
+      const formulaire = new FormData();
+      formulaire.append("audio", blob, "dictee.webm");
+      formulaire.append("langue", "fr");
+      const { data, error } = await supabase.functions.invoke("transcrire-audio", { body: formulaire });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setTexte(data?.texte || "");
+      setStatut("relecture");
+    } catch (err) {
+      setErreur(err.message || "Échec de la transcription.");
+      setStatut("erreur");
+    }
+  }, []);
+
+  const démarrer = async () => {
+    setErreur(null);
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const enregistreur = new MediaRecorder(flux);
+      morceauxRef.current = [];
+      enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceauxRef.current.push(e.data); };
+      enregistreur.onstop = () => {
+        flux.getTracks().forEach((piste) => piste.stop());
+        transcrire(new Blob(morceauxRef.current, { type: "audio/webm" }));
+      };
+      enregistreur.start();
+      enregistreurRef.current = enregistreur;
+      setStatut("enregistrement");
+    } catch (err) {
+      setErreur("Micro inaccessible : " + (err.message || "permission refusée."));
+      setStatut("erreur");
+    }
+  };
+
+  const arrêter = () => enregistreurRef.current?.stop();
+
+  const fermer = () => {
+    enregistreurRef.current?.state === "recording" && enregistreurRef.current.stop();
+    setOuvert(false);
+    setStatut("idle");
+    setTexte("");
+    setErreur(null);
+  };
+
+  const insérer = () => {
+    if (texte.trim()) editor.chain().focus().insertContent(`${texte.trim()} `).run();
+    fermer();
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <BoutonOutil
+        actif={ouvert}
+        titre="Dicter un texte (micro)"
+        onClick={() => (ouvert ? fermer() : (setOuvert(true), démarrer()))}
+      >
+        🎙
+      </BoutonOutil>
+      {ouvert && (
+        <div style={{
+          position: "absolute", top: "120%", left: 0, zIndex: 60,
+          background: "#fff", border: "0.5px solid #ddd", borderRadius: 8,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 12, width: 320,
+        }}>
+          {statut === "enregistrement" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#E24B4A", marginBottom: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#E24B4A" }} />
+                Enregistrement en cours…
+              </div>
+              <button onClick={arrêter}
+                style={{ width: "100%", padding: "6px", fontSize: 12, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>
+                Arrêter et transcrire
+              </button>
+            </div>
+          )}
+          {statut === "transcription" && (
+            <div style={{ fontSize: 12, color: "#999" }}>Transcription en cours…</div>
+          )}
+          {statut === "relecture" && (
+            <div>
+              <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>Relis et corrige avant d'insérer :</div>
+              <textarea
+                autoFocus
+                value={texte}
+                onChange={(e) => setTexte(e.target.value)}
+                rows={6}
+                style={{ width: "100%", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 6, padding: 6, resize: "vertical" }}
+              />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "space-between" }}>
+                <button onClick={fermer}
+                  style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                  Annuler
+                </button>
+                <button onClick={insérer}
+                  style={{ fontSize: 11, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 5, padding: "3px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                  Insérer dans le texte
+                </button>
+              </div>
+            </div>
+          )}
+          {statut === "erreur" && (
+            <div>
+              <div style={{ fontSize: 12, color: "#E24B4A", marginBottom: 8 }}>{erreur}</div>
+              <button onClick={fermer}
+                style={{ width: "100%", padding: "6px", fontSize: 12, color: "#555", background: "#f5f5f5", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>
+                Fermer
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Composant : Barre d'outils ──────────────────────────────────────────────────
 
 function BarreOutils({ editor, modeFocus, onToggleFocus }) {
@@ -413,6 +549,8 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().insertContent({ type: "note", attrs: { texte: "" } }).run()}>
         📝
       </BoutonOutil>
+
+      <BoutonDictee editor={editor} />
 
       <Sep />
 
