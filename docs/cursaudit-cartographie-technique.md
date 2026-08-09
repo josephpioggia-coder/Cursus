@@ -120,6 +120,62 @@ architectural nouveau, pas une continuité.
 
 ---
 
+## 2bis. Décision d'architecture partagée Cursus Édition ↔ CursAudit (formalisé le 09/08/2026)
+
+Décision de principe : **partager trois briques précises entre les deux
+produits plutôt que les construire en parallèle**, chacune pour une raison
+différente. Cette section formalise ce qui n'était jusqu'ici que discuté.
+Aucune de ces briques ne démarre avant P0a (rapatriement de `claude-prox`) et
+P0b (`OPENAI_API_KEY`) — voir la carte d'avancement du 07/08. Ce qui suit est
+une décision d'architecture, pas un chantier lancé.
+
+### a) Moteur IA à sortie structurée (partagé)
+
+Trois besoins distincts convergent aujourd'hui vers la même brique :
+1. **CopiloteIA** (existant) — texte libre, suggestions d'écriture, faible enjeu.
+2. **Protocole 60805-06** (Cursus Édition) — sortie JSON stricte, dialogue à deux rôles (Claude analyseur / GPT critique).
+3. **CursAudit** (moteur d'analyse) — sortie JSON stricte, par unité codée (confirmé aujourd'hui par l'exemplar Excel/Word produit hors code : 255 unités, 29 dimensions par unité, dialogue Claude↔GPT déjà utilisé en pratique pour ce travail manuel).
+
+Les besoins 2 et 3 sont structurellement le même problème : un appel IA à
+rôle explicite, sortie validée contre un schéma, jamais du texte libre.
+Décision : une seule Edge Function générique (`{moteur: claude|gpt, role,
+schema_sortie, system, contexte}` → sortie validée), appelée par les trois
+consommateurs plutôt que trois intégrations séparées. Le mode texte libre de
+CopiloteIA reste tel quel — pas besoin de sortie structurée pour de simples
+suggestions.
+
+### b) Questionnaire (partagé, avec le moteur de qualification proposé le 07/08)
+
+L'existant (`banque_questions` / `reponses_questionnaire`) est **plat** : un
+seul niveau utilisé aujourd'hui (l'ADN du projet, niveau 1), aucun
+branchement par profil. L'idée du "moteur de qualification" (carte
+d'avancement, branche P2b — qui êtes-vous → que cherchez-vous → sur quel
+ouvrage → questionnaire spécialisé) reste non commencée, mais la décision
+d'architecture est prise : **étendre `banque_questions` avec des colonnes de
+branchement (profil cible, question suivante) plutôt que construire un
+système séparé.** La table a déjà une colonne `niveau` — c'est une
+généralisation d'un mécanisme existant, pas une reconstruction.
+
+**Distinction importante à ne pas mélanger** : ce questionnaire de
+qualification (qui demande quoi, en amont d'une session) est un objet
+différent du référentiel `audit_criteria` de CursAudit (catégories
+épistémiques, règles de lecture par catégorie — premier brouillon réel
+trouvé le 09/08 dans la grille Excel produite hors code). Le premier
+qualifie la demande ; le second définit comment coder un extrait pendant
+l'analyse elle-même. Les deux sont réels, les deux restent à construire,
+mais ce ne sont pas la même brique.
+
+### c) Composants UI partagés
+
+Aucune bibliothèque de composants n'existe aujourd'hui — style inline
+dupliqué dans chaque fichier. Décision : extraire un petit socle commun
+(bouton, pastille de statut colorée, modale) avant de démarrer l'UI de
+CursAudit, pour ne pas dupliquer un second système de style en parallèle du
+premier. Périmètre volontairement réduit — pas une refonte de design, juste
+les trois briques qui seraient sinon copiées-collées.
+
+---
+
 ## 3. Migrations nécessaires
 
 Aucune migration n'a été écrite (conformément à la consigne du brief). Liste
