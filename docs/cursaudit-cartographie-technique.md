@@ -5,9 +5,28 @@ d'abord le dépôt existant sans modifier le code"). Aucune ligne d'architecture
 centrale n'a été touchée pour produire ce document — seule une correction de
 branche git locale (sans effet sur le code) a eu lieu en amont.*
 
-*Note de nommage : le brief désigne le produit existant sous le nom "CursEdit".
-Dans le dépôt réel, le produit s'appelle **Cursus** (`package.json` :
-`atelier-ecrivain`, nom d'affichage "Cursus") — ce document utilise le nom réel.*
+*Note de nommage, mise à jour le 09/08/2026 : **Cursus** n'est plus le nom
+d'un produit mais celui de la marque/écosystème. **CursEdit** (sans accent —
+décision actée le 09/08 : un accent empêcherait une internationalisation
+sans changer le nom) est le produit d'écriture accompagnée, ce que ce
+document appelait jusqu'ici "le produit" ou "Cursus" tout court. **CursAudit**
+est le second produit sous la même marque. D'autres modules pourraient
+suivre sous le même schéma (ex. Cursus Formation, Cursus Conseil, évoqués le
+07/08 comme extensions possibles du même moteur de qualification). Dans le
+code, `package.json` porte encore le nom d'affichage "Cursus" — à faire
+évoluer si la distinction marque/produit doit aussi se refléter techniquement,
+mais rien d'urgent ni de cassant.*
+
+---
+
+## 0. Statut des quatre chantiers de refonte identifiés le 09/08/2026
+
+| # | Chantier | Statut |
+|---|---|---|
+| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Formalisé (section 2bis), aucune brique démarrée — attend P0a/P0b |
+| 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
+| 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
+| 4 | Modèle économique — offre, tarification, positionnement relatif | **Ouvert, non commencé** |
 
 ---
 
