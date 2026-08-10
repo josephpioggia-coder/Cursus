@@ -40,7 +40,6 @@ import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
-import Administration from "./components/Administration.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
@@ -682,9 +681,16 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     const estRacine = parentId === projet.id;
     const typeRéel = estRacine ? "partie" : type;
     const parentRéel = trouverNœudLocal(projet.structure, parentId);
+    // CORRECTIF 14/08/2026 — se baser sur le NOMBRE de frères pour calculer
+    // le nouvel `ordre` suppose que les `ordre` existants sont une suite
+    // continue sans trou ni doublon. Ce n'était pas garanti (voir correctif
+    // du même jour sur promouvoirNœud/rétrograderNœud) : un nouveau nœud
+    // pouvait alors s'intercaler au milieu de ses frères au lieu d'apparaître
+    // en dernier. On se base désormais sur le plus grand `ordre` réel + 1.
+    const ordreMax = (liste) => liste.reduce((max, n) => Math.max(max, n.ordre ?? 0), 0);
     const ordre = estRacine
-      ? (projet.structure?.length || 0) + 1
-      : (parentRéel?.enfants?.length || 0) + 1;
+      ? ordreMax(projet.structure || []) + 1
+      : ordreMax(parentRéel?.enfants || []) + 1;
 
     const { data, error } = await nœudsAPI.créer({
       type: typeRéel,
@@ -894,17 +900,40 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
 
     const structureSansNœud = extraire(projet.structure || []);
 
+    // CORRECTIF 14/08/2026 — le nœud promu conservait l'`ordre` qu'il avait
+    // dans son ANCIENNE fratrie. Ça n'avait aucun effet visible tant que la
+    // page n'était pas rechargée (l'affichage local suit l'ordre du tableau,
+    // pas le champ `ordre`), mais au rechargement suivant, trierEnfants()
+    // retrie par `ordre` et le nœud atterrit n'importe où parmi ses nouveaux
+    // frères — cause du "bordel" et des positions incohérentes signalés par
+    // Joseph le 14/08/2026. On renumérote donc toute la fratrie d'arrivée
+    // (0, 1, 2...) et on persiste ces nouvelles valeurs en base.
+    let listeAffectée = null;
     const insérerAprèsAncienParent = (liste) => {
       const idx = liste.findIndex((n) => n.id === contexte.idParentActuel);
       if (idx !== -1) {
         const copie = [...liste];
         copie.splice(idx + 1, 0, nœudExtrait);
-        return copie;
+        const renumérotée = copie.map((n, i) => ({ ...n, ordre: i }));
+        listeAffectée = renumérotée;
+        return renumérotée;
       }
       return liste.map((n) => ({ ...n, enfants: insérerAprèsAncienParent(n.enfants || []) }));
     };
 
-    onMàjStructure(projet.id, insérerAprèsAncienParent(structureSansNœud));
+    const nouvelleStructure = insérerAprèsAncienParent(structureSansNœud);
+
+    if (listeAffectée) {
+      const { error: erreurOrdre } = await nœudsAPI.réordonner(
+        listeAffectée.map((n) => ({ id: n.id, ordre: n.ordre }))
+      );
+      if (erreurOrdre) {
+        journaliserErreur("VueProjet:promouvoirNœud (ordre)", erreurOrdre.message, projet.id);
+        window.alert("L'élément a été promu, mais sa position n'a pas pu être enregistrée durablement. Elle pourrait se réinitialiser au prochain rechargement.");
+      }
+    }
+
+    onMàjStructure(projet.id, nouvelleStructure);
   }, [projet, onMàjStructure]);
 
   // Fait entrer un nœud comme dernier enfant de son frère précédent —
@@ -982,15 +1011,35 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
 
     const structureSansNœud = extraire(projet.structure || []);
 
+    // CORRECTIF 14/08/2026 — même problème que promouvoirNœud (voir sa note
+    // ci-dessus) : le nœud rétrogradé conservait l'`ordre` de son ancienne
+    // fratrie, ce qui le plaçait n'importe où parmi ses nouveaux frères au
+    // prochain rechargement. On renumérote donc tous les enfants du nouveau
+    // parent (0, 1, 2...) et on persiste ces valeurs en base.
+    let listeAffectée = null;
     const insérerCommeDernierEnfant = (liste) =>
       liste.map((n) => {
         if (n.id === nouveauParent.id) {
-          return { ...n, enfants: [...(n.enfants || []), nœudExtrait] };
+          const nouveauxEnfants = [...(n.enfants || []), nœudExtrait].map((e, i) => ({ ...e, ordre: i }));
+          listeAffectée = nouveauxEnfants;
+          return { ...n, enfants: nouveauxEnfants };
         }
         return { ...n, enfants: insérerCommeDernierEnfant(n.enfants || []) };
       });
 
-    onMàjStructure(projet.id, insérerCommeDernierEnfant(structureSansNœud));
+    const nouvelleStructure = insérerCommeDernierEnfant(structureSansNœud);
+
+    if (listeAffectée) {
+      const { error: erreurOrdre } = await nœudsAPI.réordonner(
+        listeAffectée.map((n) => ({ id: n.id, ordre: n.ordre }))
+      );
+      if (erreurOrdre) {
+        journaliserErreur("VueProjet:rétrograderNœud (ordre)", erreurOrdre.message, projet.id);
+        window.alert("L'élément a été rétrogradé, mais sa position n'a pas pu être enregistrée durablement. Elle pourrait se réinitialiser au prochain rechargement.");
+      }
+    }
+
+    onMàjStructure(projet.id, nouvelleStructure);
   }, [projet, onMàjStructure]);
 
   // CORRECTIF 16/07/2026 — même problème : ne persistait pas en base.
@@ -2099,13 +2148,6 @@ function AppConnectée({ user, déconnecter }) {
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
             { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
-            // Administration (60804-03) — visible seulement pour le
-            // propriétaire du logiciel. Purement cosmétique : la vraie
-            // sécurité est vérifiée côté serveur dans admin-codes-promo,
-            // pas ici (masquer un lien n'empêche personne de deviner l'URL).
-            ...(user?.email === "joseph.pioggia@gmail.com"
-              ? [{ id: "administration", label: "Administration", icone: "🛠️" }]
-              : []),
           ].map((item) => (
             <div
               key={item.id}
@@ -2228,17 +2270,6 @@ function AppConnectée({ user, déconnecter }) {
         {vue === "tarification" && (
           <div style={{ flex: 1, overflowY: "auto" }}>
             <Tarification />
-          </div>
-        )}
-
-        {/* Vue : administration (60804-03) — le lien n'apparaît que pour
-            le propriétaire, mais le rendu ici reste aussi protégé : même
-            atteint directement, l'écran n'affiche rien sans l'email admin
-            (la sécurité réelle reste côté serveur, ceci évite juste une
-            confusion visuelle). */}
-        {vue === "administration" && user?.email === "joseph.pioggia@gmail.com" && (
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            <Administration />
           </div>
         )}
 
