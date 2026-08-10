@@ -387,6 +387,18 @@ function BoutonDialogue({ ouvert, onClick, couleur }) {
 function FilDialogue({ dialogue, onEnvoyer, couleur }) {
   const { t } = useTranslation("copilote");
   const [saisie, setSaisie] = useState("");
+  const zoneRef = useRef(null);
+
+  // Auto-agrandissement — le champ grandit avec le texte au lieu de défiler
+  // horizontalement (6-8 mots visibles seulement, signalé par Joseph le
+  // 10/08/2026). On repart de "auto" avant de mesurer, sinon scrollHeight ne
+  // diminuerait jamais si l'auteur supprime du texte.
+  useEffect(() => {
+    if (zoneRef.current) {
+      zoneRef.current.style.height = "auto";
+      zoneRef.current.style.height = `${Math.min(zoneRef.current.scrollHeight, 160)}px`;
+    }
+  }, [saisie]);
 
   const envoyer = () => {
     const question = saisie.trim();
@@ -416,32 +428,49 @@ function FilDialogue({ dialogue, onEnvoyer, couleur }) {
         <div style={{ fontSize: 11, color: "#A32D2D", marginBottom: 6 }}>{dialogue.erreur}</div>
       )}
 
-      <div style={{ display: "flex", gap: 4 }}>
-        <input
-          type="text"
+      {/* Cadre renforcé — fond distinct + bordure colorée, pour que le champ
+          de question soit clairement identifiable comme une zone active,
+          pas un simple filet gris parmi le reste de la carte. */}
+      <div style={{
+        background: `${couleur}08`, border: `1px solid ${couleur}40`,
+        borderRadius: 8, padding: 6,
+      }}>
+        <textarea
+          ref={zoneRef}
           value={saisie}
           onChange={(e) => setSaisie(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") envoyer(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              envoyer();
+            }
+          }}
           placeholder={t("dialogue.placeholder", "Qu'aimeriez-vous voir préciser ?")}
           disabled={dialogue.enCours}
+          rows={1}
           style={{
-            flex: 1, fontSize: 11.5, padding: "6px 8px",
-            border: "0.5px solid #e5e5e5", borderRadius: 6,
+            width: "100%", fontSize: 12.5, padding: "6px 8px",
+            border: "none", background: "transparent",
             fontFamily: "inherit", outline: "none",
+            resize: "none", overflow: "hidden",
+            boxSizing: "border-box", lineHeight: 1.5,
+            display: "block",
           }}
         />
-        <button
-          onClick={envoyer}
-          disabled={dialogue.enCours || !saisie.trim()}
-          style={{
-            fontSize: 11.5, padding: "6px 10px", borderRadius: 6, border: "none",
-            background: couleur, color: "#fff", fontFamily: "inherit",
-            cursor: (dialogue.enCours || !saisie.trim()) ? "default" : "pointer",
-            opacity: (dialogue.enCours || !saisie.trim()) ? 0.5 : 1,
-          }}
-        >
-          {t("dialogue.envoyer", "Envoyer")}
-        </button>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <button
+            onClick={envoyer}
+            disabled={dialogue.enCours || !saisie.trim()}
+            style={{
+              fontSize: 11.5, padding: "6px 14px", borderRadius: 6, border: "none",
+              background: couleur, color: "#fff", fontFamily: "inherit",
+              cursor: (dialogue.enCours || !saisie.trim()) ? "default" : "pointer",
+              opacity: (dialogue.enCours || !saisie.trim()) ? 0.5 : 1,
+            }}
+          >
+            {t("dialogue.envoyer", "Envoyer")}
+          </button>
+        </div>
       </div>
     </div>
   );
