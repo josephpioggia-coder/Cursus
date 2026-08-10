@@ -344,23 +344,131 @@ function BoutonCopier({ texte, couleur = "#888" }) {
   );
 }
 
-// ─── Composants d'affichage ───────────────────────────────────────────────────
+// ─── Fil de dialogue par carte ─────────────────────────────────────────────────
+// Ajouté le 10/08/2026, à la demande de Joseph : une analyse à sens unique ne
+// permet ni de demander une précision, ni de challenger un point, ni de
+// comprendre le "pourquoi" d'un jugement — pour un outil qui se veut un
+// co-pilote et non un simple correcteur. Ce fil se déplie SOUS la carte
+// concernée, dans la même colonne : pas de nouvelle colonne à gérer côté
+// mise en page (App.jsx), donc rien à toucher côté layout/mobile, et un
+// risque de régression bien plus faible qu'un changement de mise en page.
+//
+// Principe : ne JAMAIS relancer l'analyse complète pour poser une question
+// de suivi (coûteux en tokens, et le résultat pourrait différer de la carte
+// affichée). Le co-pilote reçoit systématiquement l'analyse d'origine de
+// CETTE carte précise + l'historique de l'échange, formatés en texte, et
+// répond dans le fil — un appel Claude léger (1024 tokens), pas une
+// nouvelle analyse.
+const DIALOGUE_MAX_TOKENS = 1024;
 
-function CarteSuggestion({ s, couleur }) {
+function promptDialogue(langueProjet) {
+  const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
+  return `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement. Ne redemande jamais le texte complet du chapitre : tout ce dont tu as besoin est dans l'analyse fournie et l'échange en cours. ${instruction}`;
+}
+
+function BoutonDialogue({ ouvert, onClick, couleur }) {
+  const { t } = useTranslation("copilote");
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontSize: 11, lineHeight: 1, color: ouvert ? couleur : "#888",
+        background: "transparent", border: "none",
+        cursor: "pointer", fontFamily: "inherit",
+        padding: "2px 4px", borderRadius: 4, flexShrink: 0,
+      }}
+      title={t("dialogue.ouvrir", "Poser une question sur ce point")}
+    >
+      💬
+    </button>
+  );
+}
+
+function FilDialogue({ dialogue, onEnvoyer, couleur }) {
+  const { t } = useTranslation("copilote");
+  const [saisie, setSaisie] = useState("");
+
+  const envoyer = () => {
+    const question = saisie.trim();
+    if (!question || dialogue.enCours) return;
+    setSaisie("");
+    onEnvoyer(question);
+  };
+
+  return (
+    <div style={{ marginTop: 8, paddingTop: 8, borderTop: `0.5px solid ${couleur}25` }}>
+      {(dialogue.messages || []).map((m, i) => (
+        <div key={i} style={{
+          fontSize: 11.5, lineHeight: 1.5, marginBottom: 6,
+          color: m.role === "auteur" ? "#1a1a1a" : "#555",
+        }}>
+          <span style={{ fontWeight: 600, color: m.role === "auteur" ? couleur : "#999" }}>
+            {m.role === "auteur" ? t("dialogue.vous", "Vous") : t("dialogue.copilote", "Co-pilote")}
+          </span>
+          {" — "}{m.contenu}
+        </div>
+      ))}
+
+      {dialogue.enCours && (
+        <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>{t("bouton.enCours")}</div>
+      )}
+      {dialogue.erreur && (
+        <div style={{ fontSize: 11, color: "#A32D2D", marginBottom: 6 }}>{dialogue.erreur}</div>
+      )}
+
+      <div style={{ display: "flex", gap: 4 }}>
+        <input
+          type="text"
+          value={saisie}
+          onChange={(e) => setSaisie(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") envoyer(); }}
+          placeholder={t("dialogue.placeholder", "Qu'aimeriez-vous voir préciser ?")}
+          disabled={dialogue.enCours}
+          style={{
+            flex: 1, fontSize: 11.5, padding: "6px 8px",
+            border: "0.5px solid #e5e5e5", borderRadius: 6,
+            fontFamily: "inherit", outline: "none",
+          }}
+        />
+        <button
+          onClick={envoyer}
+          disabled={dialogue.enCours || !saisie.trim()}
+          style={{
+            fontSize: 11.5, padding: "6px 10px", borderRadius: 6, border: "none",
+            background: couleur, color: "#fff", fontFamily: "inherit",
+            cursor: (dialogue.enCours || !saisie.trim()) ? "default" : "pointer",
+            opacity: (dialogue.enCours || !saisie.trim()) ? 0.5 : 1,
+          }}
+        >
+          {t("dialogue.envoyer", "Envoyer")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+
+function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
   const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷", ouverture: "✍️", angle: "🎯", question: "❓" };
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
         <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{icônes[s.type] || "→"} {s.type}</div>
-        <BoutonCopier texte={`${s.titre}\n\n${s.texte}`} couleur={couleur} />
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <BoutonCopier texte={`${s.titre}\n\n${s.texte}`} couleur={couleur} />
+          <BoutonDialogue ouvert={dialogue?.ouvert} couleur={couleur}
+            onClick={() => onOuvrirDialogue(cléCarte, `${s.titre}\n${s.texte}`)} />
+        </div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
 
-function CartePersonnage({ p }) {
+function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
   const c = { ok: "#1D9E75", attention: "#BA7517", problème: "#E24B4A" }[p.cohérence] || "#888";
   const texteÀCopier = [
     p.nom,
@@ -375,11 +483,14 @@ function CartePersonnage({ p }) {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 20, background: c + "20", color: c, fontWeight: 500 }}>{p.cohérence}</span>
           <BoutonCopier texte={texteÀCopier} couleur={c} />
+          <BoutonDialogue ouvert={dialogue?.ouvert} couleur={c}
+            onClick={() => onOuvrirDialogue(cléCarte, texteÀCopier)} />
         </div>
       </div>
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
       {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
@@ -424,7 +535,7 @@ function CarteRéférence({ r }) {
   );
 }
 
-function CarteCoherence({ p }) {
+function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
   const s = { info: { c: "#378ADD", bg: "#E6F1FB" }, attention: { c: "#BA7517", bg: "#FAEEDA" }, important: { c: "#E24B4A", bg: "#FCEBEB" } }[p.sévérité] || { c: "#888", bg: "#f0f0f0" };
   const texteÀCopier = [
     `[${p.sévérité}] ${p.type}`,
@@ -438,10 +549,15 @@ function CarteCoherence({ p }) {
           <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, fontWeight: 500, marginRight: 6 }}>{p.sévérité}</span>
           <span style={{ fontSize: 11, color: "#999" }}>{p.type}</span>
         </div>
-        <BoutonCopier texte={texteÀCopier} couleur={s.c} />
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <BoutonCopier texte={texteÀCopier} couleur={s.c} />
+          <BoutonDialogue ouvert={dialogue?.ouvert} couleur={s.c}
+            onClick={() => onOuvrirDialogue(cléCarte, texteÀCopier)} />
+        </div>
       </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
@@ -486,11 +602,68 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const abortRef = useRef(null);
   const intervalRef = useRef(null);
 
+  // ── Dialogue par carte — voir note au-dessus de DIALOGUE_MAX_TOKENS ──
+  // Clé = `${onglet}:${index}` — les fils de dialogue appartiennent à une
+  // instance précise d'analyse : relancer l'analyse remplace les cartes et
+  // donc implicitement leurs fils (comportement voulu, pas un oubli : un
+  // fil discuté porte sur UNE analyse donnée, pas sur "la carte n°2" dans
+  // l'absolu).
+  const [dialogues, setDialogues] = useState({});
+
   const messageErreur = useCallback((err) => {
     if (err.message === "SESSION_EXPIREE") return t("erreur.sessionExpiree");
     if (err.message === "__ERREUR_GENERIQUE__") return t("erreur.generique");
     return err.message;
   }, [t]);
+
+  const ouvrirDialogue = useCallback((cléCarte, contexteCarte) => {
+    setDialogues((d) => {
+      const existant = d[cléCarte];
+      if (existant) return { ...d, [cléCarte]: { ...existant, ouvert: !existant.ouvert } };
+      return { ...d, [cléCarte]: { ouvert: true, contexteCarte, messages: [], enCours: false, erreur: null } };
+    });
+  }, []);
+
+  const envoyerQuestionDialogue = useCallback(async (cléCarte, question) => {
+    setDialogues((d) => ({
+      ...d,
+      [cléCarte]: {
+        ...d[cléCarte],
+        enCours: true,
+        erreur: null,
+        messages: [...(d[cléCarte]?.messages || []), { role: "auteur", contenu: question }],
+      },
+    }));
+
+    try {
+      const état = dialogues[cléCarte];
+      const historique = [...(état?.messages || []), { role: "auteur", contenu: question }]
+        .map((m) => `${m.role === "auteur" ? "Auteur" : "Co-pilote"} : ${m.contenu}`)
+        .join("\n");
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}`;
+
+      const réponse = await appelClaude(
+        promptDialogue(langueProjet),
+        userContent,
+        null,
+        DIALOGUE_MAX_TOKENS
+      );
+
+      setDialogues((d) => ({
+        ...d,
+        [cléCarte]: {
+          ...d[cléCarte],
+          enCours: false,
+          messages: [...(d[cléCarte]?.messages || []), { role: "copilote", contenu: réponse.trim() }],
+        },
+      }));
+    } catch (err) {
+      setDialogues((d) => ({
+        ...d,
+        [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
+      }));
+    }
+  }, [dialogues, langueProjet, messageErreur]);
 
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
@@ -794,10 +967,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         )}
 
-        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} />)}
-        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} />))}
+        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />)}
+        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />))}
         {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
-        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} />))}
+        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />))}
       </div>
     </div>
   );
