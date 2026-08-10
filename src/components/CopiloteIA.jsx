@@ -150,7 +150,11 @@ const INSTRUCTION_LANGUE = {
 };
 
 const PROMPTS = {
-  suggestions: (type) => `Tu es co-pilote d'un écrivain professionnel travaillant sur un ${type === "fiction" ? "roman" : "essai ou ouvrage de non-fiction"}. Analyse le texte et génère exactement 3 suggestions concrètes. Réponds UNIQUEMENT en JSON valide :
+  suggestions: (type) => `Tu es co-pilote d'un écrivain professionnel travaillant sur un ${type === "fiction" ? "roman" : "essai ou ouvrage de non-fiction"}. Analyse le texte et génère exactement 3 suggestions concrètes.
+
+RÈGLE NON NÉGOCIABLE sur les personnes nommées dans le texte (réelles ou identifiables) : n'attribue JAMAIS un trait de caractère, une qualité, une intention ou un fait à une personne nommée si l'auteur ne l'a pas déjà écrit lui-même. Une reformulation peut clarifier, alléger ou réorganiser ce que l'auteur a écrit sur cette personne — elle ne peut jamais AJOUTER une caractérisation nouvelle ("exigeant", "patient", "bienveillant"...) qui n'existait pas dans le texte source, même si elle semble plausible ou stylistiquement séduisante. En cas de doute sur ce qui est réellement affirmé par l'auteur, reste plus neutre et plus proche du texte plutôt que d'enrichir.
+
+Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`,
 
   personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte. Réponds UNIQUEMENT en JSON valide :
@@ -184,7 +188,11 @@ Réponds UNIQUEMENT en JSON valide :
 Le champ "statut" vaut exactement "vérifié", "détail_non_confirmé" ou "non_trouvé".`;
   },
 
-  cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes. Réponds UNIQUEMENT en JSON valide :
+  cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes.
+
+RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
+
+Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
 
   // Aide au démarrage — ajouté le 18/07/2026, différencié par niveau le
@@ -363,7 +371,11 @@ const DIALOGUE_MAX_TOKENS = 1024;
 
 function promptDialogue(langueProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  return `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement. Ne redemande jamais le texte complet du chapitre : tout ce dont tu as besoin est dans l'analyse fournie et l'échange en cours. ${instruction}`;
+  return `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement. Ne redemande jamais le texte complet du chapitre : tout ce dont tu as besoin est dans l'analyse fournie et l'échange en cours.
+
+RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse d'origine que tu développes) mentionne une personne nommée dans le texte de l'auteur, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas lui-même écrit — que ce soit dans ta première réponse ou dans une reformulation que tu proposes ici. Si l'auteur te fait remarquer que tu as inventé une caractérisation, reconnais-le sans détour : ne cherche pas à justifier ou à minimiser l'invention.
+
+${instruction}`;
 }
 
 function BoutonDialogue({ ouvert, onClick, couleur }) {
@@ -384,15 +396,26 @@ function BoutonDialogue({ ouvert, onClick, couleur }) {
   );
 }
 
-function FilDialogue({ dialogue, onEnvoyer, couleur }) {
+// Reconnaissance vocale native du navigateur — ajoutée le 10/08/2026. Chrome
+// et Edge la supportent bien ; Firefox ne la supporte PAS du tout (API
+// SpeechRecognition absente), Safari de façon partielle/peu fiable. Plutôt
+// que d'afficher un bouton qui échouerait silencieusement sur Firefox
+// (navigateur que Joseph utilise, voir le souci de molette déjà rencontré),
+// le bouton ne s'affiche tout simplement pas si l'API est absente.
+const LANGUE_RECONNAISSANCE = { fr: "fr-FR", en: "en-GB" };
+
+function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet }) {
   const { t } = useTranslation("copilote");
   const [saisie, setSaisie] = useState("");
+  const [enÉcoute, setEnÉcoute] = useState(false);
   const zoneRef = useRef(null);
+  const reconnaissanceRef = useRef(null);
+  const texteAvantÉcouteRef = useRef("");
 
-  // Auto-agrandissement — le champ grandit avec le texte au lieu de défiler
-  // horizontalement (6-8 mots visibles seulement, signalé par Joseph le
-  // 10/08/2026). On repart de "auto" avant de mesurer, sinon scrollHeight ne
-  // diminuerait jamais si l'auteur supprime du texte.
+  const APIReconnaissance = typeof window !== "undefined"
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : null;
+
   useEffect(() => {
     if (zoneRef.current) {
       zoneRef.current.style.height = "auto";
@@ -400,9 +423,46 @@ function FilDialogue({ dialogue, onEnvoyer, couleur }) {
     }
   }, [saisie]);
 
+  // Coupe proprement le micro si la carte se ferme/démonte en cours d'écoute.
+  useEffect(() => () => reconnaissanceRef.current?.stop(), []);
+
+  const basculerMicro = () => {
+    if (!APIReconnaissance) return;
+
+    if (enÉcoute) {
+      reconnaissanceRef.current?.stop();
+      return;
+    }
+
+    const reco = new APIReconnaissance();
+    reco.lang = LANGUE_RECONNAISSANCE[langueProjet] || "fr-FR";
+    reco.continuous = true;
+    reco.interimResults = true;
+    texteAvantÉcouteRef.current = saisie ? `${saisie} ` : "";
+
+    reco.onresult = (événement) => {
+      let finalTexte = "";
+      let intermédiaire = "";
+      for (let i = événement.resultIndex; i < événement.results.length; i++) {
+        const morceau = événement.results[i][0].transcript;
+        if (événement.results[i].isFinal) finalTexte += morceau + " ";
+        else intermédiaire += morceau;
+      }
+      if (finalTexte) texteAvantÉcouteRef.current += finalTexte;
+      setSaisie(texteAvantÉcouteRef.current + intermédiaire);
+    };
+    reco.onerror = () => setEnÉcoute(false);
+    reco.onend = () => setEnÉcoute(false);
+
+    reconnaissanceRef.current = reco;
+    reco.start();
+    setEnÉcoute(true);
+  };
+
   const envoyer = () => {
     const question = saisie.trim();
     if (!question || dialogue.enCours) return;
+    reconnaissanceRef.current?.stop();
     setSaisie("");
     onEnvoyer(question);
   };
@@ -435,28 +495,54 @@ function FilDialogue({ dialogue, onEnvoyer, couleur }) {
         background: `${couleur}08`, border: `1px solid ${couleur}40`,
         borderRadius: 8, padding: 6,
       }}>
-        <textarea
-          ref={zoneRef}
-          value={saisie}
-          onChange={(e) => setSaisie(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              envoyer();
-            }
-          }}
-          placeholder={t("dialogue.placeholder", "Qu'aimeriez-vous voir préciser ?")}
-          disabled={dialogue.enCours}
-          rows={1}
-          style={{
-            width: "100%", fontSize: 12.5, padding: "6px 8px",
-            border: "none", background: "transparent",
-            fontFamily: "inherit", outline: "none",
-            resize: "none", overflow: "hidden",
-            boxSizing: "border-box", lineHeight: 1.5,
-            display: "block",
-          }}
-        />
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+          <textarea
+            ref={zoneRef}
+            value={saisie}
+            onChange={(e) => setSaisie(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                envoyer();
+              }
+            }}
+            placeholder={t("dialogue.placeholder", "Qu'aimeriez-vous voir préciser ?")}
+            disabled={dialogue.enCours}
+            rows={1}
+            style={{
+              flex: 1, fontSize: 12.5, padding: "6px 8px",
+              border: "none", background: "transparent",
+              fontFamily: "inherit", outline: "none",
+              resize: "none", overflow: "hidden",
+              boxSizing: "border-box", lineHeight: 1.5,
+              display: "block",
+            }}
+          />
+          {APIReconnaissance && (
+            <button
+              onClick={basculerMicro}
+              disabled={dialogue.enCours}
+              title={enÉcoute ? t("dialogue.microArreter", "Arrêter la dictée") : t("dialogue.micro", "Dicter la question")}
+              style={{
+                flexShrink: 0, fontSize: 14, lineHeight: 1,
+                width: 26, height: 26, borderRadius: "50%",
+                border: "none", cursor: dialogue.enCours ? "default" : "pointer",
+                background: enÉcoute ? "#E24B4A" : "transparent",
+                color: enÉcoute ? "#fff" : couleur,
+                fontFamily: "inherit", marginTop: 2,
+                animation: enÉcoute ? "pulseMicro 1.2s ease-in-out infinite" : "none",
+              }}
+            >
+              🎙️
+            </button>
+          )}
+        </div>
+        <style>{`@keyframes pulseMicro{0%,100%{opacity:1}50%{opacity:0.55}}`}</style>
+        {enÉcoute && (
+          <div style={{ fontSize: 10.5, color: "#E24B4A", marginTop: 2 }}>
+            {t("dialogue.enEcoute", "🔴 À l'écoute…")}
+          </div>
+        )}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
           <button
             onClick={envoyer}
@@ -478,7 +564,7 @@ function FilDialogue({ dialogue, onEnvoyer, couleur }) {
 
 
 
-function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
+function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
   const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷", ouverture: "✍️", angle: "🎯", question: "❓" };
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
@@ -492,12 +578,12 @@ function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, on
       </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
 
-function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
+function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
   const c = { ok: "#1D9E75", attention: "#BA7517", problème: "#E24B4A" }[p.cohérence] || "#888";
   const texteÀCopier = [
     p.nom,
@@ -519,7 +605,7 @@ function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQu
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
       {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
@@ -564,7 +650,7 @@ function CarteRéférence({ r }) {
   );
 }
 
-function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion }) {
+function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
   const s = { info: { c: "#378ADD", bg: "#E6F1FB" }, attention: { c: "#BA7517", bg: "#FAEEDA" }, important: { c: "#E24B4A", bg: "#FCEBEB" } }[p.sévérité] || { c: "#888", bg: "#f0f0f0" };
   const texteÀCopier = [
     `[${p.sévérité}] ${p.type}`,
@@ -586,7 +672,7 @@ function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQue
       </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
     </div>
   );
 }
@@ -996,10 +1082,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         )}
 
-        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />)}
-        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />))}
+        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />)}
+        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
         {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
-        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} />))}
+        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
       </div>
     </div>
   );
