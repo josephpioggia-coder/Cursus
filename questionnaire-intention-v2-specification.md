@@ -2,6 +2,8 @@
 
 *Document de référence pour l'implémentation future. Conçu par Joseph le 30/06/2026.*
 
+> **Remplacé par [questionnaire-intention-v3-specification.md](./questionnaire-intention-v3-specification.md)** (11/08/2026). Conservé pour mémoire — ne plus utiliser comme base d'implémentation.
+
 ---
 
 ## 1. L'intention profonde

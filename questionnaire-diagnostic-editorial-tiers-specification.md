@@ -2,7 +2,7 @@
 
 *Document de référence pour l'implémentation future. Conçu par Joseph le 04/08/2026.*
 
-*Distinct du [questionnaire d'intention](./questionnaire-intention-v2-specification.md) : celui-ci part du principe que la personne qui répond n'est pas l'auteur du texte, et ne cherche pas à définir un projet d'écriture à venir, mais à calibrer une lecture critique d'un texte déjà écrit.*
+*Distinct du [questionnaire d'intention](./questionnaire-intention-v3-specification.md) : celui-ci part du principe que la personne qui répond n'est pas l'auteur du texte, et ne cherche pas à définir un projet d'écriture à venir, mais à calibrer une lecture critique d'un texte déjà écrit.*
 
 ---
 
