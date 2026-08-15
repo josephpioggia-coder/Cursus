@@ -178,6 +178,15 @@ d'accès.**
     `docs/cursaudit-tarification.md`), structurellement incompatible avec
     un quota mensuel.
 
+**Écrit le 15/08/2026** : `supabase/functions/_shared/moteur-ia-structure.ts`
+— implémente le mécanisme (appel Claude via tool use forcé, appel GPT via
+`response_format: json_schema`, validation Ajv de la sortie contre
+`schema_sortie` dans les deux cas). Zéro appelant pour l'instant — ni la
+fonction 60805-06 ni la fonction CursAudit n'existent encore. Prochaine
+étape logique : écrire la migration `audits`/`audit_pricing_rules`/
+`audit_sections`/`audit_criteria`, puis la première des deux Edge Functions
+consommatrices.
+
 Raisons de ne **pas** tout mettre dans une seule fonction (au-delà de la
 différence de facturation) : rythme de déploiement très différent —
 `claude-prox` est stable et en prod, le moteur CursAudit va être réécrit
