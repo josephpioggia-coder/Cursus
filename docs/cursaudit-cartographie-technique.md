@@ -23,7 +23,7 @@ mais rien d'urgent ni de cassant.*
 
 | # | Chantier | Statut |
 |---|---|---|
-| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Démarré le 15/08/2026 : module `moteur-ia-structure.ts` écrit, migration `audits`/`audit_sections`/`audit_criteria`/`audit_pricing_rules` écrite (pas encore appliquée) ; questionnaire (b) et composants UI (c) toujours pas démarrés |
+| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Démarré le 15/08/2026 : module `moteur-ia-structure.ts` écrit, migration `audits`/`audit_sections`/`audit_criteria`/`audit_pricing_rules` écrite **et appliquée** sur Supabase ; questionnaire (b) et composants UI (c) toujours pas démarrés |
 | 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
 | 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
 | 4 | Modèle économique — offre, tarification, positionnement relatif | Résolu et chiffré (voir `docs/cursaudit-tarification.md`) : un seul modèle "à l'acte" couvre l'audit complet et l'approfondissement ponctuel court, remise abonné CursEdit fixée à 20 % plafonnée à 50 % du prix mensuel de l'abonnement |
@@ -184,10 +184,11 @@ d'accès.**
 `schema_sortie` dans les deux cas). Zéro appelant pour l'instant — ni la
 fonction 60805-06 ni la fonction CursAudit n'existent encore.
 
-**Migration écrite le 15/08/2026** : `2026-08-15-cursaudit-schema.sql` (pas
-encore appliquée sur Supabase — à copier-coller dans le SQL Editor après
-relecture, comme les migrations précédentes). Crée `audits`, `audit_sections`,
-`audit_criteria`, `audit_pricing_rules` (voir section 3 ci-dessous pour le
+**Migration écrite et appliquée le 15/08/2026** : `2026-08-15-cursaudit-schema.sql`.
+`audits` existait déjà en base (créée dans une session passée non commitée,
+même pattern que `claude-prox` — colonnes/RLS/policy vérifiées identiques
+avant de retirer sa création du script). `audit_sections`, `audit_criteria`,
+`audit_pricing_rules` créées avec succès (voir section 3 ci-dessous pour le
 détail), avec RLS + policies dès la création. `audit_pricing_rules` est
 pré-remplie avec les valeurs actuelles du calculateur
 (`docs/cursaudit-tarification.md`) : paliers de dimensions, modes IA, types
@@ -195,9 +196,8 @@ de rapport, paramètres globaux (dont la remise abonné CursEdit 20 % / 50 %).
 Le multiplicateur de prix par combinaison palier/mode/rapport n'est pas
 encore transposé en configuration — seule sa logique est documentée.
 
-Prochaine étape logique : appliquer la migration sur Supabase (décision de
-l'auteur du projet, pas automatique), puis écrire la première des deux Edge
-Functions consommatrices du module IA structuré.
+Prochaine étape logique : écrire la première des deux Edge Functions
+consommatrices du module IA structuré.
 
 Raisons de ne **pas** tout mettre dans une seule fonction (au-delà de la
 différence de facturation) : rythme de déploiement très différent —
@@ -239,10 +239,10 @@ les trois briques qui seraient sinon copiées-collées.
 
 ## 3. Migrations nécessaires
 
-**Écrite le 15/08/2026** : `2026-08-15-cursaudit-schema.sql`, pas encore
-appliquée sur Supabase (décision d'application distincte de la décision
-d'écriture). Reprend les points ci-dessous, tous résolus au moment de
-l'écrire — laissés en l'état pour la trace historique :
+**Écrite et appliquée le 15/08/2026** : `2026-08-15-cursaudit-schema.sql`.
+`audits` existait déjà (voir section 2bis-a) ; les trois autres tables sont
+créées. Reprend les points ci-dessous, tous résolus au moment de l'écrire —
+laissés en l'état pour la trace historique :
 
 - Toutes les tables `audit_*` proposées sont **nouvelles**, sans collision de
   nom avec l'existant.
