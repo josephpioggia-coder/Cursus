@@ -1,16 +1,17 @@
 # CursAudit — Modèle de tarification (calculateur, 15/08/2026)
 
 *Transcription du fichier Excel fourni par l'auteur du projet
-(`docs/pricing/cursaudit-calculateur-tarification.xlsx`), pour que le modèle
+(`docs/pricing/cursaudit-calculateur-tarification.xlsx`, mis à jour le
+15/08/2026 vers une version plus aboutie — "version 1"), pour que le modèle
 reste lisible et cherchable sans ouvrir Excel. Le fichier original fait foi
 en cas de divergence ; cette page ne fait que le documenter.*
 
 Ce document répond au chantier 4 ("modèle économique CursAudit") pour le
-volet **audit traditionnel** (analyse complète d'un manuscrit ou d'une
-partie). Il ne couvre pas le second usage décidé le 15/08/2026 dans la
-conversation (mini-approfondissement ponctuel sur un paragraphe/chapitre,
-rattaché au quota Cursus Édition plutôt qu'à ce calculateur) — voir la
-section "Reste ouvert" en bas de page.
+volet **audit traditionnel** (analyse complète d'un manuscrit, d'une partie,
+ou désormais d'un extrait plus court via les tranches basses de la grille —
+voir section 5). Reste ouvert : la question de savoir si un usage
+"mini-approfondissement" séparé (voir "Reste ouvert" ci-dessous) est
+distinct de ces tranches basses ou s'y confond.
 
 ---
 
@@ -63,35 +64,57 @@ Ces hypothèses sont calibrées pour donner ~16,6 € de coût IA brut sur un ca
 de référence (150 pages, 8 dimensions, 1 IA, 8,5 unités/page) — voir le
 commentaire du fichier source pour le détail.
 
-## 5. Scénarios chiffrés (`Scénarios`, déjà calculés dans le fichier)
+## 5. Scénarios chiffrés — version 1 (`Scénarios`, mise à jour du 15/08/2026)
 
-| Pages | Palier | Mode IA | Rapport | Prix HT | Prix TTC |
+La version la plus récente du fichier remplace les cas isolés par une grille
+de **paliers par tranche de pages**, avec un multiplicateur de prix qui
+grandit progressivement (×2 pour les petits textes, jusqu'à ×4 pour les
+gros) plutôt qu'un multiplicateur fixe :
+
+| Tranche de pages | Dimensions | Mode IA | Rapport | Prix HT | Prix TTC |
 |---|---|---|---|---|---|
-| 50 | Essentiel (8) | 1 IA | Synthèse courte | 25,96 € | 31,41 € |
-| 100 | Essentiel (8) | 1 IA | Synthèse courte | 45,02 € | 54,48 € |
-| 150 | Essentiel (8) | 1 IA | Synthèse courte | 64,08 € | 77,54 € |
-| 250 | Essentiel (8) | 1 IA | Synthèse courte | 102,21 € | 123,67 € |
-| 150 | Approfondi (15) | 1 IA | Rapport complet | 170,56 € | 206,38 € |
-| 150 | Expert (30) | 1 IA | Rapport complet | 313,52 € | 379,36 € |
-| 150 | Expert (30) | 2 IA | Rapport complet | 470,77 € | 569,64 € |
-| 150 | Expert (30) | 2 IA + confrontation ciblée | Rapport complet | 570,85 € | 690,72 € |
-| 150 | Expert (30) | 2 IA + arbitrage dialogique | Rapport complet | 699,51 € | 846,41 € |
-| 250 | Expert (30) | 2 IA + arbitrage dialogique | Rapport complet | 1 434,31 € | 1 735,52 € |
+| < 10 | Essentiel (8) | 1 IA | Synthèse courte | 7,14 € | 8,64 € |
+| 10-19 | Essentiel (8) | 1 IA | Synthèse courte | 12,62 € | 15,27 € |
+| 20-29 | Essentiel (8) | 1 IA | Synthèse courte | 16,43 € | 19,88 € |
+| 20-29 | Approfondi (15) | 1 IA | Synthèse courte | 24,77 € | 29,97 € |
+| 30-39 | Essentiel (8) | 1 IA | Synthèse courte | 20,24 € | 24,49 € |
+| 30-39 | Approfondi (15) | 1 IA | Synthèse courte | 31,92 € | 38,62 € |
+| 39-49 | Essentiel (8) | 1 IA | Synthèse courte | 24,06 € | 29,11 € |
+| 39-49 | Approfondi (15) | 1 IA | Synthèse courte | 39,07 € | 47,27 € |
+| 50-99 | Essentiel (8) | 1 IA | Synthèse courte | 35,49 € | 42,95 € |
+| 50-99 | Approfondi (15) | 1 IA | Synthèse courte | 60,51 € | 73,22 € |
+| 100-149 | Essentiel (8) | 1 IA | Synthèse courte | 54,55 € | 66,01 € |
+| 100-149 | Approfondi (15) | 1 IA | Synthèse courte | 96,25 € | 116,46 € |
+| 100-149 | Approfondi (15) | 1 IA | Rapport complet | 146,73 € | 177,55 € |
+| 150-249 | Expert (30) | 1 IA | Rapport complet | 408,82 € | 494,68 € |
+| 150-249 | Expert (30) | 2 IA | Rapport complet | 618,50 € | 748,38 € |
+| 150-249 | Expert (30) | 2 IA + confrontation ciblée | Rapport complet | 751,93 € | 909,83 € |
+| 150-249 | Expert (30) | 2 IA + arbitrage dialogique | Rapport complet | 923,48 € | 1 117,41 € |
+| > 250 | Expert (30) | 2 IA + arbitrage dialogique | Rapport complet | 1 371,42 € | 1 659,42 € |
+
+*Les scénarios de la version précédente (pages fixes plutôt que tranches)
+restent valides comme cas de test de la même formule — voir l'historique git
+de ce fichier.*
 
 ---
 
 ## Reste ouvert
 
 1. **Mini-approfondissement ponctuel** (décidé dans la conversation du
-   15/08/2026, en amont de ce fichier) : analyser un seul paragraphe ou
-   chapitre pendant l'écriture, sans passer par ce calculateur ni ce niveau
-   de prix — à rattacher au quota IA de Cursus Édition (`usage_ia` /
-   `quotas_paliers`), pas à `audit_pricing_rules`. Ce fichier ne modélise
-   que l'audit complet "à l'acte".
+   15/08/2026, en amont de cette V1) : analyser un seul paragraphe ou
+   chapitre pendant l'écriture, sans attendre un manuscrit complet.
+   **Hypothèse à confirmer avec l'auteur du projet** : les tranches basses
+   de la grille V1 (< 10, 10-19, 20-29 pages, palier Essentiel) donnent des
+   prix de 8,64 € à ~20-30 €, nettement sous l'audit traditionnel — ça
+   pourrait être directement la tarification du mini-approfondissement
+   (même calculateur, appliqué à un extrait court plutôt qu'au manuscrit
+   entier), plutôt qu'un mécanisme séparé rattaché au quota Cursus Édition
+   comme envisagé initialement. Pas encore tranché.
 2. **`audit_pricing_rules`** (table proposée, jamais créée — section 3 de
    `cursaudit-cartographie-technique.md`) : ce calculateur en est le contenu
-   réel — reste à transposer la formule et les paramètres en lignes de
-   configuration lisibles par l'app plutôt qu'en feuille Excel.
+   réel — reste à transposer la formule, la grille de paliers et les
+   tranches de pages en lignes de configuration lisibles par l'app plutôt
+   qu'en feuille Excel.
 3. **Présentation à l'accueil** : confirmé par l'auteur du projet que les 4
    paliers de la grille dimensions sont pensés aussi comme contenu d'accueil
    (chantier 2, cartes CursEdit/CursAudit) — reste à décider l'emplacement
