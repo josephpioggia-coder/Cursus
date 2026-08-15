@@ -119,10 +119,40 @@ calculateur, pas une contrainte structurelle difficile à changer.
    la tarification. La seule différence pour un abonné CursEdit : une
    **remise automatique** appliquée via le champ `Remise éventuelle`
    (`Calculateur!E8`, déjà intégré à la formule du prix — `× (1 - remise)`),
-   pour ne pas faire payer un abonné exactement comme un non-abonné. Le
-   mécanisme de remise existe déjà dans le calculateur ; **reste à fixer le
-   pourcentage** de cette remise abonné CursEdit (valeur non encore
-   choisie).
+   pour ne pas faire payer un abonné exactement comme un non-abonné.
+
+   **Pourcentage tranché le 15/08/2026 : 20 %, plafonné à 50 % du prix
+   mensuel de l'abonnement CursEdit de l'utilisateur** (règle silencieuse,
+   pas affichée à l'utilisateur, appliquée uniformément à tous les abonnés
+   d'un même palier — pas une exception individuelle) :
+
+   ```
+   remise_appliquée = min(0,20 × prix_TTC_audit, 0,50 × prix_mensuel_abonnement)
+   ```
+
+   Plafonds obtenus avec les prix réels de `prix-stripe-config.mjs` :
+
+   | Palier | Prix mensuel | Plafond de remise (50 %) |
+   |---|---|---|
+   | Découverte | 9,99 € | 5,00 € |
+   | Essentiel | 16,99 € | 8,50 € |
+   | Initié | 24,99 € | 12,50 € |
+   | Auteur | 49,00 € | 24,50 € |
+   | Studio | 79,00 € | 39,50 € |
+
+   Effet réel : sur les petits/moyens audits, la remise de 20 % s'applique
+   en entier pour les paliers supérieurs, mais est plafonnée pour les
+   paliers d'entrée (ex. un audit à 66,01 € donnerait 13,20 € de remise en
+   théorie, plafonnés à 5 € pour un abonné Découverte). Sur les gros audits
+   (Expert, 150+ pages, ≥ 494,68 €), le plafond s'applique systématiquement
+   quel que soit le palier — la remise pleine de 20 % ne joue donc qu'aux
+   niveaux d'entrée/milieu de la grille, ce qui protège la marge sur les
+   audits les plus chers.
+
+   Techniquement simple à appliquer côté serveur (Edge Function de checkout
+   CursAudit) : le prix mensuel du palier de l'abonné (`abonnements.palier`)
+   est déjà connu de `prix-stripe-config.mjs` côté client — à dupliquer ou
+   centraliser côté serveur au moment de l'implémentation.
 2. **`audit_pricing_rules`** (table proposée, jamais créée — section 3 de
    `cursaudit-cartographie-technique.md`) : ce calculateur en est le contenu
    réel — reste à transposer la formule, la grille de paliers et les
