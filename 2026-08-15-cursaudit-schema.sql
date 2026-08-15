@@ -4,6 +4,16 @@
 -- Editor Supabase après relecture, comme les migrations précédentes de ce
 -- dépôt (2026-08-04-codes-promo.sql, 2026-08-04-admins.sql).
 --
+-- CORRECTIF 15/08/2026 : la première tentative d'application a échoué sur
+-- `create table audits` (ERROR 42P07, relation already exists) — la table
+-- existait déjà en base, créée dans une session de chat passée jamais
+-- commitée ici (même pattern que `claude-prox`). Colonnes, RLS et policy
+-- vérifiées identiques à ce qui était prévu (voir commentaire dans la
+-- section correspondante) : rien à corriger sur `audits`, sa création est
+-- commentée ci-dessous pour ne pas être ré-exécutée. Les trois autres
+-- tables (`audit_sections`, `audit_criteria`, `audit_pricing_rules`)
+-- n'ont pas provoqué d'erreur — elles restent à créer.
+--
 -- Décisions actées dans docs/cursaudit-cartographie-technique.md et
 -- docs/cursaudit-tarification.md (session du 15/08/2026), reprises ici :
 --   - `audits` est une table séparée de `projets`, jamais une variante avec
@@ -24,53 +34,54 @@
 --     illisible en silence).
 
 -- ─── TABLE : audits ────────────────────────────────────────────────────
-
-create table audits (
-  id                uuid primary key default gen_random_uuid(),
-  user_id           uuid not null references auth.users(id) on delete cascade,
-  -- Pont vers CursEdit — nullable : un audit peut naître d'un import direct,
-  -- sans projet CursEdit associé (voir chantier 2, badge "Audit partiel"
-  -- affiché côté CursEdit quand ce champ est renseigné).
-  projet_id         uuid references projets(id) on delete set null,
-  titre             text not null default 'Audit sans titre',
-  statut            text not null default 'brouillon'
-                       check (statut in ('brouillon', 'paye', 'en_traitement', 'termine', 'echec')),
-  palier_dimensions text not null check (palier_dimensions in ('essentiel', 'approfondi', 'expert', 'libre')),
-  nombre_dimensions integer not null check (nombre_dimensions > 0),
-  mode_ia           text not null check (mode_ia in ('1 IA', '2 IA', '2 IA + confrontation ciblée', '2 IA + arbitrage dialogique')),
-  type_rapport      text not null check (type_rapport in ('Aucun', 'Synthèse courte', 'Rapport complet')),
-  nombre_pages      integer not null check (nombre_pages > 0),
-  -- Prix figé au moment du paiement — jamais recalculé rétroactivement si
-  -- le calculateur change ensuite (traçabilité de ce qui a été payé).
-  prix_ttc          numeric(10,2) not null check (prix_ttc >= 0),
-  remise_appliquee  numeric(10,2) not null default 0 check (remise_appliquee >= 0),
-  stripe_session_id text unique,
-  cree_le           timestamptz not null default now(),
-  modifie_le        timestamptz not null default now()
-);
-
-create index idx_audits_user   on audits(user_id);
-create index idx_audits_projet on audits(projet_id);
-
-create or replace function set_audits_modifie_le()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.modifie_le := now();
-  return new;
-end;
-$$;
-
-create trigger trg_audits_modifie_le
-before update on audits
-for each row
-execute function set_audits_modifie_le();
-
-alter table audits enable row level security;
-
-create policy "audits_propres" on audits
-  for all using (auth.uid() = user_id);
+-- DÉJÀ CRÉÉE (constaté le 15/08/2026 en tentant d'appliquer cette
+-- migration : ERROR 42P07, relation "audits" already exists). Colonnes
+-- vérifiées identiques à ce qui suit (mêmes noms, types, défauts), RLS
+-- activée avec la policy "audits_propres" déjà en place, identique à celle
+-- qui aurait été créée ici. Bloc conservé uniquement comme documentation
+-- de la structure réelle — NE PAS ré-exécuter cette section.
+--
+-- create table audits (
+--   id                uuid primary key default gen_random_uuid(),
+--   user_id           uuid not null references auth.users(id) on delete cascade,
+--   projet_id         uuid references projets(id) on delete set null,
+--   titre             text not null default 'Audit sans titre',
+--   statut            text not null default 'brouillon'
+--                        check (statut in ('brouillon', 'paye', 'en_traitement', 'termine', 'echec')),
+--   palier_dimensions text not null check (palier_dimensions in ('essentiel', 'approfondi', 'expert', 'libre')),
+--   nombre_dimensions integer not null check (nombre_dimensions > 0),
+--   mode_ia           text not null check (mode_ia in ('1 IA', '2 IA', '2 IA + confrontation ciblée', '2 IA + arbitrage dialogique')),
+--   type_rapport      text not null check (type_rapport in ('Aucun', 'Synthèse courte', 'Rapport complet')),
+--   nombre_pages      integer not null check (nombre_pages > 0),
+--   prix_ttc          numeric(10,2) not null check (prix_ttc >= 0),
+--   remise_appliquee  numeric(10,2) not null default 0 check (remise_appliquee >= 0),
+--   stripe_session_id text unique,
+--   cree_le           timestamptz not null default now(),
+--   modifie_le        timestamptz not null default now()
+-- );
+--
+-- create index idx_audits_user   on audits(user_id);
+-- create index idx_audits_projet on audits(projet_id);
+--
+-- create or replace function set_audits_modifie_le()
+-- returns trigger
+-- language plpgsql
+-- as $$
+-- begin
+--   new.modifie_le := now();
+--   return new;
+-- end;
+-- $$;
+--
+-- create trigger trg_audits_modifie_le
+-- before update on audits
+-- for each row
+-- execute function set_audits_modifie_le();
+--
+-- alter table audits enable row level security;
+--
+-- create policy "audits_propres" on audits
+--   for all using (auth.uid() = user_id);
 
 -- ─── TABLE : audit_sections (unités analysées, indépendante de noeuds) ──
 
