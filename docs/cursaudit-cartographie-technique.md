@@ -242,12 +242,18 @@ d'attaquer les trois moteurs métier, plutôt que de les débuter directement.
 ## 5. Risques et questions bloquantes
 
 **Risques techniques :**
-1. **`claude-prox` hors dépôt** — avant de construire quoi que ce soit dessus
-   pour CursAudit, il faut rapatrier son code réel dans
-   `supabase/functions/claude-prox/` (recommandation déjà faite le 03/08,
-   jamais actionnée). Sans ça, je ne peux pas garantir qu'un nouveau mode
-   d'appel IA structuré JSON n'entre pas en collision avec son comportement
-   actuel.
+1. ~~**`claude-prox` hors dépôt**~~ **Résolu le 15/08/2026 (P0a) :** le code
+   réel de la fonction est maintenant commité dans
+   `supabase/functions/claude-prox/`. Comportement actuel documenté ici pour
+   référence : authentifie l'utilisateur, lit son abonnement actif
+   (`abonnements`) et le quota du palier (`quotas_paliers`), calcule la
+   consommation du mois en cours (`usage_ia`), refuse au-delà du quota
+   (429), sinon relaie l'appel tel quel à `POST
+   https://api.anthropic.com/v1/messages` avec la clé `ANTHROPIC_KEY`, et
+   journalise les tokens réellement consommés. Tout nouveau mode structuré
+   JSON (section 2bis-a) devra donc soit étendre cette fonction (nouveau
+   paramètre de rôle/schéma), soit en créer une distincte qui rejoue la même
+   logique d'auth/quota — à trancher à ce moment-là, pas maintenant.
 2. **Pas de couche de composants UI partagée** — construire CursAudit "à côté"
    sans extraire de composants communs (boutons, badges de statut, modales)
    dupliquera du style, au lieu de le réutiliser comme le demande le brief.
