@@ -26,7 +26,7 @@ mais rien d'urgent ni de cassant.*
 | 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Formalisé (section 2bis) ; P0a et P0b faits le 15/08/2026, briques pas encore démarrées |
 | 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
 | 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
-| 4 | Modèle économique — offre, tarification, positionnement relatif | **Ouvert, non commencé** |
+| 4 | Modèle économique — offre, tarification, positionnement relatif | Audit complet "à l'acte" chiffré (calculateur détaillé, voir `docs/cursaudit-tarification.md`) ; second usage (mini-approfondissement rattaché au quota Cursus Édition) décidé en principe le 15/08 mais pas encore chiffré ni implémenté |
 
 ---
 
