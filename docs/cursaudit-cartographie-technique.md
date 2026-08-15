@@ -256,10 +256,18 @@ d'attaquer les trois moteurs métier, plutôt que de les débuter directement.
    chaque nouvelle table `audit_*`.
 
 **Questions bloquantes, à trancher avant l'étape 2 (schéma de données) :**
-1. `audits` doit-il être une variante de `projets` (même table, colonne
-   `type_produit` en plus) ou une table totalement séparée ? Le brief semble
-   supposer une séparation nette (section 28 liste `audits` indépendamment de
-   `projets`) — à confirmer, car ça change toute la couche API.
+1. ~~`audits` doit-il être une variante de `projets` (même table, colonne
+   `type_produit` en plus) ou une table totalement séparée ?~~ **Tranché le
+   15/08/2026 : table totalement séparée.** Le brief suppose une séparation
+   nette (section 28 liste `audits` indépendamment de `projets`) et c'est ce
+   qui est retenu. La séparation de table n'empêche pas de passer de l'un à
+   l'autre produit sur un même travail — c'est une question distincte
+   (chantier 2, déjà résolue par conception le 09/08) : `audits.projet_id`
+   référencera le projet source en clé étrangère (pont bidirectionnel sans
+   réimport, badge "Audit partiel" sur le projet en cours d'audit dans
+   CursEdit). Le détail fin du pont (comportement du badge, effet d'une
+   suppression du projet source, etc.) reste à préciser mais ne bloque plus
+   le démarrage du schéma.
 2. Le moteur IA à sortie JSON validée (section 31) est un composant
    d'infrastructure nouveau, pas une extension de `claude-prox` existant :
    confirmez-vous que c'est un chantier à part entière avant les moteurs
