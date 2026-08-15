@@ -96,6 +96,17 @@ gros) plutôt qu'un multiplicateur fixe :
 restent valides comme cas de test de la même formule — voir l'historique git
 de ce fichier.*
 
+**Note de conception (15/08/2026)** : le multiplicateur (×2 à ×4) n'est pas
+une pénalité de volume — à profondeur/mode/rapport égal, il reste constant
+quel que soit le nombre de pages dans une même tranche (ex. ×3 de 10 à 149
+pages). Il monte uniquement quand le **niveau de service** change (palier de
+dimensions, mode IA, type de rapport) : il y a un prix pour les pages
+(formule linéaire) et un prix pour le service (le multiplicateur), pas une
+dégressivité ni une progressivité par volume. Décision actée de garder cette
+logique telle quelle pour le lancement, quitte à l'ajuster plus tard selon
+les retours réels — le multiplicateur est un simple paramètre du
+calculateur, pas une contrainte structurelle difficile à changer.
+
 ---
 
 ## Reste ouvert
