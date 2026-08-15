@@ -23,7 +23,7 @@ mais rien d'urgent ni de cassant.*
 
 | # | Chantier | Statut |
 |---|---|---|
-| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Formalisé (section 2bis), aucune brique démarrée — attend P0a/P0b |
+| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Formalisé (section 2bis) ; P0a et P0b faits le 15/08/2026, briques pas encore démarrées |
 | 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
 | 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
 | 4 | Modèle économique — offre, tarification, positionnement relatif | **Ouvert, non commencé** |
@@ -144,9 +144,10 @@ architectural nouveau, pas une continuité.
 Décision de principe : **partager trois briques précises entre les deux
 produits plutôt que les construire en parallèle**, chacune pour une raison
 différente. Cette section formalise ce qui n'était jusqu'ici que discuté.
-Aucune de ces briques ne démarre avant P0a (rapatriement de `claude-prox`) et
-P0b (`OPENAI_API_KEY`) — voir la carte d'avancement du 07/08. Ce qui suit est
-une décision d'architecture, pas un chantier lancé.
+P0a (rapatriement de `claude-prox`) et P0b (`OPENAI_API_KEY`) sont faits
+(15/08/2026) — voir la carte d'avancement du 07/08 pour l'origine de ces deux
+préalables. Ce qui suit reste une décision d'architecture, pas un chantier
+lancé : aucune des trois briques ci-dessous n'a de code écrit à ce jour.
 
 ### a) Moteur IA à sortie structurée (partagé)
 
