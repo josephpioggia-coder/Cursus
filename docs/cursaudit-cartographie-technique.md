@@ -157,12 +157,32 @@ Trois besoins distincts convergent aujourd'hui vers la même brique :
 3. **CursAudit** (moteur d'analyse) — sortie JSON stricte, par unité codée (confirmé aujourd'hui par l'exemplar Excel/Word produit hors code : 255 unités, 29 dimensions par unité, dialogue Claude↔GPT déjà utilisé en pratique pour ce travail manuel).
 
 Les besoins 2 et 3 sont structurellement le même problème : un appel IA à
-rôle explicite, sortie validée contre un schéma, jamais du texte libre.
-Décision : une seule Edge Function générique (`{moteur: claude|gpt, role,
-schema_sortie, system, contexte}` → sortie validée), appelée par les trois
-consommateurs plutôt que trois intégrations séparées. Le mode texte libre de
-CopiloteIA reste tel quel — pas besoin de sortie structurée pour de simples
-suggestions.
+rôle explicite, sortie validée contre un schéma, jamais du texte libre. Le
+mode texte libre de CopiloteIA reste tel quel — pas besoin de sortie
+structurée pour de simples suggestions, `claude-prox` n'est pas touché.
+
+**Décision révisée le 15/08/2026** (remplace la version "une seule Edge
+Function générique" ci-dessus, jugée trop simple une fois la question posée
+explicitement) : **union sur le mécanisme, différenciation sur le contrôle
+d'accès.**
+- Un **module interne partagé** (pas déployé séparément, importé par les
+  fonctions qui en ont besoin) implémente uniquement le mécanisme d'appel
+  `{moteur: claude|gpt, role, schema_sortie, system, contexte}` → sortie
+  validée. Aucune logique d'auth ni de facturation dedans.
+- **Deux Edge Functions séparées**, chacune avec son propre contrôle
+  d'accès, consomment ce module :
+  - celle du protocole 60805-06 (Cursus Édition) — garde la logique de
+    quota mensuel déjà en place dans `claude-prox` (abonnement récurrent) ;
+  - une nouvelle fonction pour le moteur CursAudit — logique de paiement à
+    l'acte + remise abonné CursEdit plafonnée (voir
+    `docs/cursaudit-tarification.md`), structurellement incompatible avec
+    un quota mensuel.
+
+Raisons de ne **pas** tout mettre dans une seule fonction (au-delà de la
+différence de facturation) : rythme de déploiement très différent —
+`claude-prox` est stable et en prod, le moteur CursAudit va être réécrit
+plusieurs fois pendant sa construction ; les coupler ferait porter à
+CopiloteIA (qui marche déjà) le risque de chaque itération de CursAudit.
 
 ### b) Questionnaire (partagé, avec le moteur de qualification proposé le 07/08)
 
