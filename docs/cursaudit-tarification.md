@@ -100,16 +100,18 @@ de ce fichier.*
 
 ## Reste ouvert
 
-1. **Mini-approfondissement ponctuel** (décidé dans la conversation du
-   15/08/2026, en amont de cette V1) : analyser un seul paragraphe ou
-   chapitre pendant l'écriture, sans attendre un manuscrit complet.
-   **Hypothèse à confirmer avec l'auteur du projet** : les tranches basses
-   de la grille V1 (< 10, 10-19, 20-29 pages, palier Essentiel) donnent des
-   prix de 8,64 € à ~20-30 €, nettement sous l'audit traditionnel — ça
-   pourrait être directement la tarification du mini-approfondissement
-   (même calculateur, appliqué à un extrait court plutôt qu'au manuscrit
-   entier), plutôt qu'un mécanisme séparé rattaché au quota Cursus Édition
-   comme envisagé initialement. Pas encore tranché.
+1. ~~**Mini-approfondissement ponctuel**~~ **Tranché le 15/08/2026 :** pas de
+   mécanisme séparé ni de rattachement au quota Cursus Édition. Un seul et
+   même calculateur, appliqué à un extrait court (paragraphe/chapitre)
+   plutôt qu'au manuscrit entier — les tranches basses de la grille V1
+   (< 10, 10-19, 20-29 pages, palier Essentiel, 8,64 € à ~30 €) en sont déjà
+   la tarification. La seule différence pour un abonné CursEdit : une
+   **remise automatique** appliquée via le champ `Remise éventuelle`
+   (`Calculateur!E8`, déjà intégré à la formule du prix — `× (1 - remise)`),
+   pour ne pas faire payer un abonné exactement comme un non-abonné. Le
+   mécanisme de remise existe déjà dans le calculateur ; **reste à fixer le
+   pourcentage** de cette remise abonné CursEdit (valeur non encore
+   choisie).
 2. **`audit_pricing_rules`** (table proposée, jamais créée — section 3 de
    `cursaudit-cartographie-technique.md`) : ce calculateur en est le contenu
    réel — reste à transposer la formule, la grille de paliers et les
