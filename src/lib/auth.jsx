@@ -82,7 +82,8 @@ export function PageConnexion() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 28, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>Atelier</div>
+          <img src="/logo-cursus.png" alt="Cursus" style={{ height: 48, width: 48, borderRadius: 10, marginBottom: 8 }} />
+          <div style={{ fontSize: 28, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>Cursus</div>
           <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>Votre espace d'écriture</div>
         </div>
 
