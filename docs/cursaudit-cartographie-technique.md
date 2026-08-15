@@ -23,7 +23,7 @@ mais rien d'urgent ni de cassant.*
 
 | # | Chantier | Statut |
 |---|---|---|
-| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Démarré le 15/08/2026 : module `moteur-ia-structure.ts` écrit, migration `audits`/`audit_sections`/`audit_criteria`/`audit_pricing_rules` écrite **et appliquée** sur Supabase ; questionnaire (b) et composants UI (c) toujours pas démarrés |
+| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Bien avancé le 15/08/2026 : module `moteur-ia-structure.ts` écrit, schéma `audits`/`audit_sections`/`audit_pricing_rules` appliqué, `audit_criteria` reconstruite et peuplée (30 critères, v1 définitive), questionnaire de qualification CursAudit figé (`questionnaire-cursaudit-v1-specification.md`) ; questionnaire côté Cursus Édition (b) et composants UI (c) toujours pas démarrés |
 | 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
 | 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
 | 4 | Modèle économique — offre, tarification, positionnement relatif | Résolu et chiffré (voir `docs/cursaudit-tarification.md`) : un seul modèle "à l'acte" couvre l'audit complet et l'approfondissement ponctuel court, remise abonné CursEdit fixée à 20 % plafonnée à 50 % du prix mensuel de l'abonnement |
@@ -233,9 +233,14 @@ l'analyse elle-même. Les deux sont réels, mais pas au même stade :
   source avec GPT non retrouvée telle quelle), ossature confirmée fiable
   par l'auteur du projet.
 - **`audit_criteria`** (ce qui définit comment coder un extrait pendant
-  l'analyse — les dimensions au-delà des noms partiels déjà connus via
-  `docs/cursaudit-tarification.md` section 1) : **toujours introuvable**,
-  reste à construire ou à retrouver.
+  l'analyse) : **reconstruit et figé le 15/08/2026**, voir
+  `docs/cursaudit-criteria-v1.md` — grille complète des 30 critères (8
+  Essentiel + 7 Approfondi + 15 Expert), avec codes stables, regroupement
+  thématique et clés de sortie JSON. Table recréée en base avec ce schéma
+  définitif (migration `2026-08-15-cursaudit-criteria-v1.sql`, remplace le
+  schéma placeholder vide de `2026-08-15-cursaudit-schema.sql`). Reste
+  exclu volontairement : les critères contextuels personnels ("lentilles",
+  ex. `audit_lenses`) — pas encore conçus, table séparée à venir.
 
 Le questionnaire de qualification côté Cursus Édition (`banque_questions`/
 `reponses_questionnaire`, point b ci-dessus) est un troisième objet
