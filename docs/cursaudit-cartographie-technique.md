@@ -223,8 +223,23 @@ différent du référentiel `audit_criteria` de CursAudit (catégories
 épistémiques, règles de lecture par catégorie — premier brouillon réel
 trouvé le 09/08 dans la grille Excel produite hors code). Le premier
 qualifie la demande ; le second définit comment coder un extrait pendant
-l'analyse elle-même. Les deux sont réels, les deux restent à construire,
-mais ce ne sont pas la même brique.
+l'analyse elle-même. Les deux sont réels, mais pas au même stade :
+
+- **Questionnaire de qualification côté CursAudit : figé le 15/08/2026**,
+  voir `questionnaire-cursaudit-v1-specification.md` (10 sections : nature
+  du document, statut, finalité, question libre, degré d'intervention,
+  préservation de la voix, contraintes académiques, niveau de preuve,
+  format de sortie, relation à l'IA). Reconstruit de mémoire (conversation
+  source avec GPT non retrouvée telle quelle), ossature confirmée fiable
+  par l'auteur du projet.
+- **`audit_criteria`** (ce qui définit comment coder un extrait pendant
+  l'analyse — les dimensions au-delà des noms partiels déjà connus via
+  `docs/cursaudit-tarification.md` section 1) : **toujours introuvable**,
+  reste à construire ou à retrouver.
+
+Le questionnaire de qualification côté Cursus Édition (`banque_questions`/
+`reponses_questionnaire`, point b ci-dessus) est un troisième objet
+distinct, propre à chaque produit malgré la ressemblance de principe.
 
 ### c) Composants UI partagés
 
