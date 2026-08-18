@@ -3,8 +3,8 @@
 *Conçu le 05/08/2026, en dialogue réel entre Claude et GPT, testé en conditions
 réelles sur un extrait du livre "À cœur retrouvé" (Célicia Theys). Figé après
 convergence — voir la session du 05/08/2026 pour le débat complet qui a mené
-à chaque règle. Aucun code écrit pour l'instant : ceci est la conception,
-pas l'implémentation (60805-06 reste `/F/A`).*
+à chaque règle. Edge Function écrite le 15/08/2026 (voir "Ce qui reste à
+faire" en bas de document) — pas encore déployée sur Supabase.*
 
 ---
 
@@ -449,14 +449,39 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
 
 ## Ce qui reste à faire (hors périmètre de ce document)
 
-- Migration SQL des tables nécessaires (job de fond, dossier de contexte,
-  historique des tours).
-- Edge Function d'orchestration (appels Anthropic + OpenAI directs — voir
-  aussi le chantier séparé de sortie de Copy.ai, 60805-06 également).
+**Écrite le 15/08/2026** : `supabase/functions/verification-deux-ia/index.ts`
+— implémente les étapes 0 à 7 et le logigramme d'orchestration ci-dessus,
+en consommant `supabase/functions/_shared/moteur-ia-structure.ts` pour les
+deux appels IA. Contrôle d'accès (auth + quota) répliqué de `claude-prox`,
+cohérent avec "facturée sur le quota de tokens de l'auteur·e selon son
+palier" (voir Contexte du besoin). Pas encore déployée sur Supabase — même
+procédure que les Edge Functions précédentes (SQL Editor n'est pas
+concerné ici, c'est un déploiement de fonction, pas une migration).
+
+**Limites connues de cette première version**, documentées en tête du
+fichier plutôt que masquées :
+- Étape 0 mécanique comme l'exige le protocole, mais la détection de thèmes
+  et de reprises reste un appariement par mot-clé (`ILIKE`) — la reprise
+  "sémantique" au sens propre (embeddings) n'est pas implémentée.
+- `changements_de_registre` n'est pas rempli par l'étape 0 (une
+  classification par liste de mots produirait une fausse précision) —
+  chaque `claim` de Claude porte son propre `registre`, c'est la source de
+  vérité réelle pour ce signal.
+- `verdict_these_livre` reste à `null` : le protocole documente le besoin
+  de deux verdicts distincts (passage local / thèse du livre), mais aucun
+  mécanisme n'est décrit pour évaluer la thèse d'ensemble à partir d'un
+  dialogue sur un seul passage — non inventé plutôt que deviné.
+- `alignement_interet` et `zones_sous_expertise_requise` restent aux
+  valeurs par défaut du dossier de contexte (non calculées mécaniquement) —
+  ce sont les tours IA qui les signalent via `corrections_bloquantes`.
+
+**Toujours hors périmètre, non commencé** :
+- Migration SQL de persistance (job de fond, historique des tours,
+  versionnage du dossier de contexte) — la version actuelle de l'Edge
+  Function est synchrone, sans stockage intermédiaire.
 - Intégration UI dans l'éditeur (sélection de passage, curseur de
   profondeur/coût, notification de fin de traitement en arrière-plan).
 - Lien avec `intention_projet`/`QuestionnaireIntention` pour l'intention
-  déclarée de l'étape 0.
-
-Rien de ce qui précède n'a été codé — ce document fixe uniquement la
-conception, validée par un dialogue réel testé sur un cas concret.
+  déclarée de l'étape 0 — la fonction accepte `intention_declaree` en
+  paramètre d'entrée, mais rien ne l'alimente automatiquement depuis
+  `QuestionnaireIntention.jsx` pour l'instant.

@@ -236,10 +236,10 @@ l'analyse elle-même. Les deux sont réels, mais pas au même stade :
   l'analyse) : **reconstruit et figé le 15/08/2026**, voir
   `docs/cursaudit-criteria-v1.md` — grille complète des 30 critères (8
   Essentiel + 7 Approfondi + 15 Expert), avec codes stables, regroupement
-  thématique et clés de sortie JSON. Table recréée en base avec ce schéma
-  définitif (migration `2026-08-15-cursaudit-criteria-v1.sql`, remplace le
-  schéma placeholder vide de `2026-08-15-cursaudit-schema.sql`). Reste
-  exclu volontairement : les critères contextuels personnels ("lentilles",
+  thématique et clés de sortie JSON. Migration `2026-08-15-cursaudit-criteria-v1.sql`
+  **appliquée avec succès sur Supabase** (30 critères créés et peuplés),
+  remplace le schéma placeholder vide de `2026-08-15-cursaudit-schema.sql`.
+  Reste exclu volontairement : les critères contextuels personnels ("lentilles",
   ex. `audit_lenses`) — pas encore conçus, table séparée à venir.
 
 Le questionnaire de qualification côté Cursus Édition (`banque_questions`/
