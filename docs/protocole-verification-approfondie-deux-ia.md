@@ -4,7 +4,8 @@
 réelles sur un extrait du livre "À cœur retrouvé" (Célicia Theys). Figé après
 convergence — voir la session du 05/08/2026 pour le débat complet qui a mené
 à chaque règle. Edge Function écrite le 15/08/2026 (voir "Ce qui reste à
-faire" en bas de document) — pas encore déployée sur Supabase.*
+faire" en bas de document) — déployée sur Supabase le 15/08/2026, pas
+encore testée en conditions réelles.*
 
 ---
 
@@ -454,9 +455,9 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
 en consommant `supabase/functions/_shared/moteur-ia-structure.ts` pour les
 deux appels IA. Contrôle d'accès (auth + quota) répliqué de `claude-prox`,
 cohérent avec "facturée sur le quota de tokens de l'auteur·e selon son
-palier" (voir Contexte du besoin). Pas encore déployée sur Supabase — même
-procédure que les Edge Functions précédentes (SQL Editor n'est pas
-concerné ici, c'est un déploiement de fonction, pas une migration).
+palier" (voir Contexte du besoin). **Déployée sur Supabase le 15/08/2026**,
+pas encore testée en conditions réelles (aucun appel réel depuis
+l'éditeur — l'intégration UI reste à faire, voir plus bas).
 
 **Limites connues de cette première version**, documentées en tête du
 fichier plutôt que masquées :
