@@ -2,11 +2,19 @@
  * CURSUS ÉDITION — Edge Function : verification-deux-ia (protocole 60805-06)
  * ============================================================================
  * Implémente docs/protocole-verification-approfondie-deux-ia.md à la lettre
- * (étape 0 à 7, logigramme d'orchestration). Consomme le module partagé
- * supabase/functions/_shared/moteur-ia-structure.ts pour les deux appels IA
- * (Claude analyseur, GPT critique) — cette fonction ne contient que le
- * contrôle d'accès (auth + quota, répliqué de claude-prox) et l'orchestration
- * mécanique décrite dans le protocole, jamais de logique d'appel IA en dur.
+ * (étape 0 à 7, logigramme d'orchestration).
+ *
+ * FICHIER AUTONOME (16/08/2026) : le module d'appel IA structuré, à l'origine
+ * dans supabase/functions/_shared/moteur-ia-structure.ts, est inliné ici
+ * directement. Cause du changement : déployée via le Dashboard (collage du
+ * seul index.ts), la fonction ne pouvait pas résoudre l'import relatif vers
+ * _shared — l'isolate Deno échouait à démarrer pour CHAQUE requête, sans
+ * jamais exécuter une ligne de mon code (confirmé par les logs Supabase :
+ * event_type "Shutdown", reason "EarlyDrop", aucune trace d'exécution).
+ * Le fichier _shared/moteur-ia-structure.ts reste dans le dépôt pour un futur
+ * déploiement par CLI (qui embarque tout le dossier supabase/functions/),
+ * mais cette fonction-ci n'en dépend plus — un seul fichier à coller suffit,
+ * quelle que soit la méthode de déploiement.
  *
  * LIMITES CONNUES DE CETTE PREMIÈRE VERSION (documentées, pas cachées) :
  *  - Étape 0 est mécanique comme l'exige le protocole, mais la détection de
@@ -36,10 +44,12 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { appellerMoteurIAStructure } from "../_shared/moteur-ia-structure.ts";
+import Ajv from "https://esm.sh/ajv@8?target=deno";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
+const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const MODELE_CLAUDE = "claude-sonnet-5";
 const MODELE_GPT = "gpt-4o";
@@ -341,6 +351,132 @@ interface AppelJournalise {
   modele: string;
   tokens_entree: number;
   tokens_sortie: number;
+}
+
+// ─── Module IA structuré (inliné — voir note en tête de fichier) ──────────
+
+interface AppelMoteurIAParams {
+  moteur: "claude" | "gpt";
+  modele: string;
+  role: string;
+  schema_sortie: Record<string, unknown>;
+  system: string;
+  contexte: string;
+  max_tokens?: number;
+}
+
+interface UsageIA {
+  tokens_entree: number;
+  tokens_sortie: number;
+  modele: string;
+}
+
+interface AppelMoteurIAResultat {
+  data: unknown;
+  usage: UsageIA;
+}
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+
+function validerContreSchema(data: unknown, schema: Record<string, unknown>): void {
+  const valide = ajv.compile(schema);
+  if (!valide(data)) {
+    throw new Error(`Sortie IA non conforme au schéma attendu : ${ajv.errorsText(valide.errors)}`);
+  }
+}
+
+async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
+  if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
+
+  const nomOutil = "sortie_structuree";
+  const réponse = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: params.modele,
+      max_tokens: params.max_tokens ?? 4096,
+      system: params.system,
+      messages: [{ role: "user", content: params.contexte }],
+      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],
+      tool_choice: { type: "tool", name: nomOutil },
+    }),
+  });
+
+  const résultat = await réponse.json();
+  if (!réponse.ok) {
+    throw new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
+  }
+
+  const blocOutil = (résultat.content ?? []).find((bloc: { type: string }) => bloc.type === "tool_use");
+  if (!blocOutil) {
+    throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
+  }
+
+  validerContreSchema(blocOutil.input, params.schema_sortie);
+
+  return {
+    data: blocOutil.input,
+    usage: {
+      tokens_entree: résultat.usage?.input_tokens ?? 0,
+      tokens_sortie: résultat.usage?.output_tokens ?? 0,
+      modele: résultat.model ?? params.modele,
+    },
+  };
+}
+
+async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY manquante.");
+
+  const réponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: params.modele,
+      messages: [
+        { role: "system", content: params.system },
+        { role: "user", content: params.contexte },
+      ],
+      response_format: { type: "json_schema", json_schema: { name: "sortie_structuree", schema: params.schema_sortie, strict: true } },
+    }),
+  });
+
+  const résultat = await réponse.json();
+  if (!réponse.ok) {
+    throw new Error(résultat?.error?.message || `Échec de l'appel GPT (${réponse.status}).`);
+  }
+
+  const contenuBrut = résultat.choices?.[0]?.message?.content;
+  if (!contenuBrut) {
+    throw new Error("GPT n'a renvoyé aucun contenu — sortie structurée absente.");
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(contenuBrut);
+  } catch {
+    throw new Error("Sortie GPT non parsable en JSON malgré response_format json_schema.");
+  }
+
+  validerContreSchema(data, params.schema_sortie);
+
+  return {
+    data,
+    usage: {
+      tokens_entree: résultat.usage?.prompt_tokens ?? 0,
+      tokens_sortie: résultat.usage?.completion_tokens ?? 0,
+      modele: résultat.model ?? params.modele,
+    },
+  };
+}
+
+async function appellerMoteurIAStructure(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
+  if (params.moteur === "claude") return appellerClaudeMoteur(params);
+  if (params.moteur === "gpt") return appellerGPTMoteur(params);
+  throw new Error(`Moteur IA inconnu : "${params.moteur}".`);
 }
 
 // ─── Handler principal ──────────────────────────────────────────────────
