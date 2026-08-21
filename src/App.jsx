@@ -41,6 +41,7 @@ import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
 import CursAudit from "./components/CursAudit.jsx";
+import Administration from "./components/Administration.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -2171,6 +2172,14 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
             { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
             { id: "cursaudit",     label: t("navigation.cursaudit", "CursAudit"), icone: "🔎" },
+            // Administration (codes promo) — 16/08/2026 : le composant existait
+            // depuis 60804-03 mais n'avait jamais été relié à la navigation.
+            // Visible seulement pour le compte propriétaire ; ce n'est qu'une
+            // commodité d'affichage, la vraie vérification est refaite côté
+            // serveur (admin-codes-promo) à chaque action.
+            ...(user.email === "joseph.pioggia@gmail.com"
+              ? [{ id: "administration", label: "Administration", icone: "⚙️" }]
+              : []),
           ].map((item) => (
             <div
               key={item.id}
@@ -2298,6 +2307,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : CursAudit (référence 60816-01) */}
         {vue === "cursaudit" && <CursAudit />}
+
+        {/* Vue : Administration (codes promo) — réf. 60804-03, reliée le 16/08/2026 */}
+        {vue === "administration" && user.email === "joseph.pioggia@gmail.com" && (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <Administration />
+          </div>
+        )}
 
         {/* Vue : liste des projets */}
         {vue === "liste" && (
