@@ -63,10 +63,12 @@ les dates de cette section sont le 16/08/2026 sauf mention contraire.*
 **Chantier 1 — CursAudit, segmentation et création (`segmenterCursAudit.js`, `auditsAPI.créerDepuisTexte`, réf. 60816-01)**
 - Texte collé → unités → `audits` (statut "brouillon") + `audit_sections`.
   Segmentation testée unitairement en local.
-- Ne gère que du texte déjà en clair — l'extraction depuis un fichier
-  `.docx`/`.pdf` reste à construire (reprendre la logique JSZip déjà
-  éprouvée dans `ImportDocx.jsx`, pas `mammoth`, dépendance présente mais
-  inutilisée dans ce dépôt).
+- **Import `.docx` ajouté le 16/08/2026** (`extraireParagraphesDocx()`,
+  suite à un retour de l'auteur du projet : "coller le texte" seul était
+  trop éloigné de ce que CursEdit propose déjà). Reprend la lecture JSZip
+  déjà éprouvée dans `ImportDocx.jsx` (pas `mammoth`), simplifiée — pas de
+  détection de niveaux de titre, juste les paragraphes à plat. `.pdf`
+  reste à construire.
 
 **Chantier 1 — CursAudit, page de création (`CursAudit.jsx`, réf. 60816-01)**
 - Texte collé, palier (3 fixes, "Libre" non proposé), mode IA (seuls
@@ -86,10 +88,20 @@ les dates de cette section sont le 16/08/2026 sauf mention contraire.*
   mais rien ne le relie encore dans l'UI) et le badge "Audit partiel" sur
   un projet en cours d'audit.
 
-**Reste à construire pour CursAudit** : import `.docx`/`.pdf`, paiement
-Stripe, pont bidirectionnel + badge, affichage du rapport. Questionnaire
-de qualification côté Cursus Édition (chantier 1b) et composants UI
-partagés (chantier 1c) toujours pas démarrés.
+**Décision actée le 16/08/2026 (séquence de paiement)** : le paiement doit
+venir APRÈS le texte/palier choisis, une fois le prix exact connu à partir
+du nombre réel d'unités — jamais avant (le prix ne peut pas être fiable
+sans le texte). Séquence : création de l'audit en "brouillon" (déjà faite)
+→ bouton "Payer" ouvrant une session Stripe Checkout liée à cet audit
+(réutiliser `creer-session-checkout`) → `stripe-webhook` confirme et
+bascule `statut` à "payé", jamais une confirmation côté client. Vaut aussi
+pour un livre entier : même séquence, prix plus élevé du fait du nombre
+d'unités, seule différence pratique le temps de traitement en aval.
+
+**Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
+bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, affichage du
+rapport. Questionnaire de qualification côté Cursus Édition (chantier 1b)
+et composants UI partagés (chantier 1c) toujours pas démarrés.
 
 ---
 
