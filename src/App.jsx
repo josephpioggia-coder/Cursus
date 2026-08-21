@@ -40,6 +40,7 @@ import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
+import CursAudit from "./components/CursAudit.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
@@ -2148,6 +2149,7 @@ function AppConnectée({ user, déconnecter }) {
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
             { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
+            { id: "cursaudit",     label: t("navigation.cursaudit", "CursAudit"), icone: "🔎" },
           ].map((item) => (
             <div
               key={item.id}
@@ -2272,6 +2274,9 @@ function AppConnectée({ user, déconnecter }) {
             <Tarification />
           </div>
         )}
+
+        {/* Vue : CursAudit (référence 60816-01) */}
+        {vue === "cursaudit" && <CursAudit />}
 
         {/* Vue : liste des projets */}
         {vue === "liste" && (

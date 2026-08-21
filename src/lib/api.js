@@ -522,5 +522,15 @@ export const auditsAPI = {
 
     return { data: { audit, sections: sections || [] }, error: null };
   },
+
+  /** Règles de tarification actives (audit_pricing_rules) — lecture publique,
+   *  voir src/lib/tarifCursAudit.js pour le calcul du prix à partir de ces règles. */
+  async récupérerReglesPrix() {
+    const { data, error } = await supabase
+      .from("audit_pricing_rules")
+      .select("categorie, cle, libelle, valeur_numerique")
+      .eq("actif", true);
+    return { data, error };
+  },
 };
 
