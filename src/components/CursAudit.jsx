@@ -33,7 +33,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
-import { calculerPrixCursAudit } from "../lib/tarifCursAudit.js";
+import { calculerPrixCursAudit, estimerDuréeCursAudit } from "../lib/tarifCursAudit.js";
 
 const PALIERS = [
   { id: "essentiel", nom: "Essentiel", dimensions: 8, description: "Lecture exhaustive, coût minimal." },
@@ -85,6 +85,11 @@ export default function CursAudit() {
     if (!reglesPrix || unités.length === 0) return null;
     return calculerPrixCursAudit(reglesPrix, { palier, modeIA, typeRapport, nombreUnites: unités.length });
   }, [reglesPrix, palier, modeIA, typeRapport, unités.length]);
+
+  const durée = useMemo(() => {
+    if (unités.length === 0) return null;
+    return estimerDuréeCursAudit({ modeIA, nombreUnites: unités.length });
+  }, [modeIA, unités.length]);
 
   const importerFichier = async (fichier) => {
     if (!fichier?.name.endsWith(".docx")) { setErreurImport("Fichier .docx requis."); return; }
@@ -243,9 +248,17 @@ export default function CursAudit() {
           </div>
 
           {prix && (
-            <div style={{ background: "var(--surface, #fff)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>Prix estimé (hors remise abonné)</span>
-              <span style={{ fontSize: 18, fontWeight: 600, color: "var(--texte-primaire)" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} € <span style={{ fontSize: 11, fontWeight: 400, color: "var(--texte-tertiaire)" }}>TTC</span></span>
+            <div style={{ background: "var(--surface, #fff)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>Prix estimé (hors remise abonné)</span>
+                <span style={{ fontSize: 18, fontWeight: 600, color: "var(--texte-primaire)" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} € <span style={{ fontSize: 11, fontWeight: 400, color: "var(--texte-tertiaire)" }}>TTC</span></span>
+              </div>
+              {durée && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 6, paddingTop: 6, borderTop: "0.5px solid var(--border)" }}>
+                  <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>Temps de traitement estimé</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--texte-secondaire)" }}>{durée.texte}</span>
+                </div>
+              )}
             </div>
           )}
 

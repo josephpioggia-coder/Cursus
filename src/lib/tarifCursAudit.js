@@ -47,3 +47,36 @@ export function calculerPrixCursAudit(regles, { palier, modeIA, typeRapport, nom
     prixTTC: Math.round(prixTTC * 100) / 100,
   };
 }
+
+/**
+ * Temps de traitement estimé (16/08/2026, suite).
+ * ======================================================================
+ * ESTIMATION, pas une mesure : `DUREE_MOYENNE_PAR_APPEL_IA_SECONDES` est
+ * une hypothèse conservatrice, pas une valeur observée en conditions
+ * réelles (aucun run complet de l'orchestrateur n'a encore été chronométré
+ * de bout en bout). À recalibrer avec une vraie mesure dès qu'un audit
+ * réel aura tourné jusqu'au bout — remplacer cette constante suffira,
+ * la formule elle-même n'aura pas besoin de changer.
+ *
+ * Ce qui fait réellement varier le temps, d'après `analyser-unite-cursaudit`
+ * (60816-01) : un appel IA (Claude) par unité, et un second appel (GPT),
+ * SÉQUENTIEL et non parallèle, si mode_ia = "2 IA" — donc environ le
+ * double de temps, pas le même temps avec un contrôle en plus "gratuit".
+ * Le palier (nombre de critères demandés) et le format de rapport
+ * n'allongent PAS le traitement dans l'implémentation actuelle : le
+ * palier ne change que la taille du schéma de sortie par appel, pas le
+ * nombre d'appels ; le format de rapport n'est pas encore généré du tout
+ * (chantier séparé, non commencé) donc ne consomme aucun temps aujourd'hui.
+ */
+const DUREE_MOYENNE_PAR_APPEL_IA_SECONDES = 10;
+
+export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
+  const appelsParUnité = modeIA === "2 IA" ? 2 : 1;
+  const secondes = nombreUnites * appelsParUnité * DUREE_MOYENNE_PAR_APPEL_IA_SECONDES;
+
+  if (secondes < 60) return { secondes, texte: "moins d'une minute" };
+  const minutes = Math.round(secondes / 60);
+  if (minutes < 60) return { secondes, texte: `environ ${minutes} min` };
+  const heures = Math.round((minutes / 60) * 10) / 10;
+  return { secondes, texte: `environ ${heures} h` };
+}
