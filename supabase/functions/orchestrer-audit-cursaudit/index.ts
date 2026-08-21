@@ -311,8 +311,18 @@ Deno.serve(async (req) => {
       .eq("audit_id", auditId)
       .is("resultat_analyse", null);
 
+    // "Terminé" seulement s'il y avait réellement des unités à traiter —
+    // sinon un audit sans la moindre unité (pas encore importée) serait
+    // marqué terminé à tort dès le premier appel (bug réel du 16/08/2026,
+    // repéré en test : restantes = 0 parce que rien n'existait, pas parce
+    // que le travail était fait).
+    const { count: totalUnites } = await admin
+      .from("audit_sections")
+      .select("id", { count: "exact", head: true })
+      .eq("audit_id", auditId);
+
     let statutFinal = audit.statut === "paye" ? "en_traitement" : audit.statut;
-    if ((restantes ?? 0) === 0) {
+    if ((restantes ?? 0) === 0 && (totalUnites ?? 0) > 0) {
       statutFinal = "termine";
       await admin.from("audits").update({ statut: "termine" }).eq("id", auditId);
     }
