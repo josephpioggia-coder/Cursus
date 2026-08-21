@@ -18,6 +18,7 @@
  */
 
 import { supabase } from "./supabase.js";
+import { segmenterTexte } from "./segmenterCursAudit.js";
 
 // ─── Utilitaire ────────────────────────────────────────────────────────────────
 
@@ -448,6 +449,78 @@ export const usageIAAPI = {
       data: { palier: abonnement.palier, quotaMensuel, credits, consomme, disponible, pourcentage },
       error: null,
     };
+  },
+};
+
+// ─── AUDITS (CursAudit) — référence 60816-01 ────────────────────────────────
+// Écriture directe via RLS (auth.uid() = user_id) : pas besoin d'Edge Function
+// pour la simple création, contrairement à l'analyse elle-même qui appelle
+// des IA externes côté serveur (analyser-unite-cursaudit, orchestrer-audit-cursaudit).
+
+export const auditsAPI = {
+
+  /**
+   * Crée un audit (statut "brouillon" — le paiement Stripe pour CursAudit
+   * n'existe pas encore, voir docs/cursaudit-tarification.md) et découpe le
+   * texte fourni en unités dans audit_sections. Ne gère pas l'extraction
+   * depuis un fichier .docx/.pdf, seulement un texte déjà en clair.
+   */
+  async créerDepuisTexte({ titre, texte, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null }) {
+    const unités = segmenterTexte(texte);
+    if (unités.length === 0) return { data: null, error: { message: "Aucune unité détectée dans le texte fourni." } };
+
+    const uid = await userId();
+    const { data: audit, error: erreurAudit } = await supabase
+      .from("audits")
+      .insert([{
+        user_id:           uid,
+        projet_id:         projetId,
+        titre,
+        palier_dimensions: palierDimensions,
+        nombre_dimensions: nombreDimensions,
+        mode_ia:           modeIA,
+        type_rapport:      typeRapport,
+        nombre_pages:      nombrePages,
+        prix_ttc:          prixTTC,
+        statut:            "brouillon",
+      }])
+      .select()
+      .single();
+    if (erreurAudit) return { data: null, error: erreurAudit };
+
+    const lignes = unités.map((texteSource, i) => ({ audit_id: audit.id, ordre: i + 1, texte_source: texteSource }));
+    const { error: erreurSections } = await supabase.from("audit_sections").insert(lignes);
+    if (erreurSections) return { data: null, error: erreurSections };
+
+    return { data: { audit, nombreUnités: unités.length }, error: null };
+  },
+
+  /** Récupère tous les audits de l'utilisateur connecté */
+  async lister() {
+    const { data, error } = await supabase
+      .from("audits")
+      .select("*")
+      .order("cree_le", { ascending: false });
+    return { data, error };
+  },
+
+  /** Récupère un audit et ses unités (avec leurs résultats s'ils existent) */
+  async récupérerAvecSections(auditId) {
+    const { data: audit, error: erreurAudit } = await supabase
+      .from("audits")
+      .select("*")
+      .eq("id", auditId)
+      .single();
+    if (erreurAudit) return { data: null, error: erreurAudit };
+
+    const { data: sections, error: erreurSections } = await supabase
+      .from("audit_sections")
+      .select("*")
+      .eq("audit_id", auditId)
+      .order("ordre", { ascending: true });
+    if (erreurSections) return { data: null, error: erreurSections };
+
+    return { data: { audit, sections: sections || [] }, error: null };
   },
 };
 
