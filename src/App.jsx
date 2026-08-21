@@ -2530,6 +2530,7 @@ function AppConnectée({ user, déconnecter }) {
                 titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
+                nœudId={nœudActif.id}
               />
             </div>
           </div>
