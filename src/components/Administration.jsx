@@ -29,6 +29,21 @@ const COULEURS = {
   texteClair: "#6B5D52",
 };
 
+// Suffixe aléatoire (16/08/2026) — un code lisible seul (ex. JOSEPH-100-99)
+// expose son propre format : quiconque le voit comprend "prénom-remise%-
+// durée" et peut deviner ou reconstruire un autre code sur ce modèle. Le
+// suffixe rend chaque code non reproductible sans en changer la lisibilité
+// utile (le préfixe reste clair pour l'administrateur qui le retrouve dans
+// la liste). Alphabet sans 0/O/1/I/L pour éviter les confusions de lecture.
+// crypto.getRandomValues (pas Math.random) car ce suffixe doit être
+// imprévisible, pas seulement varié.
+const ALPHABET_SUFFIXE_PROMO = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+function genererSuffixeAléatoire(longueur = 4) {
+  const octets = new Uint8Array(longueur);
+  crypto.getRandomValues(octets);
+  return Array.from(octets, (o) => ALPHABET_SUFFIXE_PROMO[o % ALPHABET_SUFFIXE_PROMO.length]).join("");
+}
+
 const FORMULAIRE_VIDE = {
   code: "",
   clientEmail: "",
@@ -145,6 +160,12 @@ export default function Administration() {
 
   const majChamp = (champ, valeur) => setFormulaire((f) => ({ ...f, [champ]: valeur }));
 
+  const ajouterSuffixeAléatoire = () => {
+    const base = formulaire.code.trim().replace(/-+$/, "");
+    const suffixe = genererSuffixeAléatoire();
+    majChamp("code", base ? `${base}-${suffixe}` : suffixe);
+  };
+
   const créerCode = async () => {
     setEnvoiEnCours(true);
     setErreur("");
@@ -250,8 +271,19 @@ export default function Administration() {
       }}>
         <div>
           <label style={labelStyle}>Code *</label>
-          <input style={champStyle} value={formulaire.code} onChange={(e) => majChamp("code", e.target.value)}
-                 placeholder="MARIE-30-3M" required />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input style={champStyle} value={formulaire.code} onChange={(e) => majChamp("code", e.target.value)}
+                   placeholder="JOSEPH-100-99-Q7X4" required />
+            <button type="button" onClick={ajouterSuffixeAléatoire} title="Ajouter un suffixe aléatoire — empêche de deviner ou reconstruire un autre code à partir de celui-ci" style={{
+              flexShrink: 0, background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 6,
+              padding: "0 10px", fontSize: 13, cursor: "pointer", color: COULEURS.texte,
+            }}>🎲</button>
+          </div>
+          <div style={{ fontSize: 11, color: COULEURS.texteClair, marginTop: 3 }}>
+            🎲 ajoute un suffixe aléatoire (ex. "-Q7X4") : sans lui, un code lisible
+            (prénom/remise/durée) permet à quiconque le voit de comprendre le
+            format et de deviner ou reconstruire d'autres codes.
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Email cible (optionnel)</label>
