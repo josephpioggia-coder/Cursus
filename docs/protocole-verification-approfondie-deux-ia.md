@@ -453,11 +453,24 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
 **Écrite le 15/08/2026** : `supabase/functions/verification-deux-ia/index.ts`
 — implémente les étapes 0 à 7 et le logigramme d'orchestration ci-dessus,
 en consommant `supabase/functions/_shared/moteur-ia-structure.ts` pour les
-deux appels IA. Contrôle d'accès (auth + quota) répliqué de `claude-prox`,
-cohérent avec "facturée sur le quota de tokens de l'auteur·e selon son
-palier" (voir Contexte du besoin). **Déployée sur Supabase le 15/08/2026**,
-pas encore testée en conditions réelles (aucun appel réel depuis
-l'éditeur — l'intégration UI reste à faire, voir plus bas).
+deux appels IA (inlinés dans le fichier depuis le 16/08/2026 — voir la note
+en tête du fichier source, un déploiement via le Dashboard ne pouvait pas
+résoudre l'import relatif vers `_shared`, ce qui faisait échouer la fonction
+au démarrage pour toute requête, quelle que soit l'authentification).
+Contrôle d'accès (auth + quota) répliqué de `claude-prox`, cohérent avec
+"facturée sur le quota de tokens de l'auteur·e selon son palier" (voir
+Contexte du besoin).
+
+**Premier test réel réussi le 16/08/2026**, appelée directement (hors
+éditeur, pas encore d'intégration UI) sur un vrai projet et un vrai passage
+du manuscrit "Là où les portes s'ouvrent". Résultat : `verdict_passage:
+"recevable_avec_reserves"`, dialogue arrêté après seulement 2 tours (A1+B1,
+pas besoin d'aller jusqu'à A2/B2) — confirme la "profondeur adaptative,
+courte par défaut" prévue par le protocole plutôt qu'un dialogue qui
+s'éternise systématiquement. Couverture du manuscrit détectée à 100 %,
+contexte jugé suffisant. Sortie hiérarchisée correctement en 4 catégories
+(1 élément en valeur ajoutée éditoriale, 2 en alertes à vérifier sur
+source, aucune fusion en liste plate).
 
 **Limites connues de cette première version**, documentées en tête du
 fichier plutôt que masquées :
