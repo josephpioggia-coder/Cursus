@@ -11,9 +11,16 @@ faible/modérée/forte).*
 `audit_criteria` est le catalogue configurable des dimensions d'analyse
 mobilisables selon la profondeur choisie (8, 15 ou 30 — voir
 `docs/cursaudit-tarification.md` section 1). Elle ne stocke **pas** les
-résultats d'un audit — ceux-ci vont dans une table séparée (ex.
-`audit_findings`, pas encore créée), qui référence ces critères par `code`
-stable.
+résultats d'un audit — ceux-ci vont dans `audit_sections.resultat_analyse`
+(colonne `jsonb`, une ligne par unité de texte), qui référence ces critères
+par leur `output_key`.
+
+**Validée en conditions réelles le 16/08/2026** : `supabase/functions/analyser-unite-cursaudit/index.ts`
+construit dynamiquement le schéma de sortie à partir de cette table et
+appelle Claude pour noter une unité réelle sur les 8 critères du palier
+Essentiel — sortie cohérente, ancrée dans le texte (citations verbatim),
+correctement distinguée comme littéraire plutôt que factuelle. Voir
+`docs/cursaudit-cartographie-technique.md` section 0 pour le détail.
 
 **Exclusion volontaire** : les critères contextuels propres à un auteur, un
 projet ou une relation (dits "lentilles" par l'auteur du projet — ex.
