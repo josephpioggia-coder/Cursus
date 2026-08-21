@@ -45,8 +45,19 @@ export function useAuth() {
 
 // ─── Composant : Page de connexion ────────────────────────────────────────────
 
+// Dernier email connu (16/08/2026) — localStorage (pas sessionStorage :
+// doit survivre à la fermeture du navigateur/ordinateur), pré-rempli au
+// chargement de la page. Un seul champ mémorisé, jamais le mot de passe.
+const CLÉ_DERNIER_EMAIL = "cursus_dernier_email";
+
 export function PageConnexion() {
-  const [email, setEmail]       = useState("");
+  const [email, setEmail]       = useState(() => {
+    try {
+      return localStorage.getItem(CLÉ_DERNIER_EMAIL) || "";
+    } catch (_e) {
+      return "";
+    }
+  });
   const [motDePasse, setMDP]    = useState("");
   const [mode, setMode]         = useState("connexion"); // connexion | inscription
   const [chargement, setChargement] = useState(false);
@@ -67,7 +78,11 @@ export function PageConnexion() {
       if (!error) setMessage("Compte créé ! Vérifiez votre email pour confirmer.");
     }
 
-    if (error) setErreur(error.message);
+    if (error) {
+      setErreur(error.message);
+    } else {
+      try { localStorage.setItem(CLÉ_DERNIER_EMAIL, email); } catch (_e) { /* stockage indisponible, sans conséquence */ }
+    }
     setChargement(false);
   };
 
@@ -116,7 +131,7 @@ export function PageConnexion() {
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 5 }}>Mot de passe</label>
             <input type="password" value={motDePasse} onChange={(e) => setMDP(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && soumettre()}
-              placeholder="••••••••"
+              placeholder="••••••••" autoFocus={!!email}
               style={{ width: "100%", padding: "9px 12px", border: "0.5px solid #e5e5e5", borderRadius: 8, fontSize: 14, color: "#1a1a1a", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
           </div>
 
