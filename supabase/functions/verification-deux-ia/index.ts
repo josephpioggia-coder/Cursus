@@ -385,6 +385,25 @@ function validerContreSchema(data: unknown, schema: Record<string, unknown>): vo
   }
 }
 
+/**
+ * Tolère "null" comme représentation de tableau vide — les modèles rendent
+ * parfois `null` plutôt que `[]` pour un champ tableau sans élément (observé
+ * en usage réel le 16/08/2026, "claims" de Claude). Ne touche à rien
+ * d'autre : un champ manquant, ou de type incorrect autrement, reste rejeté
+ * par validerContreSchema comme avant.
+ */
+function normaliserTableauxNuls(schema: Record<string, unknown>, data: unknown): unknown {
+  if (data === null || typeof data !== "object" || Array.isArray(data)) return data;
+  const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const résultat: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+  for (const [cle, sousSchema] of Object.entries(props)) {
+    if (sousSchema.type === "array" && (résultat[cle] === null || résultat[cle] === undefined)) {
+      résultat[cle] = [];
+    }
+  }
+  return résultat;
+}
+
 async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
 
@@ -416,10 +435,11 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
   }
 
-  validerContreSchema(blocOutil.input, params.schema_sortie);
+  const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, blocOutil.input);
+  validerContreSchema(donneesNormalisees, params.schema_sortie);
 
   return {
-    data: blocOutil.input,
+    data: donneesNormalisees,
     usage: {
       tokens_entree: résultat.usage?.input_tokens ?? 0,
       tokens_sortie: résultat.usage?.output_tokens ?? 0,
@@ -461,10 +481,11 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
     throw new Error("Sortie GPT non parsable en JSON malgré response_format json_schema.");
   }
 
-  validerContreSchema(data, params.schema_sortie);
+  const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, data);
+  validerContreSchema(donneesNormalisees, params.schema_sortie);
 
   return {
-    data,
+    data: donneesNormalisees,
     usage: {
       tokens_entree: résultat.usage?.prompt_tokens ?? 0,
       tokens_sortie: résultat.usage?.completion_tokens ?? 0,
@@ -558,6 +579,8 @@ Deno.serve(async (req) => {
         system: "Tu es l'analyseur initial du protocole de vérification à deux IA de Cursus (60805-06). " +
           "Analyse les affirmations précises du passage en tenant compte STRICTEMENT du dossier de contexte fourni. " +
           "Ne produis jamais de verdict définitif si contexte_suffisant est faux dans le dossier. " +
+          "Tous les champs tableau (claims, corrections_bloquantes, corrections_non_bloquantes, requete_ciblee) " +
+          "doivent toujours être un tableau JSON, jamais null — utilise [] si aucun élément. " +
           consigne,
         contexte: JSON.stringify({
           texte_selectionne: texteSelectionne,
@@ -579,7 +602,9 @@ Deno.serve(async (req) => {
           "Conteste les affirmations précises du tour précédent en t'appuyant STRICTEMENT sur le dossier de contexte fourni — " +
           "jamais sur tes propres suppositions non vérifiables dans le texte. " +
           "Seule une objection factuelle, théorique, logique ou éthique réelle justifie peut_arreter=false ; " +
-          "une préférence stylistique ne bloque jamais.",
+          "une préférence stylistique ne bloque jamais. " +
+          "Tous les champs tableau (corrections_bloquantes, corrections_non_bloquantes, requete_ciblee) " +
+          "doivent toujours être un tableau JSON, jamais null — utilise [] si aucun élément.",
         contexte: JSON.stringify({
           texte_selectionne: texteSelectionne,
           dossier_contexte: dossier,
