@@ -489,12 +489,26 @@ fichier plutôt que masquées :
   valeurs par défaut du dossier de contexte (non calculées mécaniquement) —
   ce sont les tours IA qui les signalent via `corrections_bloquantes`.
 
+**Intégration UI — faite le 16/08/2026** : nouvel onglet "Vérification" dans
+`CopiloteIA.jsx`, à côté de Suggestions/Personnages/Références/Cohérence.
+Réutilise l'infrastructure existante du panneau (sélection de passage déjà
+gérée par le composant, bascule "analyser la sélection / tout le chapitre",
+compteur de caractères, bouton "Analyser") plutôt que de dupliquer une UI
+séparée. Explicitement exclu du mode Auto (cycle toutes les 10 min) — le
+protocole le décrit comme une action délibérée, pas un cycle automatique.
+Affichage dédié (`PanneauVerification`) : badge de verdict coloré, réponse
+optimale à l'auteur·e mise en avant, 4 catégories hiérarchisées affichées
+séparément (jamais fusionnées en liste plate), gestion du cas "verdict
+provisoire" (contexte insuffisant). Pas de curseur de profondeur/coût
+(hors périmètre pour cette première version — profondeur entièrement
+adaptative côté serveur, aucun réglage exposé à l'auteur·e), pas de
+notification de fin de traitement en arrière-plan (l'appel est synchrone,
+l'auteur·e attend le résultat dans le panneau).
+
 **Toujours hors périmètre, non commencé** :
 - Migration SQL de persistance (job de fond, historique des tours,
   versionnage du dossier de contexte) — la version actuelle de l'Edge
   Function est synchrone, sans stockage intermédiaire.
-- Intégration UI dans l'éditeur (sélection de passage, curseur de
-  profondeur/coût, notification de fin de traitement en arrière-plan).
 - Lien avec `intention_projet`/`QuestionnaireIntention` pour l'intention
   déclarée de l'étape 0 — la fonction accepte `intention_declaree` en
   paramètre d'entrée, mais rien ne l'alimente automatiquement depuis
