@@ -51,6 +51,7 @@ export default function Administration() {
   // l'administrateur devrait le retaper à chaque code), mais il ne doit
   // jamais être envoyé ailleurs qu'à admin-codes-promo, ni stocké.
   const [secretAdmin, setSecretAdmin] = useState("");
+  const [voirSecret, setVoirSecret] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [journal, setJournal] = useState([]);
   const compteurLigne = useRef(0);
@@ -220,15 +221,27 @@ export default function Administration() {
         </div>
       )}
 
+      <form onSubmit={(e) => { e.preventDefault(); créerCode(); }}>
       <div style={{
         background: "#FBE9E9", padding: "14px 16px", borderRadius: 8, marginBottom: 16,
       }}>
         <label style={{ ...labelStyle, color: "#A32D2D" }}>
           Code secret administrateur * (requis pour créer ou activer/désactiver un code — pas pour la simple consultation)
         </label>
-        <input style={{ ...champStyle, maxWidth: 320 }} type="password" value={secretAdmin}
-               onChange={(e) => setSecretAdmin(e.target.value)}
-               placeholder="connu uniquement de l'administrateur" required autoComplete="off" />
+        <div style={{ position: "relative", maxWidth: 320 }}>
+          <input style={{ ...champStyle, paddingRight: 38 }} type={voirSecret ? "text" : "password"} value={secretAdmin}
+                 onChange={(e) => setSecretAdmin(e.target.value)}
+                 placeholder="connu uniquement de l'administrateur" required autoComplete="off" />
+          <button type="button" onClick={() => setVoirSecret((v) => !v)}
+                  title={voirSecret ? "Masquer" : "Afficher"}
+                  style={{
+                    position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", fontSize: 15,
+                    padding: 4, color: COULEURS.texteClair, lineHeight: 1,
+                  }}>
+            {voirSecret ? "🙈" : "👁"}
+          </button>
+        </div>
       </div>
 
       <div style={{
@@ -288,7 +301,7 @@ export default function Administration() {
                  onChange={(e) => majChamp("utilisationsMax", e.target.value)} placeholder="illimité si vide" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); créerCode(); }} disabled={envoiEnCours} style={{
+          <button type="submit" disabled={envoiEnCours} style={{
             background: COULEURS.bordeaux, color: "#fff", border: "none", borderRadius: 6,
             padding: "10px 20px", fontSize: 13, cursor: envoiEnCours ? "default" : "pointer",
             opacity: envoiEnCours ? 0.6 : 1,
@@ -297,6 +310,7 @@ export default function Administration() {
           </button>
         </div>
       </div>
+      </form>
 
       <h2 style={{ fontSize: 15, color: COULEURS.texte, marginBottom: 12 }}>Codes existants</h2>
       {chargement ? (
