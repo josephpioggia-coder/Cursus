@@ -461,13 +461,13 @@ export const auditsAPI = {
 
   /**
    * Crée un audit (statut "brouillon" — le paiement Stripe pour CursAudit
-   * n'existe pas encore, voir docs/cursaudit-tarification.md) et découpe le
-   * texte fourni en unités dans audit_sections. Ne gère pas l'extraction
-   * depuis un fichier .docx/.pdf, seulement un texte déjà en clair.
+   * n'existe pas encore, voir docs/cursaudit-tarification.md) et ses unités
+   * dans audit_sections, à partir d'unités DÉJÀ segmentées (peu importe la
+   * source : texte collé via segmenterTexte(), ou .docx via
+   * extraireParagraphesDocx() — voir src/lib/segmenterCursAudit.js).
    */
-  async créerDepuisTexte({ titre, texte, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null }) {
-    const unités = segmenterTexte(texte);
-    if (unités.length === 0) return { data: null, error: { message: "Aucune unité détectée dans le texte fourni." } };
+  async créer({ titre, unités, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null }) {
+    if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
 
     const uid = await userId();
     const { data: audit, error: erreurAudit } = await supabase
@@ -493,6 +493,12 @@ export const auditsAPI = {
     if (erreurSections) return { data: null, error: erreurSections };
 
     return { data: { audit, nombreUnités: unités.length }, error: null };
+  },
+
+  /** Variante pratique de créer() : segmente un texte déjà en clair (collé) avant de créer. */
+  async créerDepuisTexte({ titre, texte, ...reste }) {
+    const unités = segmenterTexte(texte);
+    return auditsAPI.créer({ titre, unités, ...reste });
   },
 
   /** Récupère tous les audits de l'utilisateur connecté */

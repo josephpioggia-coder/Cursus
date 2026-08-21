@@ -1,16 +1,26 @@
 /**
  * CURSAUDIT — Création d'un audit (référence 60816-01, suite, 16/08/2026)
  * ======================================================================
- * Première interface réelle pour CursAudit : coller un texte, choisir la
- * profondeur/mode/rapport, voir le prix calculé, créer l'audit.
+ * Interface de création : texte collé OU fichier .docx importé, choix de
+ * la profondeur/mode/rapport, prix calculé en direct, création de l'audit.
+ *
+ * Import .docx ajouté après retour de l'auteur du projet : la formule
+ * "coller le texte" seule était trop éloignée de ce que CursEdit propose
+ * déjà (bouton "Importer un fichier Word") — voir extraireParagraphesDocx()
+ * dans src/lib/segmenterCursAudit.js, qui reprend la lecture JSZip déjà
+ * éprouvée dans ImportDocx.jsx, simplifiée (pas de détection de niveaux de
+ * titre, CursAudit n'a pas besoin de distinguer parties/chapitres).
  *
  * CE QUE CETTE PAGE NE FAIT PAS ENCORE (limites assumées) :
- *  - Pas d'import de fichier .docx/.pdf — texte collé uniquement.
+ *  - Pas d'import .pdf — .docx et texte collé seulement.
  *  - Pas de paiement : l'audit créé reste au statut "brouillon". Aucun
  *    flux Stripe pour CursAudit n'existe encore (voir
  *    docs/cursaudit-tarification.md) — lancer l'analyse réelle nécessite
  *    encore de repasser le statut à "paye" manuellement (SQL), comme pour
  *    les tests de analyser-unite-cursaudit / orchestrer-audit-cursaudit.
+ *    Décision actée avec l'auteur du projet le 16/08/2026 : le paiement
+ *    doit venir APRÈS le texte/palier choisis, une fois le prix exact
+ *    connu — jamais avant, puisque le prix dépend du nombre réel d'unités.
  *  - Pas de remise abonné CursEdit dans le prix affiché (nécessite de
  *    connaître l'abonnement actif de l'auteur·e — hors périmètre ici).
  *  - Modes IA limités à "1 IA" et "2 IA", les deux seuls implémentés côté
@@ -20,9 +30,9 @@
  *    trois paliers fixes.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
-import { segmenterTexte } from "../lib/segmenterCursAudit.js";
+import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit } from "../lib/tarifCursAudit.js";
 
 const PALIERS = [
@@ -44,7 +54,14 @@ const TYPES_RAPPORT = [
 
 export default function CursAudit() {
   const [titre, setTitre] = useState("");
+  const [source, setSource] = useState("coller"); // "coller" | "docx"
   const [texte, setTexte] = useState("");
+  const [unitésDocx, setUnitésDocx] = useState(null); // null = rien importé
+  const [nomFichier, setNomFichier] = useState(null);
+  const [importEnCours, setImportEnCours] = useState(false);
+  const [erreurImport, setErreurImport] = useState(null);
+  const inputFichierRef = useRef(null);
+
   const [palier, setPalier] = useState("essentiel");
   const [modeIA, setModeIA] = useState("1 IA");
   const [typeRapport, setTypeRapport] = useState("Aucun");
@@ -59,12 +76,31 @@ export default function CursAudit() {
     });
   }, []);
 
-  const unités = useMemo(() => segmenterTexte(texte), [texte]);
+  const unités = useMemo(() => {
+    if (source === "docx") return unitésDocx || [];
+    return segmenterTexte(texte);
+  }, [source, texte, unitésDocx]);
 
   const prix = useMemo(() => {
     if (!reglesPrix || unités.length === 0) return null;
     return calculerPrixCursAudit(reglesPrix, { palier, modeIA, typeRapport, nombreUnites: unités.length });
   }, [reglesPrix, palier, modeIA, typeRapport, unités.length]);
+
+  const importerFichier = async (fichier) => {
+    if (!fichier?.name.endsWith(".docx")) { setErreurImport("Fichier .docx requis."); return; }
+    setImportEnCours(true);
+    setErreurImport(null);
+    try {
+      const paragraphes = await extraireParagraphesDocx(fichier);
+      if (paragraphes.length === 0) { setErreurImport("Aucun texte exploitable trouvé dans ce fichier."); setImportEnCours(false); return; }
+      setUnitésDocx(paragraphes);
+      setNomFichier(fichier.name);
+      if (!titre.trim()) setTitre(fichier.name.replace(/\.docx$/i, ""));
+    } catch (e) {
+      setErreurImport("Impossible de lire ce fichier : " + e.message);
+    }
+    setImportEnCours(false);
+  };
 
   const créer = async () => {
     if (!titre.trim() || unités.length === 0 || !prix) return;
@@ -75,9 +111,9 @@ export default function CursAudit() {
     const palierChoisi = PALIERS.find((p) => p.id === palier);
     const nombrePagesEstimé = Math.max(1, Math.round(unités.length / 8.5));
 
-    const { data, error } = await auditsAPI.créerDepuisTexte({
+    const { data, error } = await auditsAPI.créer({
       titre: titre.trim(),
-      texte,
+      unités,
       palierDimensions: palier,
       nombreDimensions: palierChoisi.dimensions,
       modeIA,
@@ -91,11 +127,15 @@ export default function CursAudit() {
     setRésultat(data);
   };
 
+  const toutRéinitialiser = () => {
+    setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
+  };
+
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 720 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>CursAudit</h1>
       <p style={{ fontSize: 13, color: "var(--texte-tertiaire)", marginBottom: 24 }}>
-        Créer un nouvel audit — collez un texte, choisissez la profondeur d'analyse.
+        Créer un nouvel audit — collez un texte ou importez un fichier Word, choisissez la profondeur d'analyse.
       </p>
 
       {résultat ? (
@@ -107,7 +147,7 @@ export default function CursAudit() {
             Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse ne peut pas encore être lancée depuis cette page.
           </div>
           <button
-            onClick={() => { setRésultat(null); setTitre(""); setTexte(""); }}
+            onClick={toutRéinitialiser}
             style={{ marginTop: 12, padding: "7px 14px", borderRadius: 7, border: "0.5px solid #1D9E75", background: "transparent", color: "#1D9E75", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
           >
             Créer un autre audit
@@ -123,8 +163,40 @@ export default function CursAudit() {
 
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Texte à auditer</label>
-            <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} placeholder="Collez le texte ici…"
-              style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
+
+            <div style={{ display: "flex", gap: 6, marginBottom: 8, background: "#f5f5f5", borderRadius: 7, padding: 3 }}>
+              <button onClick={() => setSource("coller")}
+                style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
+                  background: source === "coller" ? "#fff" : "transparent", color: source === "coller" ? "#7F77DD" : "#999", fontWeight: source === "coller" ? 600 : 400,
+                  boxShadow: source === "coller" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
+                Coller le texte
+              </button>
+              <button onClick={() => setSource("docx")}
+                style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
+                  background: source === "docx" ? "#fff" : "transparent", color: source === "docx" ? "#7F77DD" : "#999", fontWeight: source === "docx" ? 600 : 400,
+                  boxShadow: source === "docx" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
+                Importer un fichier Word
+              </button>
+            </div>
+
+            {source === "coller" ? (
+              <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} placeholder="Collez le texte ici…"
+                style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
+            ) : (
+              <div style={{ border: "1px dashed var(--border)", borderRadius: 8, padding: "24px 16px", textAlign: "center" }}>
+                <input ref={inputFichierRef} type="file" accept=".docx" style={{ display: "none" }}
+                  onChange={(e) => importerFichier(e.target.files[0])} />
+                <button onClick={() => inputFichierRef.current?.click()} disabled={importEnCours}
+                  style={{ padding: "8px 16px", borderRadius: 7, border: "none", background: "#378ADD", color: "#fff", fontSize: 12.5, fontWeight: 500, cursor: importEnCours ? "default" : "pointer", fontFamily: "inherit" }}>
+                  {importEnCours ? "Lecture…" : "Choisir un fichier .docx"}
+                </button>
+                {nomFichier && !importEnCours && (
+                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>« {nomFichier} » — {unitésDocx?.length || 0} unités extraites</div>
+                )}
+                {erreurImport && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 10 }}>{erreurImport}</div>}
+              </div>
+            )}
+
             <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
           </div>
 
