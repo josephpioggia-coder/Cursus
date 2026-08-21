@@ -98,6 +98,35 @@ bascule `statut` à "payé", jamais une confirmation côté client. Vaut aussi
 pour un livre entier : même séquence, prix plus élevé du fait du nombre
 d'unités, seule différence pratique le temps de traitement en aval.
 
+**Chantier 3 — Codes promotionnels, extension CursAudit (réf. 60816-01, suite)**
+- Le système existant (`codes_promo`, `admin-codes-promo`, RLS fermée à
+  service_role, fonction atomique `consommer_code_promo()` — voir
+  `2026-08-04-codes-promo.sql`) est directement réutilisable pour CursAudit
+  : mêmes colonnes `remise_pourcent` (5 à 100 %), `duree_mois`,
+  `date_debut`/`date_fin`, `utilisations_max`. Pas de nouveau mécanisme à
+  construire, seulement à cibler.
+- **Colonne `produit_cible` ajoutée** (`2026-08-16-codes-promo-cursaudit.sql`)
+  : `'cursedit' | 'cursaudit' | null`. `null` = valable pour les deux
+  (comportement des codes existants, inchangé).
+- **Deuxième facteur admin ajouté** à la demande explicite de l'auteur du
+  projet ("il faut que l'administrateur qui accorde la remise aie un code
+  secret permettant de donner l'accès aux conditions") : être reconnu
+  admin (table `admins`) ne suffit plus pour "creer" ou "definirActif" —
+  il faut en plus fournir un secret serveur (`ADMIN_PROMO_SECRET`, jamais
+  dans le code, à définir dans Supabase → Edge Functions → Secrets). Défense
+  en profondeur : une session admin compromise seule ne permet plus de
+  créer un accès gratuit. "lister" (simple consultation) reste inchangé.
+- `Administration.jsx` : champ mot de passe "Code secret administrateur"
+  (jamais pré-rempli ni stocké), sélecteur "Produit cible" (Les deux /
+  CursEdit / CursAudit), colonne "Produit" ajoutée au tableau des codes.
+- **Reste à faire côté opérateur** (pas exécutable depuis cette session) :
+  exécuter la migration SQL, choisir et définir `ADMIN_PROMO_SECRET`, puis
+  redéployer `admin-codes-promo` (déjà autonome, un simple collage suffit).
+- Le checkout Stripe CursAudit (non construit — voir décision de séquence
+  ci-dessus) devra filtrer les codes par `produit_cible` avant d'appeler
+  `consommer_code_promo()`, comme `creer-session-checkout` le fait déjà
+  implicitement pour CursEdit.
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
 bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, affichage du
 rapport. Questionnaire de qualification côté Cursus Édition (chantier 1b)

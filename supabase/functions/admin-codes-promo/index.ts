@@ -11,10 +11,22 @@
  * via son jeton de session — jamais une valeur envoyée dans le corps de
  * la requête, qui pourrait être falsifiée.
  *
+ * DEUXIÈME FACTEUR AJOUTÉ LE 16/08/2026 : être admin (compte reconnu dans
+ * `admins`) ne suffit plus pour "creer" ou "definirActif" (les deux
+ * actions qui accordent réellement un accès/une remise) — il faut EN PLUS
+ * fournir `secretAdmin`, comparé à ADMIN_PROMO_SECRET (secret serveur,
+ * jamais dans le code ni côté client). Défense en profondeur : même une
+ * session admin compromise ne suffit plus à créer un code d'accès gratuit
+ * sans connaître ce secret séparé. "lister" reste accessible aux seuls
+ * admins sans ce secret (simple consultation, pas d'octroi d'accès).
+ *
  * SECRETS REQUIS dans Supabase → Settings → Edge Functions → Secrets :
- *   SUPABASE_URL      = URL du projet — déjà utilisée par les autres fonctions
- *   SERVICE_ROLE_KEY  = clé service_role — même nom que dans
- *                       creer-session-checkout et stripe-webhook
+ *   SUPABASE_URL       = URL du projet — déjà utilisée par les autres fonctions
+ *   SERVICE_ROLE_KEY   = clé service_role — même nom que dans
+ *                        creer-session-checkout et stripe-webhook
+ *   ADMIN_PROMO_SECRET = nouveau — phrase secrète connue uniquement de
+ *                        l'administrateur, à définir avant de pouvoir
+ *                        créer ou activer un code
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -24,6 +36,8 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SERVICE_ROLE_KEY")!
 );
+
+const ADMIN_PROMO_SECRET = Deno.env.get("ADMIN_PROMO_SECRET");
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -86,9 +100,21 @@ Deno.serve(async (req) => {
       return réponse({ codes: codesAvecCompte });
     }
 
+    // "creer" et "definirActif" accordent réellement un accès/une remise —
+    // le deuxième facteur est obligatoire pour ces deux actions, pas pour
+    // "lister" (simple consultation).
+    if (action === "creer" || action === "definirActif") {
+      if (!ADMIN_PROMO_SECRET) {
+        return réponse({ error: "ADMIN_PROMO_SECRET non configuré côté serveur." }, 500);
+      }
+      if (params.secretAdmin !== ADMIN_PROMO_SECRET) {
+        return réponse({ error: "Code secret administrateur invalide." }, 403);
+      }
+    }
+
     if (action === "creer") {
       const {
-        code, clientEmail, palierCible, remisePourcent,
+        code, clientEmail, palierCible, produitCible, remisePourcent,
         dureeMois, dateDebut, dateFin, utilisationsMax,
       } = params;
 
@@ -102,6 +128,7 @@ Deno.serve(async (req) => {
           code: String(code).trim().toUpperCase(),
           client_email: clientEmail || null,
           palier_cible: palierCible || null,
+          produit_cible: produitCible || null,
           remise_pourcent: remisePourcent,
           duree_mois: dureeMois ?? 0,
           date_debut: dateDebut || null,

@@ -33,6 +33,7 @@ const FORMULAIRE_VIDE = {
   code: "",
   clientEmail: "",
   palierCible: "",
+  produitCible: "",
   remisePourcent: 20,
   dureeMois: 1,
   dateDebut: "",
@@ -45,6 +46,11 @@ export default function Administration() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [formulaire, setFormulaire] = useState(FORMULAIRE_VIDE);
+  // Code secret admin (16/08/2026) — volontairement hors de `formulaire` :
+  // il ne doit PAS être réinitialisé après chaque création (sinon
+  // l'administrateur devrait le retaper à chaque code), mais il ne doit
+  // jamais être envoyé ailleurs qu'à admin-codes-promo, ni stocké.
+  const [secretAdmin, setSecretAdmin] = useState("");
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [journal, setJournal] = useState([]);
   const compteurLigne = useRef(0);
@@ -128,9 +134,11 @@ export default function Administration() {
     noter("— Clic sur « Créer le code » —");
     try {
       await appellerAdmin("creer", {
+        secretAdmin,
         code: formulaire.code,
         clientEmail: formulaire.clientEmail || null,
         palierCible: formulaire.palierCible || null,
+        produitCible: formulaire.produitCible || null,
         remisePourcent: Number(formulaire.remisePourcent),
         dureeMois: Number(formulaire.dureeMois),
         dateDebut: formulaire.dateDebut || null,
@@ -150,7 +158,7 @@ export default function Administration() {
 
   const basculerActif = async (ligne) => {
     try {
-      await appellerAdmin("definirActif", { id: ligne.id, actif: !ligne.actif });
+      await appellerAdmin("definirActif", { secretAdmin, id: ligne.id, actif: !ligne.actif });
       await rafraîchir();
     } catch (e) {
       setErreur(e.message);
@@ -197,6 +205,17 @@ export default function Administration() {
       )}
 
       <div style={{
+        background: "#FBE9E9", padding: "14px 16px", borderRadius: 8, marginBottom: 16,
+      }}>
+        <label style={{ ...labelStyle, color: "#A32D2D" }}>
+          Code secret administrateur * (requis pour créer ou activer/désactiver un code — pas pour la simple consultation)
+        </label>
+        <input style={{ ...champStyle, maxWidth: 320 }} type="password" value={secretAdmin}
+               onChange={(e) => setSecretAdmin(e.target.value)}
+               placeholder="connu uniquement de l'administrateur" required autoComplete="off" />
+      </div>
+
+      <div style={{
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12,
         background: COULEURS.fond, padding: 20, borderRadius: 8, marginBottom: 28,
       }}>
@@ -217,6 +236,14 @@ export default function Administration() {
             {ORDRE_PALIERS.map((cle) => (
               <option key={cle} value={cle}>{PRIX_STRIPE[cle].nom}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Produit cible</label>
+          <select style={champStyle} value={formulaire.produitCible} onChange={(e) => majChamp("produitCible", e.target.value)}>
+            <option value="">Les deux (CursEdit + CursAudit)</option>
+            <option value="cursedit">CursEdit uniquement</option>
+            <option value="cursaudit">CursAudit uniquement</option>
           </select>
         </div>
         <div>
@@ -268,6 +295,7 @@ export default function Administration() {
                 <th style={{ padding: "6px 8px" }}>Code</th>
                 <th style={{ padding: "6px 8px" }}>Email</th>
                 <th style={{ padding: "6px 8px" }}>Palier</th>
+                <th style={{ padding: "6px 8px" }}>Produit</th>
                 <th style={{ padding: "6px 8px" }}>Remise</th>
                 <th style={{ padding: "6px 8px" }}>Durée</th>
                 <th style={{ padding: "6px 8px" }}>Période</th>
@@ -282,6 +310,7 @@ export default function Administration() {
                   <td style={{ padding: "6px 8px", fontFamily: "monospace" }}>{c.code}</td>
                   <td style={{ padding: "6px 8px" }}>{c.client_email || "—"}</td>
                   <td style={{ padding: "6px 8px" }}>{c.palier_cible ? (PRIX_STRIPE[c.palier_cible]?.nom || c.palier_cible) : "Tous"}</td>
+                  <td style={{ padding: "6px 8px" }}>{c.produit_cible === "cursedit" ? "CursEdit" : c.produit_cible === "cursaudit" ? "CursAudit" : "Les deux"}</td>
                   <td style={{ padding: "6px 8px" }}>{c.remise_pourcent}%</td>
                   <td style={{ padding: "6px 8px" }}>{c.duree_mois === 0 ? "1 fois" : c.duree_mois === 99 ? "à vie" : `${c.duree_mois} mois`}</td>
                   <td style={{ padding: "6px 8px" }}>
