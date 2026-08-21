@@ -95,8 +95,24 @@ export default function Administration() {
     });
 
     if (error) {
-      noter(`⚠ Erreur Edge Function : ${error.message}`);
-      throw new Error(error.message || "Erreur Edge Function.");
+      // 16/08/2026 — error.message d'une FunctionsHttpError est un texte
+      // générique ("Edge Function returned a non-2xx status code"), PAS le
+      // corps JSON { error: "..." } que la fonction a réellement renvoyé.
+      // Sans ça, un 400 ("code obligatoire") et un 403 ("secret invalide")
+      // ressemblent au même message inexploitable. On relit le corps de la
+      // réponse HTTP conservée dans error.context pour retrouver le vrai
+      // message côté serveur.
+      let détail = error.message;
+      try {
+        if (error.context && typeof error.context.json === "function") {
+          const corps = await error.context.json();
+          if (corps?.error) détail = corps.error;
+        }
+      } catch (_e) {
+        // corps non lisible en JSON : on garde error.message
+      }
+      noter(`⚠ Erreur Edge Function : ${détail}`);
+      throw new Error(détail || "Erreur Edge Function.");
     }
     noter(`Réponse fonction : ${JSON.stringify(réponse).slice(0, 300)}`);
 
