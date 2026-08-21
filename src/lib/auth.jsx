@@ -59,6 +59,7 @@ export function PageConnexion() {
     }
   });
   const [motDePasse, setMDP]    = useState("");
+  const [voirMotDePasse, setVoirMotDePasse] = useState(false);
   const [mode, setMode]         = useState("connexion"); // connexion | inscription
   const [chargement, setChargement] = useState(false);
   const [message, setMessage]   = useState(null);
@@ -129,10 +130,21 @@ export function PageConnexion() {
           </div>
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#555", marginBottom: 5 }}>Mot de passe</label>
-            <input type="password" value={motDePasse} onChange={(e) => setMDP(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && soumettre()}
-              placeholder="••••••••" autoFocus={!!email}
-              style={{ width: "100%", padding: "9px 12px", border: "0.5px solid #e5e5e5", borderRadius: 8, fontSize: 14, color: "#1a1a1a", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+            <div style={{ position: "relative" }}>
+              <input type={voirMotDePasse ? "text" : "password"} value={motDePasse} onChange={(e) => setMDP(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && soumettre()}
+                placeholder="••••••••" autoFocus={!!email}
+                style={{ width: "100%", padding: "9px 38px 9px 12px", border: "0.5px solid #e5e5e5", borderRadius: 8, fontSize: 14, color: "#1a1a1a", fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              <button type="button" onClick={() => setVoirMotDePasse((v) => !v)}
+                title={voirMotDePasse ? "Masquer" : "Afficher"}
+                style={{
+                  position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", fontSize: 15,
+                  padding: 4, color: "#999", lineHeight: 1,
+                }}>
+                {voirMotDePasse ? "🙈" : "👁"}
+              </button>
+            </div>
           </div>
 
           {erreur && (
