@@ -149,12 +149,31 @@ d'unités, seule différence pratique le temps de traitement en aval.
 - Rend possible l'écran de résultat pour un livre entier : compter/filtrer
   par catégorie sans avoir à lire chaque commentaire.
 
+**Chantier 5 — Écran de résultat (`CursAuditListe.jsx`, `CursAuditDetail.jsx`, réf. 60816-01, suite, 22/08/2026)**
+- `CursAuditListe.jsx` : liste des audits de l'utilisateur (`auditsAPI.lister()`),
+  miroir de "Mes projets" côté CursEdit. Nouvelle entrée de navigation
+  "Mes audits".
+- `CursAuditDetail.jsx` : bandeau de comptage par catégorie de
+  `diagnostic_priorite` (chantier 4), cliquable pour filtrer la liste ;
+  liste paginée côté client (20/page) ; chaque unité repliée sur son
+  diagnostic, détail complet (tous les critères actifs) au clic.
+- **Premier bouton d'analyse dans l'interface** : "Lancer/Continuer
+  l'analyse" appelle `orchestrer-audit-cursaudit` en boucle tant que
+  `restantes > 0` — jusqu'ici cet appel n'existait que comme script de
+  test dans la console du navigateur. Reste gated par l'absence de
+  paiement Stripe : actif seulement si `audits.statut` est déjà "paye" ou
+  "en_traitement" (positionné manuellement en SQL en attendant le
+  chantier "bouton Payer").
+- **Pas encore testé dans le navigateur** — seul le moteur sous-jacent
+  (`orchestrer-audit-cursaudit`, catégorisation `diagnostic_priorite`) a
+  été validé en conditions réelles sur "TEST APERCU", via script console.
+  Cet écran lui-même reste à ouvrir et vérifier une fois déployé.
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
-bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, **écran de
-résultat** (liste "Mes audits" + vue détaillée par audit, maintenant
-possible à l'échelle d'un livre grâce au chantier 4 ci-dessus).
-Questionnaire de qualification côté Cursus Édition (chantier 1b) et
-composants UI partagés (chantier 1c) toujours pas démarrés.
+bouton "Payer" (Stripe Checkout, voir décision de séquence ci-dessus),
+pont bidirectionnel + badge "Audit partiel". Questionnaire de
+qualification côté Cursus Édition (chantier 1b) et composants UI partagés
+(chantier 1c) toujours pas démarrés.
 
 ---
 

@@ -52,7 +52,7 @@ const TYPES_RAPPORT = [
   { id: "Rapport complet", nom: "Rapport complet" },
 ];
 
-export default function CursAudit() {
+export default function CursAudit({ onVoirAudits } = {}) {
   const [titre, setTitre] = useState("");
   const [source, setSource] = useState("coller"); // "coller" | "docx"
   const [texte, setTexte] = useState("");
@@ -149,14 +149,24 @@ export default function CursAudit() {
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
             « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}, statut « brouillon ».
             <br />
-            Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse ne peut pas encore être lancée depuis cette page.
+            Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse ne peut pas être lancée tant que le statut reste « brouillon ».
           </div>
-          <button
-            onClick={toutRéinitialiser}
-            style={{ marginTop: 12, padding: "7px 14px", borderRadius: 7, border: "0.5px solid #1D9E75", background: "transparent", color: "#1D9E75", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Créer un autre audit
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              onClick={toutRéinitialiser}
+              style={{ padding: "7px 14px", borderRadius: 7, border: "0.5px solid #1D9E75", background: "transparent", color: "#1D9E75", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Créer un autre audit
+            </button>
+            {onVoirAudits && (
+              <button
+                onClick={onVoirAudits}
+                style={{ padding: "7px 14px", borderRadius: 7, border: "none", background: "#1D9E75", color: "#fff", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                Voir mes audits
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
