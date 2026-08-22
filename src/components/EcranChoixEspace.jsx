@@ -214,23 +214,24 @@ export default function EcranChoixEspace({ onChoisir }) {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
-      {/* 22/08/2026, v2 — rectangle HORIZONTAL demandé pour l'équilibre
-          visuel : recouvre la largeur des deux cartes CursEdit/CursAudit
-          réunies (même maxWidth que leur rangée, 680px) plutôt qu'une
-          carte verticale de même largeur qu'une seule d'entre elles.
-          Logo à gauche, titre + tagline empilés à droite. */}
+      {/* 22/08/2026, v3 — spécification exacte donnée par l'auteur du projet :
+          largeur = exactement celle des deux cartes CursEdit/CursAudit
+          réunies (300 + 20 de gap + 300 = 620px, pas 680 qui était le
+          maxWidth de leur conteneur mais pas leur largeur réelle), hauteur
+          selon le ratio 732:280 (≈2.61:1), liseré doré (couleur "or" déjà
+          utilisée ailleurs dans l'app, #C4973A), logo centré au-dessus du
+          titre plutôt qu'à côté. */}
       <div style={{
-        width: "100%", maxWidth: 680, display: "flex", alignItems: "center", gap: 24,
-        padding: "24px 32px", borderRadius: 14,
-        border: "0.5px solid #8B263540", background: "#fff",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.04)", marginBottom: 36, boxSizing: "border-box",
+        width: 620, aspectRatio: "732 / 280", boxSizing: "border-box",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        padding: "16px 24px", borderRadius: 14,
+        border: "0.5px solid #C4973A80", background: "#fff",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)", marginBottom: 36,
       }}>
-        <img src="/logo-cursus.png" alt="Cursus" style={{ height: 68, width: 68, borderRadius: 14, flexShrink: 0 }} />
-        <div style={{ textAlign: "left" }}>
-          <div style={{ fontSize: 28, fontWeight: 600, color: "#8B2635", marginBottom: 4, letterSpacing: "0.01em" }}>Cursus</div>
-          <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5 }}>
-            Une suite d'écriture et d'audit assistée par IA.
-          </div>
+        <img src="/logo-cursus.png" alt="Cursus" style={{ height: 56, width: 56, borderRadius: 12, marginBottom: 8 }} />
+        <div style={{ fontSize: 24, fontWeight: 600, color: "#8B2635", marginBottom: 6, letterSpacing: "0.01em" }}>Cursus</div>
+        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.4, textAlign: "center" }}>
+          Une suite d'écriture et d'audit assistée par IA.
         </div>
       </div>
 
