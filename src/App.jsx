@@ -2140,8 +2140,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         </button>
         <button onClick={onChangerEspace}
           title="Changer d'espace (CursEdit / CursAudit)"
-          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
-          {espaceActif === "cursaudit" ? "🔎 CursAudit" : "✍️ CursEdit"} ⇄
+          style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          <img
+            src={espaceActif === "cursaudit" ? "/logo-cursaudit.png" : "/logo-cursedit.png"}
+            alt=""
+            style={{ height: 14, width: 14, borderRadius: 3 }}
+          />
+          {espaceActif === "cursaudit" ? "CursAudit" : "CursEdit"} ⇄
         </button>
         <button onClick={déconnecter}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
