@@ -214,10 +214,20 @@ export default function EcranChoixEspace({ onChoisir }) {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
-      <img src="/logo-cursus.png" alt="Cursus" style={{ height: 68, width: 68, borderRadius: 14, marginBottom: 14 }} />
-      <div style={{ fontSize: 36, fontWeight: 600, color: "#1a1a1a", marginBottom: 8, letterSpacing: "0.01em" }}>Cursus</div>
-      <div style={{ fontSize: 14, color: "#999", marginBottom: 28, textAlign: "center", maxWidth: 320, lineHeight: 1.5 }}>
-        Une suite d'écriture et d'audit assistée par IA.
+      {/* 22/08/2026 — encadré comme les deux cartes CursEdit/CursAudit
+          ci-dessous (même largeur, même style de carte), avec un fin
+          liseré bordeaux plutôt que la couleur d'un produit en
+          particulier : Cursus est la marque commune aux deux. */}
+      <div style={{
+        width: 300, textAlign: "center", padding: "28px 24px", borderRadius: 14,
+        border: "0.5px solid #8B263540", background: "#fff",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.04)", marginBottom: 36,
+      }}>
+        <img src="/logo-cursus.png" alt="Cursus" style={{ height: 68, width: 68, borderRadius: 14, display: "block", margin: "0 auto 14px" }} />
+        <div style={{ fontSize: 30, fontWeight: 600, color: "#8B2635", marginBottom: 8, letterSpacing: "0.01em" }}>Cursus</div>
+        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5 }}>
+          Une suite d'écriture et d'audit assistée par IA.
+        </div>
       </div>
 
       <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Choisissez votre espace de travail</div>
