@@ -2170,7 +2170,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
-            { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
+            // Précision "(CursEdit)" ajoutée le 22/08/2026 : cet onglet reste
+            // visible même dans l'espace CursAudit (la navigation n'est pas
+            // encore séparée par espace), et affiche exclusivement les
+            // paliers d'abonnement CursEdit — source de malentendu signalée
+            // par l'auteur du projet, CursAudit se facturant à l'acte et
+            // n'ayant pas encore son propre panneau tarifaire dans l'app.
+            { id: "tarification", label: t("navigation.tarification") + (espaceActif === "cursaudit" ? " (CursEdit)" : ""), icone: "💳" },
             { id: "cursaudit",     label: t("navigation.cursaudit", "CursAudit"), icone: "🔎" },
             // Administration (codes promo) — 16/08/2026 : le composant existait
             // depuis 60804-03 mais n'avait jamais été relié à la navigation.
@@ -2188,7 +2194,20 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                   setVue("editeur");
                 } else if (item.id === "editeur" && projetActif) {
                   setVue("projet");
-                } else if (item.id !== "editeur") {
+                } else if (item.id === "editeur") {
+                  // 22/08/2026 — sans projet actif (notamment en arrivant
+                  // depuis l'espace CursAudit), aucune des deux conditions
+                  // ci-dessus ne matchait et le clic ne faisait STRICTEMENT
+                  // rien — signalé par l'auteur du projet comme "l'accès à
+                  // éditeur n'est pas possible". "Mes projets" est le seul
+                  // point d'entrée qui a du sens ici : la vérification
+                  // d'abonnement elle-même n'existe nulle part côté client
+                  // aujourd'hui (seul le quota IA est vérifié, côté
+                  // serveur, dans claude-prox), donc rediriger vers
+                  // Tarification sans savoir si l'abonnement est actif
+                  // serait une fausse alerte pour un abonné réel.
+                  setVue(projets.length > 0 ? "liste" : "nouveau");
+                } else {
                   setVue(item.id);
                   if (item.id !== "projet") setProjetActifId(null);
                 }
@@ -2301,6 +2320,29 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {/* Vue : tarification */}
         {vue === "tarification" && (
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {/* 22/08/2026 — clarification demandée : cette page n'affiche
+                que les paliers d'abonnement CursEdit, mais l'onglet reste
+                visible même depuis l'espace CursAudit, qui se facture
+                différemment (à l'acte). Ligne informationnelle plutôt que
+                de masquer l'onglet, pour ne pas bloquer un abonné CursEdit
+                qui y accéderait légitimement depuis l'espace CursAudit. */}
+            <div style={{
+              background: "#EEF0FB", borderBottom: "0.5px solid var(--border)",
+              padding: "10px 24px", fontSize: 12.5, color: "var(--texte-secondaire)",
+              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
+            }}>
+              <span>
+                Cette page concerne l'abonnement <strong>CursEdit</strong> (paliers mensuels).
+                {" "}<strong>CursAudit</strong> se facture à l'acte, par audit, indépendamment de cet abonnement.
+              </span>
+              <button onClick={() => setVue("cursaudit")} style={{
+                flexShrink: 0, fontSize: 12, color: "#1D9E75", background: "none",
+                border: "0.5px solid #1D9E75", borderRadius: 6, padding: "4px 10px",
+                cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Voir CursAudit →
+              </button>
+            </div>
             <Tarification />
           </div>
         )}
