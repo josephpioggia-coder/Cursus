@@ -27,8 +27,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
+import { calculerPrixPreauditGlobal } from "../lib/tarifCursAudit.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
+const PREAUDIT_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-global-cursaudit";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const CATEGORIES_DIAGNOSTIC = [
@@ -74,6 +76,125 @@ async function appelerOrchestrateur(auditId, signal) {
   const données = await réponse.json();
   if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
   return données;
+}
+
+// Pré-audit global (réf. 60816-01, suite, 22/08/2026) — un seul appel,
+// pas de boucle (contrairement à l'orchestrateur détaillé) : le manuscrit
+// entier tient dans un seul appel Claude.
+async function appelerPreauditGlobal(auditId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
+
+  const réponse = await fetch(PREAUDIT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ audit_id: auditId }),
+  });
+  const données = await réponse.json();
+  if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
+  return données;
+}
+
+function PreauditGlobal({ audit, nombreMots, reglesPrix, onTermine }) {
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const résultat = audit.preaudit_resultat;
+
+  const prix = useMemo(
+    () => (reglesPrix ? calculerPrixPreauditGlobal(reglesPrix, nombreMots) : null),
+    [reglesPrix, nombreMots]
+  );
+
+  const lancer = async () => {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      await appelerPreauditGlobal(audit.id);
+      await onTermine();
+    } catch (e) {
+      setErreur(e.message);
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  return (
+    <div style={{ border: "0.5px solid #C4973A80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#FFFBF2" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 600, color: "#8A6116", marginBottom: 2 }}>Lecture globale du manuscrit</div>
+          <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+            Une vue d'ensemble avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
+          </div>
+        </div>
+        {audit.preaudit_statut === "non_demande" && prix && (
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#8A6116" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} €</div>
+            <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>TTC · {nombreMots.toLocaleString("fr-FR")} mots</div>
+          </div>
+        )}
+      </div>
+
+      {audit.preaudit_statut === "non_demande" && (
+        <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
+          Paiement CursAudit pas encore disponible dans l'application — statut à positionner manuellement (SQL) en attendant.
+        </div>
+      )}
+
+      {audit.preaudit_statut === "paye" && (
+        <button onClick={lancer} disabled={enCours} style={{
+          marginTop: 10, background: "#C4973A", color: "#fff", border: "none", borderRadius: 8,
+          padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+          opacity: enCours ? 0.6 : 1,
+        }}>
+          {enCours ? "Lecture en cours…" : "Lancer la lecture globale"}
+        </button>
+      )}
+
+      {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
+
+      {audit.preaudit_statut === "termine" && résultat && (
+        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12.5 }}>
+            <span style={{ fontWeight: 600 }}>Genre apparent : </span>{résultat.genre_apparent}
+            {résultat.genre_reel_probable && résultat.genre_reel_probable !== résultat.genre_apparent && (
+              <span style={{ color: "var(--texte-tertiaire)" }}> (forme réelle probable : {résultat.genre_reel_probable})</span>
+            )}
+          </div>
+          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
+          {résultat.tension_principale && (
+            <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Tension principale : </span>{résultat.tension_principale}</div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>Forces globales</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                {(résultat.forces_globales || []).map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            </div>
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>Risques globaux</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                {(résultat.risques_globaux || []).map((r, i) => <li key={i}>{r}</li>)}
+              </ul>
+            </div>
+          </div>
+          {résultat.audit_recommande && (
+            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #C4973A50", borderRadius: 6, padding: "8px 10px" }}>
+              <span style={{ fontWeight: 600 }}>Recommandation pour l'audit détaillé : </span>
+              palier {résultat.audit_recommande.palier}
+              {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function LigneSection({ section }) {
@@ -160,6 +281,7 @@ function LigneSection({ section }) {
 export default function CursAuditDetail({ auditId, onRetour }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
+  const [reglesPrix, setReglesPrix] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [filtresActifs, setFiltresActifs] = useState([]);
   const [page, setPage] = useState(1);
@@ -174,6 +296,14 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   }, [auditId]);
 
   useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    auditsAPI.récupérerReglesPrix().then(({ data, error }) => { if (!error) setReglesPrix(data || []); });
+  }, []);
+
+  const nombreMots = useMemo(
+    () => (sections || []).reduce((acc, s) => acc + (s.texte_source?.split(/\s+/).filter(Boolean).length || 0), 0),
+    [sections]
+  );
 
   const comptages = useMemo(() => {
     const c = Object.fromEntries(CATEGORIES_DIAGNOSTIC.map((d) => [d.id, 0]));
@@ -263,6 +393,10 @@ export default function CursAuditDetail({ auditId, onRetour }) {
         <div style={{ background: "#FFF7E6", color: "#8A6116", padding: "10px 14px", borderRadius: 6, fontSize: 12.5, marginBottom: 16 }}>
           Cet audit est en brouillon — le paiement CursAudit n'existe pas encore dans l'application, l'analyse ne peut pas être lancée depuis cet écran.
         </div>
+      )}
+
+      {nombreMots > 0 && (
+        <PreauditGlobal audit={audit} nombreMots={nombreMots} reglesPrix={reglesPrix} onTermine={charger} />
       )}
 
       {erreur && (

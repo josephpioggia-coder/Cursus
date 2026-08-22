@@ -1,0 +1,171 @@
+/**
+ * CURSAUDIT — Edge Function : preaudit-global-cursaudit (référence 60816-01, suite, 22/08/2026)
+ * ============================================================================
+ * Lecture globale du manuscrit ENTIER, en UN SEUL appel Claude (fenêtre de
+ * contexte 1M tokens — un livre y tient largement), avant de payer/lancer
+ * l'audit détaillé unité par unité (analyser-unite-cursaudit /
+ * orchestrer-audit-cursaudit). Idée de l'auteur du projet, affinée avec
+ * GPT : le moteur détaillé analyse chaque paragraphe isolément, sans
+ * jamais voir le livre entier — cette étape comble ce trou, et sert de
+ * "premier travail léger" avant d'engager le coût de l'audit complet.
+ *
+ * Reprend la proposition de GPT en la resserrant : sa taxonomie biologique
+ * (endosquelette/mycélium/fleuve...) et ses "formats dérivés" sont écartés
+ * — trop peu fiables/universels pour un champ structuré exploitable d'un
+ * livre à l'autre. Retenu : nature du texte, colonne vertébrale, tension
+ * principale, forces/risques globaux, et une recommandation de palier pour
+ * la suite.
+ *
+ * FICHIER AUTONOME (leçon du 16/08/2026) : le mécanisme d'appel IA
+ * structuré est inliné ici, pas importé depuis _shared/.
+ *
+ * TARIF : barème par tranche de mots (audit_pricing_rules, categorie
+ * "preaudit_global_palier"), fixé à la création — voir
+ * calculerPrixPreauditGlobal() dans tarifCursAudit.js pour la même logique
+ * côté client (affichage du prix avant paiement).
+ *
+ * CYCLE DE VIE séparé de l'audit détaillé : `audits.preaudit_statut`
+ * (non_demande → paye → termine), `preaudit_prix_ht`, `preaudit_resultat`.
+ * Comme pour l'audit détaillé, aucun flux Stripe n'existe encore — le
+ * statut se positionne manuellement (SQL) en attendant.
+ *
+ * SECRETS REQUIS : ANTHROPIC_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place).
+ */
+
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import Ajv from "https://esm.sh/ajv@8?target=deno";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
+const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
+
+const MODELE_CLAUDE = "claude-sonnet-5";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...CORS } });
+
+const ajv = new Ajv({ allErrors: true, strict: false });
+
+const SCHEMA_PREAUDIT = {
+  type: "object",
+  properties: {
+    genre_apparent: { type: "string" },
+    genre_reel_probable: { type: "string" },
+    colonne_vertebrale: { type: "string" },
+    tension_principale: { type: "string" },
+    forces_globales: { type: "array", items: { type: "string" } },
+    risques_globaux: { type: "array", items: { type: "string" } },
+    audit_recommande: {
+      type: "object",
+      properties: {
+        palier: { type: "string", enum: ["essentiel", "approfondi", "expert"] },
+        priorites: { type: "array", items: { type: "string" } },
+      },
+      required: ["palier", "priorites"],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    "genre_apparent", "genre_reel_probable", "colonne_vertebrale", "tension_principale",
+    "forces_globales", "risques_globaux", "audit_recommande",
+  ],
+  additionalProperties: false,
+};
+
+const SYSTEM_PREAUDIT =
+  "Tu es le module de lecture globale de CursAudit. On te donne un manuscrit ENTIER, pas un extrait. " +
+  "Avant tout audit détaillé unité par unité, produis une lecture d'ensemble, presque anatomique : " +
+  "quel texte avons-nous devant nous, qu'est-ce qui le tient, où sont ses tensions et ses risques à l'échelle du livre entier — " +
+  "pas des observations locales sur un passage précis, mais ce qui ne se voit qu'en lisant le tout.\n\n" +
+  "- genre_apparent : le genre que le livre affiche (ex. \"essai spirituel\", \"témoignage thérapeutique\", \"manuel pratique\").\n" +
+  "- genre_reel_probable : le genre que sa forme réelle suggère, s'il diffère de l'apparent.\n" +
+  "- colonne_vertebrale : une à deux phrases — ce qui tient le livre de bout en bout.\n" +
+  "- tension_principale : l'écart le plus significatif entre ce que le livre prétend être et sa forme réelle (s'il y en a un).\n" +
+  "- forces_globales / risques_globaux : des observations à l'échelle du livre entier, jamais des redites d'un seul passage.\n" +
+  "- audit_recommande.palier : le palier de profondeur (essentiel/approfondi/expert) le plus adapté à ce texte pour l'audit détaillé qui suivra.\n" +
+  "- audit_recommande.priorites : sur quoi l'audit détaillé devrait se concentrer en priorité pour CE livre précis, pas une liste générique.";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  try {
+    if (!ANTHROPIC_KEY) return json({ error: "ANTHROPIC_KEY manquante." }, 500);
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: authError } = await admin.auth.getUser(token);
+    if (authError || !userData?.user) return json({ error: "Authentification requise." }, 401);
+    const userId = userData.user.id;
+
+    const body = await req.json();
+    const auditId: string | undefined = body?.audit_id;
+    if (!auditId) return json({ error: "audit_id est requis." }, 400);
+
+    const { data: audit } = await admin
+      .from("audits")
+      .select("id, user_id, titre, preaudit_statut")
+      .eq("id", auditId)
+      .maybeSingle();
+    if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
+    if (audit.preaudit_statut !== "paye") {
+      return json({ error: "paiement_requis", message: `Le pré-audit global a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
+    }
+
+    const { data: sections } = await admin
+      .from("audit_sections")
+      .select("texte_source")
+      .eq("audit_id", auditId)
+      .order("ordre", { ascending: true });
+    if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
+
+    const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
+
+    const réponse = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: MODELE_CLAUDE,
+        max_tokens: 2048,
+        system: SYSTEM_PREAUDIT,
+        messages: [{ role: "user", content: texteIntegral }],
+        tools: [{ name: "lecture_globale", description: "Synthèse structurée de la lecture globale du manuscrit.", input_schema: SCHEMA_PREAUDIT }],
+        tool_choice: { type: "tool", name: "lecture_globale" },
+      }),
+    });
+    const résultatAPI = await réponse.json();
+    if (!réponse.ok) return json({ error: résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).` }, 502);
+
+    const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
+    if (!blocOutil) return json({ error: "Claude n'a renvoyé aucun bloc tool_use." }, 502);
+
+    const valide = ajv.compile(SCHEMA_PREAUDIT);
+    if (!valide(blocOutil.input)) {
+      return json({ error: `Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}` }, 502);
+    }
+
+    const preauditResultat = {
+      ...blocOutil.input,
+      nombre_mots: texteIntegral.split(/\s+/).filter(Boolean).length,
+      usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
+      analyse_le: new Date().toISOString(),
+    };
+
+    const { error: erreurMaj } = await admin
+      .from("audits")
+      .update({ preaudit_statut: "termine", preaudit_resultat: preauditResultat })
+      .eq("id", auditId);
+    if (erreurMaj) return json({ error: erreurMaj.message }, 500);
+
+    return json({ audit_id: auditId, preaudit: preauditResultat });
+  } catch (err) {
+    console.error("Erreur preaudit-global-cursaudit :", err.message);
+    return json({ error: err.message }, 500);
+  }
+});

@@ -234,6 +234,34 @@ d'unités, seule différence pratique le temps de traitement en aval.
   redondant pour l'instant) : `respiration_du_texte`, `promesse_au_lecteur`.
 - Pas encore testé dans le navigateur ni en conditions réelles côté moteur.
 
+**Chantier 8 — Pré-audit global du manuscrit (`preaudit-global-cursaudit`, réf. 60816-01, suite, 22/08/2026)**
+- Idée de l'auteur du projet, affinée avec GPT : avant de payer/lancer
+  l'audit détaillé (des heures, ~29 $ sur "là où les portes s'ouvrent"),
+  une lecture globale bon marché du manuscrit ENTIER en **un seul appel**
+  Claude (fenêtre de contexte 1M tokens — un livre y tient largement).
+  Comble aussi un vrai défaut technique découvert au passage : le moteur
+  détaillé analyse chaque unité isolément, sans jamais voir le livre entier.
+- Reprend GPT en le resserrant : sa taxonomie biologique (endosquelette/
+  mycélium/fleuve...) et ses "formats dérivés" sont écartés — pas assez
+  fiables/universels d'un livre à l'autre pour un champ structuré.
+  Retenu : `genre_apparent`, `genre_reel_probable`, `colonne_vertebrale`,
+  `tension_principale`, `forces_globales[]`, `risques_globaux[]`,
+  `audit_recommande` (palier + priorités pour l'audit détaillé qui suivra).
+- **Cycle de vie séparé de l'audit détaillé**, sur `audits` directement
+  (pas de nouvelle table) : `preaudit_statut` (non_demande→paye→termine),
+  `preaudit_prix_ht`, `preaudit_resultat` (jsonb).
+- **Tarif fourni par l'auteur du projet** : barème dégressif par tranche
+  de 10 000 mots (`audit_pricing_rules`, categorie `preaudit_global_palier`)
+  — 25€ HT jusqu'à 10 000 mots (plancher), jusqu'à 140€ HT à 80 000 mots,
+  puis +10€ HT/tranche de 10 000 mots au-delà. `calculerPrixPreauditGlobal()`
+  dans `tarifCursAudit.js`.
+- **Coût réel estimé très inférieur à l'audit détaillé** : un seul appel
+  avec une sortie courte, de l'ordre de quelques dizaines de centimes à
+  1$, plutôt que ~29$ pour 1419 appels — valide l'intuition de départ
+  ("un premier travail léger, moins cher").
+- Affiché dans `CursAuditDetail.jsx`, au-dessus de la liste des unités.
+- Pas encore testé dans le navigateur ni en conditions réelles côté moteur.
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
 bouton "Payer" (Stripe Checkout, voir décision de séquence ci-dessus),
 pont bidirectionnel + badge "Audit partiel", export du rapport (le champ

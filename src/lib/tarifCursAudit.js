@@ -80,3 +80,46 @@ export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
   const heures = Math.round((minutes / 60) * 10) / 10;
   return { secondes, texte: `environ ${heures} h` };
 }
+
+/**
+ * Prix du pré-audit global (référence 60816-01, suite, 22/08/2026).
+ * ======================================================================
+ * Barème par tranche de mots fourni par l'auteur du projet — dégressif
+ * jusqu'à 80 000 mots (stocké dans audit_pricing_rules, categorie
+ * "preaudit_global_palier"), puis +10€ HT/tranche de 10 000 mots
+ * au-delà (règle fixe, pas dans la table). En-dessous de 10 000 mots,
+ * le tarif de la tranche 10 000 sert de plancher — pas de tarif dégressif
+ * sous ce montant.
+ *
+ * Facturation "à la tranche entamée" (pas d'interpolation continue) :
+ * 35 000 mots paient le tarif de la tranche 40 000, comme la règle "au-delà"
+ * le fait explicitement pour les tranches au-dessus de 80 000.
+ */
+export function calculerPrixPreauditGlobal(regles, nombreMots) {
+  const paliers = regles
+    .filter((r) => r.categorie === "preaudit_global_palier")
+    .map((r) => ({ seuil: Number(r.cle), prixHT: r.valeur_numerique }))
+    .sort((a, b) => a.seuil - b.seuil);
+
+  const tvaPct = regles.find((r) => r.categorie === "parametre_global" && r.cle === "tva_pct")?.valeur_numerique ?? 21;
+
+  const dernierPalier = paliers[paliers.length - 1];
+  let prixHT;
+  if (!dernierPalier) {
+    prixHT = 0; // règles non chargées — ne devrait pas arriver en usage normal
+  } else if (nombreMots <= dernierPalier.seuil) {
+    const palierTrouvé = paliers.find((p) => nombreMots <= p.seuil) ?? paliers[0];
+    prixHT = palierTrouvé.prixHT;
+  } else {
+    const tranchesSupplémentaires = Math.ceil((nombreMots - dernierPalier.seuil) / 10000);
+    prixHT = dernierPalier.prixHT + tranchesSupplémentaires * 10;
+  }
+
+  const tva = prixHT * (tvaPct / 100);
+  const prixTTC = prixHT + tva;
+  return {
+    prixHT: Math.round(prixHT * 100) / 100,
+    tva: Math.round(tva * 100) / 100,
+    prixTTC: Math.round(prixTTC * 100) / 100,
+  };
+}
