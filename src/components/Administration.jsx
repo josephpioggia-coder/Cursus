@@ -29,10 +29,26 @@ const COULEURS = {
   texteClair: "#6B5D52",
 };
 
+// Suffixe aléatoire (16/08/2026) — un code lisible seul (ex. JOSEPH-100-99)
+// expose son propre format : quiconque le voit comprend "prénom-remise%-
+// durée" et peut deviner ou reconstruire un autre code sur ce modèle. Le
+// suffixe rend chaque code non reproductible sans en changer la lisibilité
+// utile (le préfixe reste clair pour l'administrateur qui le retrouve dans
+// la liste). Alphabet sans 0/O/1/I/L pour éviter les confusions de lecture.
+// crypto.getRandomValues (pas Math.random) car ce suffixe doit être
+// imprévisible, pas seulement varié.
+const ALPHABET_SUFFIXE_PROMO = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+function genererSuffixeAléatoire(longueur = 4) {
+  const octets = new Uint8Array(longueur);
+  crypto.getRandomValues(octets);
+  return Array.from(octets, (o) => ALPHABET_SUFFIXE_PROMO[o % ALPHABET_SUFFIXE_PROMO.length]).join("");
+}
+
 const FORMULAIRE_VIDE = {
   code: "",
   clientEmail: "",
   palierCible: "",
+  produitCible: "",
   remisePourcent: 20,
   dureeMois: 1,
   dateDebut: "",
@@ -45,6 +61,12 @@ export default function Administration() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [formulaire, setFormulaire] = useState(FORMULAIRE_VIDE);
+  // Code secret admin (16/08/2026) — volontairement hors de `formulaire` :
+  // il ne doit PAS être réinitialisé après chaque création (sinon
+  // l'administrateur devrait le retaper à chaque code), mais il ne doit
+  // jamais être envoyé ailleurs qu'à admin-codes-promo, ni stocké.
+  const [secretAdmin, setSecretAdmin] = useState("");
+  const [voirSecret, setVoirSecret] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [journal, setJournal] = useState([]);
   const compteurLigne = useRef(0);
@@ -89,8 +111,24 @@ export default function Administration() {
     });
 
     if (error) {
-      noter(`⚠ Erreur Edge Function : ${error.message}`);
-      throw new Error(error.message || "Erreur Edge Function.");
+      // 16/08/2026 — error.message d'une FunctionsHttpError est un texte
+      // générique ("Edge Function returned a non-2xx status code"), PAS le
+      // corps JSON { error: "..." } que la fonction a réellement renvoyé.
+      // Sans ça, un 400 ("code obligatoire") et un 403 ("secret invalide")
+      // ressemblent au même message inexploitable. On relit le corps de la
+      // réponse HTTP conservée dans error.context pour retrouver le vrai
+      // message côté serveur.
+      let détail = error.message;
+      try {
+        if (error.context && typeof error.context.json === "function") {
+          const corps = await error.context.json();
+          if (corps?.error) détail = corps.error;
+        }
+      } catch (_e) {
+        // corps non lisible en JSON : on garde error.message
+      }
+      noter(`⚠ Erreur Edge Function : ${détail}`);
+      throw new Error(détail || "Erreur Edge Function.");
     }
     noter(`Réponse fonction : ${JSON.stringify(réponse).slice(0, 300)}`);
 
@@ -122,15 +160,23 @@ export default function Administration() {
 
   const majChamp = (champ, valeur) => setFormulaire((f) => ({ ...f, [champ]: valeur }));
 
+  const ajouterSuffixeAléatoire = () => {
+    const base = formulaire.code.trim().replace(/-+$/, "");
+    const suffixe = genererSuffixeAléatoire();
+    majChamp("code", base ? `${base}-${suffixe}` : suffixe);
+  };
+
   const créerCode = async () => {
     setEnvoiEnCours(true);
     setErreur("");
     noter("— Clic sur « Créer le code » —");
     try {
       await appellerAdmin("creer", {
+        secretAdmin,
         code: formulaire.code,
         clientEmail: formulaire.clientEmail || null,
         palierCible: formulaire.palierCible || null,
+        produitCible: formulaire.produitCible || null,
         remisePourcent: Number(formulaire.remisePourcent),
         dureeMois: Number(formulaire.dureeMois),
         dateDebut: formulaire.dateDebut || null,
@@ -150,7 +196,7 @@ export default function Administration() {
 
   const basculerActif = async (ligne) => {
     try {
-      await appellerAdmin("definirActif", { id: ligne.id, actif: !ligne.actif });
+      await appellerAdmin("definirActif", { secretAdmin, id: ligne.id, actif: !ligne.actif });
       await rafraîchir();
     } catch (e) {
       setErreur(e.message);
@@ -196,14 +242,48 @@ export default function Administration() {
         </div>
       )}
 
+      <form onSubmit={(e) => { e.preventDefault(); créerCode(); }}>
+      <div style={{
+        background: "#FBE9E9", padding: "14px 16px", borderRadius: 8, marginBottom: 16,
+      }}>
+        <label style={{ ...labelStyle, color: "#A32D2D" }}>
+          Code secret administrateur * (requis pour créer ou activer/désactiver un code — pas pour la simple consultation)
+        </label>
+        <div style={{ position: "relative", maxWidth: 320 }}>
+          <input style={{ ...champStyle, paddingRight: 38 }} type={voirSecret ? "text" : "password"} value={secretAdmin}
+                 onChange={(e) => setSecretAdmin(e.target.value)}
+                 placeholder="connu uniquement de l'administrateur" required autoComplete="off" />
+          <button type="button" onClick={() => setVoirSecret((v) => !v)}
+                  title={voirSecret ? "Masquer" : "Afficher"}
+                  style={{
+                    position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer", fontSize: 15,
+                    padding: 4, color: COULEURS.texteClair, lineHeight: 1,
+                  }}>
+            {voirSecret ? "🙈" : "👁"}
+          </button>
+        </div>
+      </div>
+
       <div style={{
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12,
         background: COULEURS.fond, padding: 20, borderRadius: 8, marginBottom: 28,
       }}>
         <div>
           <label style={labelStyle}>Code *</label>
-          <input style={champStyle} value={formulaire.code} onChange={(e) => majChamp("code", e.target.value)}
-                 placeholder="MARIE-30-3M" required />
+          <div style={{ display: "flex", gap: 6 }}>
+            <input style={champStyle} value={formulaire.code} onChange={(e) => majChamp("code", e.target.value)}
+                   placeholder="JOSEPH-100-99-Q7X4" required />
+            <button type="button" onClick={ajouterSuffixeAléatoire} title="Ajouter un suffixe aléatoire — empêche de deviner ou reconstruire un autre code à partir de celui-ci" style={{
+              flexShrink: 0, background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 6,
+              padding: "0 10px", fontSize: 13, cursor: "pointer", color: COULEURS.texte,
+            }}>🎲</button>
+          </div>
+          <div style={{ fontSize: 11, color: COULEURS.texteClair, marginTop: 3 }}>
+            🎲 ajoute un suffixe aléatoire (ex. "-Q7X4") : sans lui, un code lisible
+            (prénom/remise/durée) permet à quiconque le voit de comprendre le
+            format et de deviner ou reconstruire d'autres codes.
+          </div>
         </div>
         <div>
           <label style={labelStyle}>Email cible (optionnel)</label>
@@ -217,6 +297,14 @@ export default function Administration() {
             {ORDRE_PALIERS.map((cle) => (
               <option key={cle} value={cle}>{PRIX_STRIPE[cle].nom}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Produit cible</label>
+          <select style={champStyle} value={formulaire.produitCible} onChange={(e) => majChamp("produitCible", e.target.value)}>
+            <option value="">Les deux (CursEdit + CursAudit)</option>
+            <option value="cursedit">CursEdit uniquement</option>
+            <option value="cursaudit">CursAudit uniquement</option>
           </select>
         </div>
         <div>
@@ -245,7 +333,7 @@ export default function Administration() {
                  onChange={(e) => majChamp("utilisationsMax", e.target.value)} placeholder="illimité si vide" />
         </div>
         <div style={{ gridColumn: "1 / -1" }}>
-          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); créerCode(); }} disabled={envoiEnCours} style={{
+          <button type="submit" disabled={envoiEnCours} style={{
             background: COULEURS.bordeaux, color: "#fff", border: "none", borderRadius: 6,
             padding: "10px 20px", fontSize: 13, cursor: envoiEnCours ? "default" : "pointer",
             opacity: envoiEnCours ? 0.6 : 1,
@@ -254,6 +342,7 @@ export default function Administration() {
           </button>
         </div>
       </div>
+      </form>
 
       <h2 style={{ fontSize: 15, color: COULEURS.texte, marginBottom: 12 }}>Codes existants</h2>
       {chargement ? (
@@ -268,6 +357,7 @@ export default function Administration() {
                 <th style={{ padding: "6px 8px" }}>Code</th>
                 <th style={{ padding: "6px 8px" }}>Email</th>
                 <th style={{ padding: "6px 8px" }}>Palier</th>
+                <th style={{ padding: "6px 8px" }}>Produit</th>
                 <th style={{ padding: "6px 8px" }}>Remise</th>
                 <th style={{ padding: "6px 8px" }}>Durée</th>
                 <th style={{ padding: "6px 8px" }}>Période</th>
@@ -282,6 +372,7 @@ export default function Administration() {
                   <td style={{ padding: "6px 8px", fontFamily: "monospace" }}>{c.code}</td>
                   <td style={{ padding: "6px 8px" }}>{c.client_email || "—"}</td>
                   <td style={{ padding: "6px 8px" }}>{c.palier_cible ? (PRIX_STRIPE[c.palier_cible]?.nom || c.palier_cible) : "Tous"}</td>
+                  <td style={{ padding: "6px 8px" }}>{c.produit_cible === "cursedit" ? "CursEdit" : c.produit_cible === "cursaudit" ? "CursAudit" : "Les deux"}</td>
                   <td style={{ padding: "6px 8px" }}>{c.remise_pourcent}%</td>
                   <td style={{ padding: "6px 8px" }}>{c.duree_mois === 0 ? "1 fois" : c.duree_mois === 99 ? "à vie" : `${c.duree_mois} mois`}</td>
                   <td style={{ padding: "6px 8px" }}>

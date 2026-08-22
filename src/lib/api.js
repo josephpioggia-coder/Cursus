@@ -18,6 +18,7 @@
  */
 
 import { supabase } from "./supabase.js";
+import { segmenterTexte } from "./segmenterCursAudit.js";
 
 // ─── Utilitaire ────────────────────────────────────────────────────────────────
 
@@ -448,6 +449,94 @@ export const usageIAAPI = {
       data: { palier: abonnement.palier, quotaMensuel, credits, consomme, disponible, pourcentage },
       error: null,
     };
+  },
+};
+
+// ─── AUDITS (CursAudit) — référence 60816-01 ────────────────────────────────
+// Écriture directe via RLS (auth.uid() = user_id) : pas besoin d'Edge Function
+// pour la simple création, contrairement à l'analyse elle-même qui appelle
+// des IA externes côté serveur (analyser-unite-cursaudit, orchestrer-audit-cursaudit).
+
+export const auditsAPI = {
+
+  /**
+   * Crée un audit (statut "brouillon" — le paiement Stripe pour CursAudit
+   * n'existe pas encore, voir docs/cursaudit-tarification.md) et ses unités
+   * dans audit_sections, à partir d'unités DÉJÀ segmentées (peu importe la
+   * source : texte collé via segmenterTexte(), ou .docx via
+   * extraireParagraphesDocx() — voir src/lib/segmenterCursAudit.js).
+   */
+  async créer({ titre, unités, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null }) {
+    if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
+
+    const uid = await userId();
+    const { data: audit, error: erreurAudit } = await supabase
+      .from("audits")
+      .insert([{
+        user_id:           uid,
+        projet_id:         projetId,
+        titre,
+        palier_dimensions: palierDimensions,
+        nombre_dimensions: nombreDimensions,
+        mode_ia:           modeIA,
+        type_rapport:      typeRapport,
+        nombre_pages:      nombrePages,
+        prix_ttc:          prixTTC,
+        statut:            "brouillon",
+      }])
+      .select()
+      .single();
+    if (erreurAudit) return { data: null, error: erreurAudit };
+
+    const lignes = unités.map((texteSource, i) => ({ audit_id: audit.id, ordre: i + 1, texte_source: texteSource }));
+    const { error: erreurSections } = await supabase.from("audit_sections").insert(lignes);
+    if (erreurSections) return { data: null, error: erreurSections };
+
+    return { data: { audit, nombreUnités: unités.length }, error: null };
+  },
+
+  /** Variante pratique de créer() : segmente un texte déjà en clair (collé) avant de créer. */
+  async créerDepuisTexte({ titre, texte, ...reste }) {
+    const unités = segmenterTexte(texte);
+    return auditsAPI.créer({ titre, unités, ...reste });
+  },
+
+  /** Récupère tous les audits de l'utilisateur connecté */
+  async lister() {
+    const { data, error } = await supabase
+      .from("audits")
+      .select("*")
+      .order("cree_le", { ascending: false });
+    return { data, error };
+  },
+
+  /** Récupère un audit et ses unités (avec leurs résultats s'ils existent) */
+  async récupérerAvecSections(auditId) {
+    const { data: audit, error: erreurAudit } = await supabase
+      .from("audits")
+      .select("*")
+      .eq("id", auditId)
+      .single();
+    if (erreurAudit) return { data: null, error: erreurAudit };
+
+    const { data: sections, error: erreurSections } = await supabase
+      .from("audit_sections")
+      .select("*")
+      .eq("audit_id", auditId)
+      .order("ordre", { ascending: true });
+    if (erreurSections) return { data: null, error: erreurSections };
+
+    return { data: { audit, sections: sections || [] }, error: null };
+  },
+
+  /** Règles de tarification actives (audit_pricing_rules) — lecture publique,
+   *  voir src/lib/tarifCursAudit.js pour le calcul du prix à partir de ces règles. */
+  async récupérerReglesPrix() {
+    const { data, error } = await supabase
+      .from("audit_pricing_rules")
+      .select("categorie, cle, libelle, valeur_numerique")
+      .eq("actif", true);
+    return { data, error };
   },
 };
 

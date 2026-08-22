@@ -40,6 +40,9 @@ import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
+import CursAudit from "./components/CursAudit.jsx";
+import Administration from "./components/Administration.jsx";
+import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
@@ -1691,6 +1694,20 @@ const btnSecondaryStyle = {
 export default function App() {
   const { t } = useTranslation("common");
   const { user, chargement: authChargement, déconnecter } = useAuth();
+  // Choix d'espace (CursEdit / CursAudit, chantier 2) — mémorisé pour la
+  // session du navigateur (sessionStorage, pas localStorage) : on redemande
+  // à chaque nouvelle connexion/onglet, pas à chaque simple rechargement de
+  // page pendant qu'on travaille.
+  const [espace, setEspace] = useState(() => sessionStorage.getItem("cursus_espace") || null);
+
+  const choisirEspace = (id) => {
+    sessionStorage.setItem("cursus_espace", id);
+    setEspace(id);
+  };
+  const changerEspace = () => {
+    sessionStorage.removeItem("cursus_espace");
+    setEspace(null);
+  };
 
   if (authChargement) return (
     <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "system-ui", color: "#999", fontSize: 14 }}>
@@ -1698,17 +1715,18 @@ export default function App() {
     </div>
   );
   if (!user) return <PageConnexion />;
+  if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} />;
 
-  return <AppConnectée user={user} déconnecter={déconnecter} />;
+  return <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} />;
 }
 
 // ─── Composant : App connectée (après auth) ───────────────────────────────────
 
-function AppConnectée({ user, déconnecter }) {
+function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const { t, i18n } = useTranslation("common");
   const [projets, setProjets]   = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [vue, setVue]           = useState("tableau");
+  const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
   // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
   // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
@@ -2120,6 +2138,11 @@ function AppConnectée({ user, déconnecter }) {
           style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("aide.bouton")}
         </button>
+        <button onClick={onChangerEspace}
+          title="Changer d'espace (CursEdit / CursAudit)"
+          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          {espaceActif === "cursaudit" ? "🔎 CursAudit" : "✍️ CursEdit"} ⇄
+        </button>
         <button onClick={déconnecter}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("deconnexion")}
@@ -2148,6 +2171,15 @@ function AppConnectée({ user, déconnecter }) {
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
             { id: "tarification", label: t("navigation.tarification"),   icone: "💳" },
+            { id: "cursaudit",     label: t("navigation.cursaudit", "CursAudit"), icone: "🔎" },
+            // Administration (codes promo) — 16/08/2026 : le composant existait
+            // depuis 60804-03 mais n'avait jamais été relié à la navigation.
+            // Visible seulement pour le compte propriétaire ; ce n'est qu'une
+            // commodité d'affichage, la vraie vérification est refaite côté
+            // serveur (admin-codes-promo) à chaque action.
+            ...(user.email === "joseph.pioggia@gmail.com"
+              ? [{ id: "administration", label: "Administration", icone: "⚙️" }]
+              : []),
           ].map((item) => (
             <div
               key={item.id}
@@ -2270,6 +2302,16 @@ function AppConnectée({ user, déconnecter }) {
         {vue === "tarification" && (
           <div style={{ flex: 1, overflowY: "auto" }}>
             <Tarification />
+          </div>
+        )}
+
+        {/* Vue : CursAudit (référence 60816-01) */}
+        {vue === "cursaudit" && <CursAudit />}
+
+        {/* Vue : Administration (codes promo) — réf. 60804-03, reliée le 16/08/2026 */}
+        {vue === "administration" && user.email === "joseph.pioggia@gmail.com" && (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <Administration />
           </div>
         )}
 
@@ -2530,6 +2572,7 @@ function AppConnectée({ user, déconnecter }) {
                 titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
+                nœudId={nœudActif.id}
               />
             </div>
           </div>

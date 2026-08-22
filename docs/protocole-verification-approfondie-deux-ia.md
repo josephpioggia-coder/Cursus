@@ -3,8 +3,9 @@
 *Conçu le 05/08/2026, en dialogue réel entre Claude et GPT, testé en conditions
 réelles sur un extrait du livre "À cœur retrouvé" (Célicia Theys). Figé après
 convergence — voir la session du 05/08/2026 pour le débat complet qui a mené
-à chaque règle. Aucun code écrit pour l'instant : ceci est la conception,
-pas l'implémentation (60805-06 reste `/F/A`).*
+à chaque règle. Edge Function écrite le 15/08/2026 (voir "Ce qui reste à
+faire" en bas de document) — déployée sur Supabase le 15/08/2026, pas
+encore testée en conditions réelles.*
 
 ---
 
@@ -449,14 +450,66 @@ même base, sans que l'un doive faire confiance au résumé de l'autre.
 
 ## Ce qui reste à faire (hors périmètre de ce document)
 
-- Migration SQL des tables nécessaires (job de fond, dossier de contexte,
-  historique des tours).
-- Edge Function d'orchestration (appels Anthropic + OpenAI directs — voir
-  aussi le chantier séparé de sortie de Copy.ai, 60805-06 également).
-- Intégration UI dans l'éditeur (sélection de passage, curseur de
-  profondeur/coût, notification de fin de traitement en arrière-plan).
-- Lien avec `intention_projet`/`QuestionnaireIntention` pour l'intention
-  déclarée de l'étape 0.
+**Écrite le 15/08/2026** : `supabase/functions/verification-deux-ia/index.ts`
+— implémente les étapes 0 à 7 et le logigramme d'orchestration ci-dessus,
+en consommant `supabase/functions/_shared/moteur-ia-structure.ts` pour les
+deux appels IA (inlinés dans le fichier depuis le 16/08/2026 — voir la note
+en tête du fichier source, un déploiement via le Dashboard ne pouvait pas
+résoudre l'import relatif vers `_shared`, ce qui faisait échouer la fonction
+au démarrage pour toute requête, quelle que soit l'authentification).
+Contrôle d'accès (auth + quota) répliqué de `claude-prox`, cohérent avec
+"facturée sur le quota de tokens de l'auteur·e selon son palier" (voir
+Contexte du besoin).
 
-Rien de ce qui précède n'a été codé — ce document fixe uniquement la
-conception, validée par un dialogue réel testé sur un cas concret.
+**Premier test réel réussi le 16/08/2026**, appelée directement (hors
+éditeur, pas encore d'intégration UI) sur un vrai projet et un vrai passage
+du manuscrit "Là où les portes s'ouvrent". Résultat : `verdict_passage:
+"recevable_avec_reserves"`, dialogue arrêté après seulement 2 tours (A1+B1,
+pas besoin d'aller jusqu'à A2/B2) — confirme la "profondeur adaptative,
+courte par défaut" prévue par le protocole plutôt qu'un dialogue qui
+s'éternise systématiquement. Couverture du manuscrit détectée à 100 %,
+contexte jugé suffisant. Sortie hiérarchisée correctement en 4 catégories
+(1 élément en valeur ajoutée éditoriale, 2 en alertes à vérifier sur
+source, aucune fusion en liste plate).
+
+**Limites connues de cette première version**, documentées en tête du
+fichier plutôt que masquées :
+- Étape 0 mécanique comme l'exige le protocole, mais la détection de thèmes
+  et de reprises reste un appariement par mot-clé (`ILIKE`) — la reprise
+  "sémantique" au sens propre (embeddings) n'est pas implémentée.
+- `changements_de_registre` n'est pas rempli par l'étape 0 (une
+  classification par liste de mots produirait une fausse précision) —
+  chaque `claim` de Claude porte son propre `registre`, c'est la source de
+  vérité réelle pour ce signal.
+- `verdict_these_livre` reste à `null` : le protocole documente le besoin
+  de deux verdicts distincts (passage local / thèse du livre), mais aucun
+  mécanisme n'est décrit pour évaluer la thèse d'ensemble à partir d'un
+  dialogue sur un seul passage — non inventé plutôt que deviné.
+- `alignement_interet` et `zones_sous_expertise_requise` restent aux
+  valeurs par défaut du dossier de contexte (non calculées mécaniquement) —
+  ce sont les tours IA qui les signalent via `corrections_bloquantes`.
+
+**Intégration UI — faite le 16/08/2026** : nouvel onglet "Vérification" dans
+`CopiloteIA.jsx`, à côté de Suggestions/Personnages/Références/Cohérence.
+Réutilise l'infrastructure existante du panneau (sélection de passage déjà
+gérée par le composant, bascule "analyser la sélection / tout le chapitre",
+compteur de caractères, bouton "Analyser") plutôt que de dupliquer une UI
+séparée. Explicitement exclu du mode Auto (cycle toutes les 10 min) — le
+protocole le décrit comme une action délibérée, pas un cycle automatique.
+Affichage dédié (`PanneauVerification`) : badge de verdict coloré, réponse
+optimale à l'auteur·e mise en avant, 4 catégories hiérarchisées affichées
+séparément (jamais fusionnées en liste plate), gestion du cas "verdict
+provisoire" (contexte insuffisant). Pas de curseur de profondeur/coût
+(hors périmètre pour cette première version — profondeur entièrement
+adaptative côté serveur, aucun réglage exposé à l'auteur·e), pas de
+notification de fin de traitement en arrière-plan (l'appel est synchrone,
+l'auteur·e attend le résultat dans le panneau).
+
+**Toujours hors périmètre, non commencé** :
+- Migration SQL de persistance (job de fond, historique des tours,
+  versionnage du dossier de contexte) — la version actuelle de l'Edge
+  Function est synchrone, sans stockage intermédiaire.
+- Lien avec `intention_projet`/`QuestionnaireIntention` pour l'intention
+  déclarée de l'étape 0 — la fonction accepte `intention_declaree` en
+  paramètre d'entrée, mais rien ne l'alimente automatiquement depuis
+  `QuestionnaireIntention.jsx` pour l'instant.

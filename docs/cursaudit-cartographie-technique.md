@@ -23,10 +23,114 @@ mais rien d'urgent ni de cassant.*
 
 | # | Chantier | Statut |
 |---|---|---|
-| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Formalisé (section 2bis), aucune brique démarrée — attend P0a/P0b |
-| 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Résolu par conception (maquette validée le 09/08 : deux cartes d'entrée, pont bidirectionnel sans réimport sur un même projet, badge "Audit partiel" pour un projet en cours) |
+| 1 | Architecture/code — composants partagés (moteur IA, questionnaire, UI) | Très avancé le 16/08/2026 — voir détail section 0bis ci-dessous |
+| 2 | Navigation/UX — CursEdit et CursAudit à l'accueil | Maquette validée le 09/08 ; **écran de choix codé le 16/08/2026** (`EcranChoixEspace.jsx`) — pont bidirectionnel et badge "Audit partiel" pas encore construits, voir section 0bis |
 | 3 | Nom/branding | Résolu : Cursus = marque, CursEdit et CursAudit = produits, CursEdit sans accent |
-| 4 | Modèle économique — offre, tarification, positionnement relatif | **Ouvert, non commencé** |
+| 4 | Modèle économique — offre, tarification, positionnement relatif | Résolu et chiffré (voir `docs/cursaudit-tarification.md`) : un seul modèle "à l'acte" couvre l'audit complet et l'approfondissement ponctuel court, remise abonné CursEdit fixée à 20 % plafonnée à 50 % du prix mensuel de l'abonnement |
+
+---
+
+## 0bis. Détail des briques CursAudit écrites le 16/08/2026
+
+*Le tableau ci-dessus résume ; cette section détaille chaque brique. Toutes
+les dates de cette section sont le 16/08/2026 sauf mention contraire.*
+
+**Chantier 1 — Cursus Édition (bouclé)**
+- Protocole 60805-06 déployé, testé en conditions réelles, intégré dans
+  l'éditeur (onglet "Vérification" de `CopiloteIA.jsx`).
+
+**Chantier 1 — CursAudit, moteur (`analyser-unite-cursaudit`)**
+- Testé avec succès : mode "1 IA" validé sur une unité réelle (8 critères
+  du palier Essentiel), sortie ancrée dans le texte, correctement
+  diagnostiquée comme littéraire/non-factuelle.
+- Traite une unité à la fois (limite de temps d'exécution d'une Edge
+  Function) ; mode "2 IA" écrit mais pas testé isolément ; "confrontation
+  ciblée"/"arbitrage dialogique" pas implémentés.
+
+**Chantier 1 — CursAudit, orchestrateur (`orchestrer-audit-cursaudit`, réf. 60816-01)**
+- Traite les unités non analysées d'un audit par lot borné dans le temps
+  (25s de marge, pas un compte fixe), marque les échecs par unité plutôt
+  que de les retenter en boucle, bascule `audits.statut`
+  brouillon→payé→en_traitement→terminé. Pas de tâche de fond automatique —
+  l'appelant doit rappeler tant que `restantes > 0`.
+- Testé avec succès : lot de 3 unités traitées en un appel. Contraste
+  qualitatif confirmé : un passage factuel non sourcé (chiffre attribué à
+  "une étude publiée en 2019" sans auteur ni revue) diagnostiqué "besoin de
+  preuve fort"/"à sourcer"/"risque d'influence élevé", contre
+  "recevable"/"besoin de preuve faible" pour les passages narratifs du
+  même lot.
+
+**Chantier 1 — CursAudit, segmentation et création (`segmenterCursAudit.js`, `auditsAPI.créerDepuisTexte`, réf. 60816-01)**
+- Texte collé → unités → `audits` (statut "brouillon") + `audit_sections`.
+  Segmentation testée unitairement en local.
+- **Import `.docx` ajouté le 16/08/2026** (`extraireParagraphesDocx()`,
+  suite à un retour de l'auteur du projet : "coller le texte" seul était
+  trop éloigné de ce que CursEdit propose déjà). Reprend la lecture JSZip
+  déjà éprouvée dans `ImportDocx.jsx` (pas `mammoth`), simplifiée — pas de
+  détection de niveaux de titre, juste les paragraphes à plat. `.pdf`
+  reste à construire.
+
+**Chantier 1 — CursAudit, page de création (`CursAudit.jsx`, réf. 60816-01)**
+- Texte collé, palier (3 fixes, "Libre" non proposé), mode IA (seuls
+  "1 IA"/"2 IA", les deux implémentés), format de rapport, prix calculé en
+  direct (`tarifCursAudit.js`, à partir du nombre réel d'unités segmentées
+  et de `audit_pricing_rules` ; multiplicateur commercial simplifié en une
+  valeur fixe par palier, pas encore la grille par tranches complète).
+- Crée l'audit en statut "brouillon" — pas de bouton de paiement, aucun
+  flux Stripe CursAudit n'existe.
+
+**Chantier 2 — Écran de choix d'espace (`EcranChoixEspace.jsx`)**
+- S'affiche une fois après connexion (mémorisé en `sessionStorage`, pas de
+  façon permanente), deux cartes CursEdit/CursAudit, bouton "⇄" dans la
+  barre supérieure pour changer d'espace à tout moment.
+- **Pas construits** : le pont bidirectionnel (passer d'un projet CursEdit
+  à son audit sans réimporter — `audits.projet_id` existe déjà en base
+  mais rien ne le relie encore dans l'UI) et le badge "Audit partiel" sur
+  un projet en cours d'audit.
+
+**Décision actée le 16/08/2026 (séquence de paiement)** : le paiement doit
+venir APRÈS le texte/palier choisis, une fois le prix exact connu à partir
+du nombre réel d'unités — jamais avant (le prix ne peut pas être fiable
+sans le texte). Séquence : création de l'audit en "brouillon" (déjà faite)
+→ bouton "Payer" ouvrant une session Stripe Checkout liée à cet audit
+(réutiliser `creer-session-checkout`) → `stripe-webhook` confirme et
+bascule `statut` à "payé", jamais une confirmation côté client. Vaut aussi
+pour un livre entier : même séquence, prix plus élevé du fait du nombre
+d'unités, seule différence pratique le temps de traitement en aval.
+
+**Chantier 3 — Codes promotionnels, extension CursAudit (réf. 60816-01, suite)**
+- Le système existant (`codes_promo`, `admin-codes-promo`, RLS fermée à
+  service_role, fonction atomique `consommer_code_promo()` — voir
+  `2026-08-04-codes-promo.sql`) est directement réutilisable pour CursAudit
+  : mêmes colonnes `remise_pourcent` (5 à 100 %), `duree_mois`,
+  `date_debut`/`date_fin`, `utilisations_max`. Pas de nouveau mécanisme à
+  construire, seulement à cibler.
+- **Colonne `produit_cible` ajoutée** (`2026-08-16-codes-promo-cursaudit.sql`)
+  : `'cursedit' | 'cursaudit' | null`. `null` = valable pour les deux
+  (comportement des codes existants, inchangé).
+- **Deuxième facteur admin ajouté** à la demande explicite de l'auteur du
+  projet ("il faut que l'administrateur qui accorde la remise aie un code
+  secret permettant de donner l'accès aux conditions") : être reconnu
+  admin (table `admins`) ne suffit plus pour "creer" ou "definirActif" —
+  il faut en plus fournir un secret serveur (`ADMIN_PROMO_SECRET`, jamais
+  dans le code, à définir dans Supabase → Edge Functions → Secrets). Défense
+  en profondeur : une session admin compromise seule ne permet plus de
+  créer un accès gratuit. "lister" (simple consultation) reste inchangé.
+- `Administration.jsx` : champ mot de passe "Code secret administrateur"
+  (jamais pré-rempli ni stocké), sélecteur "Produit cible" (Les deux /
+  CursEdit / CursAudit), colonne "Produit" ajoutée au tableau des codes.
+- **Reste à faire côté opérateur** (pas exécutable depuis cette session) :
+  exécuter la migration SQL, choisir et définir `ADMIN_PROMO_SECRET`, puis
+  redéployer `admin-codes-promo` (déjà autonome, un simple collage suffit).
+- Le checkout Stripe CursAudit (non construit — voir décision de séquence
+  ci-dessus) devra filtrer les codes par `produit_cible` avant d'appeler
+  `consommer_code_promo()`, comme `creer-session-checkout` le fait déjà
+  implicitement pour CursEdit.
+
+**Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
+bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, affichage du
+rapport. Questionnaire de qualification côté Cursus Édition (chantier 1b)
+et composants UI partagés (chantier 1c) toujours pas démarrés.
 
 ---
 
@@ -144,9 +248,10 @@ architectural nouveau, pas une continuité.
 Décision de principe : **partager trois briques précises entre les deux
 produits plutôt que les construire en parallèle**, chacune pour une raison
 différente. Cette section formalise ce qui n'était jusqu'ici que discuté.
-Aucune de ces briques ne démarre avant P0a (rapatriement de `claude-prox`) et
-P0b (`OPENAI_API_KEY`) — voir la carte d'avancement du 07/08. Ce qui suit est
-une décision d'architecture, pas un chantier lancé.
+P0a (rapatriement de `claude-prox`) et P0b (`OPENAI_API_KEY`) sont faits
+(15/08/2026) — voir la carte d'avancement du 07/08 pour l'origine de ces deux
+préalables. Ce qui suit reste une décision d'architecture, pas un chantier
+lancé : aucune des trois briques ci-dessous n'a de code écrit à ce jour.
 
 ### a) Moteur IA à sortie structurée (partagé)
 
@@ -156,12 +261,53 @@ Trois besoins distincts convergent aujourd'hui vers la même brique :
 3. **CursAudit** (moteur d'analyse) — sortie JSON stricte, par unité codée (confirmé aujourd'hui par l'exemplar Excel/Word produit hors code : 255 unités, 29 dimensions par unité, dialogue Claude↔GPT déjà utilisé en pratique pour ce travail manuel).
 
 Les besoins 2 et 3 sont structurellement le même problème : un appel IA à
-rôle explicite, sortie validée contre un schéma, jamais du texte libre.
-Décision : une seule Edge Function générique (`{moteur: claude|gpt, role,
-schema_sortie, system, contexte}` → sortie validée), appelée par les trois
-consommateurs plutôt que trois intégrations séparées. Le mode texte libre de
-CopiloteIA reste tel quel — pas besoin de sortie structurée pour de simples
-suggestions.
+rôle explicite, sortie validée contre un schéma, jamais du texte libre. Le
+mode texte libre de CopiloteIA reste tel quel — pas besoin de sortie
+structurée pour de simples suggestions, `claude-prox` n'est pas touché.
+
+**Décision révisée le 15/08/2026** (remplace la version "une seule Edge
+Function générique" ci-dessus, jugée trop simple une fois la question posée
+explicitement) : **union sur le mécanisme, différenciation sur le contrôle
+d'accès.**
+- Un **module interne partagé** (pas déployé séparément, importé par les
+  fonctions qui en ont besoin) implémente uniquement le mécanisme d'appel
+  `{moteur: claude|gpt, role, schema_sortie, system, contexte}` → sortie
+  validée. Aucune logique d'auth ni de facturation dedans.
+- **Deux Edge Functions séparées**, chacune avec son propre contrôle
+  d'accès, consomment ce module :
+  - celle du protocole 60805-06 (Cursus Édition) — garde la logique de
+    quota mensuel déjà en place dans `claude-prox` (abonnement récurrent) ;
+  - une nouvelle fonction pour le moteur CursAudit — logique de paiement à
+    l'acte + remise abonné CursEdit plafonnée (voir
+    `docs/cursaudit-tarification.md`), structurellement incompatible avec
+    un quota mensuel.
+
+**Écrit le 15/08/2026** : `supabase/functions/_shared/moteur-ia-structure.ts`
+— implémente le mécanisme (appel Claude via tool use forcé, appel GPT via
+`response_format: json_schema`, validation Ajv de la sortie contre
+`schema_sortie` dans les deux cas). Zéro appelant pour l'instant — ni la
+fonction 60805-06 ni la fonction CursAudit n'existent encore.
+
+**Migration écrite et appliquée le 15/08/2026** : `2026-08-15-cursaudit-schema.sql`.
+`audits` existait déjà en base (créée dans une session passée non commitée,
+même pattern que `claude-prox` — colonnes/RLS/policy vérifiées identiques
+avant de retirer sa création du script). `audit_sections`, `audit_criteria`,
+`audit_pricing_rules` créées avec succès (voir section 3 ci-dessous pour le
+détail), avec RLS + policies dès la création. `audit_pricing_rules` est
+pré-remplie avec les valeurs actuelles du calculateur
+(`docs/cursaudit-tarification.md`) : paliers de dimensions, modes IA, types
+de rapport, paramètres globaux (dont la remise abonné CursEdit 20 % / 50 %).
+Le multiplicateur de prix par combinaison palier/mode/rapport n'est pas
+encore transposé en configuration — seule sa logique est documentée.
+
+Prochaine étape logique : écrire la première des deux Edge Functions
+consommatrices du module IA structuré.
+
+Raisons de ne **pas** tout mettre dans une seule fonction (au-delà de la
+différence de facturation) : rythme de déploiement très différent —
+`claude-prox` est stable et en prod, le moteur CursAudit va être réécrit
+plusieurs fois pendant sa construction ; les coupler ferait porter à
+CopiloteIA (qui marche déjà) le risque de chaque itération de CursAudit.
 
 ### b) Questionnaire (partagé, avec le moteur de qualification proposé le 07/08)
 
@@ -181,8 +327,28 @@ différent du référentiel `audit_criteria` de CursAudit (catégories
 épistémiques, règles de lecture par catégorie — premier brouillon réel
 trouvé le 09/08 dans la grille Excel produite hors code). Le premier
 qualifie la demande ; le second définit comment coder un extrait pendant
-l'analyse elle-même. Les deux sont réels, les deux restent à construire,
-mais ce ne sont pas la même brique.
+l'analyse elle-même. Les deux sont réels, mais pas au même stade :
+
+- **Questionnaire de qualification côté CursAudit : figé le 15/08/2026**,
+  voir `questionnaire-cursaudit-v1-specification.md` (10 sections : nature
+  du document, statut, finalité, question libre, degré d'intervention,
+  préservation de la voix, contraintes académiques, niveau de preuve,
+  format de sortie, relation à l'IA). Reconstruit de mémoire (conversation
+  source avec GPT non retrouvée telle quelle), ossature confirmée fiable
+  par l'auteur du projet.
+- **`audit_criteria`** (ce qui définit comment coder un extrait pendant
+  l'analyse) : **reconstruit et figé le 15/08/2026**, voir
+  `docs/cursaudit-criteria-v1.md` — grille complète des 30 critères (8
+  Essentiel + 7 Approfondi + 15 Expert), avec codes stables, regroupement
+  thématique et clés de sortie JSON. Migration `2026-08-15-cursaudit-criteria-v1.sql`
+  **appliquée avec succès sur Supabase** (30 critères créés et peuplés),
+  remplace le schéma placeholder vide de `2026-08-15-cursaudit-schema.sql`.
+  Reste exclu volontairement : les critères contextuels personnels ("lentilles",
+  ex. `audit_lenses`) — pas encore conçus, table séparée à venir.
+
+Le questionnaire de qualification côté Cursus Édition (`banque_questions`/
+`reponses_questionnaire`, point b ci-dessus) est un troisième objet
+distinct, propre à chaque produit malgré la ressemblance de principe.
 
 ### c) Composants UI partagés
 
@@ -197,8 +363,10 @@ les trois briques qui seraient sinon copiées-collées.
 
 ## 3. Migrations nécessaires
 
-Aucune migration n'a été écrite (conformément à la consigne du brief). Liste
-des tables proposées section 28, confrontée au schéma réel :
+**Écrite et appliquée le 15/08/2026** : `2026-08-15-cursaudit-schema.sql`.
+`audits` existait déjà (voir section 2bis-a) ; les trois autres tables sont
+créées. Reprend les points ci-dessous, tous résolus au moment de l'écrire —
+laissés en l'état pour la trace historique :
 
 - Toutes les tables `audit_*` proposées sont **nouvelles**, sans collision de
   nom avec l'existant.
@@ -242,12 +410,18 @@ d'attaquer les trois moteurs métier, plutôt que de les débuter directement.
 ## 5. Risques et questions bloquantes
 
 **Risques techniques :**
-1. **`claude-prox` hors dépôt** — avant de construire quoi que ce soit dessus
-   pour CursAudit, il faut rapatrier son code réel dans
-   `supabase/functions/claude-prox/` (recommandation déjà faite le 03/08,
-   jamais actionnée). Sans ça, je ne peux pas garantir qu'un nouveau mode
-   d'appel IA structuré JSON n'entre pas en collision avec son comportement
-   actuel.
+1. ~~**`claude-prox` hors dépôt**~~ **Résolu le 15/08/2026 (P0a) :** le code
+   réel de la fonction est maintenant commité dans
+   `supabase/functions/claude-prox/`. Comportement actuel documenté ici pour
+   référence : authentifie l'utilisateur, lit son abonnement actif
+   (`abonnements`) et le quota du palier (`quotas_paliers`), calcule la
+   consommation du mois en cours (`usage_ia`), refuse au-delà du quota
+   (429), sinon relaie l'appel tel quel à `POST
+   https://api.anthropic.com/v1/messages` avec la clé `ANTHROPIC_KEY`, et
+   journalise les tokens réellement consommés. Tout nouveau mode structuré
+   JSON (section 2bis-a) devra donc soit étendre cette fonction (nouveau
+   paramètre de rôle/schéma), soit en créer une distincte qui rejoue la même
+   logique d'auth/quota — à trancher à ce moment-là, pas maintenant.
 2. **Pas de couche de composants UI partagée** — construire CursAudit "à côté"
    sans extraire de composants communs (boutons, badges de statut, modales)
    dupliquera du style, au lieu de le réutiliser comme le demande le brief.
@@ -256,10 +430,18 @@ d'attaquer les trois moteurs métier, plutôt que de les débuter directement.
    chaque nouvelle table `audit_*`.
 
 **Questions bloquantes, à trancher avant l'étape 2 (schéma de données) :**
-1. `audits` doit-il être une variante de `projets` (même table, colonne
-   `type_produit` en plus) ou une table totalement séparée ? Le brief semble
-   supposer une séparation nette (section 28 liste `audits` indépendamment de
-   `projets`) — à confirmer, car ça change toute la couche API.
+1. ~~`audits` doit-il être une variante de `projets` (même table, colonne
+   `type_produit` en plus) ou une table totalement séparée ?~~ **Tranché le
+   15/08/2026 : table totalement séparée.** Le brief suppose une séparation
+   nette (section 28 liste `audits` indépendamment de `projets`) et c'est ce
+   qui est retenu. La séparation de table n'empêche pas de passer de l'un à
+   l'autre produit sur un même travail — c'est une question distincte
+   (chantier 2, déjà résolue par conception le 09/08) : `audits.projet_id`
+   référencera le projet source en clé étrangère (pont bidirectionnel sans
+   réimport, badge "Audit partiel" sur le projet en cours d'audit dans
+   CursEdit). Le détail fin du pont (comportement du badge, effet d'une
+   suppression du projet source, etc.) reste à préciser mais ne bloque plus
+   le démarrage du schéma.
 2. Le moteur IA à sortie JSON validée (section 31) est un composant
    d'infrastructure nouveau, pas une extension de `claude-prox` existant :
    confirmez-vous que c'est un chantier à part entière avant les moteurs

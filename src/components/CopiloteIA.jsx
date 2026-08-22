@@ -103,6 +103,33 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null)
   return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
 }
 
+// ─── Vérification approfondie à deux IA (protocole 60805-06) ──────────────────
+// Distinct de appelClaude : appelle verification-deux-ia (pas claude-prox),
+// qui orchestre elle-même Claude et GPT côté serveur — un seul aller-retour
+// suffit ici, la sortie est déjà une réponse structurée, jamais du texte à
+// parser. Voir docs/protocole-verification-approfondie-deux-ia.md.
+const VERIFICATION_EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/verification-deux-ia";
+
+async function appelVerificationDeuxIA(projetId, nœudId, texteSélectionné, signal) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("SESSION_EXPIREE");
+
+  const response = await fetch(VERIFICATION_EDGE_FUNCTION_URL, {
+    method: "POST",
+    signal,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ projet_id: projetId, noeud_id: nœudId, texte_selectionne: texteSélectionné }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+  return data;
+}
+
 // ─── Prompts ──────────────────────────────────────────────────────────────────
 // Ces prompts système restent en français : ce sont des instructions à Claude,
 // pas du texte d'interface. La langue de LA RÉPONSE générée (elle, visible par
@@ -677,9 +704,81 @@ function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQue
   );
 }
 
+// Affiche le résultat de verification-deux-ia (protocole 60805-06) — objet
+// structuré, pas un tableau de cartes comme les autres onglets. Gère les deux
+// formes de réponse possibles : la sortie complète (verdict_passage + 4
+// catégories hiérarchisées), ou l'arrêt anticipé pour contexte insuffisant
+// (verdict: "verdict_provisoire" au premier niveau, voir le protocole).
+function PanneauVerification({ résultat }) {
+  if (résultat?.verdict === "verdict_provisoire" && !("verdict_passage" in résultat)) {
+    return (
+      <div style={{ background: "#f5f5f5", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "12px 14px", fontSize: 12, color: "#555", lineHeight: 1.6 }}>
+        <div style={{ fontWeight: 600, marginBottom: 4, color: "#854F0B" }}>⏸️ Vérification incomplète</div>
+        <div>{résultat.raison}</div>
+        {résultat.recommandation && <div style={{ marginTop: 6, fontStyle: "italic" }}>{résultat.recommandation}</div>}
+      </div>
+    );
+  }
+
+  const VERDICTS = {
+    recevable: { label: "Recevable", c: "#1D9E75", bg: "#EAF3DE" },
+    recevable_avec_reserves: { label: "Recevable avec réserves", c: "#BA7517", bg: "#FAEEDA" },
+    correction_recommandee: { label: "Correction recommandée", c: "#A32D2D", bg: "#FCEBEB" },
+    verdict_provisoire: { label: "Verdict provisoire", c: "#888", bg: "#f0f0f0" },
+  };
+  const v = VERDICTS[résultat.verdict_passage] || VERDICTS.verdict_provisoire;
+
+  const SECTIONS = [
+    { cle: "valeur_ajoutee_editoriale", titre: "Valeur ajoutée éditoriale", c: "#7F77DD", bg: "#F1EFFB", accent: true },
+    { cle: "corrections_probables", titre: "Corrections probables", c: "#378ADD", bg: "#E6F1FB" },
+    { cle: "alertes_a_verifier_sur_source", titre: "À vérifier sur le document source", c: "#BA7517", bg: "#FAEEDA" },
+    { cle: "remarques_non_bloquantes", titre: "Remarques non bloquantes", c: "#999", bg: "#f5f5f5" },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, padding: "3px 10px", borderRadius: 20, background: v.bg, color: v.c, fontWeight: 600 }}>{v.label}</span>
+        {typeof résultat.couverture_manuscrit === "number" && (
+          <span style={{ fontSize: 10, color: "#999" }}>Couverture manuscrit : {Math.round(résultat.couverture_manuscrit * 100)}%</span>
+        )}
+      </div>
+
+      {résultat.reponse_optimale_auteur && (
+        <div style={{ fontSize: 12, color: "#1a1a1a", lineHeight: 1.6, marginBottom: 12, background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px" }}>
+          {résultat.reponse_optimale_auteur}
+        </div>
+      )}
+
+      {SECTIONS.map(s => {
+        const items = résultat[s.cle];
+        if (!Array.isArray(items) || items.length === 0) return null;
+        return (
+          <div key={s.cle} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: s.c, marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.3 }}>
+              {s.accent && "★ "}{s.titre}
+            </div>
+            {items.map((texte, i) => (
+              <div key={i} style={{ background: s.bg, borderRadius: 7, padding: "8px 10px", marginBottom: 5, fontSize: 12, color: "#1a1a1a", lineHeight: 1.5 }}>
+                {texte}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+
+      {!résultat.contexte_suffisant && (
+        <div style={{ fontSize: 10.5, color: "#999", marginTop: 4, fontStyle: "italic" }}>
+          Contexte du projet jugé partiel au moment de l'analyse.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, onDemanderUpgrade = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADN, setContexteADN] = useState(null);
   // Consommation IA réelle du compte (60803-03) — remontée par
@@ -709,7 +808,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     return () => { annulé = true; };
   }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
-  const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null });
+  const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null });
   const [chargement, setChargement] = useState({});
   const [erreur, setErreur] = useState({});
   const [modeAuto, setModeAuto] = useState(false);
@@ -829,6 +928,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
         setDonnées(d => ({ ...d, cohérence: p.points || [] }));
+      } else if (ongletCible === "vérification") {
+        // Protocole 60805-06 : orchestré côté serveur (verification-deux-ia),
+        // pas un simple appel Claude à parser ici — la réponse est déjà
+        // structurée. Peut prendre 10-30s (plusieurs tours IA enchaînés).
+        const résultatVérification = await appelVerificationDeuxIA(projetId, nœudId, texte, sig);
+        setDonnées(d => ({ ...d, vérification: résultatVérification }));
       }
 
       setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
@@ -839,7 +944,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur]);
+  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -875,7 +980,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
 
   useEffect(() => {
-    if (modeAuto) {
+    // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
+    // action délibérée sur un passage choisi, jamais un cycle automatique
+    // (voir "Fonctionnalité optionnelle... à profondeur adaptative" dans le
+    // protocole — un déclenchement toutes les 10 min irait à l'encontre de
+    // ce principe, en plus de consommer le quota sans que l'auteur·e l'ait
+    // demandé).
+    if (modeAuto && onglet !== "vérification") {
       analyser(onglet);
       intervalRef.current = setInterval(() => analyser(onglet), 600000);
     } else {
@@ -889,6 +1000,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     { id: "personnages", label: t("onglets.personnages") },
     { id: "références", label: t("onglets.references") },
     { id: "cohérence", label: t("onglets.coherence") },
+    { id: "vérification", label: t("onglets.verification", "Vérification") },
   ];
 
   const données_onglet = données[onglet];
@@ -1079,6 +1191,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             {onglet === "personnages" && t("videEtat.personnages")}
             {onglet === "références" && t("videEtat.references")}
             {onglet === "cohérence" && t("videEtat.coherence")}
+            {onglet === "vérification" && t("videEtat.verification", "Vérification approfondie à deux IA (Claude + GPT) d'une affirmation précise du passage. Peut prendre jusqu'à 30 secondes.")}
           </div>
         )}
 
@@ -1086,6 +1199,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
         {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
         {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
+        {onglet === "vérification" && données_onglet && !Array.isArray(données_onglet) && <PanneauVerification résultat={données_onglet} />}
       </div>
     </div>
   );
