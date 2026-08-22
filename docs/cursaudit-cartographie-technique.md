@@ -169,11 +169,40 @@ d'unités, seule différence pratique le temps de traitement en aval.
   été validé en conditions réelles sur "TEST APERCU", via script console.
   Cet écran lui-même reste à ouvrir et vérifier une fois déployé.
 
+**Chantier 6 — Questionnaire de qualification câblé (`CursAuditQuestionnaire.jsx`, réf. 60816-01, suite, 22/08/2026)**
+- Écart signalé par l'auteur du projet en relisant les textes de l'écran
+  de choix d'espace (`EcranChoixEspace.jsx`), qui décrivaient ce
+  questionnaire comme existant alors qu'il n'était encore que figé en
+  spécification (`questionnaire-cursaudit-v1-specification.md`, 15/08).
+- Reprend les sections 1, 2, 3, 4, 5, 7 (conditionnelle, mémoire/TFE), 10
+  — porte d'entrée obligatoire avant le texte à auditer dans `CursAudit.jsx`.
+- **Section 6 volontairement absente** ("préserver ma voix", comparaison à
+  des pages de référence) — le document d'origine la marque lui-même hors
+  périmètre (stockage et logique de comparaison stylistique jamais conçus).
+- **Sections 8 et 9 pas dupliquées** — la note technique du document
+  d'origine les fait correspondre directement au palier/mode et au format
+  de rapport déjà présents dans `CursAudit.jsx`.
+- **Nouvelles colonnes `audits`** (`2026-08-22-audits-questionnaire.sql`) :
+  `type_document`, `statut_texte`, `finalite_audit`, `question_libre`,
+  `degre_intervention`, `contraintes_academiques`, `relation_ia`.
+- **Ce qui change réellement le résultat** : la question libre (section 4)
+  et le degré d'intervention (section 5) sont injectés dans le prompt
+  système de `analyser-unite-cursaudit` et `orchestrer-audit-cursaudit`
+  (fonction `construireContexteQualification()`, dupliquée dans les deux
+  fichiers autonomes). Limite assumée : le moteur ne produit toujours
+  qu'un diagnostic par critère, jamais un texte réécrit séparé — les
+  degrés "reformulation"/"réécriture" n'influencent que le contenu du
+  commentaire, pas la forme de sortie. Les autres réponses (type de
+  document, statut, contraintes académiques, style de relation à l'IA)
+  qualifient la demande mais n'influencent pas encore le résultat.
+- **Pas encore testé dans le navigateur** ni en conditions réelles côté
+  moteur (nouveau prompt jamais exécuté).
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
 bouton "Payer" (Stripe Checkout, voir décision de séquence ci-dessus),
-pont bidirectionnel + badge "Audit partiel". Questionnaire de
-qualification côté Cursus Édition (chantier 1b) et composants UI partagés
-(chantier 1c) toujours pas démarrés.
+pont bidirectionnel + badge "Audit partiel". Questionnaire d'intention v2
+côté Cursus Édition (chantier 1b, différent de celui de CursAudit
+ci-dessus) et composants UI partagés (chantier 1c) toujours pas démarrés.
 
 ---
 
