@@ -214,9 +214,11 @@ export default function EcranChoixEspace({ onChoisir }) {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
-      <img src="/logo-cursus.png" alt="Cursus" style={{ height: 56, width: 56, borderRadius: 12, marginBottom: 12 }} />
-      <div style={{ fontSize: 26, fontWeight: 500, color: "#1a1a1a", marginBottom: 4, letterSpacing: "0.01em" }}>Cursus</div>
-      <div style={{ fontSize: 13.5, color: "#999", marginBottom: 28 }}>Une suite d'écriture et d'audit assistée par IA.</div>
+      <img src="/logo-cursus.png" alt="Cursus" style={{ height: 68, width: 68, borderRadius: 14, marginBottom: 14 }} />
+      <div style={{ fontSize: 36, fontWeight: 600, color: "#1a1a1a", marginBottom: 8, letterSpacing: "0.01em" }}>Cursus</div>
+      <div style={{ fontSize: 14, color: "#999", marginBottom: 28, textAlign: "center", maxWidth: 320, lineHeight: 1.5 }}>
+        Une suite d'écriture et d'audit assistée par IA.
+      </div>
 
       <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Choisissez votre espace de travail</div>
       <div style={{ fontSize: 13, color: "#999", marginBottom: 36, textAlign: "center", maxWidth: 420 }}>
@@ -233,7 +235,7 @@ export default function EcranChoixEspace({ onChoisir }) {
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column",
             }}
           >
-            <img src={e.logo} alt={e.nom} style={{ width: 110, height: "auto", marginBottom: 14 }} />
+            <img src={e.logo} alt={e.nom} style={{ width: 110, height: "auto", display: "block", margin: "0 auto 14px" }} />
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.accroche}</div>
             <button
               onClick={() => onChoisir(e.id)}
