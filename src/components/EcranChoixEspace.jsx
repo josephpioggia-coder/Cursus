@@ -228,7 +228,8 @@ export default function EcranChoixEspace({ onChoisir }) {
         border: "0.5px solid #C4973A80", background: "#fff",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)", marginBottom: 36,
       }}>
-        <img src="/logo-cursus.png" alt="Cursus" style={{ height: 56, width: 56, borderRadius: 12, marginBottom: 8 }} />
+        {/* Logo agrandi ×1,75 (56→98px), demandé après premier retour */}
+        <img src="/logo-cursus.png" alt="Cursus" style={{ height: 98, width: 98, borderRadius: 16, marginBottom: 6 }} />
         <div style={{ fontSize: 24, fontWeight: 600, color: "#8B2635", marginBottom: 6, letterSpacing: "0.01em" }}>Cursus</div>
         <div style={{ fontSize: 13, color: "#999", lineHeight: 1.4, textAlign: "center" }}>
           Une suite d'écriture et d'audit assistée par IA.
