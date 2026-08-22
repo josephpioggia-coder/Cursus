@@ -198,11 +198,50 @@ d'unités, seule différence pratique le temps de traitement en aval.
 - **Pas encore testé dans le navigateur** ni en conditions réelles côté
   moteur (nouveau prompt jamais exécuté).
 
+**Chantier 7 — Synthèse éditoriale globale par unité (réf. 60816-01, suite, 22/08/2026)**
+- Écart signalé par l'auteur du projet : "dans CursEdit il y a des
+  propositions, ici rien ?" — le diagnostic critère par critère ne suffit
+  pas pour un écrivain. Proposition de GPT reprise et resserrée (plusieurs
+  de ses champs faisaient doublon avec des critères déjà existants dans
+  `audit_criteria` — `risque_principal` ≈ `risque_influence`,
+  `diagnostic_global` ≈ `diagnostic_priorite`, "voix de l'auteur" ≈
+  section 6 du questionnaire, déjà mise hors périmètre).
+- **4 champs retenus, ajoutés à la sortie de chaque unité** (pas de
+  nouvelle colonne SQL — vivent dans le même `resultat_analyse` jsonb) :
+  `effet_lecteur` (tableau catégorisé : adhesion/resistance/emotion/
+  confusion/fatigue/curiosite/malaise/impression_de_profondeur/
+  impression_de_repetition), `geste_editorial` (direction de travail,
+  texte libre), `action_recommandee` (catégorie fermée : conserver/
+  alleger/nuancer/deplacer/developper/couper/sourcer/reformuler/reecrire/
+  expertiser), `proposition` (texte libre ou null).
+- **`proposition` est la seule vraiment gated par le degré d'intervention**
+  (voir `DEGRES_AUTORISANT_PROPOSITION`) — vide si "observer"/"signaler"/
+  non renseigné, ou si l'établissement académique n'autorise pas l'IA
+  (`contraintes_academiques.autorisationIA === "Non"`, jusqu'ici collecté
+  par le questionnaire mais jamais transmis au moteur — corrigé au passage).
+  `action_recommandee` n'est PAS gated : c'est un conseil sur ce que
+  l'auteur·ice pourrait faire, pas une intervention de CursAudit lui-même.
+- `construireContexteQualification()` étendue en même temps : injecte
+  maintenant aussi `type_document` et `finalite_audit` (collectés par le
+  questionnaire mais jamais utilisés jusqu'ici), en plus de la question
+  libre et du degré d'intervention déjà câblés.
+- **Coût à recalibrer** : 4 champs de sortie en plus par unité augmentent
+  mécaniquement les tokens de sortie — `cout_unite_base` (tout juste
+  recalibré à 0,0189 €) redeviendra sous-estimé une fois ce chantier
+  redéployé ; à remesurer sur un nouveau vrai test avant de refaire
+  confiance au prix affiché.
+- Différé volontairement (proposition de GPT, jugé trop étroit ou
+  redondant pour l'instant) : `respiration_du_texte`, `promesse_au_lecteur`.
+- Pas encore testé dans le navigateur ni en conditions réelles côté moteur.
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
 bouton "Payer" (Stripe Checkout, voir décision de séquence ci-dessus),
-pont bidirectionnel + badge "Audit partiel". Questionnaire d'intention v2
-côté Cursus Édition (chantier 1b, différent de celui de CursAudit
-ci-dessus) et composants UI partagés (chantier 1c) toujours pas démarrés.
+pont bidirectionnel + badge "Audit partiel", export du rapport (le champ
+"Format de rapport" est collecté à la création mais ne produit encore
+aucun document — signalé comme un vrai manque le 22/08/2026, priorité
+avant même le paiement Stripe). Questionnaire d'intention v2 côté Cursus
+Édition (chantier 1b, différent de celui de CursAudit ci-dessus) et
+composants UI partagés (chantier 1c) toujours pas démarrés.
 
 ---
 
