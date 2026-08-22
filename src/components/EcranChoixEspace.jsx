@@ -21,14 +21,14 @@ const ESPACES = [
     nom: "CursEdit",
     accroche: "Écrire, structurer, être accompagné·e par l'IA pendant la rédaction.",
     couleur: "#7F77DD",
-    icone: "✍️",
+    logo: "/logo-cursedit.png",
   },
   {
     id: "cursaudit",
     nom: "CursAudit",
     accroche: "Auditer un texte déjà écrit : preuve, cohérence, risques, sur une grille de critères.",
     couleur: "#1D9E75",
-    icone: "🔎",
+    logo: "/logo-cursaudit.png",
   },
 ];
 
@@ -54,7 +54,7 @@ export default function EcranChoixEspace({ onChoisir }) {
             onMouseEnter={(ev) => { ev.currentTarget.style.boxShadow = `0 6px 20px ${e.couleur}25`; ev.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={(ev) => { ev.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)"; ev.currentTarget.style.transform = "none"; }}
           >
-            <div style={{ fontSize: 26, marginBottom: 10 }}>{e.icone}</div>
+            <img src={e.logo} alt={e.nom} style={{ height: 44, width: 44, borderRadius: 10, marginBottom: 10 }} />
             <div style={{ fontSize: 17, fontWeight: 600, color: e.couleur, marginBottom: 6 }}>{e.nom}</div>
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6 }}>{e.accroche}</div>
           </button>

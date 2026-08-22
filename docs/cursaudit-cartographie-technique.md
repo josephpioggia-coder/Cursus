@@ -127,10 +127,34 @@ d'unités, seule différence pratique le temps de traitement en aval.
   `consommer_code_promo()`, comme `creer-session-checkout` le fait déjà
   implicitement pour CursEdit.
 
+**Chantier 4 — `diagnostic_priorite` catégorisé (réf. 60816-01, suite, 22/08/2026)**
+- Constat en préparant l'écran de résultat : `valeur` est du texte libre
+  généré par l'IA pour chaque critère (ex. "à nuancer / à sourcer
+  partiellement") — ingérable à l'échelle d'un livre de 60000 mots
+  (~1475 unités observées sur un livre réel) : impossible de compter
+  "X % recevables" si chaque diagnostic est formulé différemment.
+- **`audit_criteria.categories` ajoutée** (`2026-08-22-audit-criteria-categories.sql`)
+  : `jsonb`, `null` pour 29 des 30 critères (texte libre inchangé, leur
+  richesse qualitative est voulue), peuplée uniquement pour
+  `diagnostic_priorite` avec les 5 valeurs déjà présentes dans sa
+  description d'origine (`recevable`, `a_nuancer`, `a_sourcer`,
+  `a_reformuler`, `a_verifier`).
+- `valeur` devient un **tableau** de ces catégories quand `categories`
+  est renseignée, pas une seule — une unité réelle peut cumuler "à
+  nuancer" ET "à sourcer" en même temps (observé dans le test du
+  22/08/2026), un enum à choix unique aurait perdu cette information.
+- `analyser-unite-cursaudit` et `orchestrer-audit-cursaudit` mis à jour en
+  parallèle (schéma dynamique + consigne de prompt), les deux dupliquant
+  cette logique à l'identique (fichiers autonomes, voir leçon du 16/08).
+- Rend possible l'écran de résultat pour un livre entier : compter/filtrer
+  par catégorie sans avoir à lire chaque commentaire.
+
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
-bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, affichage du
-rapport. Questionnaire de qualification côté Cursus Édition (chantier 1b)
-et composants UI partagés (chantier 1c) toujours pas démarrés.
+bouton "Payer" décrit ci-dessus, pont bidirectionnel + badge, **écran de
+résultat** (liste "Mes audits" + vue détaillée par audit, maintenant
+possible à l'échelle d'un livre grâce au chantier 4 ci-dessus).
+Questionnaire de qualification côté Cursus Édition (chantier 1b) et
+composants UI partagés (chantier 1c) toujours pas démarrés.
 
 ---
 

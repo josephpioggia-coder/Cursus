@@ -160,16 +160,30 @@ interface CritereActif {
   label: string;
   description: string | null;
   output_key: string;
+  categories: string[] | null;
 }
 
+// 22/08/2026 — `categories` (voir 2026-08-22-audit-criteria-categories.sql) :
+// null pour la grande majorité des critères, qui restent en texte libre
+// (leur richesse qualitative est voulue, un livre entier ne s'en sert pas
+// pour un comptage). Un critère avec `categories` renseignées (aujourd'hui
+// seul diagnostic_priorite) devient un TABLEAU de valeurs prises dans cette
+// liste fermée — un tableau plutôt qu'une valeur unique parce qu'une unité
+// réelle peut cumuler plusieurs diagnostics à la fois (ex. "à nuancer" ET
+// "à sourcer"), observé dans le test du 22/08/2026. C'est ce qui permet à
+// l'écran de résultat de compter/filtrer sur un livre de 60000 mots sans
+// devoir lire chaque commentaire un par un.
 function construireSchemaAnalyse(criteres: CritereActif[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   for (const c of criteres) {
+    const valeurSchema = c.categories && c.categories.length > 0
+      ? { type: "array", items: { type: "string", enum: c.categories }, minItems: 1 }
+      : { type: "string" };
     properties[c.output_key] = {
       type: "object",
       properties: {
-        valeur: { type: "string" },
+        valeur: valeurSchema,
         commentaire: { type: "string" },
       },
       required: ["valeur", "commentaire"],
@@ -182,7 +196,12 @@ function construireSchemaAnalyse(criteres: CritereActif[]): Record<string, unkno
 
 function construireConsigneCriteres(criteres: CritereActif[]): string {
   return criteres
-    .map((c) => `- ${c.output_key} (${c.label}) : ${c.description ?? "sans description"}`)
+    .map((c) => {
+      const consigneCategories = c.categories && c.categories.length > 0
+        ? ` — valeur = un TABLEAU d'une ou plusieurs de ces catégories exactes : ${c.categories.join(", ")} (cumule-les si plusieurs s'appliquent à la fois, n'en invente aucune autre)`
+        : "";
+      return `- ${c.output_key} (${c.label}) : ${c.description ?? "sans description"}${consigneCategories}`;
+    })
     .join("\n");
 }
 
@@ -249,7 +268,7 @@ Deno.serve(async (req) => {
     //    inclut Approfondi et Essentiel, voir docs/cursaudit-criteria-v1.md).
     const { data: criteresBruts } = await admin
       .from("audit_criteria")
-      .select("code, label, description, output_key, min_grid_level")
+      .select("code, label, description, output_key, min_grid_level, categories")
       .eq("is_active", true)
       .lte("min_grid_level", audit.nombre_dimensions)
       .order("sort_order", { ascending: true });

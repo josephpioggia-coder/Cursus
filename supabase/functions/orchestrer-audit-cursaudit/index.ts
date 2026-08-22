@@ -153,15 +153,22 @@ async function appellerMoteurIAStructure(params: AppelMoteurIAParams): Promise<A
 
 // ─── Construction dynamique du schéma, identique à analyser-unite-cursaudit ─
 
-interface CritereActif { code: string; label: string; description: string | null; output_key: string }
+interface CritereActif { code: string; label: string; description: string | null; output_key: string; categories: string[] | null }
 
+// 22/08/2026 — voir 2026-08-22-audit-criteria-categories.sql et le
+// commentaire jumeau dans analyser-unite-cursaudit/index.ts : `categories`
+// ferme le vocabulaire de `valeur` (tableau, pas une seule) pour les
+// critères qui en ont, null pour les autres (texte libre inchangé).
 function construireSchemaAnalyse(criteres: CritereActif[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   for (const c of criteres) {
+    const valeurSchema = c.categories && c.categories.length > 0
+      ? { type: "array", items: { type: "string", enum: c.categories }, minItems: 1 }
+      : { type: "string" };
     properties[c.output_key] = {
       type: "object",
-      properties: { valeur: { type: "string" }, commentaire: { type: "string" } },
+      properties: { valeur: valeurSchema, commentaire: { type: "string" } },
       required: ["valeur", "commentaire"],
       additionalProperties: false,
     };
@@ -171,7 +178,14 @@ function construireSchemaAnalyse(criteres: CritereActif[]): Record<string, unkno
 }
 
 function construireConsigneCriteres(criteres: CritereActif[]): string {
-  return criteres.map((c) => `- ${c.output_key} (${c.label}) : ${c.description ?? "sans description"}`).join("\n");
+  return criteres
+    .map((c) => {
+      const consigneCategories = c.categories && c.categories.length > 0
+        ? ` — valeur = un TABLEAU d'une ou plusieurs de ces catégories exactes : ${c.categories.join(", ")} (cumule-les si plusieurs s'appliquent à la fois, n'en invente aucune autre)`
+        : "";
+      return `- ${c.output_key} (${c.label}) : ${c.description ?? "sans description"}${consigneCategories}`;
+    })
+    .join("\n");
 }
 
 const SCHEMA_CONTROLE_GPT = {
@@ -270,7 +284,7 @@ Deno.serve(async (req) => {
 
     const { data: criteresBruts } = await admin
       .from("audit_criteria")
-      .select("code, label, description, output_key, min_grid_level")
+      .select("code, label, description, output_key, min_grid_level, categories")
       .eq("is_active", true)
       .lte("min_grid_level", audit.nombre_dimensions)
       .order("sort_order", { ascending: true });
