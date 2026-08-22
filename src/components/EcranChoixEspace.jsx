@@ -8,14 +8,14 @@
  * voir sessionStorage dans App.jsx), avant d'entrer dans l'un ou l'autre
  * produit.
  *
- * REFONTE DU 22/08/2026, à la demande de l'auteur du projet : bouton
- * principal "Ouvrir X" + lien secondaire "Voir les fonctionnalités" (au
- * lieu de la carte entière cliquable), qui ouvre une fenêtre d'info à
- * trois rubriques ("Pour quoi faire ?", "Ce que l'outil permet",
- * "Exemples d'usage"). Contenu rédigé pour rester fidèle à ce qui existe
- * VRAIMENT aujourd'hui — pas d'aspiration/roadmap présentée comme acquise
- * (ex. pas d'import PDF ni de paiement pour CursAudit, pas encore
- * construits).
+ * TEXTES du 22/08/2026 : rédigés intégralement par l'auteur du projet
+ * (en-tête, accroches, contenu des fenêtres "Voir les fonctionnalités").
+ * Certains éléments décrits pour CursAudit (questionnaire de qualification
+ * du texte, "degré d'intervention" jusqu'à la réécriture) correspondent à
+ * la conception déjà figée du produit mais ne sont PAS ENCORE câblés dans
+ * l'écran de création actuel (CursAudit.jsx, qui ne propose que
+ * titre/texte/palier/mode/format) — écart connu, assumé, à résorber quand
+ * ces briques seront construites.
  *
  * PONT BIDIRECTIONNEL — pas encore construit ici : la maquette prévoit de
  * pouvoir passer d'un projet CursEdit à son audit sans réimporter, avec un
@@ -34,19 +34,36 @@ const ESPACES = [
     couleur: "#7F77DD",
     logo: "/logo-cursedit.png",
     info: {
-      pourquoi: "Écrire un livre (roman, essai, témoignage…) avec un accompagnement IA à chaque étape, sans perdre sa propre voix.",
-      permet: [
-        "Structurer un manuscrit en parties/chapitres, avec suivi de progression",
-        "Éditeur riche avec compteurs de mots et objectifs",
-        "Copilote IA : suggestions, cohérence, personnages, références",
-        "Vérification approfondie à deux IA (protocole de contrôle croisé)",
-        "Import et export Word",
-        "Bibliothèque de citations et carnet d'idées",
+      sousTitre: "Votre espace d'écriture accompagné par IA",
+      intro: [
+        "CursEdit vous aide à transformer une idée, un fragment, un chapitre ou un projet complet en texte structuré, cohérent et fidèle à votre intention.",
+        "Il ne remplace pas l'auteur. Il l'accompagne.",
       ],
-      exemples: [
-        "Rédiger un roman chapitre par chapitre avec des suggestions IA en marge",
-        "Faire vérifier la cohérence d'un passage factuel avant publication",
-        "Importer un manuscrit déjà commencé pour continuer à l'écrire dans l'app",
+      permet: [
+        "Structurer un livre, un essai, un récit ou un document long en parties, chapitres et sections.",
+        "Clarifier l'intention du projet : public visé, ton, niveau de profondeur, limites, promesse faite au lecteur.",
+        "Organiser les idées, citations, notes, scènes, personnages ou références.",
+        "Développer un plan progressif sans perdre la vision d'ensemble.",
+        "Être accompagné pendant la rédaction par une IA qui tient compte du contexte du projet.",
+        "Reformuler, alléger, enrichir ou resserrer un passage selon le degré d'intervention choisi.",
+        "Préserver la voix de l'auteur au lieu de lisser le texte.",
+        "Préparer l'export d'un manuscrit ou d'un document structuré.",
+      ],
+      usagesIntro: "CursEdit peut accompagner :",
+      usages: [
+        "l'écriture d'un livre",
+        "la construction d'un essai",
+        "la rédaction d'un mémoire ou d'un travail long",
+        "la préparation d'articles",
+        "l'organisation de notes personnelles",
+        "la transformation de fragments en chapitre",
+        "la réécriture progressive d'un manuscrit",
+      ],
+      esprit: [
+        "CursEdit n'est pas un générateur automatique de texte.",
+        "C'est un atelier d'écriture augmenté.",
+        "L'IA aide à clarifier, structurer, questionner, proposer.",
+        "L'auteur garde la direction, le sens et la responsabilité du texte.",
       ],
     },
   },
@@ -57,23 +74,66 @@ const ESPACES = [
     couleur: "#1D9E75",
     logo: "/logo-cursaudit.png",
     info: {
-      pourquoi: "Faire auditer un texte déjà écrit — livre entier ou simple extrait — pour repérer ce qui manque de preuve, ce qui est à nuancer, ce qui présente un risque.",
-      permet: [
-        "Importer le texte (collé ou fichier Word)",
-        "Choisir la profondeur d'analyse (8, 15 ou 30 critères)",
-        "Analyse par IA, critère par critère",
-        "Résultat catégorisé et filtrable : recevable, à nuancer, à sourcer, à reformuler, à vérifier",
+      sousTitre: "Votre espace d'audit critique des textes",
+      intro: [
+        "CursAudit analyse un texte déjà écrit pour en vérifier la cohérence, la solidité, le niveau de preuve, les risques de glissement et la clarté argumentative.",
+        "Il ne cherche pas d'abord à réécrire.",
+        "Il commence par comprendre ce que le texte prétend faire.",
       ],
-      exemples: [
-        "Auditer un essai avant de le soumettre à un éditeur, pour repérer les affirmations non sourcées",
-        "Vérifier la cohérence argumentative d'un mémoire ou d'un rapport",
-        "Identifier les passages à risque (juridique, éthique) dans un texte professionnel avant diffusion",
+      permet: [
+        "Identifier le type de texte : mémoire, essai, manuscrit, article, rapport, témoignage, correspondance ou document personnel.",
+        "Clarifier le statut du texte : brouillon, version avancée, texte déjà envoyé, version publiée ou document à retravailler.",
+        "Définir la question d'audit avant toute analyse.",
+        "Choisir le degré d'intervention : observation, signalement, pistes, reformulation limitée ou réécriture plus libre.",
+        "Évaluer le type d'énoncé : fait, hypothèse, interprétation, témoignage, jugement, métaphore, prescription.",
+        "Mesurer le niveau de preuve nécessaire et le niveau de preuve disponible.",
+        "Repérer les affirmations insuffisamment sourcées.",
+        "Identifier les généralisations abusives ou les glissements de registre.",
+        "Vérifier la cohérence interne d'un passage, d'un chapitre ou d'un manuscrit.",
+        "Distinguer récit personnel, analyse, pédagogie, théorie, spiritualité, argumentation et promesse faite au lecteur.",
+        "Signaler les zones sensibles : médicales, thérapeutiques, académiques, juridiques, relationnelles ou éthiques.",
+        "Préserver la voix de l'auteur sans produire un texte artificiellement lissé.",
+        "Produire un diagnostic clair : recevable, à nuancer, à sourcer, à reformuler ou à expertiser.",
+      ],
+      niveaux: [
+        { titre: "Audit essentiel — 8 critères", texte: "Pour obtenir rapidement un diagnostic clair sur la cohérence, le statut des affirmations et les principaux risques." },
+        { titre: "Audit approfondi — 15 critères", texte: "Pour examiner plus finement les preuves, les sources, la structure argumentative, les effets de style et la portée des affirmations." },
+        { titre: "Audit expert — 30 critères", texte: "Pour une analyse complète : niveau de preuve, contrat de lecture, promesse au lecteur, risques éthiques, glissements de registre, cohérence longitudinale et recommandations d'action." },
+      ],
+      usagesIntro: "CursAudit peut être utilisé pour :",
+      usages: [
+        "relire un mémoire ou un TFE sans l'écrire à la place de l'étudiant",
+        "vérifier la cohérence d'un chapitre de livre",
+        "auditer un texte thérapeutique, spirituel ou pédagogique",
+        "repérer les passages trop affirmatifs ou insuffisamment prouvés",
+        "analyser un texte généré ou retravaillé avec IA",
+        "préserver la voix d'un auteur",
+        "préparer une réédition ou une version plus fluide d'un manuscrit",
+        "produire une grille d'audit exploitable",
+      ],
+      esprit: [
+        "CursAudit ne juge pas l'auteur.",
+        "Il examine le texte.",
+        "Il distingue ce qui est vécu, affirmé, interprété, démontré ou simplement suggéré.",
+        "Son rôle est d'aider à voir plus clair avant de corriger.",
       ],
     },
   },
 ];
 
+function Rubrique({ titre, couleur, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: couleur, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+        {titre}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function FenêtreInfo({ espace, onFermer }) {
+  const i = espace.info;
   return (
     <div
       onClick={onFermer}
@@ -85,43 +145,62 @@ function FenêtreInfo({ espace, onFermer }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "#fff", borderRadius: 14, padding: "28px 30px", maxWidth: 460, width: "100%",
-          maxHeight: "80vh", overflowY: "auto", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          background: "#fff", borderRadius: 14, padding: "28px 30px", maxWidth: 500, width: "100%",
+          maxHeight: "84vh", overflowY: "auto", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img src={espace.logo} alt={espace.nom} style={{ width: 36, height: "auto" }} />
-          </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <img src={espace.logo} alt={espace.nom} style={{ width: 40, height: "auto" }} />
           <button onClick={onFermer} style={{
             background: "none", border: "none", fontSize: 18, color: "#999", cursor: "pointer", lineHeight: 1, padding: 4,
           }}>✕</button>
         </div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 18 }}>{i.sousTitre}</div>
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: espace.couleur, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
-            Pour quoi faire ?
-          </div>
-          <div style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6 }}>{espace.info.pourquoi}</div>
-        </div>
+        {i.intro.map((p, idx) => (
+          <p key={idx} style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6, margin: "0 0 8px" }}>{p}</p>
+        ))}
+        <div style={{ height: 12 }} />
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: espace.couleur, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
-            Ce que l'outil permet
-          </div>
+        <Rubrique titre={`Ce que ${espace.nom} permet`} couleur={espace.couleur}>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "#333", lineHeight: 1.8 }}>
-            {espace.info.permet.map((ligne, i) => <li key={i}>{ligne}</li>)}
+            {i.permet.map((ligne, idx) => <li key={idx}>{ligne}</li>)}
           </ul>
-        </div>
+        </Rubrique>
 
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: espace.couleur, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
-            Exemples d'usage
-          </div>
+        {i.niveaux && (
+          <Rubrique titre="Trois niveaux d'audit" couleur={espace.couleur}>
+            <div style={{ display: "grid", gap: 10 }}>
+              {i.niveaux.map((n, idx) => (
+                <div key={idx}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#333" }}>{n.titre}</div>
+                  <div style={{ fontSize: 13, color: "#666", lineHeight: 1.6 }}>{n.texte}</div>
+                </div>
+              ))}
+            </div>
+          </Rubrique>
+        )}
+
+        <Rubrique titre="Pour quels usages ?" couleur={espace.couleur}>
+          <p style={{ fontSize: 13.5, color: "#333", margin: "0 0 6px" }}>{i.usagesIntro}</p>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "#333", lineHeight: 1.8 }}>
-            {espace.info.exemples.map((ligne, i) => <li key={i}>{ligne}</li>)}
+            {i.usages.map((ligne, idx) => <li key={idx}>{ligne}</li>)}
           </ul>
-        </div>
+        </Rubrique>
+
+        <Rubrique titre={`L'esprit de ${espace.nom}`} couleur={espace.couleur}>
+          {i.esprit.map((p, idx) => (
+            <p key={idx} style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6, margin: "0 0 4px" }}>{p}</p>
+          ))}
+        </Rubrique>
+
+        <button onClick={onFermer} style={{
+          width: "100%", padding: "9px 0", borderRadius: 8, border: `0.5px solid ${espace.couleur}50`,
+          background: "transparent", color: espace.couleur, fontSize: 13, fontWeight: 500, cursor: "pointer",
+          fontFamily: "inherit", marginTop: 4,
+        }}>
+          Retour au choix
+        </button>
       </div>
     </div>
   );
@@ -136,8 +215,13 @@ export default function EcranChoixEspace({ onChoisir }) {
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
       <img src="/logo-cursus.png" alt="Cursus" style={{ height: 56, width: 56, borderRadius: 12, marginBottom: 12 }} />
-      <div style={{ fontSize: 26, fontWeight: 500, color: "#1a1a1a", marginBottom: 6, letterSpacing: "0.01em" }}>Cursus</div>
-      <div style={{ fontSize: 13.5, color: "#999", marginBottom: 40 }}>Une suite d'écriture et d'audit assistée par IA.</div>
+      <div style={{ fontSize: 26, fontWeight: 500, color: "#1a1a1a", marginBottom: 4, letterSpacing: "0.01em" }}>Cursus</div>
+      <div style={{ fontSize: 13.5, color: "#999", marginBottom: 28 }}>Une suite d'écriture et d'audit assistée par IA.</div>
+
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Choisissez votre espace de travail</div>
+      <div style={{ fontSize: 13, color: "#999", marginBottom: 36, textAlign: "center", maxWidth: 420 }}>
+        Écrivez, structurez, relisez ou auditez vos textes selon votre besoin du moment.
+      </div>
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 680 }}>
         {ESPACES.map((e) => (
