@@ -82,18 +82,21 @@ export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
 }
 
 /**
- * Prix du pré-audit global (référence 60816-01, suite, 22/08/2026).
+ * Prix du pré-audit global (référence 60816-01, suite, 22/08/2026 — barème
+ * révisé le même jour, le premier jugé trop cher par l'auteur du projet).
  * ======================================================================
- * Barème par tranche de mots fourni par l'auteur du projet — dégressif
- * jusqu'à 80 000 mots (stocké dans audit_pricing_rules, categorie
- * "preaudit_global_palier"), puis +10€ HT/tranche de 10 000 mots
- * au-delà (règle fixe, pas dans la table). En-dessous de 10 000 mots,
- * le tarif de la tranche 10 000 sert de plancher — pas de tarif dégressif
- * sous ce montant.
+ * Barème linéaire fourni par l'auteur du projet — +12€ HT par tranche de
+ * 10 000 mots, de 24€ (10 000 mots) à 132€ (100 000 mots), stocké dans
+ * audit_pricing_rules (categorie "preaudit_global_palier"). Au-delà de
+ * 100 000 mots : continuité supposée à +12€ HT/tranche de 10 000 mots
+ * (pas explicitement confirmée par l'auteur du projet — l'ancien barème
+ * dégressif avait sa propre règle "au-delà" à +10€, qui n'a plus de sens
+ * une fois la table elle-même devenue linéaire à +12€). En-dessous de
+ * 10 000 mots, le tarif de la tranche 10 000 sert de plancher.
  *
  * Facturation "à la tranche entamée" (pas d'interpolation continue) :
  * 35 000 mots paient le tarif de la tranche 40 000, comme la règle "au-delà"
- * le fait explicitement pour les tranches au-dessus de 80 000.
+ * le fait explicitement pour les tranches au-dessus de 100 000.
  */
 export function calculerPrixPreauditGlobal(regles, nombreMots) {
   const paliers = regles
@@ -112,7 +115,7 @@ export function calculerPrixPreauditGlobal(regles, nombreMots) {
     prixHT = palierTrouvé.prixHT;
   } else {
     const tranchesSupplémentaires = Math.ceil((nombreMots - dernierPalier.seuil) / 10000);
-    prixHT = dernierPalier.prixHT + tranchesSupplémentaires * 10;
+    prixHT = dernierPalier.prixHT + tranchesSupplémentaires * 12;
   }
 
   const tva = prixHT * (tvaPct / 100);
