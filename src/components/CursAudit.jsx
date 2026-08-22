@@ -78,6 +78,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [palier, setPalier] = useState("essentiel");
   const [modeIA, setModeIA] = useState("1 IA");
   const [typeRapport, setTypeRapport] = useState("Aucun");
+  const [demanderPreaudit, setDemanderPreaudit] = useState(false);
   const [reglesPrix, setReglesPrix] = useState(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -152,6 +153,8 @@ export default function CursAudit({ onVoirAudits } = {}) {
       typeRapport,
       nombrePages: nombrePagesEstimé,
       prixTTC: prix.prixTTC,
+      demanderPreaudit,
+      preauditPrixHT: demanderPreaudit ? prixPreaudit?.prixHT : null,
       typeDocument: questionnaire?.typeDocument,
       statutTexte: questionnaire?.statutTexte,
       finaliteAudit: questionnaire?.finaliteAudit,
@@ -168,7 +171,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
   const toutRéinitialiser = () => {
     setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
-    setQuestionnaire(null);
+    setQuestionnaire(null); setDemanderPreaudit(false);
   };
 
   return (
@@ -183,8 +186,14 @@ export default function CursAudit({ onVoirAudits } = {}) {
           <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé</div>
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
             « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}, statut « brouillon ».
+            {demanderPreaudit && (
+              <>
+                <br />
+                Lecture globale incluse — lancez-la depuis l'écran de détail de cet audit.
+              </>
+            )}
             <br />
-            Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse ne peut pas être lancée tant que le statut reste « brouillon ».
+            Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse détaillée ne peut pas être lancée tant que le statut reste « brouillon ».
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button
@@ -262,20 +271,39 @@ export default function CursAudit({ onVoirAudits } = {}) {
           </div>
 
           {prixPreaudit && (
-            <div style={{ background: "#FFFBF2", border: "0.5px solid #C4973A80", borderRadius: 8, padding: "12px 14px" }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116", marginBottom: 4 }}>
-                Option : lecture globale d'abord ({nombreMots.toLocaleString("fr-FR")} mots)
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12.5, color: "var(--texte-secondaire)" }}>
-                <span>Vue d'ensemble du manuscrit avant l'audit détaillé ci-dessous — un seul appel IA.</span>
-                <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>{prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC</span>
-              </div>
-              {duréePreaudit && (
-                <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 2 }}>Temps estimé : {duréePreaudit.texte}</div>
-              )}
-              <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>
-                Se lance depuis l'écran de détail, une fois l'audit créé ci-dessous.
-              </div>
+            <div style={{
+              background: "#FFFBF2", borderRadius: 8, padding: "12px 14px",
+              border: demanderPreaudit ? "1.5px solid #C4973A" : "0.5px solid #C4973A80",
+            }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={demanderPreaudit}
+                  onChange={(e) => setDemanderPreaudit(e.target.checked)}
+                  style={{ marginTop: 3, flexShrink: 0, width: 15, height: 15, accentColor: "#C4973A" }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116" }}>
+                      Ajouter la lecture globale d'abord ({nombreMots.toLocaleString("fr-FR")} mots)
+                    </span>
+                    <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>{prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.5, marginTop: 4 }}>
+                    L'audit détaillé ci-dessous examine chaque unité séparément — précis, mais aveugle à l'ensemble.
+                    La lecture globale lit le manuscrit ENTIER en un seul appel IA : elle révèle la colonne
+                    vertébrale du texte, ses tensions et ses risques à l'échelle du livre, et recommande le palier
+                    d'audit le plus adapté — pour un coût bien plus faible, avant de s'engager sur le prix plus
+                    élevé de l'audit détaillé.
+                  </div>
+                  {duréePreaudit && (
+                    <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>Temps estimé : {duréePreaudit.texte}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 2 }}>
+                    Se lance depuis l'écran de détail, une fois l'audit créé ci-dessous.
+                  </div>
+                </div>
+              </label>
             </div>
           )}
 
