@@ -11,6 +11,14 @@
  * éprouvée dans ImportDocx.jsx, simplifiée (pas de détection de niveaux de
  * titre, CursAudit n'a pas besoin de distinguer parties/chapitres).
  *
+ * QUESTIONNAIRE DE QUALIFICATION ajouté le 22/08/2026 (CursAuditQuestionnaire.jsx)
+ * — porte d'entrée obligatoire avant le texte, reprend
+ * questionnaire-cursaudit-v1-specification.md sections 1-5, 7, 10 (section 6
+ * "préserver ma voix" hors périmètre, sections 8/9 déjà couvertes par le
+ * palier/mode/rapport ci-dessous). La question libre et le degré
+ * d'intervention sont transmis au moteur d'analyse ; le reste qualifie la
+ * demande sans influencer encore le résultat.
+ *
  * CE QUE CETTE PAGE NE FAIT PAS ENCORE (limites assumées) :
  *  - Pas d'import .pdf — .docx et texte collé seulement.
  *  - Pas de paiement : l'audit créé reste au statut "brouillon". Aucun
@@ -34,6 +42,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit } from "../lib/tarifCursAudit.js";
+import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
 const PALIERS = [
   { id: "essentiel", nom: "Essentiel", dimensions: 8, description: "Lecture exhaustive, coût minimal." },
@@ -53,6 +62,10 @@ const TYPES_RAPPORT = [
 ];
 
 export default function CursAudit({ onVoirAudits } = {}) {
+  // Questionnaire de qualification (22/08/2026) — porte d'entrée obligatoire
+  // avant le texte, voir CursAuditQuestionnaire.jsx. null = pas encore rempli.
+  const [questionnaire, setQuestionnaire] = useState(null);
+
   const [titre, setTitre] = useState("");
   const [source, setSource] = useState("coller"); // "coller" | "docx"
   const [texte, setTexte] = useState("");
@@ -125,6 +138,13 @@ export default function CursAudit({ onVoirAudits } = {}) {
       typeRapport,
       nombrePages: nombrePagesEstimé,
       prixTTC: prix.prixTTC,
+      typeDocument: questionnaire?.typeDocument,
+      statutTexte: questionnaire?.statutTexte,
+      finaliteAudit: questionnaire?.finaliteAudit,
+      questionLibre: questionnaire?.questionLibre,
+      degreIntervention: questionnaire?.degreIntervention,
+      contraintesAcademiques: questionnaire?.contraintesAcademiques,
+      relationIA: questionnaire?.relationIA,
     });
 
     setEnCours(false);
@@ -134,6 +154,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
   const toutRéinitialiser = () => {
     setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
+    setQuestionnaire(null);
   };
 
   return (
@@ -168,8 +189,19 @@ export default function CursAudit({ onVoirAudits } = {}) {
             )}
           </div>
         </div>
+      ) : !questionnaire ? (
+        <CursAuditQuestionnaire onValider={setQuestionnaire} />
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--fond, #F7F4EF)", padding: "8px 14px", borderRadius: 8 }}>
+            <span style={{ fontSize: 12, color: "var(--texte-secondaire)" }}>
+              Questionnaire rempli — {questionnaire.typeDocument}, {questionnaire.finaliteAudit.length} objectif{questionnaire.finaliteAudit.length > 1 ? "s" : ""}
+            </span>
+            <button onClick={() => setQuestionnaire(null)} style={{ fontSize: 11.5, color: "#1D9E75", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+              Modifier mes réponses
+            </button>
+          </div>
+
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Titre</label>
             <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre de l'audit"
@@ -215,6 +247,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
             <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
           </div>
 
+          {/* Palier + mode + format répondent aux sections 8 (niveau de preuve
+              attendu) et 9 (sortie attendue) du questionnaire — pas de champ
+              séparé, voir la note technique de
+              questionnaire-cursaudit-v1-specification.md. */}
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Palier de profondeur</label>
             <div style={{ display: "flex", gap: 8 }}>

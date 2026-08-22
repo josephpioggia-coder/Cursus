@@ -466,7 +466,15 @@ export const auditsAPI = {
    * source : texte collé via segmenterTexte(), ou .docx via
    * extraireParagraphesDocx() — voir src/lib/segmenterCursAudit.js).
    */
-  async créer({ titre, unités, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null }) {
+  async créer({
+    titre, unités, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null,
+    // Questionnaire de qualification (référence 60816-01, suite, 22/08/2026)
+    // — voir questionnaire-cursaudit-v1-specification.md et
+    // CursAuditQuestionnaire.jsx. Optionnels : un appel existant sans ces
+    // champs (aucun ne l'était avant ce jour) continue de fonctionner.
+    typeDocument = null, statutTexte = null, finaliteAudit = null, questionLibre = null,
+    degreIntervention = null, contraintesAcademiques = null, relationIA = null,
+  }) {
     if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
 
     const uid = await userId();
@@ -483,6 +491,13 @@ export const auditsAPI = {
         nombre_pages:      nombrePages,
         prix_ttc:          prixTTC,
         statut:            "brouillon",
+        type_document:           typeDocument,
+        statut_texte:            statutTexte,
+        finalite_audit:          finaliteAudit,
+        question_libre:          questionLibre,
+        degre_intervention:      degreIntervention,
+        contraintes_academiques: contraintesAcademiques,
+        relation_ia:             relationIA,
       }])
       .select()
       .single();

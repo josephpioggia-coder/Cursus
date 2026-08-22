@@ -206,6 +206,46 @@ const SCHEMA_CONTROLE_GPT = {
   additionalProperties: false,
 };
 
+// ─── Qualification de la demande (questionnaire, réf. 60816-01, suite, 22/08/2026) ─
+// Voir le commentaire jumeau dans analyser-unite-cursaudit/index.ts — même
+// logique, dupliquée (fichier autonome).
+const LABELS_DEGRE_INTERVENTION: Record<string, string> = {
+  observer: "Observer seulement : diagnostique, ne suggère aucune correction.",
+  signaler: "Signale les problèmes, sans proposer de solution.",
+  pistes: "Propose des pistes de correction dans le commentaire, sans reformuler à la place de l'auteur·ice.",
+  reformulations_ponctuelles: "Tu peux glisser une suggestion de reformulation ponctuelle dans le commentaire si cela aide à comprendre le problème — jamais une réécriture complète.",
+  reecrire_legerement: "Tu peux esquisser une reformulation dans le commentaire, mais la sortie reste un diagnostic, pas un texte de remplacement (aucun champ dédié à la réécriture n'existe).",
+  reecrire_librement: "Même limite que ci-dessus, en te montrant plus libre dans la reformulation suggérée au sein du commentaire.",
+};
+
+interface AuditQualification {
+  question_libre: string | null;
+  degre_intervention: string | null;
+  relation_ia: { adresse?: string; ton?: string; posture?: string; longueur?: string; role?: string } | null;
+}
+
+function construireContexteQualification(audit: AuditQualification): string {
+  const lignes: string[] = [];
+  if (audit.question_libre) {
+    lignes.push(`Question posée par l'auteur·ice pour cet audit, à garder à l'esprit pour chaque unité : "${audit.question_libre}"`);
+  }
+  if (audit.degre_intervention && LABELS_DEGRE_INTERVENTION[audit.degre_intervention]) {
+    lignes.push(`Degré d'intervention autorisé : ${LABELS_DEGRE_INTERVENTION[audit.degre_intervention]}`);
+  }
+  if (audit.relation_ia) {
+    const r = audit.relation_ia;
+    const parts = [
+      r.adresse === "vous" ? "vouvoie l'auteur·ice" : "tutoie l'auteur·ice",
+      r.ton ? `ton ${r.ton}` : null,
+      r.posture ? `posture ${r.posture}` : null,
+      r.longueur === "court" ? "commentaires courts" : "commentaires détaillés",
+      r.role ? `plutôt en ${r.role}` : null,
+    ].filter(Boolean);
+    lignes.push(`Style attendu dans les commentaires : ${parts.join(", ")}.`);
+  }
+  return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
+}
+
 // ─── Analyse d'une unité (logique identique à analyser-unite-cursaudit) ────
 
 async function analyserUneSection(
@@ -214,8 +254,10 @@ async function analyserUneSection(
   criteres: CritereActif[],
   schema: Record<string, unknown>,
   consigneCriteres: string,
+  contexteQualification: string,
 ): Promise<Record<string, unknown>> {
   const systemClaude =
+    contexteQualification +
     "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
     "CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
     "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
@@ -267,7 +309,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, question_libre, degre_intervention, relation_ia")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -292,6 +334,7 @@ Deno.serve(async (req) => {
     if (criteres.length === 0) return json({ error: "Aucun critère actif pour ce palier de dimensions." }, 500);
     const schema = construireSchemaAnalyse(criteres);
     const consigneCriteres = construireConsigneCriteres(criteres);
+    const contexteQualification = construireContexteQualification(audit);
 
     const { data: sections } = await admin
       .from("audit_sections")
@@ -308,7 +351,7 @@ Deno.serve(async (req) => {
       if (Date.now() - départ > BUDGET_MS) break; // lot suivant au prochain appel
 
       try {
-        const résultat = await analyserUneSection(section, audit.mode_ia, criteres, schema, consigneCriteres);
+        const résultat = await analyserUneSection(section, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification);
         await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
         traiteesCetteFois++;
       } catch (err) {

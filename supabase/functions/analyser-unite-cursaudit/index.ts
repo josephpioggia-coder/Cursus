@@ -205,6 +205,51 @@ function construireConsigneCriteres(criteres: CritereActif[]): string {
     .join("\n");
 }
 
+// ─── Qualification de la demande (questionnaire, réf. 60816-01, suite, 22/08/2026) ─
+// Injecte dans le prompt système la question libre et le degré
+// d'intervention posés par l'auteur·ice avant analyse (sections 4 et 5 de
+// questionnaire-cursaudit-v1-specification.md, câblées côté UI dans
+// CursAuditQuestionnaire.jsx). LIMITE ASSUMÉE : le moteur ne produit
+// toujours qu'un diagnostic (valeur + commentaire) par critère, jamais un
+// texte réécrit séparé — les degrés "reformulation"/"réécriture" ne
+// changent que ce que le commentaire peut contenir, pas la forme de sortie.
+const LABELS_DEGRE_INTERVENTION: Record<string, string> = {
+  observer: "Observer seulement : diagnostique, ne suggère aucune correction.",
+  signaler: "Signale les problèmes, sans proposer de solution.",
+  pistes: "Propose des pistes de correction dans le commentaire, sans reformuler à la place de l'auteur·ice.",
+  reformulations_ponctuelles: "Tu peux glisser une suggestion de reformulation ponctuelle dans le commentaire si cela aide à comprendre le problème — jamais une réécriture complète.",
+  reecrire_legerement: "Tu peux esquisser une reformulation dans le commentaire, mais la sortie reste un diagnostic, pas un texte de remplacement (aucun champ dédié à la réécriture n'existe).",
+  reecrire_librement: "Même limite que ci-dessus, en te montrant plus libre dans la reformulation suggérée au sein du commentaire.",
+};
+
+interface AuditQualification {
+  question_libre: string | null;
+  degre_intervention: string | null;
+  relation_ia: { adresse?: string; ton?: string; posture?: string; longueur?: string; role?: string } | null;
+}
+
+function construireContexteQualification(audit: AuditQualification): string {
+  const lignes: string[] = [];
+  if (audit.question_libre) {
+    lignes.push(`Question posée par l'auteur·ice pour cet audit, à garder à l'esprit pour chaque unité : "${audit.question_libre}"`);
+  }
+  if (audit.degre_intervention && LABELS_DEGRE_INTERVENTION[audit.degre_intervention]) {
+    lignes.push(`Degré d'intervention autorisé : ${LABELS_DEGRE_INTERVENTION[audit.degre_intervention]}`);
+  }
+  if (audit.relation_ia) {
+    const r = audit.relation_ia;
+    const parts = [
+      r.adresse === "vous" ? "vouvoie l'auteur·ice" : "tutoie l'auteur·ice",
+      r.ton ? `ton ${r.ton}` : null,
+      r.posture ? `posture ${r.posture}` : null,
+      r.longueur === "court" ? "commentaires courts" : "commentaires détaillés",
+      r.role ? `plutôt en ${r.role}` : null,
+    ].filter(Boolean);
+    lignes.push(`Style attendu dans les commentaires : ${parts.join(", ")}.`);
+  }
+  return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
+}
+
 const SCHEMA_CONTROLE_GPT = {
   type: "object",
   properties: {
@@ -253,7 +298,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, question_libre, degre_intervention, relation_ia")
       .eq("id", section.audit_id)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -279,7 +324,9 @@ Deno.serve(async (req) => {
     const consigneCriteres = construireConsigneCriteres(criteres);
 
     // 5. Analyse Claude (toujours) puis, si mode_ia = "2 IA", contrôle GPT.
+    const contexteQualification = construireContexteQualification(audit);
     const systemClaude =
+      contexteQualification +
       "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
       "CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
       "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
