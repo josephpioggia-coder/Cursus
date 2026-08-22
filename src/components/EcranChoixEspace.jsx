@@ -55,13 +55,16 @@ export default function EcranChoixEspace({ onChoisir }) {
             onMouseEnter={(ev) => { ev.currentTarget.style.boxShadow = `0 6px 20px ${e.couleur}25`; ev.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={(ev) => { ev.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)"; ev.currentTarget.style.transform = "none"; }}
           >
-            {/* 22/08/2026 — logo-cursedit.png/logo-cursaudit.png ne sont PAS
-                carrés (icône + nom de marque empilés dans une seule image,
-                ratio ~0.82) : une hauteur ET largeur fixes identiques les
-                écrasait. Largeur fixe + hauteur automatique préserve leurs
-                proportions réelles. */}
-            <img src={e.logo} alt={e.nom} style={{ width: 64, height: "auto", borderRadius: 10, marginBottom: 10 }} />
-            <div style={{ fontSize: 17, fontWeight: 600, color: e.couleur, marginBottom: 6 }}>{e.nom}</div>
+            {/* 22/08/2026 — logo-cursedit.png (836×1020) et logo-cursaudit.png
+                (868×1024) ne sont PAS carrés et n'ont pas exactement le même
+                ratio l'un que l'autre (icône + nom de marque empilés dans
+                chaque image) : largeur fixe + hauteur automatique préserve
+                le ratio RÉEL propre à chaque fichier plutôt que d'imposer
+                une même hauteur aux deux, ce qui en aurait légèrement déformé
+                un des deux. Le nom du produit est déjà écrit dans l'image —
+                le texte {"{e.nom}"} séparé qui doublait cette information a
+                été retiré (demande explicite de l'auteur du projet). */}
+            <img src={e.logo} alt={e.nom} style={{ width: 110, height: "auto", marginBottom: 14 }} />
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6 }}>{e.accroche}</div>
           </button>
         ))}
