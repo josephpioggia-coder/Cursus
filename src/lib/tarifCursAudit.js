@@ -6,34 +6,25 @@
  * pages × unités/page du calculateur original — ici les unités sont
  * connues avant paiement, plus précis qu'une estimation.
  *
- * MULTIPLICATEUR CORRIGÉ le 22/08/2026 — BUG RÉEL : les valeurs
- * précédentes ({essentiel: 2, approfondi: 3, expert: 4}) avaient été
- * inventées sans être vérifiées contre le fichier Excel d'origine
- * (`CursAudit_Calculateur_Tarification.xlsx`, feuille "Scénarios"). Le
- * vrai fichier montre {essentiel: 3, approfondi: 4, expert: 4} sur 5
- * scénarios distincts (vérifié : "200 pages, 8 dim, 1 IA, Synthèse
- * courte" donne 100,60 € avec multiplicateur=3, contre 100,61 € dans le
- * fichier — écart d'arrondi seulement). Conséquence concrète : le prix
- * était sous-évalué d'environ un tiers pour tout audit créé avant cette
- * correction (ex. 74,69 € affiché au lieu d'environ 112 € pour "là où les
- * portes s'ouvrent" — comme pour cout_unite_base, la correction ne
- * s'applique qu'aux audits créés à partir de maintenant).
- *
- * LIMITE CONNUE, PAS CORRIGÉE ICI : le fichier montre aussi un scénario
- * "250 pages, Expert (30 dim), 2 IA + arbitrage" avec multiplicateur=5,
- * pas 4 — suggérant une escalade du multiplicateur au-delà d'un certain
- * volume de pages, jamais formalisée dans le fichier lui-même (le
- * multiplicateur y est un champ libre par scénario, pas une formule). Une
- * seule paire de points (150 pages→4, 250 pages→5) ne suffit pas à en
- * déduire une règle fiable — à builder plus tard sur base de vrais
- * échanges avec l'auteur du projet, pas d'une extrapolation à 2 points.
+ * MULTIPLICATEUR SIMPLIFIÉ le 22/08/2026 — l'export complet du fichier
+ * Excel d'origine (`CursAudit_Calculateur_Tarification.xlsx`, feuille
+ * "Scénarios", 11 lignes) montre en réalité un multiplicateur constant de
+ * 3,0x sur TOUS les scénarios (essentiel comme expert, 1 IA comme 2 IA +
+ * arbitrage dialogique, 50 pages comme 250 pages) — les valeurs {3, 4, 4}
+ * déduites juste avant, à partir d'une seule ligne de référence, étaient
+ * une extrapolation erronée. Choix assumé pour l'instant : 3,0x partout,
+ * quel que soit le palier. Vérifié contre les 11 lignes de l'export
+ * (ex. 250 pages/30 dim/2 IA + arbitrage dialogique/Rapport complet →
+ * 1041,31 € TTC calculé avec 3,0x, correspond à l'export). À revoir avec
+ * l'auteur du projet si une différenciation par palier doit être
+ * réintroduite plus tard (ex. paliers hauts plus rentables, ou l'inverse).
  *
  * Ne calcule PAS la remise abonné CursEdit (20 %, plafonnée à 50 % du
  * prix de l'abonnement) — nécessite de connaître l'abonnement actif de
  * l'auteur·e, hors périmètre de ce premier formulaire de création.
  */
 
-const MULTIPLICATEUR_PAR_PALIER = { essentiel: 3, approfondi: 4, expert: 4, libre: 4 };
+const MULTIPLICATEUR_PAR_PALIER = { essentiel: 3, approfondi: 3, expert: 3, libre: 3 };
 
 export function calculerPrixCursAudit(regles, { palier, modeIA, typeRapport, nombreUnites }) {
   const val = (categorie, cle) => regles.find((r) => r.categorie === categorie && r.cle === cle)?.valeur_numerique;
