@@ -24,7 +24,7 @@
 -- mesurée en conditions réelles. À corriger le jour où un vrai test "2 IA"
 -- sera mené (comme celui-ci l'a été pour "1 IA").
 
-insert into audit_pricing_rules (categorie, cle, label, valeur_numerique, description)
+insert into audit_pricing_rules (categorie, cle, libelle, valeur_numerique, description)
 values ('parametre_global', 'taux_usd_vers_eur', 'Taux de conversion USD → EUR', 0.92,
         'Approximatif, à mettre à jour périodiquement — pas un taux temps réel.');
 
