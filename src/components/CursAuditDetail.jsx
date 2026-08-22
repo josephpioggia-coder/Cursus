@@ -41,6 +41,17 @@ const CATEGORIES_DIAGNOSTIC = [
 
 const PAR_PAGE = 20;
 
+// Synthèse éditoriale (réf. 60816-01, suite, 22/08/2026) — voir le
+// commentaire dans analyser-unite-cursaudit/index.ts. `effet_lecteur` a son
+// propre vocabulaire, distinct de CATEGORIES_DIAGNOSTIC ; `proposition` est
+// une chaîne simple (ou null), pas un objet {valeur, commentaire} comme les
+// autres champs — traitée à part dans le rendu plutôt que par la boucle générique.
+const LABELS_EFFET_LECTEUR = {
+  adhesion: "Adhésion", resistance: "Résistance", emotion: "Émotion", confusion: "Confusion",
+  fatigue: "Fatigue", curiosite: "Curiosité", malaise: "Malaise",
+  impression_de_profondeur: "Impression de profondeur", impression_de_repetition: "Impression de répétition",
+};
+
 function humaniserCle(cle) {
   return cle.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
@@ -114,13 +125,25 @@ function LigneSection({ section }) {
             <div style={{ fontSize: 12.5, color: "var(--texte-tertiaire)" }}>Pas encore analysée.</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
-              {Object.entries(résultat.analyse || {}).map(([clé, val]) => (
+              {résultat.analyse?.proposition && (
+                <div style={{
+                  fontSize: 12.5, background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 6, padding: "8px 10px",
+                }}>
+                  <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 2 }}>Proposition</div>
+                  <div style={{ color: "var(--texte-primaire)", lineHeight: 1.5 }}>{résultat.analyse.proposition}</div>
+                </div>
+              )}
+              {Object.entries(résultat.analyse || {})
+                .filter(([clé]) => clé !== "proposition")
+                .map(([clé, val]) => (
                 <div key={clé} style={{ fontSize: 12.5 }}>
                   <div style={{ fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 2 }}>
                     {humaniserCle(clé)}
                     {" — "}
                     <span style={{ fontWeight: 400, color: "var(--texte-primaire)" }}>
-                      {Array.isArray(val.valeur) ? val.valeur.map((v) => CATEGORIES_DIAGNOSTIC.find((d) => d.id === v)?.label || v).join(", ") : val.valeur}
+                      {Array.isArray(val.valeur)
+                        ? val.valeur.map((v) => (clé === "effet_lecteur" ? LABELS_EFFET_LECTEUR[v] : CATEGORIES_DIAGNOSTIC.find((d) => d.id === v)?.label) || v).join(", ")
+                        : val.valeur}
                     </span>
                   </div>
                   <div style={{ color: "var(--texte-tertiaire)", lineHeight: 1.5 }}>{val.commentaire}</div>

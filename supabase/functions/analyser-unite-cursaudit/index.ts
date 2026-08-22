@@ -222,19 +222,41 @@ const LABELS_DEGRE_INTERVENTION: Record<string, string> = {
   reecrire_librement: "Même limite que ci-dessus, en te montrant plus libre dans la reformulation suggérée au sein du commentaire.",
 };
 
+// Degrés qui autorisent le champ `proposition` (voir SCHEMA_SYNTHESE_EDITORIALE
+// plus bas) — "observer"/"signaler", et l'absence de choix (audits créés
+// avant ce questionnaire), restent délibérément SANS proposition : défaut
+// prudent, pas de suggestion non sollicitée sans consentement explicite.
+const DEGRES_AUTORISANT_PROPOSITION = new Set([
+  "pistes", "reformulations_ponctuelles", "reecrire_legerement", "reecrire_librement",
+]);
+
 interface AuditQualification {
+  type_document: string | null;
+  finalite_audit: string[] | null;
   question_libre: string | null;
   degre_intervention: string | null;
+  contraintes_academiques: { autorisationIA?: string; conditions?: string[] } | null;
   relation_ia: { adresse?: string; ton?: string; posture?: string; longueur?: string; role?: string } | null;
 }
 
 function construireContexteQualification(audit: AuditQualification): string {
   const lignes: string[] = [];
+  if (audit.type_document) {
+    lignes.push(`Type de document audité : ${audit.type_document}.`);
+  }
+  if (audit.finalite_audit && audit.finalite_audit.length > 0) {
+    lignes.push(`Ce que l'auteur·ice cherche à obtenir de cet audit : ${audit.finalite_audit.join(", ")}.`);
+  }
   if (audit.question_libre) {
     lignes.push(`Question posée par l'auteur·ice pour cet audit, à garder à l'esprit pour chaque unité : "${audit.question_libre}"`);
   }
   if (audit.degre_intervention && LABELS_DEGRE_INTERVENTION[audit.degre_intervention]) {
     lignes.push(`Degré d'intervention autorisé : ${LABELS_DEGRE_INTERVENTION[audit.degre_intervention]}`);
+  }
+  if (audit.contraintes_academiques?.autorisationIA === "Non") {
+    lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail — reste strictement au diagnostic, aucune proposition ni reformulation, quel que soit le degré d'intervention choisi par ailleurs.");
+  } else if (audit.contraintes_academiques?.conditions && audit.contraintes_academiques.conditions.length > 0) {
+    lignes.push(`Conditions académiques à respecter : ${audit.contraintes_academiques.conditions.join(", ")}.`);
   }
   if (audit.relation_ia) {
     const r = audit.relation_ia;
@@ -248,6 +270,91 @@ function construireContexteQualification(audit: AuditQualification): string {
     lignes.push(`Style attendu dans les commentaires : ${parts.join(", ")}.`);
   }
   return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
+}
+
+// ─── Synthèse éditoriale globale par unité (réf. 60816-01, suite, 22/08/2026) ─
+// Ajoutée à la demande de l'auteur du projet, après échange avec GPT : le
+// diagnostic critère par critère ne suffit pas pour un écrivain — il
+// manque un niveau "ce qu'il faudrait faire", pas seulement "ce que le
+// texte est". Champs choisis en écartant ceux qui font doublon avec des
+// critères déjà présents dans audit_criteria (ex. `risque_influence`
+// couvre déjà ce que GPT proposait comme "risque_principal") :
+//  - effet_lecteur : axe absent ailleurs, comment le texte atterrit chez
+//    un lecteur (pas s'il est vrai/prouvé, mais ce qu'il produit comme effet).
+//  - geste_editorial : le pont entre diagnostic et correction, une
+//    direction de travail, pas encore une réécriture.
+//  - action_recommandee : vocabulaire fermé, catégorisable comme
+//    diagnostic_priorite — jamais gated par le degré d'intervention (c'est
+//    un conseil sur ce QUE l'auteur·ice pourrait faire, pas une
+//    intervention de CursAudit lui-même).
+//  - proposition : seule à être réellement gated par le degré
+//    d'intervention (voir DEGRES_AUTORISANT_PROPOSITION) — vide si
+//    "observer"/"signaler"/non renseigné, ou si l'établissement académique
+//    n'autorise pas l'IA.
+const EFFETS_LECTEUR = [
+  "adhesion", "resistance", "emotion", "confusion", "fatigue",
+  "curiosite", "malaise", "impression_de_profondeur", "impression_de_repetition",
+];
+const ACTIONS_RECOMMANDEES = [
+  "conserver", "alleger", "nuancer", "deplacer", "developper",
+  "couper", "sourcer", "reformuler", "reecrire", "expertiser",
+];
+
+function construireSchemaSyntheseEditoriale(autoriserProposition: boolean): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      effet_lecteur: {
+        type: "object",
+        properties: {
+          valeur: { type: "array", items: { type: "string", enum: EFFETS_LECTEUR }, minItems: 1 },
+          commentaire: { type: "string" },
+        },
+        required: ["valeur", "commentaire"],
+        additionalProperties: false,
+      },
+      geste_editorial: {
+        type: "object",
+        properties: { valeur: { type: "string" }, commentaire: { type: "string" } },
+        required: ["valeur", "commentaire"],
+        additionalProperties: false,
+      },
+      action_recommandee: {
+        type: "object",
+        properties: {
+          valeur: { type: "string", enum: ACTIONS_RECOMMANDEES },
+          commentaire: { type: "string" },
+        },
+        required: ["valeur", "commentaire"],
+        additionalProperties: false,
+      },
+      proposition: autoriserProposition ? { type: "string" } : { type: "null" },
+    },
+    required: ["effet_lecteur", "geste_editorial", "action_recommandee", "proposition"],
+    additionalProperties: false,
+  };
+}
+
+function construireConsigneSyntheseEditoriale(autoriserProposition: boolean): string {
+  const consigneProposition = autoriserProposition
+    ? `- proposition : une suggestion concrète et actionnable (reformulation, piste de correction), en respectant strictement le degré d'intervention autorisé ci-dessus — jamais au-delà.`
+    : `- proposition : DOIT être null. Le degré d'intervention choisi (ou son absence) n'autorise aucune proposition de correction — diagnostique et oriente (geste_editorial) sans jamais rédiger à la place de l'auteur·ice.`;
+  return (
+    "En plus de l'évaluation critère par critère, produis une synthèse éditoriale globale pour cette unité :\n" +
+    `- effet_lecteur : un tableau d'une ou plusieurs de ces catégories exactes : ${EFFETS_LECTEUR.join(", ")} — l'effet que ce passage produirait chez un lecteur, pas s'il est vrai ou prouvé.\n` +
+    `- geste_editorial : une direction de travail concrète mais non rédigée (ex. "ramener l'énoncé vers le vécu de l'auteur·ice plutôt que vers une généralisation").\n` +
+    `- action_recommandee : une seule de ces catégories exactes : ${ACTIONS_RECOMMANDEES.join(", ")}.\n` +
+    consigneProposition
+  );
+}
+
+function fusionnerSchemas(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: { ...(a.properties as object), ...(b.properties as object) },
+    required: [...(a.required as string[]), ...(b.required as string[])],
+    additionalProperties: false,
+  };
 }
 
 const SCHEMA_CONTROLE_GPT = {
@@ -298,7 +405,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia, question_libre, degre_intervention, relation_ia")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia")
       .eq("id", section.audit_id)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -320,7 +427,10 @@ Deno.serve(async (req) => {
     const criteres = (criteresBruts ?? []) as CritereActif[];
     if (criteres.length === 0) return json({ error: "Aucun critère actif pour ce palier de dimensions." }, 500);
 
-    const schema = construireSchemaAnalyse(criteres);
+    const autoriserProposition =
+      DEGRES_AUTORISANT_PROPOSITION.has(audit.degre_intervention ?? "") &&
+      audit.contraintes_academiques?.autorisationIA !== "Non";
+    const schema = fusionnerSchemas(construireSchemaAnalyse(criteres), construireSchemaSyntheseEditoriale(autoriserProposition));
     const consigneCriteres = construireConsigneCriteres(criteres);
 
     // 5. Analyse Claude (toujours) puis, si mode_ia = "2 IA", contrôle GPT.
@@ -330,7 +440,8 @@ Deno.serve(async (req) => {
       "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
       "CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
       "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
-      consigneCriteres;
+      consigneCriteres + "\n\n" +
+      construireConsigneSyntheseEditoriale(autoriserProposition);
 
     const { data: analyse, usage: usageClaude } = await appellerMoteurIAStructure({
       moteur: "claude",
