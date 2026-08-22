@@ -41,6 +41,8 @@ import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
 import Tarification from "./components/Tarification.jsx";
 import CursAudit from "./components/CursAudit.jsx";
+import CursAuditListe from "./components/CursAuditListe.jsx";
+import CursAuditDetail from "./components/CursAuditDetail.jsx";
 import Administration from "./components/Administration.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
@@ -1728,6 +1730,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [chargement, setChargement] = useState(true);
   const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
+  const [auditActifId, setAuditActifId] = useState(null);
   // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
   // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
   // pour permettre la mise en garde en rouge demandée par Joseph.
@@ -2183,6 +2186,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             // n'ayant pas encore son propre panneau tarifaire dans l'app.
             { id: "tarification", label: t("navigation.tarification") + (espaceActif === "cursaudit" ? " (CursEdit)" : ""), icone: "💳" },
             { id: "cursaudit",     label: t("navigation.cursaudit", "CursAudit"), icone: "🔎" },
+            // "Mes audits" — 22/08/2026, même logique que "Mes projets" du
+            // 28/07 : l'écran de résultat existait (CursAuditListe.jsx /
+            // CursAuditDetail.jsx) mais avait besoin d'un point d'entrée
+            // dans la navigation.
+            { id: "mesaudits",     label: "Mes audits",                          icone: "📋" },
             // Administration (codes promo) — 16/08/2026 : le composant existait
             // depuis 60804-03 mais n'avait jamais été relié à la navigation.
             // Visible seulement pour le compte propriétaire ; ce n'est qu'une
@@ -2353,7 +2361,20 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         )}
 
         {/* Vue : CursAudit (référence 60816-01) */}
-        {vue === "cursaudit" && <CursAudit />}
+        {vue === "cursaudit" && <CursAudit onVoirAudits={() => setVue("mesaudits")} />}
+
+        {/* Vue : Mes audits (liste, réf. 60816-01, suite, 22/08/2026) */}
+        {vue === "mesaudits" && (
+          <CursAuditListe
+            onOuvrir={(id) => { setAuditActifId(id); setVue("auditdetail"); }}
+            onNouveau={() => setVue("cursaudit")}
+          />
+        )}
+
+        {/* Vue : détail d'un audit (résultat, réf. 60816-01, suite, 22/08/2026) */}
+        {vue === "auditdetail" && auditActifId && (
+          <CursAuditDetail auditId={auditActifId} onRetour={() => setVue("mesaudits")} />
+        )}
 
         {/* Vue : Administration (codes promo) — réf. 60804-03, reliée le 16/08/2026 */}
         {vue === "administration" && user.email === "joseph.pioggia@gmail.com" && (
