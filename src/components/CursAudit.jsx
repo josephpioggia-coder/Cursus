@@ -41,7 +41,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
-import { calculerPrixCursAudit, estimerDuréeCursAudit } from "../lib/tarifCursAudit.js";
+import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditGlobal, estimerDuréePreauditGlobal } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
 const PALIERS = [
@@ -103,6 +103,20 @@ export default function CursAudit({ onVoirAudits } = {}) {
     if (unités.length === 0) return null;
     return estimerDuréeCursAudit({ modeIA, nombreUnites: unités.length });
   }, [modeIA, unités.length]);
+
+  // Pré-audit global (référence 60816-01, suite, 22/08/2026) — affiché dès
+  // la création pour informer le choix, même si l'exécution elle-même
+  // n'est possible qu'une fois l'audit (et ses unités) créés en base,
+  // sur l'écran de détail (CursAuditDetail.jsx).
+  const nombreMots = useMemo(
+    () => unités.reduce((acc, u) => acc + (u?.split(/\s+/).filter(Boolean).length || 0), 0),
+    [unités]
+  );
+  const prixPreaudit = useMemo(() => {
+    if (!reglesPrix || nombreMots === 0) return null;
+    return calculerPrixPreauditGlobal(reglesPrix, nombreMots);
+  }, [reglesPrix, nombreMots]);
+  const duréePreaudit = useMemo(() => (nombreMots === 0 ? null : estimerDuréePreauditGlobal(nombreMots)), [nombreMots]);
 
   const importerFichier = async (fichier) => {
     if (!fichier?.name.endsWith(".docx")) { setErreurImport("Fichier .docx requis."); return; }
@@ -246,6 +260,24 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
             <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
           </div>
+
+          {prixPreaudit && (
+            <div style={{ background: "#FFFBF2", border: "0.5px solid #C4973A80", borderRadius: 8, padding: "12px 14px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116", marginBottom: 4 }}>
+                Option : lecture globale d'abord ({nombreMots.toLocaleString("fr-FR")} mots)
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 12.5, color: "var(--texte-secondaire)" }}>
+                <span>Vue d'ensemble du manuscrit avant l'audit détaillé ci-dessous — un seul appel IA.</span>
+                <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>{prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC</span>
+              </div>
+              {duréePreaudit && (
+                <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 2 }}>Temps estimé : {duréePreaudit.texte}</div>
+              )}
+              <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>
+                Se lance depuis l'écran de détail, une fois l'audit créé ci-dessous.
+              </div>
+            </div>
+          )}
 
           {/* Palier + mode + format répondent aux sections 8 (niveau de preuve
               attendu) et 9 (sortie attendue) du questionnaire — pas de champ

@@ -123,3 +123,25 @@ export function calculerPrixPreauditGlobal(regles, nombreMots) {
     prixTTC: Math.round(prixTTC * 100) / 100,
   };
 }
+
+/**
+ * Temps estimé du pré-audit global (référence 60816-01, suite, 22/08/2026).
+ * ======================================================================
+ * ESTIMATION, pas une mesure — comme estimerDuréeCursAudit() ci-dessus,
+ * à recalibrer sur un vrai test. Contrairement à l'audit détaillé, il n'y
+ * a QU'UN SEUL appel IA, quelle que soit la taille du livre — la variable
+ * n'est donc pas le nombre d'unités mais le temps de "prefill" (lecture du
+ * contexte par Claude) sur un texte pouvant faire plusieurs dizaines de
+ * milliers de mots, plus une sortie courte et bornée (max_tokens=2048 côté
+ * serveur). Hypothèse : une base fixe (démarrage de l'appel, génération de
+ * la sortie) + un terme qui croît doucement avec la taille du texte.
+ */
+const DUREE_BASE_PREAUDIT_SECONDES = 20;
+const DUREE_PAR_10000_MOTS_SECONDES = 5;
+
+export function estimerDuréePreauditGlobal(nombreMots) {
+  const secondes = DUREE_BASE_PREAUDIT_SECONDES + (nombreMots / 10000) * DUREE_PAR_10000_MOTS_SECONDES;
+  if (secondes < 60) return { secondes, texte: "moins d'une minute" };
+  const minutes = Math.round(secondes / 60);
+  return { secondes, texte: `environ ${minutes} min` };
+}
