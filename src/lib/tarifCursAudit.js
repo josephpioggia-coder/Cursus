@@ -6,20 +6,34 @@
  * pages × unités/page du calculateur original — ici les unités sont
  * connues avant paiement, plus précis qu'une estimation.
  *
- * Multiplicateur commercial : simplifié en une valeur fixe par palier
- * (Essentiel ×2, Approfondi ×3, Expert ×4), approximant la grille par
- * tranches de pages du calculateur original sans la reproduire à
- * l'identique — `audit_pricing_rules` ne stocke pas encore ce
- * multiplicateur par combinaison (noté comme non fait dans la migration
- * du 15/08/2026, `2026-08-15-cursaudit-schema.sql`). À affiner si le
- * produit se précise.
+ * MULTIPLICATEUR CORRIGÉ le 22/08/2026 — BUG RÉEL : les valeurs
+ * précédentes ({essentiel: 2, approfondi: 3, expert: 4}) avaient été
+ * inventées sans être vérifiées contre le fichier Excel d'origine
+ * (`CursAudit_Calculateur_Tarification.xlsx`, feuille "Scénarios"). Le
+ * vrai fichier montre {essentiel: 3, approfondi: 4, expert: 4} sur 5
+ * scénarios distincts (vérifié : "200 pages, 8 dim, 1 IA, Synthèse
+ * courte" donne 100,60 € avec multiplicateur=3, contre 100,61 € dans le
+ * fichier — écart d'arrondi seulement). Conséquence concrète : le prix
+ * était sous-évalué d'environ un tiers pour tout audit créé avant cette
+ * correction (ex. 74,69 € affiché au lieu d'environ 112 € pour "là où les
+ * portes s'ouvrent" — comme pour cout_unite_base, la correction ne
+ * s'applique qu'aux audits créés à partir de maintenant).
+ *
+ * LIMITE CONNUE, PAS CORRIGÉE ICI : le fichier montre aussi un scénario
+ * "250 pages, Expert (30 dim), 2 IA + arbitrage" avec multiplicateur=5,
+ * pas 4 — suggérant une escalade du multiplicateur au-delà d'un certain
+ * volume de pages, jamais formalisée dans le fichier lui-même (le
+ * multiplicateur y est un champ libre par scénario, pas une formule). Une
+ * seule paire de points (150 pages→4, 250 pages→5) ne suffit pas à en
+ * déduire une règle fiable — à builder plus tard sur base de vrais
+ * échanges avec l'auteur du projet, pas d'une extrapolation à 2 points.
  *
  * Ne calcule PAS la remise abonné CursEdit (20 %, plafonnée à 50 % du
  * prix de l'abonnement) — nécessite de connaître l'abonnement actif de
  * l'auteur·e, hors périmètre de ce premier formulaire de création.
  */
 
-const MULTIPLICATEUR_PAR_PALIER = { essentiel: 2, approfondi: 3, expert: 4, libre: 3 };
+const MULTIPLICATEUR_PAR_PALIER = { essentiel: 3, approfondi: 4, expert: 4, libre: 4 };
 
 export function calculerPrixCursAudit(regles, { palier, modeIA, typeRapport, nombreUnites }) {
   const val = (categorie, cle) => regles.find((r) => r.categorie === categorie && r.cle === cle)?.valeur_numerique;
