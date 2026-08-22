@@ -38,6 +38,7 @@ export default function EcranChoixEspace({ onChoisir }) {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
+      <img src="/logo-cursus.png" alt="Cursus" style={{ height: 56, width: 56, borderRadius: 12, marginBottom: 12 }} />
       <div style={{ fontSize: 26, fontWeight: 500, color: "#1a1a1a", marginBottom: 6, letterSpacing: "0.01em" }}>Cursus</div>
       <div style={{ fontSize: 13.5, color: "#999", marginBottom: 40 }}>Choisissez votre espace de travail</div>
 
@@ -54,7 +55,12 @@ export default function EcranChoixEspace({ onChoisir }) {
             onMouseEnter={(ev) => { ev.currentTarget.style.boxShadow = `0 6px 20px ${e.couleur}25`; ev.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={(ev) => { ev.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)"; ev.currentTarget.style.transform = "none"; }}
           >
-            <img src={e.logo} alt={e.nom} style={{ height: 44, width: 44, borderRadius: 10, marginBottom: 10 }} />
+            {/* 22/08/2026 — logo-cursedit.png/logo-cursaudit.png ne sont PAS
+                carrés (icône + nom de marque empilés dans une seule image,
+                ratio ~0.82) : une hauteur ET largeur fixes identiques les
+                écrasait. Largeur fixe + hauteur automatique préserve leurs
+                proportions réelles. */}
+            <img src={e.logo} alt={e.nom} style={{ width: 64, height: "auto", borderRadius: 10, marginBottom: 10 }} />
             <div style={{ fontSize: 17, fontWeight: 600, color: e.couleur, marginBottom: 6 }}>{e.nom}</div>
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6 }}>{e.accroche}</div>
           </button>

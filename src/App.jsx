@@ -2147,7 +2147,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           <img
             src={espaceActif === "cursaudit" ? "/logo-cursaudit.png" : "/logo-cursedit.png"}
             alt=""
-            style={{ height: 14, width: 14, borderRadius: 3 }}
+            style={{ width: 14, height: "auto", borderRadius: 3 }}
           />
           {espaceActif === "cursaudit" ? "CursAudit" : "CursEdit"} ⇄
         </button>
