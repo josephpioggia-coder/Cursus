@@ -11,28 +11,39 @@
  * l'échelle du livre entier — PAS un audit unité par unité (ça, c'est déjà
  * analyser-unite-cursaudit / orchestrer-audit-cursaudit).
  *
- * STRUCTURE RÉVISÉE UNE 2e FOIS le 23/08/2026, sur le premier vrai résultat
- * généré par la structure en 7 blocs (v1, même jour) : jugée "mesquine" —
- * trop occupée à dire "il faudra vérifier ça dans l'audit détaillé" (une
- * note de préparation interne) plutôt que de livrer une vraie lecture
- * éditoriale autonome, et repérée en train de se focaliser tout entière sur
- * UNE piste de correction précise (ex. "ajouter une partenaire de
- * randonnée à Scalpa") au lieu de rester à l'échelle de l'organisme-livre.
- * Nouvelle structure en 10 points (retour GPT, validé par l'auteur du
- * projet) : nature dominante, colonne vertébrale, contrat de lecture
- * affiché vs réel, forces à préserver, faiblesses structurelles, TROIS
- * scénarios éditoriaux (avec ampleur de réécriture chacun), zones
- * prioritaires pour l'audit détaillé, exemples justifiant les hypothèses,
- * recommandation finale claire. RÈGLES EXPLICITES DANS LE PROMPT :
- *  - hypothèses à vérifier, jamais des verdicts établis (déjà en v1, gardé) ;
- *  - GÉNÉROSITÉ OBLIGATOIRE : dire aussi ce qui tient déjà et doit être
- *    préservé, pas seulement ce qui ne va pas (le problème "sévère sans
- *    être généreux" de la v1) ;
- *  - NE PAS se focaliser sur une seule piste de correction précise — elle
- *    peut apparaître comme UN exemple à l'intérieur d'un scénario, jamais
- *    comme le centre de l'analyse (le problème principal de la v1) ;
- *  - se terminer par une vraie décision éditoriale exploitable, pas
- *    seulement une liste de points à auditer plus tard.
+ * STRUCTURE RÉVISÉE UNE 3e FOIS le 23/08/2026. v1 (7 blocs) était "mesquine" :
+ * trop occupée à dire "il faudra vérifier ça dans l'audit détaillé" plutôt
+ * que de livrer un vrai travail. v2 (10 points, diagnostic + hypothèses)
+ * corrigeait le ton, mais restait un DIAGNOSTIC ("votre livre est plutôt
+ * une fable qu'un roman") plutôt qu'un PLAN D'INTERVENTION ("voici quoi
+ * faire, dans quel ordre, avec quel niveau de réécriture, et pourquoi") —
+ * constat de l'auteur du projet après le 2e test réel : bien vu, mais rien
+ * qu'un·e auteur·ice puisse appliquer directement à son manuscrit.
+ *
+ * v3 — nouvelle structure en 10 points, orientée DÉCISION + ACTION :
+ * nature réelle, promesse affichée, écart promesse/exécution, trois voies
+ * éditoriales, recommandation principale, PLAN D'INTERVENTION en chantiers
+ * concrets (pas "à vérifier" — un geste éditorial par chantier), exemples
+ * concrets structurés (problème/effet/geste éditorial/proposition, même
+ * esprit que la synthèse éditoriale par unité de analyser-unite-cursaudit),
+ * ce qu'il faut préserver, ce qu'il faut couper/alléger, prochaine étape
+ * recommandée (qui peut être "pas besoin d'audit détaillé" — pas un
+ * réflexe de vente automatique).
+ *
+ * RÈGLES EXPLICITES DANS LE PROMPT :
+ *  - Aucune orientation ne doit se limiter à "à vérifier plus tard" — chaque
+ *    chantier et chaque exemple porte un geste éditorial actionnable
+ *    MAINTENANT, avec ou sans audit détaillé ensuite (le vrai problème de v1
+ *    ET, dans une moindre mesure, de v2).
+ *  - Rester au niveau de préconisation, pas de certitude absolue sur le
+ *    texte lui-même ("tout indique que...", pas "Clara n'a pas d'arc") —
+ *    mais les RECOMMANDATIONS, elles, doivent être franches et directives.
+ *  - GÉNÉROSITÉ OBLIGATOIRE : dire aussi ce qui tient déjà (à préserver),
+ *    pas seulement ce qui ne va pas.
+ *  - Les exemples concrets illustrent un patron plus large, jamais une
+ *    seule idée de correction qui deviendrait le centre de toute l'analyse.
+ *  - La prochaine étape recommandée doit être honnête, y compris si la
+ *    réponse est "pas besoin d'audit détaillé, réécrire directement".
  *
  * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
  * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
@@ -92,20 +103,10 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 const SCHEMA_PREAUDIT_APPROFONDI = {
   type: "object",
   properties: {
-    nature_dominante: { type: "string" },
-    colonne_vertebrale: { type: "string" },
-    contrat_lecture: {
-      type: "object",
-      properties: {
-        promesse_affichee: { type: "string" },
-        contrat_reel: { type: "string" },
-      },
-      required: ["promesse_affichee", "contrat_reel"],
-      additionalProperties: false,
-    },
-    forces_a_preserver: { type: "array", items: { type: "string" } },
-    faiblesses_structurelles: { type: "array", items: { type: "string" } },
-    scenarios_editoriaux: {
+    nature_reelle: { type: "string" },
+    promesse_affichee: { type: "string" },
+    ecart_promesse_execution: { type: "string" },
+    voies_editoriales: {
       type: "array",
       minItems: 3,
       maxItems: 3,
@@ -120,14 +121,44 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         additionalProperties: false,
       },
     },
-    zones_prioritaires_audit: { type: "array", items: { type: "string" } },
-    exemples: { type: "array", items: { type: "string" } },
-    recommandation_finale: { type: "string" },
+    recommandation_principale: { type: "string" },
+    plan_intervention: {
+      type: "array",
+      minItems: 3,
+      maxItems: 6,
+      items: {
+        type: "object",
+        properties: {
+          chantier: { type: "string" },
+          geste_editorial: { type: "string" },
+        },
+        required: ["chantier", "geste_editorial"],
+        additionalProperties: false,
+      },
+    },
+    exemples_concrets: {
+      type: "array",
+      minItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          probleme: { type: "string" },
+          effet: { type: "string" },
+          geste_editorial: { type: "string" },
+          proposition: { type: "string" },
+        },
+        required: ["probleme", "effet", "geste_editorial", "proposition"],
+        additionalProperties: false,
+      },
+    },
+    a_preserver: { type: "array", items: { type: "string" } },
+    a_couper_ou_alleger: { type: "array", items: { type: "string" } },
+    prochaine_etape: { type: "string" },
   },
   required: [
-    "nature_dominante", "colonne_vertebrale", "contrat_lecture", "forces_a_preserver",
-    "faiblesses_structurelles", "scenarios_editoriaux", "zones_prioritaires_audit",
-    "exemples", "recommandation_finale",
+    "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
+    "recommandation_principale", "plan_intervention", "exemples_concrets",
+    "a_preserver", "a_couper_ou_alleger", "prochaine_etape",
   ],
   additionalProperties: false,
 };
@@ -177,37 +208,40 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
   return (
     "Tu es le module de pré-audit approfondi de CursAudit. On te donne un manuscrit ENTIER, ainsi qu'un " +
     "aperçu rapide déjà réalisé sur ce même livre. Ton rôle n'est PAS de refaire cet aperçu, ni d'auditer " +
-    "chaque unité une par une (un autre module fait déjà cela) : c'est de livrer une LECTURE ÉDITORIALE " +
-    "AUTONOME et utile en elle-même — pas une simple liste de choses que l'audit détaillé devra vérifier.\n\n" +
-    "QUATRE RÈGLES NON NÉGOCIABLES, établies après un premier essai jugé trop faible :\n" +
-    "1. Hypothèses, jamais des verdicts établis. Ne formule pas \"Clara n'a pas d'arc dramatique\" mais " +
-    "\"Hypothèse à vérifier : Clara semble fonctionner davantage comme élève-réceptacle que comme personnage " +
-    "autonome\". Tu orientes, tu ne condamnes pas.\n" +
-    "2. Sois généreux autant que sévère. Ne te contente pas de lister ce qui ne va pas — dis aussi ce qui " +
-    "tient déjà et doit être préservé à tout prix (forces_a_preserver n'est pas une formalité, c'est aussi " +
-    "important que les faiblesses).\n" +
-    "3. Reste à l'échelle du livre entier — l'ORGANISME, pas UNE scène ou UNE piste de correction précise. " +
-    "Si une idée de correction concrète te vient (ex. ajouter un personnage, une scène), elle peut apparaître " +
-    "comme UN exemple à l'intérieur d'un scénario éditorial, jamais comme le sujet central de ta réponse.\n" +
-    "4. Termine toujours sur une vraie décision éditoriale exploitable (recommandation_finale) — pas une " +
-    "liste ouverte de points à auditer plus tard. Le client doit pouvoir agir avec ce que tu produis, même " +
-    "sans lancer l'audit détaillé.\n\n" +
+    "chaque unité une par une (un autre module fait déjà cela) : c'est de produire un PLAN DE DÉCISION " +
+    "ÉDITORIALE — pas un diagnostic qui constate, un outil qui aide l'auteur·ice à transformer son livre. " +
+    "Le test à te poser en permanence : après avoir lu ta réponse, l'auteur·ice peut-il/elle faire cinq " +
+    "modifications concrètes dans son manuscrit ? Si la réponse est non, ce n'est pas encore assez utile.\n\n" +
+    "CINQ RÈGLES NON NÉGOCIABLES, établies après deux essais jugés trop faibles :\n" +
+    "1. Aucun \"il faudra vérifier ça dans l'audit détaillé\". Chaque chantier du plan d'intervention et " +
+    "chaque exemple concret porte un geste éditorial que l'auteur·ice peut appliquer MAINTENANT, avec ou " +
+    "sans commander l'audit détaillé ensuite.\n" +
+    "2. Reste au niveau de la préconisation sur le texte lui-même (\"tout indique que...\", pas \"Clara n'a " +
+    "pas d'arc dramatique\" comme un fait acquis) — mais tes RECOMMANDATIONS, elles, doivent être franches " +
+    "et directives, pas des hypothèses timides.\n" +
+    "3. Sois généreux autant que sévère : dis aussi ce qui tient déjà et doit être préservé (a_preserver " +
+    "n'est pas une formalité).\n" +
+    "4. Reste à l'échelle du livre entier — l'ORGANISME. Une idée de correction concrète (ex. ajouter un " +
+    "personnage, une scène) illustre un patron plus large dans un exemple, elle ne devient jamais à elle " +
+    "seule le sujet central de ta réponse.\n" +
+    "5. prochaine_etape doit être honnête, y compris si la vraie réponse est \"pas besoin d'audit détaillé, " +
+    "l'auteur·ice peut réécrire directement à partir de ce plan\" — ce n'est pas un réflexe de vente.\n\n" +
     `${contexteQualification}` +
     `Colonne vertébrale déjà repérée par l'aperçu : ${apercu?.colonne_vertebrale ?? "non disponible"}\n` +
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
     `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
     "Produis les 10 éléments suivants :\n" +
-    "- nature_dominante : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
-    "- colonne_vertebrale : UNE phrase — ce qui tient le livre de bout en bout.\n" +
-    "- contrat_lecture.promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
-    "- contrat_lecture.contrat_reel : ce que sa forme réelle tient effectivement, et l'écart avec la promesse s'il y en a un.\n" +
-    "- forces_a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu dans une réécriture, quelle qu'elle soit.\n" +
-    "- faiblesses_structurelles : 3 à 5 hypothèses (règle 1) sur les fragilités les plus significatives de CE livre précis.\n" +
-    "- scenarios_editoriaux : EXACTEMENT 3 scénarios, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacun avec son ampleur_reecriture (légère/moyenne/lourde).\n" +
-    "- zones_prioritaires_audit : sur quoi l'audit détaillé devrait porter en priorité si le client le commande ensuite.\n" +
-    "- exemples : des passages ou scènes PRÉCIS du livre qui illustrent tes hypothèses (pas une catégorie générique).\n" +
-    "- recommandation_finale : UN scénario recommandé (parmi les 3), avec la réserve explicite si l'auteur·ice vise délibérément autre chose."
+    "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
+    "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
+    "- ecart_promesse_execution : l'écart entre cette promesse et ce que la forme réelle tient effectivement.\n" +
+    "- voies_editoriales : EXACTEMENT 3 voies, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacune avec son ampleur_reecriture (légère/moyenne/lourde).\n" +
+    "- recommandation_principale : LA voie recommandée parmi les 3, franchement, avec la réserve explicite si l'auteur·ice vise délibérément autre chose.\n" +
+    "- plan_intervention : 3 à 6 chantiers concrets (voir règle 1) — chacun un problème réel de CE livre et son geste_editorial, jamais \"à vérifier\".\n" +
+    "- exemples_concrets : au moins 3, chacun avec probleme (ce qui se passe dans le texte), effet (ce que ça produit chez le lecteur), geste_editorial (l'action éditoriale concrète), et proposition (à quoi ça pourrait ressembler après ce geste) — sur des passages PRÉCIS du livre, pas des catégories génériques.\n" +
+    "- a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu, quelle que soit la voie choisie.\n" +
+    "- a_couper_ou_alleger : ce qui alourdit le texte sans lui apporter de valeur (répétitions, longueurs...).\n" +
+    "- prochaine_etape : voir règle 5."
   );
 }
 
@@ -257,10 +291,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 7500,
+        max_tokens: 8000,
         system: systemPrompt,
         messages: [{ role: "user", content: texteIntegral }],
-        tools: [{ name: "preaudit_approfondi", description: "Lecture éditoriale autonome en 10 points, avec 3 scénarios éditoriaux et une recommandation finale.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
+        tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale : 3 voies, un plan d'intervention en chantiers, des exemples concrets actionnables, une prochaine étape honnête.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
         tool_choice: { type: "tool", name: "preaudit_approfondi" },
       }),
     });

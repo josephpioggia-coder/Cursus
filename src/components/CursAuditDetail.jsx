@@ -242,9 +242,9 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
     <div style={{ border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#F7F6FD" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Pré-audit approfondi</div>
+          <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Rapport de décision éditoriale (pré-audit)</div>
           <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            Développe l'aperçu ci-dessus en une lecture éditoriale autonome : forces à préserver, faiblesses, trois scénarios de réécriture possibles, et une recommandation.
+            Pas un diagnostic qui constate — un plan : trois voies éditoriales, un plan d'intervention en chantiers concrets, des exemples actionnables, une prochaine étape.
           </div>
         </div>
         {audit.preaudit_statut !== "termine" && prix && (
@@ -276,75 +276,89 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
 
       {audit.preaudit_statut === "termine" && résultat && (
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature dominante : </span>{résultat.nature_dominante}</div>
-          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
-
-          {résultat.contrat_lecture && (
-            <div style={{ fontSize: 12.5 }}>
-              <span style={{ fontWeight: 600 }}>Contrat de lecture : </span>{résultat.contrat_lecture.promesse_affichee}
-              {résultat.contrat_lecture.contrat_reel && (
-                <span style={{ color: "var(--texte-tertiaire)" }}> — dans les faits : {résultat.contrat_lecture.contrat_reel}</span>
-              )}
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {résultat.forces_a_preserver?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>Forces à préserver</div>
-                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                  {résultat.forces_a_preserver.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
-                </ul>
-              </div>
-            )}
-            {résultat.faiblesses_structurelles?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>Faiblesses structurelles (hypothèses)</div>
-                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                  {résultat.faiblesses_structurelles.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
-                </ul>
-              </div>
+          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature réelle : </span>{résultat.nature_reelle}</div>
+          <div style={{ fontSize: 12.5 }}>
+            <span style={{ fontWeight: 600 }}>Promesse affichée : </span>{résultat.promesse_affichee}
+            {résultat.ecart_promesse_execution && (
+              <span style={{ color: "var(--texte-tertiaire)" }}> — écart : {résultat.ecart_promesse_execution}</span>
             )}
           </div>
 
-          {résultat.scenarios_editoriaux?.length > 0 && (
+          {résultat.voies_editoriales?.length > 0 && (
             <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 5 }}>Scénarios éditoriaux</div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 5 }}>Voies éditoriales possibles</div>
               <div style={{ display: "grid", gap: 6 }}>
-                {résultat.scenarios_editoriaux.map((s, i) => (
+                {résultat.voies_editoriales.map((v, i) => (
                   <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                      <span style={{ fontWeight: 600 }}>{s.nom}</span>
-                      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", flexShrink: 0 }}>Réécriture {s.ampleur_reecriture}</span>
+                      <span style={{ fontWeight: 600 }}>{v.nom}</span>
+                      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", flexShrink: 0 }}>Réécriture {v.ampleur_reecriture}</span>
                     </div>
-                    <div style={{ marginTop: 3, color: "var(--texte-secondaire)" }}>{s.description}</div>
+                    <div style={{ marginTop: 3, color: "var(--texte-secondaire)" }}>{v.description}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {résultat.recommandation_finale && (
+          {résultat.recommandation_principale && (
             <div style={{ fontSize: 12.5, background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 6, padding: "8px 10px" }}>
-              <span style={{ fontWeight: 600, color: "#1D9E75" }}>Recommandation : </span>{résultat.recommandation_finale}
+              <span style={{ fontWeight: 600, color: "#1D9E75" }}>Recommandation : </span>{résultat.recommandation_principale}
             </div>
           )}
 
-          {résultat.zones_prioritaires_audit?.length > 0 && (
+          {résultat.plan_intervention?.length > 0 && (
             <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Zones prioritaires pour l'audit détaillé</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                {résultat.zones_prioritaires_audit.map((z, i) => <li key={i} style={{ marginBottom: 4 }}>{z}</li>)}
-              </ul>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 5 }}>Plan d'intervention</div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {résultat.plan_intervention.map((c, i) => (
+                  <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
+                    <div style={{ fontWeight: 600 }}>{c.chantier}</div>
+                    <div style={{ marginTop: 3, color: "var(--texte-secondaire)" }}>{c.geste_editorial}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
-          {résultat.exemples?.length > 0 && (
+          {résultat.exemples_concrets?.length > 0 && (
             <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Exemples tirés du texte</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: "var(--texte-tertiaire)" }}>
-                {résultat.exemples.map((e, i) => <li key={i} style={{ marginBottom: 4 }}>{e}</li>)}
-              </ul>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 5 }}>Exemples concrets</div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {résultat.exemples_concrets.map((ex, i) => (
+                  <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid var(--border)", borderRadius: 6, padding: "8px 10px", display: "grid", gap: 3 }}>
+                    <div><span style={{ fontWeight: 600 }}>Problème — </span>{ex.probleme}</div>
+                    <div><span style={{ fontWeight: 600 }}>Effet — </span>{ex.effet}</div>
+                    <div><span style={{ fontWeight: 600, color: "#5B52C4" }}>Geste éditorial — </span>{ex.geste_editorial}</div>
+                    <div><span style={{ fontWeight: 600, color: "#1D9E75" }}>Proposition — </span>{ex.proposition}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {résultat.a_preserver?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>À préserver</div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                  {résultat.a_preserver.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
+                </ul>
+              </div>
+            )}
+            {résultat.a_couper_ou_alleger?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>À couper ou alléger</div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                  {résultat.a_couper_ou_alleger.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {résultat.prochaine_etape && (
+            <div style={{ fontSize: 12.5, background: "var(--fond, #F7F4EF)", borderRadius: 6, padding: "8px 10px" }}>
+              <span style={{ fontWeight: 600 }}>Prochaine étape : </span>{résultat.prochaine_etape}
             </div>
           )}
         </div>
