@@ -80,7 +80,7 @@ async function appelerOrchestrateur(auditId, signal) {
     body: JSON.stringify({ audit_id: auditId }),
   });
   const données = await réponse.json();
-  if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
+  if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
   return données;
 }
 
@@ -102,7 +102,7 @@ async function appelerApercuGlobal(auditId) {
     body: JSON.stringify({ audit_id: auditId }),
   });
   const données = await réponse.json();
-  if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
+  if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
   return données;
 }
 
@@ -212,7 +212,7 @@ async function appelerPreauditApprofondi(auditId) {
     body: JSON.stringify({ audit_id: auditId }),
   });
   const données = await réponse.json();
-  if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
+  if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
   return données;
 }
 
