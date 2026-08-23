@@ -41,7 +41,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
-import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditGlobal, estimerDuréePreauditGlobal } from "../lib/tarifCursAudit.js";
+import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
 const PALIERS = [
@@ -78,7 +78,6 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [palier, setPalier] = useState("essentiel");
   const [modeIA, setModeIA] = useState("1 IA");
   const [typeRapport, setTypeRapport] = useState("Aucun");
-  const [demanderPreaudit, setDemanderPreaudit] = useState(false);
   const [reglesPrix, setReglesPrix] = useState(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -105,19 +104,22 @@ export default function CursAudit({ onVoirAudits } = {}) {
     return estimerDuréeCursAudit({ modeIA, nombreUnites: unités.length });
   }, [modeIA, unités.length]);
 
-  // Pré-audit global (référence 60816-01, suite, 22/08/2026) — affiché dès
-  // la création pour informer le choix, même si l'exécution elle-même
-  // n'est possible qu'une fois l'audit (et ses unités) créés en base,
-  // sur l'écran de détail (CursAuditDetail.jsx).
+  // Aperçu gratuit + pré-audit payant (référence 60816-01, suite, 23/08/2026)
+  // — purement informatif ici : l'aperçu se lance depuis l'écran de détail
+  // (gratuit, un clic), et le pré-audit approfondi (payant, 40 % du prix de
+  // l'audit détaillé) ne peut être proposé qu'une fois l'aperçu terminé —
+  // voir CursAuditDetail.jsx. On calcule quand même le prix du pré-audit
+  // ici à titre de teaser, puisque le prix de l'audit détaillé (sa base de
+  // calcul) est déjà connu sur cet écran.
   const nombreMots = useMemo(
     () => unités.reduce((acc, u) => acc + (u?.split(/\s+/).filter(Boolean).length || 0), 0),
     [unités]
   );
-  const prixPreaudit = useMemo(() => {
-    if (!reglesPrix || nombreMots === 0) return null;
-    return calculerPrixPreauditGlobal(reglesPrix, nombreMots);
-  }, [reglesPrix, nombreMots]);
-  const duréePreaudit = useMemo(() => (nombreMots === 0 ? null : estimerDuréePreauditGlobal(nombreMots)), [nombreMots]);
+  const duréeApercu = useMemo(() => (nombreMots === 0 ? null : estimerDuréeAppelGlobal(nombreMots)), [nombreMots]);
+  const prixPreauditApprofondi = useMemo(() => {
+    if (!reglesPrix || !prix) return null;
+    return calculerPrixPreauditPourcentage(reglesPrix, prix.prixTTC);
+  }, [reglesPrix, prix]);
 
   const importerFichier = async (fichier) => {
     if (!fichier?.name.endsWith(".docx")) { setErreurImport("Fichier .docx requis."); return; }
@@ -153,8 +155,6 @@ export default function CursAudit({ onVoirAudits } = {}) {
       typeRapport,
       nombrePages: nombrePagesEstimé,
       prixTTC: prix.prixTTC,
-      demanderPreaudit,
-      preauditPrixHT: demanderPreaudit ? prixPreaudit?.prixHT : null,
       typeDocument: questionnaire?.typeDocument,
       statutTexte: questionnaire?.statutTexte,
       finaliteAudit: questionnaire?.finaliteAudit,
@@ -171,7 +171,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
   const toutRéinitialiser = () => {
     setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
-    setQuestionnaire(null); setDemanderPreaudit(false);
+    setQuestionnaire(null);
   };
 
   return (
@@ -186,12 +186,8 @@ export default function CursAudit({ onVoirAudits } = {}) {
           <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé</div>
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
             « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}, statut « brouillon ».
-            {demanderPreaudit && (
-              <>
-                <br />
-                Lecture globale incluse — lancez-la depuis l'écran de détail de cet audit.
-              </>
-            )}
+            <br />
+            Un aperçu gratuit du manuscrit est disponible dès maintenant depuis l'écran de détail de cet audit.
             <br />
             Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse détaillée ne peut pas être lancée tant que le statut reste « brouillon ».
           </div>
@@ -270,42 +266,18 @@ export default function CursAudit({ onVoirAudits } = {}) {
             <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
           </div>
 
-          {prixPreaudit && (
-            <div style={{
-              background: "#FFFBF2", borderRadius: 8, padding: "12px 14px",
-              border: demanderPreaudit ? "1.5px solid #C4973A" : "0.5px solid #C4973A80",
-            }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={demanderPreaudit}
-                  onChange={(e) => setDemanderPreaudit(e.target.checked)}
-                  style={{ marginTop: 3, flexShrink: 0, width: 15, height: 15, accentColor: "#C4973A" }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116" }}>
-                      Ajouter la lecture globale d'abord ({nombreMots.toLocaleString("fr-FR")} mots)
-                    </span>
-                    <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>
-                      {prixPreaudit.prixTTC > 0 ? `${prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC` : "Gratuit"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.5, marginTop: 4 }}>
-                    L'audit détaillé ci-dessous examine chaque unité séparément — précis, mais aveugle à l'ensemble.
-                    La lecture globale lit le manuscrit ENTIER en un seul appel IA : elle révèle la colonne
-                    vertébrale du texte, ses tensions et ses risques à l'échelle du livre, et recommande le palier
-                    d'audit le plus adapté. C'est une orientation, pas un livrable en soi — c'est pour ça que
-                    c'est gratuit ; l'audit détaillé ci-dessous reste le produit que vous commandez réellement.
-                  </div>
-                  {duréePreaudit && (
-                    <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>Temps estimé : {duréePreaudit.texte}</div>
-                  )}
-                  <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 2 }}>
-                    Se lance depuis l'écran de détail, une fois l'audit créé ci-dessous.
-                  </div>
-                </div>
-              </label>
+          {nombreMots > 0 && (
+            <div style={{ background: "#FFFBF2", border: "0.5px solid #C4973A80", borderRadius: 8, padding: "12px 14px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116", marginBottom: 4 }}>
+                Avant l'audit détaillé : un aperçu gratuit ({nombreMots.toLocaleString("fr-FR")} mots)
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.5 }}>
+                L'audit détaillé ci-dessous examine chaque unité séparément. Une fois cet audit créé, un aperçu
+                gratuit du manuscrit entier (colonne vertébrale, tensions, risques) sera disponible en un clic
+                depuis l'écran de détail{duréeApercu ? ` (${duréeApercu.texte})` : ""}. Vous pourrez ensuite,
+                si vous le souhaitez, commander un pré-audit approfondi qui développe ces pistes avant de lancer
+                l'audit détaillé{prixPreauditApprofondi ? ` — ${prixPreauditApprofondi.prixTTC.toFixed(2).replace(".", ",")} € TTC (${prixPreauditApprofondi.pourcentage} % du prix ci-dessous, dont une partie déductible si vous commandez ensuite l'audit détaillé)` : ""}.
+              </div>
             </div>
           )}
 

@@ -27,9 +27,15 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
+import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
-const PREAUDIT_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-global-cursaudit";
+// Nom de fonction déployée inchangé (preaudit-global-cursaudit) même si elle
+// est renommée "aperçu" côté produit depuis le 23/08/2026 — voir son
+// commentaire d'en-tête. Renommer la fonction déployée demanderait une
+// action manuelle supplémentaire côté Supabase Dashboard, pas nécessaire ici.
+const APERCU_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-global-cursaudit";
+const PREAUDIT_APPROFONDI_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-approfondi-cursaudit";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const CATEGORIES_DIAGNOSTIC = [
@@ -77,15 +83,15 @@ async function appelerOrchestrateur(auditId, signal) {
   return données;
 }
 
-// Pré-audit global (réf. 60816-01, suite, 22/08/2026) — un seul appel,
-// pas de boucle (contrairement à l'orchestrateur détaillé) : le manuscrit
-// entier tient dans un seul appel Claude.
-async function appelerPreauditGlobal(auditId) {
+// Aperçu gratuit — phase 1 (réf. 60816-01, suite, 22/08/2026, renommé
+// "aperçu" le 23/08/2026) — un seul appel, pas de boucle (contrairement à
+// l'orchestrateur détaillé) : le manuscrit entier tient dans un seul appel Claude.
+async function appelerApercuGlobal(auditId) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
 
-  const réponse = await fetch(PREAUDIT_URL, {
+  const réponse = await fetch(APERCU_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -99,16 +105,16 @@ async function appelerPreauditGlobal(auditId) {
   return données;
 }
 
-function PreauditGlobal({ audit, nombreMots, onTermine }) {
+function ApercuGlobal({ audit, nombreMots, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
-  const résultat = audit.preaudit_resultat;
+  const résultat = audit.apercu_resultat;
 
   const lancer = async () => {
     setEnCours(true);
     setErreur(null);
     try {
-      await appelerPreauditGlobal(audit.id);
+      await appelerApercuGlobal(audit.id);
       await onTermine();
     } catch (e) {
       setErreur(e.message);
@@ -118,15 +124,15 @@ function PreauditGlobal({ audit, nombreMots, onTermine }) {
   };
 
   return (
-    <div style={{ border: "0.5px solid #C4973A80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#FFFBF2" }}>
+    <div style={{ border: "0.5px solid #C4973A80", borderRadius: 10, padding: "16px 18px", marginBottom: 16, background: "#FFFBF2" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div>
-          <div style={{ fontWeight: 600, color: "#8A6116", marginBottom: 2 }}>Lecture globale du manuscrit</div>
+          <div style={{ fontWeight: 600, color: "#8A6116", marginBottom: 2 }}>Aperçu gratuit du manuscrit</div>
           <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            Une vue d'ensemble avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
+            Une vue d'ensemble rapide avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
           </div>
         </div>
-        {audit.preaudit_statut !== "termine" && (
+        {audit.apercu_statut !== "termine" && (
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: "#8A6116" }}>Gratuit</div>
             <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>{nombreMots.toLocaleString("fr-FR")} mots</div>
@@ -134,19 +140,19 @@ function PreauditGlobal({ audit, nombreMots, onTermine }) {
         )}
       </div>
 
-      {(audit.preaudit_statut === "paye" || audit.preaudit_statut === "non_demande") && (
+      {audit.apercu_statut !== "termine" && (
         <button onClick={lancer} disabled={enCours} style={{
           marginTop: 10, background: "#C4973A", color: "#fff", border: "none", borderRadius: 8,
           padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
           opacity: enCours ? 0.6 : 1,
         }}>
-          {enCours ? "Lecture en cours…" : "Lancer la lecture globale"}
+          {enCours ? "Analyse en cours… (moins d'une minute en général)" : "Lancer l'aperçu"}
         </button>
       )}
 
       {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
 
-      {audit.preaudit_statut === "termine" && résultat && (
+      {audit.apercu_statut === "termine" && résultat && (
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           <div style={{ fontSize: 12.5 }}>
             <span style={{ fontWeight: 600 }}>Genre apparent : </span>{résultat.genre_apparent}
@@ -177,6 +183,135 @@ function PreauditGlobal({ audit, nombreMots, onTermine }) {
               <span style={{ fontWeight: 600 }}>Recommandation pour l'audit détaillé : </span>
               palier {résultat.audit_recommande.palier}
               {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Pré-audit approfondi — phase 2, payante (réf. 60816-01, suite, 23/08/2026).
+// N'apparaît qu'une fois l'aperçu (phase 1) terminé. Un seul appel Claude,
+// pas de vraie tâche de fond serveur (voir la discussion documentée dans
+// preaudit-approfondi-cursaudit/index.ts) — juste un état "en cours" sans
+// pourcentage inventé, l'appel unique n'ayant pas de signal d'avancement réel.
+async function appelerPreauditApprofondi(auditId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
+
+  const réponse = await fetch(PREAUDIT_APPROFONDI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ audit_id: auditId }),
+  });
+  const données = await réponse.json();
+  if (!réponse.ok) throw new Error(données?.error || données?.message || `HTTP ${réponse.status}`);
+  return données;
+}
+
+function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const résultat = audit.preaudit_resultat;
+
+  const prix = useMemo(
+    () => (reglesPrix ? calculerPrixPreauditPourcentage(reglesPrix, audit.prix_ttc) : null),
+    [reglesPrix, audit.prix_ttc]
+  );
+
+  const lancer = async () => {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      await appelerPreauditApprofondi(audit.id);
+      await onTermine();
+    } catch (e) {
+      setErreur(e.message);
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  return (
+    <div style={{ border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#F7F6FD" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Pré-audit approfondi</div>
+          <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+            Développe l'aperçu ci-dessus : hypothèses à vérifier, échantillons précis, décision éditoriale — oriente l'audit détaillé sans le remplacer.
+          </div>
+        </div>
+        {audit.preaudit_statut !== "termine" && prix && (
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#5B52C4" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} €</div>
+            <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>TTC · {prix.pourcentage} % du prix de l'audit détaillé</div>
+          </div>
+        )}
+      </div>
+
+      {audit.preaudit_statut === "non_demande" && (
+        <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
+          Paiement CursAudit pas encore disponible dans l'application — statut à positionner manuellement (SQL) en attendant.
+          {prix && ` Si l'audit détaillé est commandé ensuite, ${prix.reductionSurAuditFinal.toFixed(2).replace(".", ",")} € seront déductibles de son prix.`}
+        </div>
+      )}
+
+      {audit.preaudit_statut === "paye" && (
+        <button onClick={lancer} disabled={enCours} style={{
+          marginTop: 10, background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
+          padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+          opacity: enCours ? 0.6 : 1,
+        }}>
+          {enCours ? "Analyse en cours… (1 à 3 minutes en général)" : "Lancer le pré-audit"}
+        </button>
+      )}
+
+      {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
+
+      {audit.preaudit_statut === "termine" && résultat && (
+        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature dominante : </span>{résultat.nature_dominante}</div>
+          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Contrat de lecture : </span>{résultat.contrat_lecture}</div>
+          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
+
+          {résultat.hypotheses_tension?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Hypothèses à vérifier</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                {résultat.hypotheses_tension.map((h, i) => <li key={i} style={{ marginBottom: 4 }}>{h}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {résultat.echantillons_a_verifier?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Échantillons à vérifier dans l'audit détaillé</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                {résultat.echantillons_a_verifier.map((e, i) => <li key={i} style={{ marginBottom: 4 }}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {résultat.audit_recommande && (
+            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
+              <span style={{ fontWeight: 600 }}>Axe recommandé pour l'audit détaillé : </span>{résultat.audit_recommande.axe_principal}
+              {résultat.audit_recommande.criteres?.length > 0 && (
+                <div style={{ marginTop: 4 }}>Critères prioritaires : {résultat.audit_recommande.criteres.join(", ")}</div>
+              )}
+            </div>
+          )}
+
+          {résultat.decision_editoriale && (
+            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Décision éditoriale à trancher</div>
+              <div><span style={{ fontWeight: 600 }}>Voie A — </span>{résultat.decision_editoriale.voie_a}</div>
+              <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Voie B — </span>{résultat.decision_editoriale.voie_b}</div>
             </div>
           )}
         </div>
@@ -269,6 +404,7 @@ function LigneSection({ section }) {
 export default function CursAuditDetail({ auditId, onRetour }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
+  const [reglesPrix, setReglesPrix] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [filtresActifs, setFiltresActifs] = useState([]);
   const [page, setPage] = useState(1);
@@ -283,6 +419,9 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   }, [auditId]);
 
   useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    auditsAPI.récupérerReglesPrix().then(({ data, error }) => { if (!error) setReglesPrix(data || []); });
+  }, []);
 
   const nombreMots = useMemo(
     () => (sections || []).reduce((acc, s) => acc + (s.texte_source?.split(/\s+/).filter(Boolean).length || 0), 0),
@@ -380,7 +519,11 @@ export default function CursAuditDetail({ auditId, onRetour }) {
       )}
 
       {nombreMots > 0 && (
-        <PreauditGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />
+        <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />
+      )}
+
+      {audit.apercu_statut === "termine" && (
+        <PreauditApprofondi audit={audit} reglesPrix={reglesPrix} onTermine={charger} />
       )}
 
       {erreur && (

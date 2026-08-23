@@ -1,33 +1,36 @@
 /**
- * CURSAUDIT — Edge Function : preaudit-global-cursaudit (référence 60816-01, suite, 22/08/2026)
+ * CURSAUDIT — Edge Function : preaudit-global-cursaudit (référence 60816-01,
+ * suite — RENOMMÉ EN INTERNE "APERÇU" le 23/08/2026, nom de fonction déployée
+ * inchangé pour ne pas casser l'URL déjà en place côté frontend).
  * ============================================================================
- * Lecture globale du manuscrit ENTIER, en UN SEUL appel Claude (fenêtre de
- * contexte 1M tokens — un livre y tient largement), avant de payer/lancer
- * l'audit détaillé unité par unité (analyser-unite-cursaudit /
- * orchestrer-audit-cursaudit). Idée de l'auteur du projet, affinée avec
- * GPT : le moteur détaillé analyse chaque paragraphe isolément, sans
- * jamais voir le livre entier — cette étape comble ce trou, et sert de
- * "premier travail léger" avant d'engager le coût de l'audit complet.
+ * PHASE 1 SEULEMENT (gratuite) du travail en deux phases décrit par l'auteur
+ * du projet le 15/08/2026 : "un travail plus léger qui permettrait à moindre
+ * coût de comprendre que quelque chose doit être fait". Lecture globale du
+ * manuscrit ENTIER, en UN SEUL appel Claude (fenêtre de contexte 1M tokens —
+ * un livre y tient largement) : nature du texte, colonne vertébrale, tension
+ * principale, forces/risques globaux, et une recommandation de palier —
+ * juste assez pour orienter, pas un livrable en soi.
+ *
+ * La PHASE 2 — "le travail suivant, qui coûterait beaucoup plus cher" —
+ * reprend le résultat de CETTE fonction et le développe en profondeur ; elle
+ * vit dans une fonction séparée, preaudit-approfondi-cursaudit (23/08/2026),
+ * seule à porter le nom "pré-audit" côté produit désormais. Erreur initiale
+ * du 22/08/2026 corrigée : cette fonction-ci avait été présentée comme "le
+ * pré-audit" et facturée sur le barème par tranche de mots — ce barème
+ * s'applique en réalité à la phase 2, voir 2026-08-23-preaudit-vrai.sql.
  *
  * Reprend la proposition de GPT en la resserrant : sa taxonomie biologique
  * (endosquelette/mycélium/fleuve...) et ses "formats dérivés" sont écartés
  * — trop peu fiables/universels pour un champ structuré exploitable d'un
- * livre à l'autre. Retenu : nature du texte, colonne vertébrale, tension
- * principale, forces/risques globaux, et une recommandation de palier pour
- * la suite.
+ * livre à l'autre.
  *
  * FICHIER AUTONOME (leçon du 16/08/2026) : le mécanisme d'appel IA
  * structuré est inliné ici, pas importé depuis _shared/.
  *
- * TARIF : barème par tranche de mots (audit_pricing_rules, categorie
- * "preaudit_global_palier"), fixé à la création — voir
- * calculerPrixPreauditGlobal() dans tarifCursAudit.js pour la même logique
- * côté client (affichage du prix avant paiement).
- *
- * CYCLE DE VIE séparé de l'audit détaillé : `audits.preaudit_statut`
- * (non_demande → paye → termine), `preaudit_prix_ht`, `preaudit_resultat`.
- * Comme pour l'audit détaillé, aucun flux Stripe n'existe encore — le
- * statut se positionne manuellement (SQL) en attendant.
+ * GRATUIT, PAS DE STATUT "PAYE" À VÉRIFIER : `audits.apercu_statut`
+ * (non_demande → termine), `apercu_resultat`. `apercu_prix_ht` existe encore
+ * dans le schéma (renommé depuis preaudit_prix_ht) mais reste toujours null
+ * ici, gardé simplement pour ne pas casser la colonne.
  *
  * SECRETS REQUIS : ANTHROPIC_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place).
  */
@@ -110,12 +113,12 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, titre, preaudit_statut")
+      .select("id, user_id, titre, apercu_statut")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
-    if (audit.preaudit_statut !== "paye") {
-      return json({ error: "paiement_requis", message: `Le pré-audit global a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
+    if (audit.apercu_statut === "termine") {
+      return json({ error: "déjà_fait", message: "L'aperçu global a déjà été généré pour cet audit." }, 409);
     }
 
     const { data: sections } = await admin
@@ -150,7 +153,7 @@ Deno.serve(async (req) => {
       return json({ error: `Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}` }, 502);
     }
 
-    const preauditResultat = {
+    const apercuResultat = {
       ...blocOutil.input,
       nombre_mots: texteIntegral.split(/\s+/).filter(Boolean).length,
       usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
@@ -159,11 +162,11 @@ Deno.serve(async (req) => {
 
     const { error: erreurMaj } = await admin
       .from("audits")
-      .update({ preaudit_statut: "termine", preaudit_resultat: preauditResultat })
+      .update({ apercu_statut: "termine", apercu_resultat: apercuResultat })
       .eq("id", auditId);
     if (erreurMaj) return json({ error: erreurMaj.message }, 500);
 
-    return json({ audit_id: auditId, preaudit: preauditResultat });
+    return json({ audit_id: auditId, apercu: apercuResultat });
   } catch (err) {
     console.error("Erreur preaudit-global-cursaudit :", err.message);
     return json({ error: err.message }, 500);

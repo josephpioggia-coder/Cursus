@@ -474,14 +474,6 @@ export const auditsAPI = {
     // champs (aucun ne l'était avant ce jour) continue de fonctionner.
     typeDocument = null, statutTexte = null, finaliteAudit = null, questionLibre = null,
     degreIntervention = null, contraintesAcademiques = null, relationIA = null,
-    // Lecture globale / pré-audit (référence 60816-01, suite, 22/08/2026) —
-    // choisie via une case à cocher sur l'écran de création (CursAudit.jsx).
-    // Comme pour l'audit détaillé lui-même, aucun paiement Stripe n'existe
-    // encore pour CursAudit : cocher la case positionne directement
-    // preaudit_statut à "paye" (au lieu de "non_demande") pour permettre de
-    // lancer la lecture globale immédiatement depuis l'écran de détail,
-    // sans étape SQL manuelle supplémentaire.
-    demanderPreaudit = false, preauditPrixHT = null,
   }) {
     if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
 
@@ -506,8 +498,6 @@ export const auditsAPI = {
         degre_intervention:      degreIntervention,
         contraintes_academiques: contraintesAcademiques,
         relation_ia:             relationIA,
-        preaudit_statut:   demanderPreaudit ? "paye" : "non_demande",
-        preaudit_prix_ht:  demanderPreaudit ? preauditPrixHT : null,
       }])
       .select()
       .single();
