@@ -255,21 +255,27 @@ d'unités, seule différence pratique le temps de traitement en aval.
   jamais construite. Rendue gratuite, la phase 1 a ensuite été comprise
   comme un simple teaser plutôt qu'un livrable.
 - **Phase 2, "pré-audit" (payant)** — `preaudit-approfondi-cursaudit`
-  (nouvelle fonction, 23/08/2026, **schéma révisé une 2e fois le même jour**
-  sur le premier vrai résultat, jugé "mesquin" par l'auteur du projet : trop
-  occupé à dire "il faudra vérifier ça dans l'audit détaillé" au lieu d'être
-  un livrable autonome, et repéré en train de se focaliser sur UNE piste de
-  correction précise plutôt que de rester à l'échelle du livre entier).
-  Structure v2, en 10 points : `nature_dominante`, `colonne_vertebrale`,
-  `contrat_lecture {promesse_affichee, contrat_reel}`,
-  `forces_a_preserver[]`, `faiblesses_structurelles[]`,
-  `scenarios_editoriaux[]` (EXACTEMENT 3, chacun avec `nom`, `description`,
-  `ampleur_reecriture` légère/moyenne/lourde), `zones_prioritaires_audit[]`,
-  `exemples[]`, `recommandation_finale`. Quatre règles explicites dans le
-  prompt système : hypothèses jamais des verdicts, généreux autant que
-  sévère (dire aussi ce qui tient déjà), rester à l'échelle du livre entier
-  (pas une seule piste de correction), toujours terminer par une
-  recommandation exploitable. 1 SEULE IA (Claude) — le dialogue à deux IA
+  (nouvelle fonction, 23/08/2026, **schéma révisé une 3e fois le même jour**).
+  v1 (7 blocs) était "mesquine" : trop occupée à dire "il faudra vérifier ça
+  dans l'audit détaillé". v2 (10 points) corrigeait le ton mais restait un
+  DIAGNOSTIC ("votre livre est plutôt une fable qu'un roman") plutôt qu'un
+  PLAN D'INTERVENTION — constat de l'auteur du projet après le 2e test réel :
+  bien vu, mais rien qu'un·e auteur·ice puisse appliquer directement.
+  **Structure v3, orientée décision + action** : `nature_reelle`,
+  `promesse_affichee`, `ecart_promesse_execution`, `voies_editoriales[]`
+  (EXACTEMENT 3, chacune `nom`/`description`/`ampleur_reecriture`
+  légère-moyenne-lourde), `recommandation_principale`,
+  `plan_intervention[]` (3-6 chantiers, chacun `chantier`/`geste_editorial`
+  — jamais "à vérifier"), `exemples_concrets[]` (au moins 3, chacun
+  `probleme`/`effet`/`geste_editorial`/`proposition`, même esprit que la
+  synthèse éditoriale par unité), `a_preserver[]`, `a_couper_ou_alleger[]`,
+  `prochaine_etape` (peut honnêtement être "pas besoin d'audit détaillé").
+  Cinq règles explicites dans le prompt système : aucune orientation
+  "à vérifier plus tard" (chaque chantier/exemple porte un geste actionnable
+  maintenant), préconisation sur le texte mais recommandations franches et
+  directives, généreux autant que sévère, rester à l'échelle du livre entier
+  (pas une seule piste de correction au centre), prochaine étape honnête
+  plutôt qu'un réflexe de vente. 1 SEULE IA (Claude) — le dialogue à deux IA
   reste réservé à l'audit détaillé en mode "2 IA", décision du 23/08/2026
   pour garder le pré-audit rapide et bon marché. Cycle de vie séparé :
   `preaudit_statut` (non_demande→paye→termine),
