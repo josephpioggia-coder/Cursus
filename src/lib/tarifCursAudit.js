@@ -87,21 +87,22 @@ export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
 }
 
 /**
- * Prix du pré-audit global (référence 60816-01, suite, 22/08/2026 — barème
- * révisé le même jour, le premier jugé trop cher par l'auteur du projet).
+ * Prix du pré-audit global (référence 60816-01, suite — GRATUIT depuis le
+ * 23/08/2026, voir 2026-08-23-preaudit-gratuit.sql).
  * ======================================================================
- * Barème linéaire fourni par l'auteur du projet — +12€ HT par tranche de
- * 10 000 mots, de 24€ (10 000 mots) à 132€ (100 000 mots), stocké dans
- * audit_pricing_rules (categorie "preaudit_global_palier"). Au-delà de
- * 100 000 mots : continuité supposée à +12€ HT/tranche de 10 000 mots
- * (pas explicitement confirmée par l'auteur du projet — l'ancien barème
- * dégressif avait sa propre règle "au-delà" à +10€, qui n'a plus de sens
- * une fois la table elle-même devenue linéaire à +12€). En-dessous de
- * 10 000 mots, le tarif de la tranche 10 000 sert de plancher.
+ * Rendu gratuit après un premier vrai test (38 864 mots, résultat conforme
+ * aux attentes) facturé 72,60€ TTC avec le barème linéaire d'origine, pour
+ * un coût réel mesuré d'environ 0,13€ (un seul appel Claude, sortie
+ * plafonnée à 2048 tokens). Décision de l'auteur du projet : le pré-audit
+ * n'est pas le produit que le client commande — juste une orientation
+ * avant de s'engager sur le prix de l'audit détaillé, qui reste lui seul
+ * facturé (coût réel + marge, voir calculerPrixCursAudit ci-dessus).
  *
- * Facturation "à la tranche entamée" (pas d'interpolation continue) :
- * 35 000 mots paient le tarif de la tranche 40 000, comme la règle "au-delà"
- * le fait explicitement pour les tranches au-dessus de 100 000.
+ * La mécanique par tranche de mots ci-dessous est conservée telle quelle
+ * (structure de audit_pricing_rules inchangée, seules les valeurs sont à
+ * 0) : si un jour l'auteur du projet veut refacturer le pré-audit
+ * différemment, il suffit de remettre des valeurs non nulles dans
+ * audit_pricing_rules, sans toucher au code.
  */
 export function calculerPrixPreauditGlobal(regles, nombreMots) {
   const paliers = regles

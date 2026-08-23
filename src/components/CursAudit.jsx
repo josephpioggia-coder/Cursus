@@ -287,14 +287,16 @@ export default function CursAudit({ onVoirAudits } = {}) {
                     <span style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116" }}>
                       Ajouter la lecture globale d'abord ({nombreMots.toLocaleString("fr-FR")} mots)
                     </span>
-                    <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>{prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC</span>
+                    <span style={{ flexShrink: 0, marginLeft: 12, fontWeight: 600, color: "#8A6116" }}>
+                      {prixPreaudit.prixTTC > 0 ? `${prixPreaudit.prixTTC.toFixed(2).replace(".", ",")} € TTC` : "Gratuit"}
+                    </span>
                   </div>
                   <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.5, marginTop: 4 }}>
                     L'audit détaillé ci-dessous examine chaque unité séparément — précis, mais aveugle à l'ensemble.
                     La lecture globale lit le manuscrit ENTIER en un seul appel IA : elle révèle la colonne
                     vertébrale du texte, ses tensions et ses risques à l'échelle du livre, et recommande le palier
-                    d'audit le plus adapté — pour un coût bien plus faible, avant de s'engager sur le prix plus
-                    élevé de l'audit détaillé.
+                    d'audit le plus adapté. C'est une orientation, pas un livrable en soi — c'est pour ça que
+                    c'est gratuit ; l'audit détaillé ci-dessous reste le produit que vous commandez réellement.
                   </div>
                   {duréePreaudit && (
                     <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>Temps estimé : {duréePreaudit.texte}</div>

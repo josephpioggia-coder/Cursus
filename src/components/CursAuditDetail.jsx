@@ -27,7 +27,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
-import { calculerPrixPreauditGlobal } from "../lib/tarifCursAudit.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
 const PREAUDIT_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-global-cursaudit";
@@ -100,15 +99,10 @@ async function appelerPreauditGlobal(auditId) {
   return données;
 }
 
-function PreauditGlobal({ audit, nombreMots, reglesPrix, onTermine }) {
+function PreauditGlobal({ audit, nombreMots, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   const résultat = audit.preaudit_resultat;
-
-  const prix = useMemo(
-    () => (reglesPrix ? calculerPrixPreauditGlobal(reglesPrix, nombreMots) : null),
-    [reglesPrix, nombreMots]
-  );
 
   const lancer = async () => {
     setEnCours(true);
@@ -132,21 +126,15 @@ function PreauditGlobal({ audit, nombreMots, reglesPrix, onTermine }) {
             Une vue d'ensemble avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
           </div>
         </div>
-        {audit.preaudit_statut === "non_demande" && prix && (
+        {audit.preaudit_statut !== "termine" && (
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#8A6116" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} €</div>
-            <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>TTC · {nombreMots.toLocaleString("fr-FR")} mots</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#8A6116" }}>Gratuit</div>
+            <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>{nombreMots.toLocaleString("fr-FR")} mots</div>
           </div>
         )}
       </div>
 
-      {audit.preaudit_statut === "non_demande" && (
-        <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
-          Paiement CursAudit pas encore disponible dans l'application — statut à positionner manuellement (SQL) en attendant.
-        </div>
-      )}
-
-      {audit.preaudit_statut === "paye" && (
+      {(audit.preaudit_statut === "paye" || audit.preaudit_statut === "non_demande") && (
         <button onClick={lancer} disabled={enCours} style={{
           marginTop: 10, background: "#C4973A", color: "#fff", border: "none", borderRadius: 8,
           padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
@@ -281,7 +269,6 @@ function LigneSection({ section }) {
 export default function CursAuditDetail({ auditId, onRetour }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
-  const [reglesPrix, setReglesPrix] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [filtresActifs, setFiltresActifs] = useState([]);
   const [page, setPage] = useState(1);
@@ -296,9 +283,6 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   }, [auditId]);
 
   useEffect(() => { charger(); }, [charger]);
-  useEffect(() => {
-    auditsAPI.récupérerReglesPrix().then(({ data, error }) => { if (!error) setReglesPrix(data || []); });
-  }, []);
 
   const nombreMots = useMemo(
     () => (sections || []).reduce((acc, s) => acc + (s.texte_source?.split(/\s+/).filter(Boolean).length || 0), 0),
@@ -396,7 +380,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
       )}
 
       {nombreMots > 0 && (
-        <PreauditGlobal audit={audit} nombreMots={nombreMots} reglesPrix={reglesPrix} onTermine={charger} />
+        <PreauditGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />
       )}
 
       {erreur && (
