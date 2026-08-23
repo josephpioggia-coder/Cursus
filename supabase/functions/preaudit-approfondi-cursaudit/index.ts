@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 8000,
+        max_tokens: 16000,
         system: systemPrompt,
         messages: [{ role: "user", content: texteIntegral }],
         tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale : 3 voies, un plan d'intervention en chantiers, des exemples concrets actionnables, une prochaine étape honnête.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
