@@ -11,14 +11,28 @@
  * l'échelle du livre entier — PAS un audit unité par unité (ça, c'est déjà
  * analyser-unite-cursaudit / orchestrer-audit-cursaudit).
  *
- * STRUCTURE EN 7 BLOCS validée par l'auteur du projet le 23/08/2026, après
- * un retour de GPT sur un premier prototype jugé "trop affirmatif pour un
- * pré-audit" : nature dominante, colonne vertébrale, contrat de lecture,
- * hypothèses de tension, échantillons à vérifier, audit recommandé,
- * décision éditoriale. RÈGLE DE TON EXPLICITE (le vrai problème du premier
- * prototype) : formuler les points comme des HYPOTHÈSES À VÉRIFIER dans
- * l'audit détaillé, jamais comme des verdicts déjà établis — "le pré-audit
- * ne condamne pas encore, il oriente l'enquête" (auteur du projet, 23/08).
+ * STRUCTURE RÉVISÉE UNE 2e FOIS le 23/08/2026, sur le premier vrai résultat
+ * généré par la structure en 7 blocs (v1, même jour) : jugée "mesquine" —
+ * trop occupée à dire "il faudra vérifier ça dans l'audit détaillé" (une
+ * note de préparation interne) plutôt que de livrer une vraie lecture
+ * éditoriale autonome, et repérée en train de se focaliser tout entière sur
+ * UNE piste de correction précise (ex. "ajouter une partenaire de
+ * randonnée à Scalpa") au lieu de rester à l'échelle de l'organisme-livre.
+ * Nouvelle structure en 10 points (retour GPT, validé par l'auteur du
+ * projet) : nature dominante, colonne vertébrale, contrat de lecture
+ * affiché vs réel, forces à préserver, faiblesses structurelles, TROIS
+ * scénarios éditoriaux (avec ampleur de réécriture chacun), zones
+ * prioritaires pour l'audit détaillé, exemples justifiant les hypothèses,
+ * recommandation finale claire. RÈGLES EXPLICITES DANS LE PROMPT :
+ *  - hypothèses à vérifier, jamais des verdicts établis (déjà en v1, gardé) ;
+ *  - GÉNÉROSITÉ OBLIGATOIRE : dire aussi ce qui tient déjà et doit être
+ *    préservé, pas seulement ce qui ne va pas (le problème "sévère sans
+ *    être généreux" de la v1) ;
+ *  - NE PAS se focaliser sur une seule piste de correction précise — elle
+ *    peut apparaître comme UN exemple à l'intérieur d'un scénario, jamais
+ *    comme le centre de l'analyse (le problème principal de la v1) ;
+ *  - se terminer par une vraie décision éditoriale exploitable, pas
+ *    seulement une liste de points à auditer plus tard.
  *
  * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
  * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
@@ -79,32 +93,41 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
   type: "object",
   properties: {
     nature_dominante: { type: "string" },
-    contrat_lecture: { type: "string" },
     colonne_vertebrale: { type: "string" },
-    hypotheses_tension: { type: "array", items: { type: "string" } },
-    echantillons_a_verifier: { type: "array", items: { type: "string" } },
-    audit_recommande: {
+    contrat_lecture: {
       type: "object",
       properties: {
-        axe_principal: { type: "string" },
-        criteres: { type: "array", items: { type: "string" } },
+        promesse_affichee: { type: "string" },
+        contrat_reel: { type: "string" },
       },
-      required: ["axe_principal", "criteres"],
+      required: ["promesse_affichee", "contrat_reel"],
       additionalProperties: false,
     },
-    decision_editoriale: {
-      type: "object",
-      properties: {
-        voie_a: { type: "string" },
-        voie_b: { type: "string" },
+    forces_a_preserver: { type: "array", items: { type: "string" } },
+    faiblesses_structurelles: { type: "array", items: { type: "string" } },
+    scenarios_editoriaux: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          nom: { type: "string" },
+          description: { type: "string" },
+          ampleur_reecriture: { type: "string", enum: ["légère", "moyenne", "lourde"] },
+        },
+        required: ["nom", "description", "ampleur_reecriture"],
+        additionalProperties: false,
       },
-      required: ["voie_a", "voie_b"],
-      additionalProperties: false,
     },
+    zones_prioritaires_audit: { type: "array", items: { type: "string" } },
+    exemples: { type: "array", items: { type: "string" } },
+    recommandation_finale: { type: "string" },
   },
   required: [
-    "nature_dominante", "contrat_lecture", "colonne_vertebrale", "hypotheses_tension",
-    "echantillons_a_verifier", "audit_recommande", "decision_editoriale",
+    "nature_dominante", "colonne_vertebrale", "contrat_lecture", "forces_a_preserver",
+    "faiblesses_structurelles", "scenarios_editoriaux", "zones_prioritaires_audit",
+    "exemples", "recommandation_finale",
   ],
   additionalProperties: false,
 };
@@ -154,27 +177,37 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
   return (
     "Tu es le module de pré-audit approfondi de CursAudit. On te donne un manuscrit ENTIER, ainsi qu'un " +
     "aperçu rapide déjà réalisé sur ce même livre. Ton rôle n'est PAS de refaire cet aperçu, ni d'auditer " +
-    "chaque unité une par une (un autre module fait déjà cela) : c'est de PROPOSER UNE LECTURE STRUCTURÉE " +
-    "qui oriente l'audit détaillé qui suivra — sans jamais trancher à sa place.\n\n" +
-    "RÈGLE DE TON, LA PLUS IMPORTANTE : tu n'es pas encore en train d'auditer, tu orientes l'enquête. " +
-    "Ne formule JAMAIS un constat comme un verdict établi (\"Clara n'a pas d'arc dramatique\"). Formule " +
-    "toujours une hypothèse à vérifier (\"Hypothèse à vérifier : Clara semble fonctionner davantage comme " +
-    "élève-réceptacle que comme personnage autonome — il faudra cartographier ses moments de résistance et " +
-    "de transformation réelle dans l'audit détaillé\"). Le pré-audit ne condamne pas, il oriente.\n\n" +
+    "chaque unité une par une (un autre module fait déjà cela) : c'est de livrer une LECTURE ÉDITORIALE " +
+    "AUTONOME et utile en elle-même — pas une simple liste de choses que l'audit détaillé devra vérifier.\n\n" +
+    "QUATRE RÈGLES NON NÉGOCIABLES, établies après un premier essai jugé trop faible :\n" +
+    "1. Hypothèses, jamais des verdicts établis. Ne formule pas \"Clara n'a pas d'arc dramatique\" mais " +
+    "\"Hypothèse à vérifier : Clara semble fonctionner davantage comme élève-réceptacle que comme personnage " +
+    "autonome\". Tu orientes, tu ne condamnes pas.\n" +
+    "2. Sois généreux autant que sévère. Ne te contente pas de lister ce qui ne va pas — dis aussi ce qui " +
+    "tient déjà et doit être préservé à tout prix (forces_a_preserver n'est pas une formalité, c'est aussi " +
+    "important que les faiblesses).\n" +
+    "3. Reste à l'échelle du livre entier — l'ORGANISME, pas UNE scène ou UNE piste de correction précise. " +
+    "Si une idée de correction concrète te vient (ex. ajouter un personnage, une scène), elle peut apparaître " +
+    "comme UN exemple à l'intérieur d'un scénario éditorial, jamais comme le sujet central de ta réponse.\n" +
+    "4. Termine toujours sur une vraie décision éditoriale exploitable (recommandation_finale) — pas une " +
+    "liste ouverte de points à auditer plus tard. Le client doit pouvoir agir avec ce que tu produis, même " +
+    "sans lancer l'audit détaillé.\n\n" +
     `${contexteQualification}` +
     `Colonne vertébrale déjà repérée par l'aperçu : ${apercu?.colonne_vertebrale ?? "non disponible"}\n` +
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
-    `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même 3 à 5 priorités à partir du texte"}\n\n` +
-    "Produis les 7 éléments suivants :\n" +
-    "- nature_dominante : la nature dominante du manuscrit (ex. \"récit initiatique fonctionnant comme manuel dialogué\"), avec une phrase qui explique en quoi.\n" +
-    "- contrat_lecture : ce que le livre promet au lecteur (roman ? initiation ? manuel ? méditation guidée ? fable ?) et si sa forme réelle tient cette promesse.\n" +
-    "- colonne_vertebrale : condensée, 1 à 2 phrases — ce qui tient le livre de bout en bout.\n" +
-    "- hypotheses_tension : 3 à 5 hypothèses (PAS des verdicts, voir règle de ton ci-dessus) sur les tensions ou fragilités les plus significatives de CE livre précis.\n" +
-    "- echantillons_a_verifier : des passages ou scènes PRÉCIS du livre (pas une catégorie générique) que l'audit détaillé devrait examiner en priorité pour vérifier ces hypothèses.\n" +
-    "- audit_recommande.axe_principal : sur quoi l'audit détaillé devrait porter en priorité pour ce livre (pas un palier générique, un axe de travail réel).\n" +
-    "- audit_recommande.criteres : une liste concrète de critères à auditer en priorité.\n" +
-    "- decision_editoriale.voie_a / voie_b : deux directions éditoriales possibles entre lesquelles l'auteur·ice devra choisir, sachant que l'audit détaillé ne sera pas le même selon la voie retenue."
+    `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
+    "Produis les 10 éléments suivants :\n" +
+    "- nature_dominante : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
+    "- colonne_vertebrale : UNE phrase — ce qui tient le livre de bout en bout.\n" +
+    "- contrat_lecture.promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
+    "- contrat_lecture.contrat_reel : ce que sa forme réelle tient effectivement, et l'écart avec la promesse s'il y en a un.\n" +
+    "- forces_a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu dans une réécriture, quelle qu'elle soit.\n" +
+    "- faiblesses_structurelles : 3 à 5 hypothèses (règle 1) sur les fragilités les plus significatives de CE livre précis.\n" +
+    "- scenarios_editoriaux : EXACTEMENT 3 scénarios, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacun avec son ampleur_reecriture (légère/moyenne/lourde).\n" +
+    "- zones_prioritaires_audit : sur quoi l'audit détaillé devrait porter en priorité si le client le commande ensuite.\n" +
+    "- exemples : des passages ou scènes PRÉCIS du livre qui illustrent tes hypothèses (pas une catégorie générique).\n" +
+    "- recommandation_finale : UN scénario recommandé (parmi les 3), avec la réserve explicite si l'auteur·ice vise délibérément autre chose."
   );
 }
 
@@ -224,10 +257,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 6144,
+        max_tokens: 7500,
         system: systemPrompt,
         messages: [{ role: "user", content: texteIntegral }],
-        tools: [{ name: "preaudit_approfondi", description: "Lecture structurée en 7 blocs orientant l'audit détaillé.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
+        tools: [{ name: "preaudit_approfondi", description: "Lecture éditoriale autonome en 10 points, avec 3 scénarios éditoriaux et une recommandation finale.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
         tool_choice: { type: "tool", name: "preaudit_approfondi" },
       }),
     });

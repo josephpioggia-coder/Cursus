@@ -244,7 +244,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
         <div>
           <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Pré-audit approfondi</div>
           <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            Développe l'aperçu ci-dessus : hypothèses à vérifier, échantillons précis, décision éditoriale — oriente l'audit détaillé sans le remplacer.
+            Développe l'aperçu ci-dessus en une lecture éditoriale autonome : forces à préserver, faiblesses, trois scénarios de réécriture possibles, et une recommandation.
           </div>
         </div>
         {audit.preaudit_statut !== "termine" && prix && (
@@ -277,41 +277,74 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
       {audit.preaudit_statut === "termine" && résultat && (
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature dominante : </span>{résultat.nature_dominante}</div>
-          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Contrat de lecture : </span>{résultat.contrat_lecture}</div>
           <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
 
-          {résultat.hypotheses_tension?.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Hypothèses à vérifier</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                {résultat.hypotheses_tension.map((h, i) => <li key={i} style={{ marginBottom: 4 }}>{h}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {résultat.echantillons_a_verifier?.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Échantillons à vérifier dans l'audit détaillé</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                {résultat.echantillons_a_verifier.map((e, i) => <li key={i} style={{ marginBottom: 4 }}>{e}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {résultat.audit_recommande && (
-            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
-              <span style={{ fontWeight: 600 }}>Axe recommandé pour l'audit détaillé : </span>{résultat.audit_recommande.axe_principal}
-              {résultat.audit_recommande.criteres?.length > 0 && (
-                <div style={{ marginTop: 4 }}>Critères prioritaires : {résultat.audit_recommande.criteres.join(", ")}</div>
+          {résultat.contrat_lecture && (
+            <div style={{ fontSize: 12.5 }}>
+              <span style={{ fontWeight: 600 }}>Contrat de lecture : </span>{résultat.contrat_lecture.promesse_affichee}
+              {résultat.contrat_lecture.contrat_reel && (
+                <span style={{ color: "var(--texte-tertiaire)" }}> — dans les faits : {résultat.contrat_lecture.contrat_reel}</span>
               )}
             </div>
           )}
 
-          {résultat.decision_editoriale && (
-            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>Décision éditoriale à trancher</div>
-              <div><span style={{ fontWeight: 600 }}>Voie A — </span>{résultat.decision_editoriale.voie_a}</div>
-              <div style={{ marginTop: 4 }}><span style={{ fontWeight: 600 }}>Voie B — </span>{résultat.decision_editoriale.voie_b}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {résultat.forces_a_preserver?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>Forces à préserver</div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                  {résultat.forces_a_preserver.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
+                </ul>
+              </div>
+            )}
+            {résultat.faiblesses_structurelles?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>Faiblesses structurelles (hypothèses)</div>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                  {résultat.faiblesses_structurelles.map((f, i) => <li key={i} style={{ marginBottom: 4 }}>{f}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {résultat.scenarios_editoriaux?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 5 }}>Scénarios éditoriaux</div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {résultat.scenarios_editoriaux.map((s, i) => (
+                  <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{s.nom}</span>
+                      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", flexShrink: 0 }}>Réécriture {s.ampleur_reecriture}</span>
+                    </div>
+                    <div style={{ marginTop: 3, color: "var(--texte-secondaire)" }}>{s.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {résultat.recommandation_finale && (
+            <div style={{ fontSize: 12.5, background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 6, padding: "8px 10px" }}>
+              <span style={{ fontWeight: 600, color: "#1D9E75" }}>Recommandation : </span>{résultat.recommandation_finale}
+            </div>
+          )}
+
+          {résultat.zones_prioritaires_audit?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#5B52C4", marginBottom: 3 }}>Zones prioritaires pour l'audit détaillé</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                {résultat.zones_prioritaires_audit.map((z, i) => <li key={i} style={{ marginBottom: 4 }}>{z}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {résultat.exemples?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Exemples tirés du texte</div>
+              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: "var(--texte-tertiaire)" }}>
+                {résultat.exemples.map((e, i) => <li key={i} style={{ marginBottom: 4 }}>{e}</li>)}
+              </ul>
             </div>
           )}
         </div>
