@@ -24,7 +24,19 @@ const COULEUR_ACCENT = "5B52C4";
 const COULEUR_TEXTE_ATTENUE = "666666";
 const COULEUR_POSITIF = "1D9E75";
 
-function titre(texte, niveau = HeadingLevel.HEADING_2) {
+// Deux niveaux de titre seulement dans ce document, pour garder une
+// hiérarchie simple et sans ambiguïté : HEADING_1 pour chaque section du
+// rapport (Résumé exécutif, Voies éditoriales, Plan d'intervention...),
+// HEADING_2 pour les seules sous-sections imbriquées (à l'intérieur de
+// "Cartographie du contexte"). Les tailles/couleurs des deux niveaux sont
+// définies une fois dans `styles.default` (voir plus bas) et décroissent
+// strictement — aucun texte du corps (labels en gras, "Explicite —",
+// "Problème —"...) ne dépasse jamais la taille du corps de texte, donc ne
+// peut jamais paraître plus important qu'un vrai titre. Correctif du
+// 23/08/2026 : avant, une partie des sections de même niveau logique
+// utilisait HEADING_1 et l'autre HEADING_2 sans raison — incohérence
+// signalée par l'auteur du projet.
+function titre(texte, niveau = HeadingLevel.HEADING_1) {
   return new Paragraph({ heading: niveau, spacing: { before: 320, after: 120 }, text: texte });
 }
 
@@ -105,7 +117,7 @@ function sectionCartographie(carto) {
   const blocs = [titre("Cartographie du contexte")];
 
   if (carto.personnages_principaux?.length > 0) {
-    blocs.push(titre("Personnages principaux", HeadingLevel.HEADING_3));
+    blocs.push(titre("Personnages principaux", HeadingLevel.HEADING_2));
     carto.personnages_principaux.forEach((p) => {
       blocs.push(new Paragraph({
         spacing: { before: 100, after: 20 },
@@ -120,7 +132,7 @@ function sectionCartographie(carto) {
   }
 
   if (carto.lieux_principaux?.length > 0) {
-    blocs.push(titre("Lieux principaux", HeadingLevel.HEADING_3));
+    blocs.push(titre("Lieux principaux", HeadingLevel.HEADING_2));
     carto.lieux_principaux.forEach((l) => {
       blocs.push(new Paragraph({
         spacing: { before: 100, after: 20 },
@@ -134,14 +146,14 @@ function sectionCartographie(carto) {
   }
 
   if (carto.carte_sensorielle) {
-    blocs.push(titre("Carte sensorielle", HeadingLevel.HEADING_3));
+    blocs.push(titre("Carte sensorielle", HeadingLevel.HEADING_2));
     blocs.push(ligneÉtiquette("Sens développés", (carto.carte_sensorielle.sens_developpes || []).join(", ") || "—"));
     blocs.push(ligneÉtiquette("Sens sous-exploités", (carto.carte_sensorielle.sens_sous_exploites || []).join(", ") || "—"));
     blocs.push(paragraphe(carto.carte_sensorielle.diagnostic));
   }
 
   if (carto.objets_motifs?.length > 0) {
-    blocs.push(titre("Objets et motifs récurrents", HeadingLevel.HEADING_3));
+    blocs.push(titre("Objets et motifs récurrents", HeadingLevel.HEADING_2));
     carto.objets_motifs.forEach((o) => {
       blocs.push(new Paragraph({ spacing: { before: 100, after: 20 }, children: [new TextRun({ text: o.element || "", bold: true })] }));
       blocs.push(paragraphe(o.fonction_symbolique));
@@ -249,7 +261,21 @@ export async function exporterPreauditWord(audit, résultat) {
     }],
     styles: {
       default: {
+        // Échelle strictement décroissante : titre 1 (30 = 15pt) > titre 2
+        // (24 = 12pt) > corps de texte (22 = 11pt). Tous les libellés en
+        // gras/couleur utilisés dans le corps (blocTitré, noms de
+        // personnages/lieux...) héritent de la taille du corps — ils ne
+        // peuvent donc jamais paraître plus importants qu'un vrai titre,
+        // quels que soient le gras ou la couleur appliqués localement.
         document: { run: { font: "Georgia", size: 22 } },
+        heading1: {
+          run: { font: "Georgia", size: 30, bold: true, color: COULEUR_ACCENT },
+          paragraph: { spacing: { before: 320, after: 140 } },
+        },
+        heading2: {
+          run: { font: "Georgia", size: 24, bold: true, color: "3D3670" },
+          paragraph: { spacing: { before: 240, after: 100 } },
+        },
       },
     },
   });
