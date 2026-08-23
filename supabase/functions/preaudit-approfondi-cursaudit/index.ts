@@ -181,15 +181,25 @@ const CORS = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...CORS } });
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+// useDefaults + removeAdditional (réf. 60816-01, suite, 23/08/2026) — corrige
+// un vrai échec observé en test : sur un item ajouté par le passage
+// d'amendement (ex. un 3e personnage suggéré par la critique GPT), Claude a
+// produit une clé légèrement différente du schéma au lieu du champ requis
+// (ex. pas de a_developper) — faisant échouer toute la validation, et donc
+// tout le pipeline à 3 passages (coûteux à refaire). removeAdditional
+// supprime les clés en trop plutôt que de rejeter ; useDefaults + `default`
+// sur les champs texte/liste comble un champ requis manquant par une valeur
+// vide plutôt que de tout faire échouer — un item incomplet reste imparfait,
+// mais n'invalide plus tout le rapport après 3 appels IA.
+const ajv = new Ajv({ allErrors: true, strict: false, useDefaults: true, removeAdditional: true });
 
 const SCHEMA_PREAUDIT_APPROFONDI = {
   type: "object",
   properties: {
-    resume_executif: { type: "string" },
-    nature_reelle: { type: "string" },
-    promesse_affichee: { type: "string" },
-    ecart_promesse_execution: { type: "string" },
+    resume_executif: { type: "string", default: "" },
+    nature_reelle: { type: "string", default: "" },
+    promesse_affichee: { type: "string", default: "" },
+    ecart_promesse_execution: { type: "string", default: "" },
     voies_editoriales: {
       type: "array",
       minItems: 3,
@@ -197,16 +207,16 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
       items: {
         type: "object",
         properties: {
-          nom: { type: "string" },
-          description: { type: "string" },
-          ampleur_reecriture: { type: "string", enum: ["légère", "moyenne", "lourde"] },
-          duree_estimee_travail: { type: "string" },
+          nom: { type: "string", default: "" },
+          description: { type: "string", default: "" },
+          ampleur_reecriture: { type: "string", enum: ["légère", "moyenne", "lourde"], default: "moyenne" },
+          duree_estimee_travail: { type: "string", default: "" },
         },
         required: ["nom", "description", "ampleur_reecriture", "duree_estimee_travail"],
         additionalProperties: false,
       },
     },
-    recommandation_principale: { type: "string" },
+    recommandation_principale: { type: "string", default: "" },
     plan_intervention: {
       type: "array",
       minItems: 3,
@@ -214,8 +224,8 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
       items: {
         type: "object",
         properties: {
-          chantier: { type: "string" },
-          geste_editorial: { type: "string" },
+          chantier: { type: "string", default: "" },
+          geste_editorial: { type: "string", default: "" },
         },
         required: ["chantier", "geste_editorial"],
         additionalProperties: false,
@@ -227,18 +237,18 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
       items: {
         type: "object",
         properties: {
-          probleme: { type: "string" },
-          effet: { type: "string" },
-          geste_editorial: { type: "string" },
-          proposition: { type: "string" },
+          probleme: { type: "string", default: "" },
+          effet: { type: "string", default: "" },
+          geste_editorial: { type: "string", default: "" },
+          proposition: { type: "string", default: "" },
         },
         required: ["probleme", "effet", "geste_editorial", "proposition"],
         additionalProperties: false,
       },
     },
-    a_preserver: { type: "array", items: { type: "string" } },
-    a_couper_ou_alleger: { type: "array", items: { type: "string" } },
-    prochaine_etape: { type: "string" },
+    a_preserver: { type: "array", items: { type: "string" }, default: [] },
+    a_couper_ou_alleger: { type: "array", items: { type: "string" }, default: [] },
+    prochaine_etape: { type: "string", default: "" },
     cartographie_contexte: {
       type: "object",
       properties: {
@@ -249,10 +259,10 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
           items: {
             type: "object",
             properties: {
-              nom: { type: "string" },
-              role: { type: "string" },
-              explicite: { type: "string" },
-              a_developper: { type: "string" },
+              nom: { type: "string", default: "" },
+              role: { type: "string", default: "" },
+              explicite: { type: "string", default: "" },
+              a_developper: { type: "string", default: "" },
             },
             required: ["nom", "role", "explicite", "a_developper"],
             additionalProperties: false,
@@ -265,9 +275,9 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
           items: {
             type: "object",
             properties: {
-              nom: { type: "string" },
-              fonction: { type: "string" },
-              a_enrichir: { type: "string" },
+              nom: { type: "string", default: "" },
+              fonction: { type: "string", default: "" },
+              a_enrichir: { type: "string", default: "" },
             },
             required: ["nom", "fonction", "a_enrichir"],
             additionalProperties: false,
@@ -276,9 +286,9 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         carte_sensorielle: {
           type: "object",
           properties: {
-            sens_developpes: { type: "array", items: { type: "string" } },
-            sens_sous_exploites: { type: "array", items: { type: "string" } },
-            diagnostic: { type: "string" },
+            sens_developpes: { type: "array", items: { type: "string" }, default: [] },
+            sens_sous_exploites: { type: "array", items: { type: "string" }, default: [] },
+            diagnostic: { type: "string", default: "" },
           },
           required: ["sens_developpes", "sens_sous_exploites", "diagnostic"],
           additionalProperties: false,
@@ -290,18 +300,18 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
           items: {
             type: "object",
             properties: {
-              element: { type: "string" },
-              fonction_symbolique: { type: "string" },
-              potentiel_inexploite: { type: "string" },
+              element: { type: "string", default: "" },
+              fonction_symbolique: { type: "string", default: "" },
+              potentiel_inexploite: { type: "string", default: "" },
             },
             required: ["element", "fonction_symbolique", "potentiel_inexploite"],
             additionalProperties: false,
           },
         },
-        domaines_a_verifier: { type: "array", items: { type: "string" } },
-        voix: { type: "string" },
-        densite: { type: "string" },
-        valeur_ajoutee_audit_complet: { type: "string" },
+        domaines_a_verifier: { type: "array", items: { type: "string" }, default: [] },
+        voix: { type: "string", default: "" },
+        densite: { type: "string", default: "" },
+        valeur_ajoutee_audit_complet: { type: "string", default: "" },
       },
       required: [
         "personnages_principaux", "lieux_principaux", "carte_sensorielle", "objets_motifs",
@@ -312,12 +322,12 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     fiche_synthese: {
       type: "object",
       properties: {
-        contrat_annonce: { type: "string" },
-        contrat_reel: { type: "string" },
-        ecart_principal: { type: "string" },
-        risque_lecteur: { type: "string" },
-        recommandation: { type: "string" },
-        priorite: { type: "string" },
+        contrat_annonce: { type: "string", default: "" },
+        contrat_reel: { type: "string", default: "" },
+        ecart_principal: { type: "string", default: "" },
+        risque_lecteur: { type: "string", default: "" },
+        recommandation: { type: "string", default: "" },
+        priorite: { type: "string", default: "" },
       },
       required: ["contrat_annonce", "contrat_reel", "ecart_principal", "risque_lecteur", "recommandation", "priorite"],
       additionalProperties: false,
