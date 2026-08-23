@@ -1731,6 +1731,26 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
   const [auditActifId, setAuditActifId] = useState(null);
+  // ── Mise en page mobile (23/08/2026) ── La grille "220px 1fr" était figée
+  // quelle que soit la largeur d'écran : sur téléphone, ces 220px de barre
+  // latérale ne laissaient presque plus de place au contenu, d'où des
+  // titres de projet tous tronqués — signalé par l'auteur du projet. Seuil
+  // 768px = limite classique tablette/mobile. La barre latérale devient un
+  // tiroir qui glisse depuis la gauche (position fixed, transform), ouvert
+  // via un bouton hamburger, plutôt qu'une colonne de grille figée.
+  const [estMobile, setEstMobile] = useState(() => window.innerWidth <= 768);
+  const [menuMobileOuvert, setMenuMobileOuvert] = useState(false);
+  useEffect(() => {
+    const surRedimensionnement = () => setEstMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", surRedimensionnement);
+    return () => window.removeEventListener("resize", surRedimensionnement);
+  }, []);
+  // Referme le tiroir mobile après toute navigation ou changement de projet
+  // — évite de laisser le menu ouvert par-dessus le contenu qu'on vient de
+  // choisir d'afficher.
+  useEffect(() => {
+    if (estMobile) setMenuMobileOuvert(false);
+  }, [vue, projetActifId, estMobile]);
   // Modale de confirmation de suppression — ajoutée 28/07/2026. null =
   // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
   // pour permettre la mise en garde en rouge demandée par Joseph.
@@ -2094,7 +2114,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "220px 1fr",
+      gridTemplateColumns: estMobile ? "1fr" : "220px 1fr",
       gridTemplateRows: "48px minmax(0, 1fr)",
       // CORRECTIF TABLETTE 28/07/2026 : 100dvh (dynamic viewport height) au
       // lieu de 100vh. Sur les navigateurs mobiles/tablettes, 100vh est
@@ -2122,6 +2142,19 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         borderBottom: "0.5px solid var(--border)",
         background: "var(--surface)",
       }}>
+        {estMobile && (
+          <button
+            onClick={() => setMenuMobileOuvert((v) => !v)}
+            aria-label="Ouvrir le menu"
+            style={{
+              flexShrink: 0, background: "none", border: "0.5px solid var(--border)",
+              borderRadius: 6, width: 30, height: 30, fontSize: 16, cursor: "pointer",
+              color: "var(--texte-primaire)", padding: 0,
+            }}
+          >
+            ☰
+          </button>
+        )}
         <img
           src="/logo-cursus.png"
           alt={t("marque")}
@@ -2157,12 +2190,26 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         </button>
       </div>
 
+      {/* ── Fond assombri derrière le tiroir mobile — clic pour refermer ── */}
+      {estMobile && menuMobileOuvert && (
+        <div
+          onClick={() => setMenuMobileOuvert(false)}
+          style={{ position: "fixed", top: 48, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.4)", zIndex: 499 }}
+        />
+      )}
+
       {/* ── Sidebar ── */}
       <div style={{
         borderRight: "0.5px solid var(--border)",
         background: "#fafafa",
         display: "flex", flexDirection: "column",
         overflowY: "auto",
+        ...(estMobile ? {
+          position: "fixed", top: 48, bottom: 0, left: 0, width: 260, zIndex: 500,
+          transform: menuMobileOuvert ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.2s ease",
+          boxShadow: menuMobileOuvert ? "2px 0 12px rgba(0,0,0,0.15)" : "none",
+        } : {}),
       }}>
         {/* Navigation principale */}
         <div style={{ padding: "16px 12px 8px" }}>
