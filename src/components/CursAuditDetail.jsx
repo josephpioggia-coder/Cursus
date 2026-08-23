@@ -384,6 +384,87 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
               <span style={{ fontWeight: 600 }}>Prochaine étape : </span>{résultat.prochaine_etape}
             </div>
           )}
+
+          {résultat.cartographie_contexte && (
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14, display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#5B52C4" }}>Cartographie du contexte</div>
+
+              {résultat.cartographie_contexte.personnages_principaux?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 5 }}>Personnages principaux</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {résultat.cartographie_contexte.personnages_principaux.map((p, i) => (
+                      <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid var(--border)", borderRadius: 6, padding: "8px 10px" }}>
+                        <div style={{ fontWeight: 600 }}>{p.nom} <span style={{ fontWeight: 400, color: "var(--texte-tertiaire)" }}>— {p.role}</span></div>
+                        <div style={{ marginTop: 3 }}><span style={{ fontWeight: 600 }}>Explicite — </span>{p.explicite}</div>
+                        <div style={{ marginTop: 2, color: "#5B52C4" }}><span style={{ fontWeight: 600 }}>À développer — </span>{p.a_developper}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {résultat.cartographie_contexte.lieux_principaux?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 5 }}>Lieux principaux</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {résultat.cartographie_contexte.lieux_principaux.map((l, i) => (
+                      <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid var(--border)", borderRadius: 6, padding: "8px 10px" }}>
+                        <div style={{ fontWeight: 600 }}>{l.nom} <span style={{ fontWeight: 400, color: "var(--texte-tertiaire)" }}>— {l.fonction}</span></div>
+                        <div style={{ marginTop: 2, color: "#5B52C4" }}><span style={{ fontWeight: 600 }}>À enrichir — </span>{l.a_enrichir}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {résultat.cartographie_contexte.carte_sensorielle && (
+                <div style={{ fontSize: 12.5 }}>
+                  <span style={{ fontWeight: 600 }}>Sensoriel — </span>
+                  développé : {résultat.cartographie_contexte.carte_sensorielle.sens_developpes?.join(", ") || "—"} ·
+                  sous-exploité : {résultat.cartographie_contexte.carte_sensorielle.sens_sous_exploites?.join(", ") || "—"}
+                  <div style={{ color: "var(--texte-tertiaire)", marginTop: 2 }}>{résultat.cartographie_contexte.carte_sensorielle.diagnostic}</div>
+                </div>
+              )}
+
+              {résultat.cartographie_contexte.objets_motifs?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 5 }}>Objets et motifs récurrents</div>
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {résultat.cartographie_contexte.objets_motifs.map((o, i) => (
+                      <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid var(--border)", borderRadius: 6, padding: "8px 10px" }}>
+                        <div style={{ fontWeight: 600 }}>{o.element}</div>
+                        <div style={{ marginTop: 2 }}>{o.fonction_symbolique}</div>
+                        <div style={{ marginTop: 2, color: "#5B52C4" }}><span style={{ fontWeight: 600 }}>Potentiel inexploité — </span>{o.potentiel_inexploite}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {résultat.cartographie_contexte.domaines_a_verifier?.length > 0 && (
+                <div style={{ fontSize: 12.5 }}>
+                  <span style={{ fontWeight: 600 }}>Domaines à documenter/vérifier — </span>
+                  {résultat.cartographie_contexte.domaines_a_verifier.join(" · ")}
+                </div>
+              )}
+
+              {résultat.cartographie_contexte.voix && (
+                <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Voix — </span>{résultat.cartographie_contexte.voix}</div>
+              )}
+
+              {résultat.cartographie_contexte.densite && (
+                <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Densité — </span>{résultat.cartographie_contexte.densite}</div>
+              )}
+
+              {résultat.cartographie_contexte.valeur_ajoutee_audit_complet && (
+                <div style={{ fontSize: 12.5, background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 6, padding: "8px 10px" }}>
+                  <span style={{ fontWeight: 600, color: "#1D9E75" }}>Ce que l'audit détaillé apporterait en plus — </span>
+                  {résultat.cartographie_contexte.valeur_ajoutee_audit_complet}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

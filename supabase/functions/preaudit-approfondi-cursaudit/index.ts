@@ -72,6 +72,27 @@
  * détaillé (`audit_criteria`) — hors périmètre de cette fonction, touche un
  * système différent et déjà éprouvé (`analyser-unite-cursaudit`).
  *
+ * v5 → v6, MÊME JOUR. GPT était ensuite revenu avec 19 "fiches" supplémentaires
+ * (personnages, lieux, sensoriel, objets, motifs, scènes, domaines,
+ * références, genre, conflits, silences, sur-explication, chronologie,
+ * densité, voix, modèles à préserver, points à approfondir...) — la plupart
+ * faisaient doublon avec ce qui existe déjà (contrat de genre = nature_reelle/
+ * promesse_affichee ; conflits = ecart_promesse_execution ; silences/modèles
+ * = a_preserver ; sur-explication = le chantier télégraphage ; "points à
+ * approfondir" aurait réintroduit EXACTEMENT le problème "à vérifier plus
+ * tard" corrigé en v3). L'auteur du projet a tranché : garder les axes non
+ * redondants (personnages, lieux, sensoriel, objets/motifs, domaines à
+ * vérifier, voix, densité) dans une section À PART, `cartographie_contexte`,
+ * distincte du plan de décision — raison assumée : montrer la richesse et
+ * les manques du texte pour que le client comprenne concrètement ce que
+ * l'audit détaillé (qui couvre les ~1400+ unités du livre) lui apporterait
+ * en plus de ce pré-audit. Choix ASSUMÉ de rester COMPACT (2-5 personnages
+ * principaux, pas tous ; 1-4 lieux, pas toutes les scènes) : une version
+ * exhaustive referait l'audit détaillé dans un seul appel, ce qui casserait
+ * le prix et le délai du pré-audit. `valeur_ajoutee_audit_complet` explicite
+ * le pont entre cette cartographie et l'audit détaillé, honnêtement (règle
+ * 5), pas comme un argumentaire de vente forcé.
+ *
  * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
  * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
  * "2 IA". Garder le pré-audit rapide et bon marché ; le dialogisme
@@ -183,6 +204,76 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     a_preserver: { type: "array", items: { type: "string" } },
     a_couper_ou_alleger: { type: "array", items: { type: "string" } },
     prochaine_etape: { type: "string" },
+    cartographie_contexte: {
+      type: "object",
+      properties: {
+        personnages_principaux: {
+          type: "array",
+          minItems: 2,
+          maxItems: 5,
+          items: {
+            type: "object",
+            properties: {
+              nom: { type: "string" },
+              role: { type: "string" },
+              explicite: { type: "string" },
+              a_developper: { type: "string" },
+            },
+            required: ["nom", "role", "explicite", "a_developper"],
+            additionalProperties: false,
+          },
+        },
+        lieux_principaux: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: {
+            type: "object",
+            properties: {
+              nom: { type: "string" },
+              fonction: { type: "string" },
+              a_enrichir: { type: "string" },
+            },
+            required: ["nom", "fonction", "a_enrichir"],
+            additionalProperties: false,
+          },
+        },
+        carte_sensorielle: {
+          type: "object",
+          properties: {
+            sens_developpes: { type: "array", items: { type: "string" } },
+            sens_sous_exploites: { type: "array", items: { type: "string" } },
+            diagnostic: { type: "string" },
+          },
+          required: ["sens_developpes", "sens_sous_exploites", "diagnostic"],
+          additionalProperties: false,
+        },
+        objets_motifs: {
+          type: "array",
+          minItems: 2,
+          maxItems: 5,
+          items: {
+            type: "object",
+            properties: {
+              element: { type: "string" },
+              fonction_symbolique: { type: "string" },
+              potentiel_inexploite: { type: "string" },
+            },
+            required: ["element", "fonction_symbolique", "potentiel_inexploite"],
+            additionalProperties: false,
+          },
+        },
+        domaines_a_verifier: { type: "array", items: { type: "string" } },
+        voix: { type: "string" },
+        densite: { type: "string" },
+        valeur_ajoutee_audit_complet: { type: "string" },
+      },
+      required: [
+        "personnages_principaux", "lieux_principaux", "carte_sensorielle", "objets_motifs",
+        "domaines_a_verifier", "voix", "densite", "valeur_ajoutee_audit_complet",
+      ],
+      additionalProperties: false,
+    },
     fiche_synthese: {
       type: "object",
       properties: {
@@ -200,7 +291,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
   required: [
     "resume_executif", "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
     "recommandation_principale", "plan_intervention", "exemples_concrets",
-    "a_preserver", "a_couper_ou_alleger", "prochaine_etape", "fiche_synthese",
+    "a_preserver", "a_couper_ou_alleger", "prochaine_etape", "cartographie_contexte", "fiche_synthese",
   ],
   additionalProperties: false,
 };
@@ -280,7 +371,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
     `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
-    "Produis les 12 éléments suivants :\n" +
+    "Produis les 13 éléments suivants :\n" +
     "- resume_executif : 6 à 8 lignes MAXIMUM, en langage simple pour l'auteur·ice — ce livre fonctionne-t-il, comment, et quelle voie tu recommandes. Doit pouvoir se lire seul, avant tout le reste (ex. \"Votre livre fonctionne. Mais il fonctionne mieux comme fable méditative que comme roman. La voie recommandée est l'hybride équilibré.\").\n" +
     "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
     "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
@@ -292,6 +383,16 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "- a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu, quelle que soit la voie choisie.\n" +
     "- a_couper_ou_alleger : ce qui alourdit le texte sans lui apporter de valeur (répétitions, longueurs...).\n" +
     "- prochaine_etape : voir règle 5.\n" +
+    "- cartographie_contexte : une cartographie COMPACTE du livre, distincte du plan de décision ci-dessus — pas un audit unité par unité, juste les grandes lignes utiles :\n" +
+    "  - personnages_principaux : 2 à 5 personnages PRINCIPAUX seulement (pas tous les personnages) — role, ce qui est explicite dans le texte, ce qui reste à développer.\n" +
+    "  - lieux_principaux : 1 à 4 lieux principaux — fonction narrative, ce qui pourrait être enrichi.\n" +
+    "  - carte_sensorielle : quels sens sont développés, lesquels sont sous-exploités sur l'ensemble du livre, et un diagnostic en une phrase.\n" +
+    "  - objets_motifs : 2 à 5 objets ou motifs récurrents (pas tous) — leur fonction symbolique et leur potentiel encore inexploité (distinct de a_couper_ou_alleger : ici c'est le potentiel, pas la lassitude par répétition).\n" +
+    "  - domaines_a_verifier : les domaines réels (géographie, technique, médical, historique...) que l'auteur·ice devrait documenter ou faire vérifier — vide si aucun.\n" +
+    "  - voix : en une ou deux phrases, les personnages parlent-ils vraiment différemment ou l'auteur·ice parle-t-il/elle à travers eux tous.\n" +
+    "  - densite : en une ou deux phrases, l'équilibre entre dialogue/description/explication/sensoriel sur l'ensemble du livre.\n" +
+    "  - valeur_ajoutee_audit_complet : ce que l'audit détaillé permettrait concrètement de vérifier et développer à partir de CETTE cartographie, à l'échelle des scènes et sur l'ensemble du livre — honnête (règle 5), pas un argumentaire commercial forcé, mais une description réelle de ce que l'ampleur du livre entier permet de creuser que cette cartographie compacte ne peut pas faire.\n" +
+    "  Adapte ces catégories à la nature du texte : pour un roman, personnages/lieux prennent tout leur sens ; pour un texte non narratif (essai, manuel), remplace-les par ce qui est pertinent (ex. concepts-clés à la place de personnages).\n" +
     "- fiche_synthese : une fiche COURTE en complément de tout ce qui précède, chaque champ en quelques mots seulement (PAS des phrases complètes, PAS de répétition mot pour mot du texte déjà écrit ailleurs) — contrat_annonce (ex. \"roman initiatique\"), contrat_reel (ex. \"conte philosophique dialogué\"), ecart_principal (ex. \"insuffisance de conflit narratif\"), risque_lecteur (ce que le lecteur risque de ressentir, ex. \"attente romanesque déçue\"), recommandation (ex. \"réécriture hybride moyenne\"), priorite (l'action la plus urgente, ex. \"renforcer Clara et opacifier Scalpa\")."
   );
 }
@@ -342,10 +443,10 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 16000,
+        max_tokens: 24000,
         system: systemPrompt,
         messages: [{ role: "user", content: texteIntegral }],
-        tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale : 3 voies, un plan d'intervention en chantiers, des exemples concrets actionnables, une prochaine étape honnête.", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
+        tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale (3 voies, plan d'intervention, exemples actionnables, prochaine étape honnête) et une cartographie compacte du contexte du livre (personnages, lieux, sensoriel, objets/motifs, domaines à vérifier, voix, densité).", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
         tool_choice: { type: "tool", name: "preaudit_approfondi" },
       }),
     });
