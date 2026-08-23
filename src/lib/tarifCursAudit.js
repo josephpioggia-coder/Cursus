@@ -87,69 +87,67 @@ export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
 }
 
 /**
- * Prix du pré-audit global (référence 60816-01, suite — GRATUIT depuis le
- * 23/08/2026, voir 2026-08-23-preaudit-gratuit.sql).
+ * Aperçu gratuit + pré-audit payant (référence 60816-01, suite, 23/08/2026)
  * ======================================================================
- * Rendu gratuit après un premier vrai test (38 864 mots, résultat conforme
- * aux attentes) facturé 72,60€ TTC avec le barème linéaire d'origine, pour
- * un coût réel mesuré d'environ 0,13€ (un seul appel Claude, sortie
- * plafonnée à 2048 tokens). Décision de l'auteur du projet : le pré-audit
- * n'est pas le produit que le client commande — juste une orientation
- * avant de s'engager sur le prix de l'audit détaillé, qui reste lui seul
- * facturé (coût réel + marge, voir calculerPrixCursAudit ci-dessus).
+ * Après un aller-retour complet sur le sujet (voir l'historique dans
+ * 2026-08-23-preaudit-vrai.sql), le travail en deux phases décrit par
+ * l'auteur du projet le 15/08/2026 se répartit ainsi :
+ *  - Phase 1, "aperçu" (GRATUIT, voir preaudit-global-cursaudit — nom de
+ *    fonction déployée inchangé, renommé "aperçu" seulement en interne) :
+ *    une lecture rapide, une page de synthèse, juste assez pour orienter.
+ *  - Phase 2, "pré-audit" (PAYANT, preaudit-approfondi-cursaudit) : reprend
+ *    l'aperçu et le développe — hypothèses à vérifier, échantillons précis,
+ *    décision éditoriale. C'est CE prix-ci, calculé ci-dessous.
  *
- * La mécanique par tranche de mots ci-dessous est conservée telle quelle
- * (structure de audit_pricing_rules inchangée, seules les valeurs sont à
- * 0) : si un jour l'auteur du projet veut refacturer le pré-audit
- * différemment, il suffit de remettre des valeurs non nulles dans
- * audit_pricing_rules, sans toucher au code.
+ * Barème choisi par l'auteur du projet le 23/08/2026 — un pourcentage du
+ * prix de l'audit détaillé (déjà connu à la création, pas besoin d'un
+ * barème par tranche de mots séparé) plutôt qu'un tarif fixe :
+ *  - Prix du pré-audit = 40 % du prix TTC de l'audit détaillé.
+ *  - Si l'audit détaillé est commandé ensuite, 50 % du prix du pré-audit
+ *    (= 20 % du prix de l'audit détaillé) en est déduit.
+ *  - Total pré-audit + audit détaillé commandé ensuite = 120 % du prix de
+ *    l'audit détaillé seul, au lieu de 140 % sans déduction.
+ * Les deux pourcentages sont dans audit_pricing_rules (categorie
+ * "parametre_global", clés "preaudit_pourcentage_prix_final" et
+ * "preaudit_deduction_pourcentage") — pas en dur ici, ajustables sans
+ * toucher au code. La déduction reste pour l'instant INFORMATIONNELLE :
+ * aucun paiement Stripe n'existe encore pour CursAudit, donc rien ne
+ * l'applique automatiquement au moment de payer l'audit détaillé.
  */
-export function calculerPrixPreauditGlobal(regles, nombreMots) {
-  const paliers = regles
-    .filter((r) => r.categorie === "preaudit_global_palier")
-    .map((r) => ({ seuil: Number(r.cle), prixHT: r.valeur_numerique }))
-    .sort((a, b) => a.seuil - b.seuil);
+export function calculerPrixPreauditPourcentage(regles, prixAuditFinalTTC) {
+  const pourcentage = regles.find((r) => r.categorie === "parametre_global" && r.cle === "preaudit_pourcentage_prix_final")?.valeur_numerique ?? 40;
+  const deductionPourcentage = regles.find((r) => r.categorie === "parametre_global" && r.cle === "preaudit_deduction_pourcentage")?.valeur_numerique ?? 50;
 
-  const tvaPct = regles.find((r) => r.categorie === "parametre_global" && r.cle === "tva_pct")?.valeur_numerique ?? 21;
+  const prixTTC = Math.round(prixAuditFinalTTC * (pourcentage / 100) * 100) / 100;
+  const reductionSurAuditFinal = Math.round(prixTTC * (deductionPourcentage / 100) * 100) / 100;
+  const prixAuditFinalApresReduction = Math.round((prixAuditFinalTTC - reductionSurAuditFinal) * 100) / 100;
 
-  const dernierPalier = paliers[paliers.length - 1];
-  let prixHT;
-  if (!dernierPalier) {
-    prixHT = 0; // règles non chargées — ne devrait pas arriver en usage normal
-  } else if (nombreMots <= dernierPalier.seuil) {
-    const palierTrouvé = paliers.find((p) => nombreMots <= p.seuil) ?? paliers[0];
-    prixHT = palierTrouvé.prixHT;
-  } else {
-    const tranchesSupplémentaires = Math.ceil((nombreMots - dernierPalier.seuil) / 10000);
-    prixHT = dernierPalier.prixHT + tranchesSupplémentaires * 12;
-  }
-
-  const tva = prixHT * (tvaPct / 100);
-  const prixTTC = prixHT + tva;
-  return {
-    prixHT: Math.round(prixHT * 100) / 100,
-    tva: Math.round(tva * 100) / 100,
-    prixTTC: Math.round(prixTTC * 100) / 100,
-  };
+  return { prixTTC, pourcentage, reductionSurAuditFinal, prixAuditFinalApresReduction };
 }
 
 /**
- * Temps estimé du pré-audit global (référence 60816-01, suite, 22/08/2026).
+ * Temps estimé d'un appel unique sur le manuscrit entier (référence
+ * 60816-01, suite, 22/08/2026 — partagé par l'aperçu gratuit ET le
+ * pré-audit payant, les deux étant UN SEUL appel Claude sur le texte
+ * intégral, seule la taille de sortie diffère).
  * ======================================================================
- * ESTIMATION, pas une mesure — comme estimerDuréeCursAudit() ci-dessus,
- * à recalibrer sur un vrai test. Contrairement à l'audit détaillé, il n'y
- * a QU'UN SEUL appel IA, quelle que soit la taille du livre — la variable
- * n'est donc pas le nombre d'unités mais le temps de "prefill" (lecture du
- * contexte par Claude) sur un texte pouvant faire plusieurs dizaines de
- * milliers de mots, plus une sortie courte et bornée (max_tokens=2048 côté
- * serveur). Hypothèse : une base fixe (démarrage de l'appel, génération de
- * la sortie) + un terme qui croît doucement avec la taille du texte.
+ * ESTIMATION, pas une mesure — comme estimerDuréeCursAudit() ci-dessus, à
+ * recalibrer sur un vrai test. La variable n'est pas le nombre d'unités
+ * mais le temps de "prefill" (lecture du contexte par Claude) sur un texte
+ * pouvant faire plusieurs dizaines de milliers de mots, plus la génération
+ * de la sortie. Hypothèse : une base fixe + un terme qui croît doucement
+ * avec la taille du texte. Volontairement PAS de fausse barre de
+ * progression : un appel unique n'a pas de signal d'avancement réel à
+ * afficher — voir la discussion du 23/08/2026 sur le traitement en
+ * arrière-plan (pas de vraie tâche de fond côté serveur pour l'instant,
+ * juste cet appel synchrone, largement sous la limite d'une heure fixée
+ * par l'auteur du projet).
  */
-const DUREE_BASE_PREAUDIT_SECONDES = 20;
+const DUREE_BASE_APPEL_GLOBAL_SECONDES = 20;
 const DUREE_PAR_10000_MOTS_SECONDES = 5;
 
-export function estimerDuréePreauditGlobal(nombreMots) {
-  const secondes = DUREE_BASE_PREAUDIT_SECONDES + (nombreMots / 10000) * DUREE_PAR_10000_MOTS_SECONDES;
+export function estimerDuréeAppelGlobal(nombreMots) {
+  const secondes = DUREE_BASE_APPEL_GLOBAL_SECONDES + (nombreMots / 10000) * DUREE_PAR_10000_MOTS_SECONDES;
   if (secondes < 60) return { secondes, texte: "moins d'une minute" };
   const minutes = Math.round(secondes / 60);
   return { secondes, texte: `environ ${minutes} min` };

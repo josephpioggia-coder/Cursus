@@ -234,33 +234,62 @@ d'unités, seule différence pratique le temps de traitement en aval.
   redondant pour l'instant) : `respiration_du_texte`, `promesse_au_lecteur`.
 - Pas encore testé dans le navigateur ni en conditions réelles côté moteur.
 
-**Chantier 8 — Pré-audit global du manuscrit (`preaudit-global-cursaudit`, réf. 60816-01, suite, 22/08/2026)**
-- Idée de l'auteur du projet, affinée avec GPT : avant de payer/lancer
-  l'audit détaillé (des heures, ~29 $ sur "là où les portes s'ouvrent"),
-  une lecture globale bon marché du manuscrit ENTIER en **un seul appel**
-  Claude (fenêtre de contexte 1M tokens — un livre y tient largement).
-  Comble aussi un vrai défaut technique découvert au passage : le moteur
-  détaillé analyse chaque unité isolément, sans jamais voir le livre entier.
-- Reprend GPT en le resserrant : sa taxonomie biologique (endosquelette/
-  mycélium/fleuve...) et ses "formats dérivés" sont écartés — pas assez
-  fiables/universels d'un livre à l'autre pour un champ structuré.
-  Retenu : `genre_apparent`, `genre_reel_probable`, `colonne_vertebrale`,
+**Chantier 8 — Aperçu gratuit + pré-audit payant (réf. 60816-01, suite, 22-23/08/2026)**
+- Idée d'origine de l'auteur du projet (15/08/2026), affinée avec GPT à deux
+  reprises : un travail en DEUX phases avant l'audit détaillé (des heures,
+  ~29 $ sur "là où les portes s'ouvrent"), pas une seule.
+- **Phase 1, "aperçu" (gratuit)** — `preaudit-global-cursaudit` (nom de
+  fonction déployée inchangé, renommé "aperçu" seulement en interne le
+  23/08). Un seul appel Claude (contexte 1M tokens, le livre entier y
+  tient) : `genre_apparent`, `genre_reel_probable`, `colonne_vertebrale`,
   `tension_principale`, `forces_globales[]`, `risques_globaux[]`,
-  `audit_recommande` (palier + priorités pour l'audit détaillé qui suivra).
-- **Cycle de vie séparé de l'audit détaillé**, sur `audits` directement
-  (pas de nouvelle table) : `preaudit_statut` (non_demande→paye→termine),
-  `preaudit_prix_ht`, `preaudit_resultat` (jsonb).
-- **Tarif fourni par l'auteur du projet** : barème dégressif par tranche
-  de 10 000 mots (`audit_pricing_rules`, categorie `preaudit_global_palier`)
-  — 25€ HT jusqu'à 10 000 mots (plancher), jusqu'à 140€ HT à 80 000 mots,
-  puis +10€ HT/tranche de 10 000 mots au-delà. `calculerPrixPreauditGlobal()`
-  dans `tarifCursAudit.js`.
-- **Coût réel estimé très inférieur à l'audit détaillé** : un seul appel
-  avec une sortie courte, de l'ordre de quelques dizaines de centimes à
-  1$, plutôt que ~29$ pour 1419 appels — valide l'intuition de départ
-  ("un premier travail léger, moins cher").
-- Affiché dans `CursAuditDetail.jsx`, au-dessus de la liste des unités.
-- Pas encore testé dans le navigateur ni en conditions réelles côté moteur.
+  `audit_recommande` (palier + priorités). Cycle de vie sur `audits` :
+  `apercu_statut` (non_demande→termine, pas de "paye" puisque gratuit),
+  `apercu_resultat` (jsonb). Coût réel de l'ordre de 0,10-0,15€ (mesuré sur
+  un vrai test, 38 864 mots).
+- **Erreur du 22/08 corrigée le 23/08** : la phase 1 avait d'abord été
+  facturée (barème dégressif puis linéaire par tranche de mots, 24€→132€
+  HT) et présentée comme "le pré-audit" — l'auteur du projet a fait
+  remarquer qu'une page de synthèse à 72,60€ pour un appel coûtant 0,13€
+  n'était pas vendable, ET que ce barème visait en réalité la vraie phase 2,
+  jamais construite. Rendue gratuite, la phase 1 a ensuite été comprise
+  comme un simple teaser plutôt qu'un livrable.
+- **Phase 2, "pré-audit" (payant)** — `preaudit-approfondi-cursaudit`
+  (nouvelle fonction, 23/08/2026). Reprend le résultat de l'aperçu et le
+  DÉVELOPPE en 7 blocs (structure validée par l'auteur du projet après un
+  retour de GPT jugeant un premier prototype "trop affirmatif") :
+  `nature_dominante`, `contrat_lecture`, `colonne_vertebrale`,
+  `hypotheses_tension[]`, `echantillons_a_verifier[]`,
+  `audit_recommande {axe_principal, criteres[]}`,
+  `decision_editoriale {voie_a, voie_b}`. RÈGLE DE TON explicite dans le
+  prompt système : formuler les points comme des hypothèses à vérifier dans
+  l'audit détaillé, jamais comme des verdicts déjà établis. 1 SEULE IA
+  (Claude) — le dialogue à deux IA reste réservé à l'audit détaillé en mode
+  "2 IA", décision du 23/08/2026 pour garder le pré-audit rapide et bon
+  marché. Cycle de vie séparé : `preaudit_statut` (non_demande→paye→termine),
+  `preaudit_prix_ht`, `preaudit_resultat` (jsonb). N'apparaît dans
+  `CursAuditDetail.jsx` qu'une fois l'aperçu terminé.
+- **Tarif de la phase 2** : 40 % du prix TTC de l'audit détaillé (déjà
+  connu à la création, pas de barème par tranche de mots séparé) — si
+  l'audit détaillé est commandé ensuite, 50 % du prix du pré-audit (= 20 %
+  du prix de l'audit détaillé) en est déduit, soit 120 % du prix de l'audit
+  détaillé au total au lieu de 140 % sans déduction. Décision de l'auteur
+  du projet, 23/08/2026 ; déduction pour l'instant INFORMATIONNELLE (pas de
+  paiement Stripe pour l'appliquer). `calculerPrixPreauditPourcentage()`
+  dans `tarifCursAudit.js`, deux paramètres dans `audit_pricing_rules`
+  (categorie `parametre_global` : `preaudit_pourcentage_prix_final`,
+  `preaudit_deduction_pourcentage`).
+- **Pas de vraie tâche de fond serveur** : discuté avec l'auteur du projet
+  le 23/08/2026, qui voulait un traitement "en arrière-plan avec barre de
+  progression". Un appel unique (aperçu ou pré-audit) prend de l'ordre de
+  1 à 3 minutes, largement sous la limite d'une heure qu'il a fixée, et n'a
+  pas de signal d'avancement réel à afficher — pas de fausse barre de
+  progression. Une vraie tâche de fond (qui survit à la fermeture de
+  l'onglet, avec notification) demanderait une infrastructure séparée
+  (table de jobs + poller + notification), jugée disproportionnée ici et
+  PAS construite.
+- Pas encore testé dans le navigateur ni en conditions réelles côté moteur
+  (ni la phase 1 relookée, ni la phase 2, nouvelle).
 
 **Reste à construire pour CursAudit** : import `.pdf` (`.docx` fait), le
 bouton "Payer" (Stripe Checkout, voir décision de séquence ci-dessus),
