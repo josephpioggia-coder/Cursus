@@ -16,7 +16,7 @@
  */
 
 import {
-  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak,
+  Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageBreak, TableOfContents,
 } from "docx";
 import { nomDeFichierSûr } from "./exportWord.js";
 
@@ -40,8 +40,15 @@ function titre(texte, niveau = HeadingLevel.HEADING_1) {
   return new Paragraph({ heading: niveau, spacing: { before: 320, after: 120 }, text: texte });
 }
 
+// Justifié (AlignmentType.JUSTIFIED) sur tout le texte courant — une ligne
+// qui ne remplit pas toute la largeur (dernier ligne d'un paragraphe, ou
+// paragraphe tenant sur une seule ligne) reste alignée à gauche comme
+// d'habitude ; seules les lignes qui débordent sur plusieurs lignes sont
+// étirées pour occuper toute la largeur, demande explicite de l'auteur du
+// projet (23/08/2026).
 function paragraphe(texte, options = {}) {
   return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 140 },
     children: [new TextRun({ text: texte || "", ...options })],
   });
@@ -49,6 +56,7 @@ function paragraphe(texte, options = {}) {
 
 function ligneÉtiquette(étiquette, valeur) {
   return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
     spacing: { after: 80 },
     children: [
       new TextRun({ text: `${étiquette} — `, bold: true }),
@@ -58,7 +66,12 @@ function ligneÉtiquette(étiquette, valeur) {
 }
 
 function puce(texte) {
-  return new Paragraph({ bullet: { level: 0 }, spacing: { after: 60 }, children: [new TextRun(texte || "")] });
+  return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    bullet: { level: 0 },
+    spacing: { after: 60 },
+    children: [new TextRun(texte || "")],
+  });
 }
 
 // Bloc encadré simulé : docx n'a pas de "carte" native, on simule avec un
@@ -201,6 +214,12 @@ export async function exporterPreauditWord(audit, résultat) {
     new Paragraph({ children: [new PageBreak()] }),
   ];
 
+  const sommaire = [
+    new Paragraph({ heading: HeadingLevel.HEADING_1, text: "Table des matières" }),
+    new TableOfContents("Table des matières", { hyperlink: true, headingStyleRange: "1-3" }),
+    new Paragraph({ children: [new PageBreak()] }),
+  ];
+
   const contenu = [];
 
   if (résultat.resume_executif) {
@@ -257,7 +276,7 @@ export async function exporterPreauditWord(audit, résultat) {
   const documentWord = new Document({
     sections: [{
       properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
-      children: [...pageDeTitre, ...contenu],
+      children: [...pageDeTitre, ...sommaire, ...contenu],
     }],
     styles: {
       default: {
