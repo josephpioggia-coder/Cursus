@@ -572,6 +572,18 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
               </div>
             </details>
           )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+            <button
+              onClick={() => exporterPreauditWord(audit, résultat)}
+              style={{
+                background: "#5B52C4", color: "#fff", border: "none",
+                borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Exporter en Word
+            </button>
+          </div>
         </div>
       )}
     </div>
