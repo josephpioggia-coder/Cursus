@@ -105,10 +105,10 @@
  * PIPELINE EN 3 PASSAGES (même schéma OpenAI json_schema que le mode "2 IA"
  * déjà éprouvé dans analyser-unite-cursaudit, réutilisé ici) :
  *  1. Claude produit un brouillon (le prompt v6 ci-dessus, inchangé).
- *  2. GPT (gpt-4o) relit le manuscrit ET ce brouillon, et signale
- *     UNIQUEMENT des manques réels ou des redites superflues — il ne
- *     réécrit rien lui-même (même limite que le "second lecteur" du mode
- *     2 IA de l'audit détaillé).
+ *  2. GPT relit CE BROUILLON (PAS le manuscrit — voir correctif ci-dessous),
+ *     et signale UNIQUEMENT des manques réels ou des redites superflues —
+ *     il ne réécrit rien lui-même (même limite que le "second lecteur" du
+ *     mode 2 IA de l'audit détaillé).
  *  3. Claude reprend SON PROPRE brouillon à la lumière de cette critique et
  *     produit la version finale — il reste seul juge de ce qu'il retient
  *     ou écarte (l'auteur du projet, littéralement : "tu l'amendes en ne
@@ -130,6 +130,25 @@
  * le mode "2 IA" systématique pour l'audit détaillé aussi, et de refondre la
  * tarification autour de la profondeur plutôt que du nombre d'IA — discuté,
  * pas implémenté, à ouvrir séparément si l'auteur du projet le confirme.
+ *
+ * CORRECTIF v7.1, MÊME JOUR — bug réel rencontré au premier test du pipeline
+ * à 3 passages : "Request too large for gpt-4o... Limit 30000, Requested
+ * 46373" — le passage 2 envoyait le MANUSCRIT ENTIER (~58 000 tokens) à
+ * gpt-4o, dont le palier de l'organisation de l'auteur du projet est de
+ * 30 000 tokens/minute. Deux corrections :
+ *  1. Le passage 2 n'envoie plus que le brouillon JSON à GPT (quelques Ko),
+ *     pas le manuscrit — sa tâche réelle (cohérence interne, complétude) ne
+ *     nécessite pas de revérifier chaque affirmation contre le texte source
+ *     ligne à ligne, contrairement au passage 1 et au passage 3 (Claude), qui
+ *     eux gardent le manuscrit complet.
+ *  2. Modèle changé de `gpt-4o` à `gpt-5` (choix explicite de l'auteur du
+ *     projet, vérifié sur platform.openai.com/settings/organization/limits :
+ *     `gpt-5` a un palier de 500 000 TPM sur son organisation, largement
+ *     suffisant même si le manuscrit y était encore envoyé). Attention à ne
+ *     pas confondre l'abonnement ChatGPT Plus personnel de l'auteur du
+ *     projet (chatgpt.com) avec l'organisation API (platform.openai.com,
+ *     `OPENAI_API_KEY`) — deux systèmes de facturation et de paliers
+ *     séparés, malgré le même compte.
  *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
@@ -171,7 +190,7 @@ const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const MODELE_CLAUDE = "claude-sonnet-5";
-const MODELE_GPT = "gpt-4o";
+const MODELE_GPT = "gpt-5";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -527,18 +546,22 @@ Deno.serve(async (req) => {
 
     const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
 
-    // Passage 2 — GPT relit le manuscrit ET le brouillon, signale manques/redites réels, ne réécrit rien.
+    // Passage 2 — GPT relit le brouillon (PAS le manuscrit, voir note ci-dessous),
+    // signale manques/redites réels, ne réécrit rien.
     let critiqueGPT: unknown = null;
     let usageGPT: unknown = null;
     const systemGPT =
-      "Tu es le second lecteur du pré-audit CursAudit. On te donne le manuscrit entier et un pré-audit déjà " +
-      "rédigé par un premier moteur (13 éléments : résumé exécutif, nature réelle, promesse affichée, écart, " +
-      "voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à couper, " +
-      "prochaine étape, cartographie du contexte, fiche de synthèse). Relis-le à la lumière du manuscrit et " +
-      "signale UNIQUEMENT : des manques réels (un élément important du texte que le pré-audit a ignoré, une " +
-      "affirmation mal ancrée) et des redites superflues (une idée répétée inutilement entre plusieurs " +
-      "champs). Ne réécris rien toi-même, ne propose pas de nouvelle version — indique seulement ce qui " +
-      "devrait changer, pour que le premier moteur amende son propre travail.";
+      "Tu es le second lecteur du pré-audit CursAudit. On te donne un pré-audit déjà rédigé par un premier " +
+      "moteur à partir d'un manuscrit (13 éléments : résumé exécutif, nature réelle, promesse affichée, " +
+      "écart, voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à " +
+      "couper, prochaine étape, cartographie du contexte, fiche de synthèse). Le manuscrit lui-même ne " +
+      "t'est PAS fourni — ta relecture porte sur la COHÉRENCE INTERNE et la COMPLÉTUDE du document, pas sur " +
+      "une vérification ligne à ligne contre le texte source. Signale UNIQUEMENT : des manques réels (un " +
+      "champ trop vague ou générique par rapport aux autres, une voie éditoriale sans lien avec le plan " +
+      "d'intervention, une recommandation qui ne découle pas de ce qui précède) et des redites superflues " +
+      "(la même idée répétée presque mot pour mot entre plusieurs champs). Ne réécris rien toi-même, ne " +
+      "propose pas de nouvelle version — indique seulement ce qui devrait changer, pour que le premier " +
+      "moteur amende son propre travail.";
     const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
@@ -546,7 +569,7 @@ Deno.serve(async (req) => {
         model: MODELE_GPT,
         messages: [
           { role: "system", content: systemGPT },
-          { role: "user", content: JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillon.data }) },
+          { role: "user", content: JSON.stringify({ preaudit_brouillon: brouillon.data }) },
         ],
         response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
       }),
