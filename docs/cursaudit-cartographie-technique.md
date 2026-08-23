@@ -275,12 +275,44 @@ d'unités, seule différence pratique le temps de traitement en aval.
   maintenant), préconisation sur le texte mais recommandations franches et
   directives, généreux autant que sévère, rester à l'échelle du livre entier
   (pas une seule piste de correction au centre), prochaine étape honnête
-  plutôt qu'un réflexe de vente. 1 SEULE IA (Claude) — le dialogue à deux IA
-  reste réservé à l'audit détaillé en mode "2 IA", décision du 23/08/2026
-  pour garder le pré-audit rapide et bon marché. Cycle de vie séparé :
+  plutôt qu'un réflexe de vente. Cycle de vie séparé :
   `preaudit_statut` (non_demande→paye→termine),
   `preaudit_prix_ht`, `preaudit_resultat` (jsonb). N'apparaît dans
   `CursAuditDetail.jsx` qu'une fois l'aperçu terminé.
+- **v4 → v6, même jour, sur retours GPT successifs** : v4 ajoute
+  `resume_executif` (6-8 lignes) et `duree_estimee_travail` par voie, plus
+  ton professionnel et ancrage systématique dans des repères nommés du
+  texte. v5 ajoute `fiche_synthese` (fiche courte, quelques mots par champ,
+  potentiellement exploitable pour comparer plusieurs pré-audits entre
+  eux). v6 ajoute `cartographie_contexte` (personnages principaux, lieux,
+  carte sensorielle, objets/motifs récurrents, domaines à documenter/
+  vérifier, voix, densité, `valeur_ajoutee_audit_complet`) — reprend 7 des
+  19 "fiches" proposées par GPT sur ce tour, en écartant les 12 autres
+  jugées redondantes avec l'existant (contrat de genre, conflits, silences,
+  sur-explication, "points à approfondir" auraient réintroduit le problème
+  "à vérifier plus tard" corrigé en v3). Choix assumé de rester COMPACT
+  (2-5 personnages, 1-4 lieux — pas une fiche exhaustive par unité) pour ne
+  pas refaire l'audit détaillé dans un seul appel.
+- **v6 → v7, même jour — REVIREMENT sur le niveau d'IA.** La règle "1 seule
+  IA" est abandonnée : après 4 tours de révision manuelle où un second
+  regard (GPT, relayé par l'auteur du projet) a systématiquement repéré des
+  manques ou des excès, l'auteur du projet a demandé que ce filet de
+  sécurité soit intégré au pipeline lui-même (le relais humain ne sera plus
+  là une fois le produit automatisé). **Pipeline en 3 passages**, même
+  mécanisme OpenAI `json_schema` que le mode "2 IA" déjà éprouvé dans
+  `analyser-unite-cursaudit` : (1) Claude produit un brouillon ; (2) GPT
+  (`gpt-4o`) relit le manuscrit ET le brouillon, signale uniquement des
+  manques/redites réels, ne réécrit rien ; (3) Claude reprend SON PROPRE
+  brouillon à la lumière de la critique et produit la version finale,
+  seul juge de ce qu'il retient. La critique GPT est conservée
+  (`preaudit_resultat.revision.critique_gpt`) pour la traçabilité, affichée
+  en repli (`<details>`) dans `CursAuditDetail.jsx`. `max_tokens` du passage
+  Claude porté à 24 000 (schéma v6 plus riche), toujours large marge sous
+  les 128k supportés par `claude-sonnet-5`. Secret `OPENAI_API_KEY`
+  désormais requis par cette fonction (déjà en place pour l'audit détaillé).
+  **Hors périmètre de ce changement**, discuté mais pas implémenté : rendre
+  le mode "2 IA" systématique pour l'audit détaillé aussi, et refondre la
+  tarification autour de la profondeur plutôt que du nombre d'IA.
 - **Tarif de la phase 2** : 40 % du prix TTC de l'audit détaillé (déjà
   connu à la création, pas de barème par tranche de mots séparé) — si
   l'audit détaillé est commandé ensuite, 50 % du prix du pré-audit (= 20 %
@@ -293,13 +325,14 @@ d'unités, seule différence pratique le temps de traitement en aval.
   `preaudit_deduction_pourcentage`).
 - **Pas de vraie tâche de fond serveur** : discuté avec l'auteur du projet
   le 23/08/2026, qui voulait un traitement "en arrière-plan avec barre de
-  progression". Un appel unique (aperçu ou pré-audit) prend de l'ordre de
-  1 à 3 minutes, largement sous la limite d'une heure qu'il a fixée, et n'a
-  pas de signal d'avancement réel à afficher — pas de fausse barre de
-  progression. Une vraie tâche de fond (qui survit à la fermeture de
-  l'onglet, avec notification) demanderait une infrastructure séparée
-  (table de jobs + poller + notification), jugée disproportionnée ici et
-  PAS construite.
+  progression". L'aperçu (1 appel) prend de l'ordre d'une minute ; le
+  pré-audit (3 passages depuis v7 : Claude → GPT → Claude) prend plusieurs
+  minutes — dans les deux cas largement sous la limite d'une heure fixée
+  par l'auteur du projet, et sans signal d'avancement réel à afficher entre
+  les passages — pas de fausse barre de progression. Une vraie tâche de
+  fond (qui survit à la fermeture de l'onglet, avec notification)
+  demanderait une infrastructure séparée (table de jobs + poller +
+  notification), jugée disproportionnée ici et PAS construite.
 - Pas encore testé dans le navigateur ni en conditions réelles côté moteur
   (ni la phase 1 relookée, ni la phase 2, nouvelle).
 

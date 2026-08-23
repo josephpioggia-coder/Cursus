@@ -93,10 +93,43 @@
  * le pont entre cette cartographie et l'audit détaillé, honnêtement (règle
  * 5), pas comme un argumentaire de vente forcé.
  *
- * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
- * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
- * "2 IA". Garder le pré-audit rapide et bon marché ; le dialogisme
- * resterait à construire comme option premium plus tard si besoin, pas ici.
+ * v6 → v7, MÊME JOUR — REVIREMENT SUR LE NIVEAU D'IA. La décision "1 seule
+ * IA" ci-dessous est ABANDONNÉE. Constat de l'auteur du projet après 4
+ * tours de révision manuelle (v1→v6) : à chaque fois, un second regard
+ * (GPT, relayé par l'auteur du projet) a signalé des manques ou des excès
+ * que le premier passage seul n'avait pas vus — et l'auteur du projet a dit
+ * clairement qu'une fois le produit vraiment automatisé (sans lui pour
+ * arbitrer à chaque fois), ce filet de sécurité doit être intégré dans le
+ * pipeline, pas laissé à un humain qui ne sera plus là.
+ *
+ * PIPELINE EN 3 PASSAGES (même schéma OpenAI json_schema que le mode "2 IA"
+ * déjà éprouvé dans analyser-unite-cursaudit, réutilisé ici) :
+ *  1. Claude produit un brouillon (le prompt v6 ci-dessus, inchangé).
+ *  2. GPT (gpt-4o) relit le manuscrit ET ce brouillon, et signale
+ *     UNIQUEMENT des manques réels ou des redites superflues — il ne
+ *     réécrit rien lui-même (même limite que le "second lecteur" du mode
+ *     2 IA de l'audit détaillé).
+ *  3. Claude reprend SON PROPRE brouillon à la lumière de cette critique et
+ *     produit la version finale — il reste seul juge de ce qu'il retient
+ *     ou écarte (l'auteur du projet, littéralement : "tu l'amendes en ne
+ *     retenant que les éléments clés... en laissant de côté ce que tu
+ *     estimes inutile") — ce n'est PAS une nouvelle génération indépendante,
+ *     c'est une révision de son propre travail.
+ * La critique GPT est conservée dans le résultat (`revision.critique_gpt`)
+ * pour la traçabilité, même si elle n'est pas toutes retenue.
+ *
+ * CONSÉQUENCE ASSUMÉE : le temps de traitement passe de ~1-3 min à
+ * plusieurs minutes (3 appels au lieu d'1), et le coût réel est mécaniquement
+ * plus élevé (toujours de l'ordre de quelques dizaines de centimes, pas
+ * disproportionné face au prix de 40 %) — ce n'est pas un ralentissement
+ * artificiel, c'est du vrai travail de contrôle en plus, dans l'esprit de ce
+ * que l'auteur du projet a fait manuellement à chaque itération de ce fichier.
+ *
+ * HORS PÉRIMÈTRE DE CE CHANGEMENT (décision explicite de l'auteur du projet,
+ * "pour le moment on doit juste peaufiner ce pré-audit") : l'idée de rendre
+ * le mode "2 IA" systématique pour l'audit détaillé aussi, et de refondre la
+ * tarification autour de la profondeur plutôt que du nombre d'IA — discuté,
+ * pas implémenté, à ouvrir séparément si l'auteur du projet le confirme.
  *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
@@ -125,7 +158,7 @@
  * Comme pour l'audit détaillé, aucun flux Stripe n'existe encore — le
  * statut se positionne manuellement (SQL) en attendant.
  *
- * SECRETS REQUIS : ANTHROPIC_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place).
+ * SECRETS REQUIS : ANTHROPIC_KEY, OPENAI_API_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place).
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -135,8 +168,10 @@ import Ajv from "https://esm.sh/ajv@8?target=deno";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 const MODELE_CLAUDE = "claude-sonnet-5";
+const MODELE_GPT = "gpt-4o";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -296,6 +331,20 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
   additionalProperties: false,
 };
 
+// ─── Second passage GPT (réf. 60816-01, suite, 23/08/2026) — même principe
+// que le "second lecteur" du mode 2 IA de analyser-unite-cursaudit : GPT ne
+// réécrit rien, il signale seulement des manques ou des redites réelles.
+const SCHEMA_CRITIQUE_GPT = {
+  type: "object",
+  properties: {
+    elements_manquants: { type: "array", items: { type: "string" } },
+    elements_superflus: { type: "array", items: { type: "string" } },
+    verdict_global: { type: "string" },
+  },
+  required: ["elements_manquants", "elements_superflus", "verdict_global"],
+  additionalProperties: false,
+};
+
 // ─── Qualification de la demande (questionnaire) — dupliqué depuis
 // analyser-unite-cursaudit/index.ts, voir ce fichier pour le détail complet
 // des champs. Reprise minimale : un paragraphe de contexte, pas de logique
@@ -402,6 +451,7 @@ Deno.serve(async (req) => {
 
   try {
     if (!ANTHROPIC_KEY) return json({ error: "ANTHROPIC_KEY manquante." }, 500);
+    if (!OPENAI_API_KEY) return json({ error: "OPENAI_API_KEY manquante." }, 500);
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const authHeader = req.headers.get("Authorization") ?? "";
@@ -436,34 +486,90 @@ Deno.serve(async (req) => {
 
     const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
     const contexteQualification = construireContexteQualification(audit);
-    const systemPrompt = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {});
+    const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {});
 
-    const réponse = await fetch("https://api.anthropic.com/v1/messages", {
+    // Passage 1 — Claude produit le brouillon.
+    const appelClaude = async (system: string, contexte: string) => {
+      if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
+      const réponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: MODELE_CLAUDE,
+          max_tokens: 24000,
+          system,
+          messages: [{ role: "user", content: contexte }],
+          tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale (3 voies, plan d'intervention, exemples actionnables, prochaine étape honnête) et une cartographie compacte du contexte du livre (personnages, lieux, sensoriel, objets/motifs, domaines à vérifier, voix, densité).", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
+          tool_choice: { type: "tool", name: "preaudit_approfondi" },
+        }),
+      });
+      const résultatAPI = await réponse.json();
+      if (!réponse.ok) throw new Error(résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
+      const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
+      if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use.");
+      const valide = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
+      if (!valide(blocOutil.input)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}`);
+      return {
+        data: blocOutil.input,
+        usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
+      };
+    };
+
+    const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
+
+    // Passage 2 — GPT relit le manuscrit ET le brouillon, signale manques/redites réels, ne réécrit rien.
+    let critiqueGPT: unknown = null;
+    let usageGPT: unknown = null;
+    const systemGPT =
+      "Tu es le second lecteur du pré-audit CursAudit. On te donne le manuscrit entier et un pré-audit déjà " +
+      "rédigé par un premier moteur (13 éléments : résumé exécutif, nature réelle, promesse affichée, écart, " +
+      "voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à couper, " +
+      "prochaine étape, cartographie du contexte, fiche de synthèse). Relis-le à la lumière du manuscrit et " +
+      "signale UNIQUEMENT : des manques réels (un élément important du texte que le pré-audit a ignoré, une " +
+      "affirmation mal ancrée) et des redites superflues (une idée répétée inutilement entre plusieurs " +
+      "champs). Ne réécris rien toi-même, ne propose pas de nouvelle version — indique seulement ce qui " +
+      "devrait changer, pour que le premier moteur amende son propre travail.";
+    const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
       body: JSON.stringify({
-        model: MODELE_CLAUDE,
-        max_tokens: 24000,
-        system: systemPrompt,
-        messages: [{ role: "user", content: texteIntegral }],
-        tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale (3 voies, plan d'intervention, exemples actionnables, prochaine étape honnête) et une cartographie compacte du contexte du livre (personnages, lieux, sensoriel, objets/motifs, domaines à vérifier, voix, densité).", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
-        tool_choice: { type: "tool", name: "preaudit_approfondi" },
+        model: MODELE_GPT,
+        messages: [
+          { role: "system", content: systemGPT },
+          { role: "user", content: JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillon.data }) },
+        ],
+        response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
       }),
     });
-    const résultatAPI = await réponse.json();
-    if (!réponse.ok) return json({ error: résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).` }, 502);
+    const résultatGPT = await réponseGPT.json();
+    if (!réponseGPT.ok) throw new Error(résultatGPT?.error?.message || `Échec de l'appel GPT (${réponseGPT.status}).`);
+    const contenuGPT = résultatGPT.choices?.[0]?.message?.content;
+    if (!contenuGPT) throw new Error("GPT n'a renvoyé aucun contenu.");
+    critiqueGPT = JSON.parse(contenuGPT);
+    usageGPT = { tokens_entree: résultatGPT.usage?.prompt_tokens ?? 0, tokens_sortie: résultatGPT.usage?.completion_tokens ?? 0, modele: résultatGPT.model ?? MODELE_GPT };
 
-    const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
-    if (!blocOutil) return json({ error: "Claude n'a renvoyé aucun bloc tool_use." }, 502);
-
-    const valide = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
-    if (!valide(blocOutil.input)) {
-      return json({ error: `Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}` }, 502);
-    }
+    // Passage 3 — Claude reprend SON PROPRE brouillon à la lumière de la critique GPT et produit la version finale.
+    const systemAmendement =
+      systemPromptInitial +
+      "\n\nTU AS DÉJÀ PRODUIT UN BROUILLON (fourni dans le message utilisateur, avec le manuscrit). Un second " +
+      "lecteur (GPT) l'a relu et propose des amendements (elements_manquants, elements_superflus), également " +
+      "fournis. Reprends TON PROPRE brouillon et produis la VERSION FINALE : intègre les remarques qui te " +
+      "semblent justifiées et utiles, ignore celles qui ne le sont pas — tu restes seul juge en dernier " +
+      "ressort, n'accepte pas une remarque simplement parce qu'elle est proposée. Ce n'est PAS une nouvelle " +
+      "génération indépendante : c'est une révision de ton propre travail, qui doit rester reconnaissable.";
+    const versionFinale = await appelClaude(
+      systemAmendement,
+      JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillon.data, critique_gpt: critiqueGPT })
+    );
 
     const preauditResultat = {
-      ...blocOutil.input,
-      usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
+      ...versionFinale.data,
+      revision: { critique_gpt: critiqueGPT },
+      usage: {
+        claude_brouillon: brouillon.usage,
+        gpt_critique: usageGPT,
+        claude_final: versionFinale.usage,
+      },
       analyse_le: new Date().toISOString(),
     };
 
