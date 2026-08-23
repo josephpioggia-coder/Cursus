@@ -215,8 +215,15 @@ async function appelerPreauditApprofondi(auditId) {
   return données;
 }
 
+const LABELS_ETAPE_PREAUDIT = {
+  brouillon: "Passage 1/3 terminé — lancement du second avis…",
+  critique: "Passage 2/3 terminé — rédaction de la version finale…",
+  termine: "Version finale prête.",
+};
+
 function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
   const [enCours, setEnCours] = useState(false);
+  const [progression, setProgression] = useState(null);
   const [erreur, setErreur] = useState(null);
   const résultat = audit.preaudit_resultat;
 
@@ -228,13 +235,25 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
   const lancer = async () => {
     setEnCours(true);
     setErreur(null);
+    setProgression(null);
     try {
-      await appelerPreauditApprofondi(audit.id);
+      // Le pipeline se fait en 3 appels HTTP séparés — un par passage — pour
+      // rester sous la limite de 150s imposée par Supabase Edge Functions
+      // (voir le commentaire d'en-tête de preaudit-approfondi-cursaudit).
+      // On rappelle la fonction jusqu'à ce qu'elle indique restant=false,
+      // même principe que "Lancer/Continuer l'analyse" pour l'audit détaillé.
+      let restant = true;
+      while (restant) {
+        const résultatAppel = await appelerPreauditApprofondi(audit.id);
+        restant = résultatAppel.restant;
+        setProgression(résultatAppel.etape);
+      }
       await onTermine();
     } catch (e) {
       setErreur(e.message);
     } finally {
       setEnCours(false);
+      setProgression(null);
     }
   };
 
@@ -268,7 +287,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
           padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
           opacity: enCours ? 0.6 : 1,
         }}>
-          {enCours ? "Analyse en cours… (rédaction, second avis, révision — plusieurs minutes)" : "Lancer le pré-audit"}
+          {enCours ? (LABELS_ETAPE_PREAUDIT[progression] ?? "Passage 1/3 : rédaction du brouillon…") : "Lancer le pré-audit"}
         </button>
       )}
 

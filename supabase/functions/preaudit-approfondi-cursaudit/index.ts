@@ -569,7 +569,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, preaudit_statut, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques")
+      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -591,7 +591,6 @@ Deno.serve(async (req) => {
     const contexteQualification = construireContexteQualification(audit);
     const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {});
 
-    // Passage 1 — Claude produit le brouillon.
     const appelClaude = async (system: string, contexte: string) => {
       if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
       const réponse = await fetch("https://api.anthropic.com/v1/messages", {
@@ -619,44 +618,75 @@ Deno.serve(async (req) => {
       };
     };
 
-    const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
+    // 3 PASSAGES EN 3 APPELS HTTP SÉPARÉS (réf. 60816-01, suite, 23/08/2026) —
+    // corrige "Request idle timeout limit (150s) reached" : Supabase impose
+    // 150s max pour répondre à une requête, sur tous les plans, non
+    // configurable. Les 3 passages mis bout à bout dans UN appel dépassaient
+    // ce plafond. Chaque appel ici ne fait qu'UN SEUL passage, sauvegarde son
+    // résultat intermédiaire, et répond — le client rappelle la fonction
+    // jusqu'à { restant: false }, même principe que "Lancer/Continuer
+    // l'analyse" pour l'audit détaillé (orchestrer-audit-cursaudit,
+    // BUDGET_MS = 25000 par lot). Contrairement à l'audit détaillé, qui dose
+    // par petites unités, le pré-audit porte sur le livre entier à chaque
+    // passage — pas de dosage possible, juste un passage complet par appel.
 
-    // Passage 2 — GPT relit le brouillon (PAS le manuscrit, voir note ci-dessous),
-    // signale manques/redites réels, ne réécrit rien.
-    let critiqueGPT: unknown = null;
-    let usageGPT: unknown = null;
-    const systemGPT =
-      "Tu es le second lecteur du pré-audit CursAudit. On te donne un pré-audit déjà rédigé par un premier " +
-      "moteur à partir d'un manuscrit (13 éléments : résumé exécutif, nature réelle, promesse affichée, " +
-      "écart, voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à " +
-      "couper, prochaine étape, cartographie du contexte, fiche de synthèse). Le manuscrit lui-même ne " +
-      "t'est PAS fourni — ta relecture porte sur la COHÉRENCE INTERNE et la COMPLÉTUDE du document, pas sur " +
-      "une vérification ligne à ligne contre le texte source. Signale UNIQUEMENT : des manques réels (un " +
-      "champ trop vague ou générique par rapport aux autres, une voie éditoriale sans lien avec le plan " +
-      "d'intervention, une recommandation qui ne découle pas de ce qui précède) et des redites superflues " +
-      "(la même idée répétée presque mot pour mot entre plusieurs champs). Ne réécris rien toi-même, ne " +
-      "propose pas de nouvelle version — indique seulement ce qui devrait changer, pour que le premier " +
-      "moteur amende son propre travail.";
-    const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
-      body: JSON.stringify({
-        model: MODELE_GPT,
-        messages: [
-          { role: "system", content: systemGPT },
-          { role: "user", content: JSON.stringify({ preaudit_brouillon: brouillon.data }) },
-        ],
-        response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
-      }),
-    });
-    const résultatGPT = await réponseGPT.json();
-    if (!réponseGPT.ok) throw new Error(résultatGPT?.error?.message || `Échec de l'appel GPT (${réponseGPT.status}).`);
-    const contenuGPT = résultatGPT.choices?.[0]?.message?.content;
-    if (!contenuGPT) throw new Error("GPT n'a renvoyé aucun contenu.");
-    critiqueGPT = JSON.parse(contenuGPT);
-    usageGPT = { tokens_entree: résultatGPT.usage?.prompt_tokens ?? 0, tokens_sortie: résultatGPT.usage?.completion_tokens ?? 0, modele: résultatGPT.model ?? MODELE_GPT };
+    if (!audit.preaudit_brouillon) {
+      // Passage 1 — Claude produit le brouillon.
+      const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
+      const { error: erreurMaj } = await admin
+        .from("audits")
+        .update({ preaudit_brouillon: brouillon })
+        .eq("id", auditId);
+      if (erreurMaj) return json({ error: erreurMaj.message }, 500);
+      return json({ audit_id: auditId, etape: "brouillon", restant: true });
+    }
+
+    if (!audit.preaudit_critique_gpt) {
+      // Passage 2 — GPT relit le brouillon (PAS le manuscrit, voir note plus
+      // haut sur le plafond TPM), signale manques/redites réels, ne réécrit rien.
+      const systemGPT =
+        "Tu es le second lecteur du pré-audit CursAudit. On te donne un pré-audit déjà rédigé par un premier " +
+        "moteur à partir d'un manuscrit (13 éléments : résumé exécutif, nature réelle, promesse affichée, " +
+        "écart, voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à " +
+        "couper, prochaine étape, cartographie du contexte, fiche de synthèse). Le manuscrit lui-même ne " +
+        "t'est PAS fourni — ta relecture porte sur la COHÉRENCE INTERNE et la COMPLÉTUDE du document, pas sur " +
+        "une vérification ligne à ligne contre le texte source. Signale UNIQUEMENT : des manques réels (un " +
+        "champ trop vague ou générique par rapport aux autres, une voie éditoriale sans lien avec le plan " +
+        "d'intervention, une recommandation qui ne découle pas de ce qui précède) et des redites superflues " +
+        "(la même idée répétée presque mot pour mot entre plusieurs champs). Ne réécris rien toi-même, ne " +
+        "propose pas de nouvelle version — indique seulement ce qui devrait changer, pour que le premier " +
+        "moteur amende son propre travail.";
+      const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+        body: JSON.stringify({
+          model: MODELE_GPT,
+          messages: [
+            { role: "system", content: systemGPT },
+            { role: "user", content: JSON.stringify({ preaudit_brouillon: (audit.preaudit_brouillon as { data: unknown }).data }) },
+          ],
+          response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
+        }),
+      });
+      const résultatGPT = await réponseGPT.json();
+      if (!réponseGPT.ok) throw new Error(résultatGPT?.error?.message || `Échec de l'appel GPT (${réponseGPT.status}).`);
+      const contenuGPT = résultatGPT.choices?.[0]?.message?.content;
+      if (!contenuGPT) throw new Error("GPT n'a renvoyé aucun contenu.");
+      const critiqueGPT = {
+        data: JSON.parse(contenuGPT),
+        usage: { tokens_entree: résultatGPT.usage?.prompt_tokens ?? 0, tokens_sortie: résultatGPT.usage?.completion_tokens ?? 0, modele: résultatGPT.model ?? MODELE_GPT },
+      };
+      const { error: erreurMaj } = await admin
+        .from("audits")
+        .update({ preaudit_critique_gpt: critiqueGPT })
+        .eq("id", auditId);
+      if (erreurMaj) return json({ error: erreurMaj.message }, 500);
+      return json({ audit_id: auditId, etape: "critique", restant: true });
+    }
 
     // Passage 3 — Claude reprend SON PROPRE brouillon à la lumière de la critique GPT et produit la version finale.
+    const brouillonStocké = audit.preaudit_brouillon as { data: unknown; usage: unknown };
+    const critiqueStockée = audit.preaudit_critique_gpt as { data: unknown; usage: unknown };
     const systemAmendement =
       systemPromptInitial +
       "\n\nTU AS DÉJÀ PRODUIT UN BROUILLON (fourni dans le message utilisateur, avec le manuscrit). Un second " +
@@ -667,15 +697,15 @@ Deno.serve(async (req) => {
       "génération indépendante : c'est une révision de ton propre travail, qui doit rester reconnaissable.";
     const versionFinale = await appelClaude(
       systemAmendement,
-      JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillon.data, critique_gpt: critiqueGPT })
+      JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillonStocké.data, critique_gpt: critiqueStockée.data })
     );
 
     const preauditResultat = {
       ...versionFinale.data,
-      revision: { critique_gpt: critiqueGPT },
+      revision: { critique_gpt: critiqueStockée.data },
       usage: {
-        claude_brouillon: brouillon.usage,
-        gpt_critique: usageGPT,
+        claude_brouillon: brouillonStocké.usage,
+        gpt_critique: critiqueStockée.usage,
         claude_final: versionFinale.usage,
       },
       analyse_le: new Date().toISOString(),
@@ -687,7 +717,7 @@ Deno.serve(async (req) => {
       .eq("id", auditId);
     if (erreurMaj) return json({ error: erreurMaj.message }, 500);
 
-    return json({ audit_id: auditId, preaudit: preauditResultat });
+    return json({ audit_id: auditId, etape: "termine", restant: false, preaudit: preauditResultat });
   } catch (err) {
     console.error("Erreur preaudit-approfondi-cursaudit :", err.message);
     return json({ error: err.message }, 500);

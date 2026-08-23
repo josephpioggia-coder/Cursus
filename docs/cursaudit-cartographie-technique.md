@@ -313,6 +313,28 @@ d'unités, seule différence pratique le temps de traitement en aval.
   **Hors périmètre de ce changement**, discuté mais pas implémenté : rendre
   le mode "2 IA" systématique pour l'audit détaillé aussi, et refondre la
   tarification autour de la profondeur plutôt que du nombre d'IA.
+- **Correctifs v7.1-v7.3, même jour** : (1) le passage GPT envoyait le
+  manuscrit entier (~58 000 tokens) et dépassait le palier TPM de
+  l'organisation (30 000 pour `gpt-4o`) — ne reçoit plus que le brouillon
+  JSON, et modèle passé à `gpt-5` (500 000 TPM sur cette organisation,
+  vérifié sur `platform.openai.com/settings/organization/limits`, à ne pas
+  confondre avec l'abonnement ChatGPT Plus personnel). (2) Deux bugs de
+  conformité au schéma consécutifs (`a_developper` manquant dans un item,
+  puis `cartographie_contexte`/`fiche_synthese` absents) — signe que le
+  schéma (13 champs) approche une limite de fiabilité en un seul passage ;
+  ajout de `combler()`, un comblement récursif à partir du schéma avant
+  validation (même esprit que `normaliserTableauxNuls()` dans
+  `analyser-unite-cursaudit`, généralisé). (3) **"Request idle timeout limit
+  (150s) reached"** — contrainte Supabase non configurable (150s max pour
+  répondre à une requête HTTP, tous plans confondus) : les 3 passages
+  Claude→GPT→Claude mis bout à bout dans un seul appel la dépassaient.
+  Pipeline redécoupé en **3 appels HTTP séparés** (nouvelles colonnes
+  `preaudit_brouillon`, `preaudit_critique_gpt` pour l'état intermédiaire),
+  le client rappelant la fonction jusqu'à `restant: false` — même principe
+  que "Lancer/Continuer l'analyse" pour l'audit détaillé, qui gère déjà ça
+  nativement via son budget de 25s par lot (`BUDGET_MS` dans
+  `orchestrer-audit-cursaudit`). Bouton "Lancer le pré-audit" affiche
+  désormais une vraie progression (Passage 1/3 → 2/3 → 3/3).
 - **Tarif de la phase 2** : 40 % du prix TTC de l'audit détaillé (déjà
   connu à la création, pas de barème par tranche de mots séparé) — si
   l'audit détaillé est commandé ensuite, 50 % du prix du pré-audit (= 20 %
