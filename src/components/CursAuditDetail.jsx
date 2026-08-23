@@ -268,7 +268,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
           padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
           opacity: enCours ? 0.6 : 1,
         }}>
-          {enCours ? "Analyse en cours… (1 à 3 minutes en général)" : "Lancer le pré-audit"}
+          {enCours ? "Analyse en cours… (rédaction, second avis, révision — plusieurs minutes)" : "Lancer le pré-audit"}
         </button>
       )}
 
@@ -464,6 +464,29 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
                 </div>
               )}
             </div>
+          )}
+
+          {résultat.revision?.critique_gpt && (
+            <details style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 4 }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Second avis (contrôle GPT) pris en compte pour cette version</summary>
+              <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                {résultat.revision.critique_gpt.verdict_global && (
+                  <div>{résultat.revision.critique_gpt.verdict_global}</div>
+                )}
+                {résultat.revision.critique_gpt.elements_manquants?.length > 0 && (
+                  <div>
+                    <span style={{ fontWeight: 600 }}>Manques signalés : </span>
+                    {résultat.revision.critique_gpt.elements_manquants.join(" · ")}
+                  </div>
+                )}
+                {résultat.revision.critique_gpt.elements_superflus?.length > 0 && (
+                  <div>
+                    <span style={{ fontWeight: 600 }}>Redites signalées : </span>
+                    {résultat.revision.critique_gpt.elements_superflus.join(" · ")}
+                  </div>
+                )}
+              </div>
+            </details>
           )}
         </div>
       )}
