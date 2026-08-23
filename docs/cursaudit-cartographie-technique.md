@@ -335,6 +335,22 @@ d'unités, seule différence pratique le temps de traitement en aval.
   nativement via son budget de 25s par lot (`BUDGET_MS` dans
   `orchestrer-audit-cursaudit`). Bouton "Lancer le pré-audit" affiche
   désormais une vraie progression (Passage 1/3 → 2/3 → 3/3).
+- **Correctif v7.4, même jour — bug le plus grave de la série** : un vrai
+  test a produit un résultat enregistré `preaudit_statut = "termine"` alors
+  que 11 des 13 champs de premier niveau étaient vides (seuls `a_preserver`
+  et `a_couper_ou_alleger` remplis) — alors même que la critique GPT du
+  passage 2 (`revision.critique_gpt`) avait correctement et intégralement
+  signalé chacun de ces manques. Cause racine : `combler()` (v7.2), conçu
+  pour rattraper un champ isolé manquant, était trop permissif — il a
+  silencieusement transformé un échec de génération très majoritaire en un
+  faux "succès" affiché comme un vrai rapport, sans jamais réagir aux
+  manques que GPT avait lui-même détectés. Ajout de `CHAMPS_CLÉS_NON_VIDES`
+  (6 champs texte de premier niveau) et `compterChampsClésVides()`, appelés
+  dans `appelClaude()` juste après la validation ajv : si 3 champs clés ou
+  plus restent vides après comblement, la fonction lève une erreur réelle
+  (à relancer) au lieu d'enregistrer un rapport quasi vide comme terminé.
+  `combler()` reste utile pour les manques isolés ; il ne doit plus jamais
+  masquer un échec massif.
 - **Tarif de la phase 2** : 40 % du prix TTC de l'audit détaillé (déjà
   connu à la création, pas de barème par tranche de mots séparé) — si
   l'audit détaillé est commandé ensuite, 50 % du prix du pré-audit (= 20 %

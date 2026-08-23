@@ -166,6 +166,41 @@
  * fiabilité en un seul passage — à garder à l'esprit avant d'ajouter encore
  * des champs sans retour d'usage réel entre-temps.
  *
+ * CORRECTIF v7.3, MÊME JOUR — troisième bug réel : "Request idle timeout
+ * limit (150s) reached". Contrainte de la plateforme Supabase Edge Functions
+ * (150s max pour répondre à une requête HTTP, non configurable, tous plans),
+ * dépassée par les 3 passages (Claude brouillon → GPT critique → Claude
+ * version finale) enchaînés dans UN SEUL appel. Pipeline redécoupé en 3
+ * appels HTTP séparés — un par passage, état intermédiaire dans les
+ * nouvelles colonnes `preaudit_brouillon`/`preaudit_critique_gpt`, le client
+ * rappelant la fonction jusqu'à `{ restant: false }`. Même principe que
+ * "Lancer/Continuer l'analyse" pour l'audit détaillé (BUDGET_MS = 25000 dans
+ * orchestrer-audit-cursaudit) — sauf qu'ici, pas de dosage par petites
+ * unités possible : chaque passage porte sur le livre entier, donc un
+ * passage complet par appel, pas un lot. NOTE : ceci rend le paragraphe
+ * "PAS DE VRAIE TÂCHE DE FOND SERVEUR" ci-dessous partiellement caduc (il
+ * décrivait encore "un seul appel synchrone") — conservé tel quel car le
+ * raisonnement de fond (pas de vraie tâche serveur asynchrone/notifiée)
+ * reste valable, seul le découpage en 3 appels a changé.
+ *
+ * CORRECTIF v7.4, MÊME JOUR — quatrième bug réel, le plus grave : un vrai
+ * test a produit un résultat enregistré comme "terminé" alors que 11 des 13
+ * champs de premier niveau étaient vides (seuls `a_preserver` et
+ * `a_couper_ou_alleger` étaient remplis) — et la propre critique de GPT
+ * (passage 2, conservée dans `revision.critique_gpt`) avait pourtant
+ * correctement et intégralement signalé chacun de ces manques. Cause
+ * racine : `combler()` (v7.2), construit pour rattraper un champ isolé
+ * manquant, était trop permissif — il a silencieusement transformé un échec
+ * de génération très majoritaire en un faux "succès" affiché comme un
+ * vrai rapport, sans jamais faire réagir le pipeline aux manques que GPT
+ * avait lui-même détectés. Ajout de `CHAMPS_CLÉS_NON_VIDES` (6 champs texte
+ * de premier niveau jugés indispensables à un rapport minimalement utile)
+ * et de `compterChampsClésVides()`, appelés dans `appelClaude()` juste après
+ * la validation ajv : si 3 champs clés ou plus sont vides après comblement,
+ * on lève une erreur réelle (à relancer) au lieu d'enregistrer et d'afficher
+ * un résultat quasi vide. `combler()` reste utile pour les manques isolés ;
+ * il ne doit plus jamais masquer un échec massif.
+ *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
  * voulait un traitement "en arrière-plan avec barre de progression" — un
@@ -272,6 +307,28 @@ function combler(schema: Record<string, unknown>, data: unknown): unknown {
     }
   }
   return base;
+}
+
+// ─── Garde-fou contre un résultat quasi vide (réf. 60816-01, suite, 23/08/2026) ─
+// Bug réel constaté en test : combler() a rempli PRESQUE TOUT le document
+// avec des valeurs vides (11 des 13 champs) sur une vraie génération ratée,
+// et ce résultat a quand même été enregistré comme "terminé" — GPT avait
+// pourtant tout signalé dans sa critique (revision.critique_gpt), mais rien
+// n'empêchait de sauvegarder et de montrer ce résultat comme un vrai
+// rapport. combler() protège contre UN champ isolé manquant dans un item ;
+// il ne doit JAMAIS servir à faire passer une génération très majoritairement
+// vide pour un succès. Si plusieurs champs clés sont vides après comblement,
+// on rejette avec une erreur (à relancer) plutôt que d'enregistrer.
+const CHAMPS_CLÉS_NON_VIDES = [
+  "resume_executif", "nature_reelle", "promesse_affichee",
+  "ecart_promesse_execution", "recommandation_principale", "prochaine_etape",
+];
+
+function compterChampsClésVides(data: Record<string, unknown>): number {
+  return CHAMPS_CLÉS_NON_VIDES.filter((clé) => {
+    const valeur = data[clé];
+    return typeof valeur !== "string" || valeur.trim() === "";
+  }).length;
 }
 
 // useDefaults + removeAdditional (réf. 60816-01, suite, 23/08/2026) — corrige
@@ -612,6 +669,10 @@ Deno.serve(async (req) => {
       const donnéesComblées = combler(SCHEMA_PREAUDIT_APPROFONDI, blocOutil.input);
       const valide = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
       if (!valide(donnéesComblées)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}`);
+      const nbChampsVides = compterChampsClésVides(donnéesComblées as Record<string, unknown>);
+      if (nbChampsVides >= 3) {
+        throw new Error(`Génération quasi vide (${nbChampsVides}/${CHAMPS_CLÉS_NON_VIDES.length} champs clés manquants) — échec réel, à relancer plutôt qu'à afficher.`);
+      }
       return {
         data: donnéesComblées,
         usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
