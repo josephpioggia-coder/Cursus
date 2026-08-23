@@ -39,6 +39,7 @@ const ESPACES = [
         "CursEdit vous aide à transformer une idée, un fragment, un chapitre ou un projet complet en texte structuré, cohérent et fidèle à votre intention.",
         "Il ne remplace pas l'auteur. Il l'accompagne.",
       ],
+      differenciation: "Vous pouvez suivre une formation pour apprendre à écrire. Avec CursEdit, vous travaillez directement dans votre manuscrit, avec un copilote qui connaît votre projet, votre intention, vos personnages, vos scènes, vos faiblesses et vos versions successives.",
       permet: [
         "Structurer un livre, un essai, un récit ou un document long en parties, chapitres et sections.",
         "Clarifier l'intention du projet : public visé, ton, niveau de profondeur, limites, promesse faite au lecteur.",
@@ -80,6 +81,7 @@ const ESPACES = [
         "Il ne cherche pas d'abord à réécrire.",
         "Il commence par comprendre ce que le texte prétend faire.",
       ],
+      differenciation: "Là où une formation vous apprend les principes, CursAudit audite votre texte réel : contrat de lecture, personnages, preuves, cohérence, risques, répétitions, promesse faite au lecteur et chantiers de réécriture.",
       permet: [
         "Identifier le type de texte : mémoire, essai, manuscrit, article, rapport, témoignage, correspondance ou document personnel.",
         "Clarifier le statut du texte : brouillon, version avancée, texte déjà envoyé, version publiée ou document à retravailler.",
@@ -160,6 +162,16 @@ function FenêtreInfo({ espace, onFermer }) {
         {i.intro.map((p, idx) => (
           <p key={idx} style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6, margin: "0 0 8px" }}>{p}</p>
         ))}
+
+        {i.differenciation && (
+          <p style={{
+            fontSize: 13.5, color: espace.couleur, lineHeight: 1.6, fontWeight: 500,
+            margin: "10px 0 0", padding: "10px 12px", borderLeft: `2.5px solid ${espace.couleur}`,
+            background: `${espace.couleur}0d`, borderRadius: "0 6px 6px 0",
+          }}>
+            {i.differenciation}
+          </p>
+        )}
         <div style={{ height: 12 }} />
 
         <Rubrique titre={`Ce que ${espace.nom} permet`} couleur={espace.couleur}>
