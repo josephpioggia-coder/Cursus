@@ -221,9 +221,40 @@ const LABELS_ETAPE_PREAUDIT = {
   termine: "Version finale prête.",
 };
 
+// Messages illustratifs qui défilent PENDANT chaque passage, réf. 60816-01,
+// suite, 23/08/2026 — demande explicite de l'auteur du projet : ne pas
+// laisser l'écran figé pendant l'attente. Différent de la barre de
+// progression volontairement écartée ailleurs dans ce fichier : ce ne sont
+// PAS des pourcentages ni des étapes réelles mesurées (un appel non
+// streamé à Claude/GPT ne donne aucun signal d'avancement granulaire) —
+// juste une illustration honnête du type de travail en cours à ce
+// passage-là, pour donner de la texture à l'attente sans prétendre à une
+// précision qu'on n'a pas.
+const MESSAGES_PENDANT_PREAUDIT = {
+  attente: [
+    "Lecture du manuscrit entier…",
+    "Repérage de la colonne vertébrale du texte…",
+    "Analyse du contrat de lecture (promesse affichée vs. réalité)…",
+    "Élaboration des trois voies éditoriales…",
+    "Rédaction du plan d'intervention…",
+    "Cartographie des personnages, lieux et motifs récurrents…",
+  ],
+  brouillon: [
+    "Relecture du brouillon par un second moteur…",
+    "Vérification de la cohérence interne du rapport…",
+    "Recherche de manques ou de redites…",
+  ],
+  critique: [
+    "Prise en compte des remarques retenues…",
+    "Réécriture de la version finale…",
+    "Finalisation du rapport…",
+  ],
+};
+
 function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [progression, setProgression] = useState(null);
+  const [indiceMessage, setIndiceMessage] = useState(0);
   const [erreur, setErreur] = useState(null);
   const résultat = audit.preaudit_resultat;
 
@@ -231,6 +262,16 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
     () => (reglesPrix ? calculerPrixPreauditPourcentage(reglesPrix, audit.prix_ttc) : null),
     [reglesPrix, audit.prix_ttc]
   );
+
+  useEffect(() => {
+    if (!enCours) return;
+    setIndiceMessage(0);
+    const intervalle = setInterval(() => setIndiceMessage((i) => i + 1), 3500);
+    return () => clearInterval(intervalle);
+  }, [enCours, progression]);
+
+  const messagesActuels = MESSAGES_PENDANT_PREAUDIT[progression ?? "attente"] ?? [];
+  const messageActuel = messagesActuels.length > 0 ? messagesActuels[indiceMessage % messagesActuels.length] : null;
 
   const lancer = async () => {
     setEnCours(true);
@@ -282,13 +323,25 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
       )}
 
       {audit.preaudit_statut === "paye" && (
-        <button onClick={lancer} disabled={enCours} style={{
-          marginTop: 10, background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
-          padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
-          opacity: enCours ? 0.6 : 1,
-        }}>
-          {enCours ? (LABELS_ETAPE_PREAUDIT[progression] ?? "Passage 1/3 : rédaction du brouillon…") : "Lancer le pré-audit"}
-        </button>
+        <>
+          <button onClick={lancer} disabled={enCours} style={{
+            marginTop: 10, background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
+            padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+            opacity: enCours ? 0.6 : 1,
+          }}>
+            {enCours ? (LABELS_ETAPE_PREAUDIT[progression] ?? "Passage 1/3 : rédaction du brouillon…") : "Lancer le pré-audit"}
+          </button>
+          {enCours && messageActuel && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%", background: "#7F77DD", flexShrink: 0,
+                animation: "preauditPulse 1.2s ease-in-out infinite",
+              }} />
+              {messageActuel}
+              <style>{"@keyframes preauditPulse { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }"}</style>
+            </div>
+          )}
+        </>
       )}
 
       {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
