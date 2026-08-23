@@ -45,6 +45,19 @@
  *  - La prochaine étape recommandée doit être honnête, y compris si la
  *    réponse est "pas besoin d'audit détaillé, réécrire directement".
  *
+ * v3 → v4, MÊME JOUR, sur retour de GPT après un premier test v3 jugé "enfin
+ * utile" : ne PAS approfondir davantage en volume ("sinon on recrée un audit
+ * complet déguisé"), mais stabiliser la FORME du livrable — ajout de
+ * `resume_executif` (6-8 lignes, lisible seul, avant tout le reste) et de
+ * `duree_estimee_travail` par voie éditoriale (en plus de `ampleur_reecriture`,
+ * une estimation concrète même approximative : "1-2 semaines"/"3-6
+ * semaines"/"plusieurs mois"), plus deux règles supplémentaires dans le
+ * prompt : ton professionnel jamais accusatoire ("décalage" plutôt que
+ * "le texte ment"), et ancrage systématique des affirmations importantes
+ * dans un repère concret et nommé du texte (déjà spontanément présent dans
+ * `exemples_concrets.probleme`, maintenant exigé aussi dans
+ * `ecart_promesse_execution` et chaque chantier de `plan_intervention`).
+ *
  * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
  * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
  * "2 IA". Garder le pré-audit rapide et bon marché ; le dialogisme
@@ -103,6 +116,7 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 const SCHEMA_PREAUDIT_APPROFONDI = {
   type: "object",
   properties: {
+    resume_executif: { type: "string" },
     nature_reelle: { type: "string" },
     promesse_affichee: { type: "string" },
     ecart_promesse_execution: { type: "string" },
@@ -116,8 +130,9 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
           nom: { type: "string" },
           description: { type: "string" },
           ampleur_reecriture: { type: "string", enum: ["légère", "moyenne", "lourde"] },
+          duree_estimee_travail: { type: "string" },
         },
-        required: ["nom", "description", "ampleur_reecriture"],
+        required: ["nom", "description", "ampleur_reecriture", "duree_estimee_travail"],
         additionalProperties: false,
       },
     },
@@ -156,7 +171,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     prochaine_etape: { type: "string" },
   },
   required: [
-    "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
+    "resume_executif", "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
     "recommandation_principale", "plan_intervention", "exemples_concrets",
     "a_preserver", "a_couper_ou_alleger", "prochaine_etape",
   ],
@@ -212,7 +227,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "ÉDITORIALE — pas un diagnostic qui constate, un outil qui aide l'auteur·ice à transformer son livre. " +
     "Le test à te poser en permanence : après avoir lu ta réponse, l'auteur·ice peut-il/elle faire cinq " +
     "modifications concrètes dans son manuscrit ? Si la réponse est non, ce n'est pas encore assez utile.\n\n" +
-    "CINQ RÈGLES NON NÉGOCIABLES, établies après deux essais jugés trop faibles :\n" +
+    "SEPT RÈGLES NON NÉGOCIABLES, établies après trois essais successifs :\n" +
     "1. Aucun \"il faudra vérifier ça dans l'audit détaillé\". Chaque chantier du plan d'intervention et " +
     "chaque exemple concret porte un geste éditorial que l'auteur·ice peut appliquer MAINTENANT, avec ou " +
     "sans commander l'audit détaillé ensuite.\n" +
@@ -225,19 +240,27 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "personnage, une scène) illustre un patron plus large dans un exemple, elle ne devient jamais à elle " +
     "seule le sujet central de ta réponse.\n" +
     "5. prochaine_etape doit être honnête, y compris si la vraie réponse est \"pas besoin d'audit détaillé, " +
-    "l'auteur·ice peut réécrire directement à partir de ce plan\" — ce n'est pas un réflexe de vente.\n\n" +
+    "l'auteur·ice peut réécrire directement à partir de ce plan\" — ce n'est pas un réflexe de vente.\n" +
+    "6. TON PROFESSIONNEL, JAMAIS ACCUSATOIRE. Ne dis pas \"le texte ment sur sa forme\" — dis \"le texte " +
+    "crée un décalage entre le contrat annoncé et l'expérience réelle de lecture\". Le constat peut être " +
+    "sévère, la formulation reste toujours respectueuse du travail de l'auteur·ice.\n" +
+    "7. ANCRE CHAQUE AFFIRMATION IMPORTANTE dans un repère concret et nommé du texte (une scène précise, " +
+    "une porte/un chapitre, un dialogue identifiable) — jamais une généralité flottante. C'est déjà ce que " +
+    "probleme doit faire dans exemples_concrets ; applique la même exigence dans ecart_promesse_execution " +
+    "et dans chaque chantier de plan_intervention.\n\n" +
     `${contexteQualification}` +
     `Colonne vertébrale déjà repérée par l'aperçu : ${apercu?.colonne_vertebrale ?? "non disponible"}\n` +
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
     `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
-    "Produis les 10 éléments suivants :\n" +
+    "Produis les 11 éléments suivants :\n" +
+    "- resume_executif : 6 à 8 lignes MAXIMUM, en langage simple pour l'auteur·ice — ce livre fonctionne-t-il, comment, et quelle voie tu recommandes. Doit pouvoir se lire seul, avant tout le reste (ex. \"Votre livre fonctionne. Mais il fonctionne mieux comme fable méditative que comme roman. La voie recommandée est l'hybride équilibré.\").\n" +
     "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
     "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
-    "- ecart_promesse_execution : l'écart entre cette promesse et ce que la forme réelle tient effectivement.\n" +
-    "- voies_editoriales : EXACTEMENT 3 voies, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacune avec son ampleur_reecriture (légère/moyenne/lourde).\n" +
+    "- ecart_promesse_execution : l'écart entre cette promesse et ce que la forme réelle tient effectivement (règle 7 : ancré dans des repères précis).\n" +
+    "- voies_editoriales : EXACTEMENT 3 voies, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacune avec son ampleur_reecriture (légère/moyenne/lourde) ET duree_estimee_travail (une estimation en temps, même approximative, ex. \"1 à 2 semaines\", \"3 à 6 semaines\", \"plusieurs mois\" — utile même imprécise).\n" +
     "- recommandation_principale : LA voie recommandée parmi les 3, franchement, avec la réserve explicite si l'auteur·ice vise délibérément autre chose.\n" +
-    "- plan_intervention : 3 à 6 chantiers concrets (voir règle 1) — chacun un problème réel de CE livre et son geste_editorial, jamais \"à vérifier\".\n" +
+    "- plan_intervention : 3 à 6 chantiers concrets (règles 1 et 7) — chacun un problème réel et nommé de CE livre et son geste_editorial, jamais \"à vérifier\".\n" +
     "- exemples_concrets : au moins 3, chacun avec probleme (ce qui se passe dans le texte), effet (ce que ça produit chez le lecteur), geste_editorial (l'action éditoriale concrète), et proposition (à quoi ça pourrait ressembler après ce geste) — sur des passages PRÉCIS du livre, pas des catégories génériques.\n" +
     "- a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu, quelle que soit la voie choisie.\n" +
     "- a_couper_ou_alleger : ce qui alourdit le texte sans lui apporter de valeur (répétitions, longueurs...).\n" +

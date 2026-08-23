@@ -276,6 +276,11 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
 
       {audit.preaudit_statut === "termine" && résultat && (
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          {résultat.resume_executif && (
+            <div style={{ fontSize: 13, lineHeight: 1.6, background: "#fff", border: "1px solid #7F77DD50", borderRadius: 8, padding: "10px 12px" }}>
+              {résultat.resume_executif}
+            </div>
+          )}
           <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature réelle : </span>{résultat.nature_reelle}</div>
           <div style={{ fontSize: 12.5 }}>
             <span style={{ fontWeight: 600 }}>Promesse affichée : </span>{résultat.promesse_affichee}
@@ -292,7 +297,10 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
                   <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #7F77DD50", borderRadius: 6, padding: "8px 10px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                       <span style={{ fontWeight: 600 }}>{v.nom}</span>
-                      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", flexShrink: 0 }}>Réécriture {v.ampleur_reecriture}</span>
+                      <span style={{ fontSize: 11, color: "var(--texte-tertiaire)", flexShrink: 0, textAlign: "right" }}>
+                        Réécriture {v.ampleur_reecriture}
+                        {v.duree_estimee_travail && <><br />{v.duree_estimee_travail}</>}
+                      </span>
                     </div>
                     <div style={{ marginTop: 3, color: "var(--texte-secondaire)" }}>{v.description}</div>
                   </div>
