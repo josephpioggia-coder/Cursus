@@ -58,6 +58,20 @@
  * `exemples_concrets.probleme`, maintenant exigé aussi dans
  * `ecart_promesse_execution` et chaque chantier de `plan_intervention`).
  *
+ * v4 → v5, MÊME JOUR, sur retour de GPT après un test v4 jugé complet sur le
+ * fond : ajout de `fiche_synthese`, une fiche COURTE (quelques mots par
+ * champ, pas des phrases) en complément des champs narratifs déjà riches —
+ * contrat_annonce, contrat_reel, ecart_principal, risque_lecteur,
+ * recommandation, priorite. Lisible en un coup d'œil pour l'auteur·ice, et
+ * potentiellement exploitable plus tard pour comparer/agréger plusieurs
+ * pré-audits entre eux (même logique que la catégorisation de
+ * `diagnostic_priorite` pour l'audit détaillé, voir
+ * 2026-08-22-audit-criteria-categories.sql). Point plus large soulevé par
+ * GPT, PAS traité ici : CursAudit devrait aussi auditer le "contrat de
+ * lecture" comme un critère à part entière dans la grille de l'audit
+ * détaillé (`audit_criteria`) — hors périmètre de cette fonction, touche un
+ * système différent et déjà éprouvé (`analyser-unite-cursaudit`).
+ *
  * NIVEAU D'IA — décision du 23/08/2026 : 1 SEULE IA (Claude), jamais le
  * dialogue à deux IA (Claude + GPT) réservé à l'audit détaillé en mode
  * "2 IA". Garder le pré-audit rapide et bon marché ; le dialogisme
@@ -169,11 +183,24 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     a_preserver: { type: "array", items: { type: "string" } },
     a_couper_ou_alleger: { type: "array", items: { type: "string" } },
     prochaine_etape: { type: "string" },
+    fiche_synthese: {
+      type: "object",
+      properties: {
+        contrat_annonce: { type: "string" },
+        contrat_reel: { type: "string" },
+        ecart_principal: { type: "string" },
+        risque_lecteur: { type: "string" },
+        recommandation: { type: "string" },
+        priorite: { type: "string" },
+      },
+      required: ["contrat_annonce", "contrat_reel", "ecart_principal", "risque_lecteur", "recommandation", "priorite"],
+      additionalProperties: false,
+    },
   },
   required: [
     "resume_executif", "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
     "recommandation_principale", "plan_intervention", "exemples_concrets",
-    "a_preserver", "a_couper_ou_alleger", "prochaine_etape",
+    "a_preserver", "a_couper_ou_alleger", "prochaine_etape", "fiche_synthese",
   ],
   additionalProperties: false,
 };
@@ -253,7 +280,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
     `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
-    "Produis les 11 éléments suivants :\n" +
+    "Produis les 12 éléments suivants :\n" +
     "- resume_executif : 6 à 8 lignes MAXIMUM, en langage simple pour l'auteur·ice — ce livre fonctionne-t-il, comment, et quelle voie tu recommandes. Doit pouvoir se lire seul, avant tout le reste (ex. \"Votre livre fonctionne. Mais il fonctionne mieux comme fable méditative que comme roman. La voie recommandée est l'hybride équilibré.\").\n" +
     "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
     "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
@@ -264,7 +291,8 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "- exemples_concrets : au moins 3, chacun avec probleme (ce qui se passe dans le texte), effet (ce que ça produit chez le lecteur), geste_editorial (l'action éditoriale concrète), et proposition (à quoi ça pourrait ressembler après ce geste) — sur des passages PRÉCIS du livre, pas des catégories génériques.\n" +
     "- a_preserver : ce qui fonctionne déjà et ne doit PAS être perdu, quelle que soit la voie choisie.\n" +
     "- a_couper_ou_alleger : ce qui alourdit le texte sans lui apporter de valeur (répétitions, longueurs...).\n" +
-    "- prochaine_etape : voir règle 5."
+    "- prochaine_etape : voir règle 5.\n" +
+    "- fiche_synthese : une fiche COURTE en complément de tout ce qui précède, chaque champ en quelques mots seulement (PAS des phrases complètes, PAS de répétition mot pour mot du texte déjà écrit ailleurs) — contrat_annonce (ex. \"roman initiatique\"), contrat_reel (ex. \"conte philosophique dialogué\"), ecart_principal (ex. \"insuffisance de conflit narratif\"), risque_lecteur (ce que le lecteur risque de ressentir, ex. \"attente romanesque déçue\"), recommandation (ex. \"réécriture hybride moyenne\"), priorite (l'action la plus urgente, ex. \"renforcer Clara et opacifier Scalpa\")."
   );
 }
 

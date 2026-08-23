@@ -281,6 +281,21 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
               {résultat.resume_executif}
             </div>
           )}
+
+          {résultat.fiche_synthese && (
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px",
+              fontSize: 12, background: "var(--fond, #F7F4EF)", borderRadius: 8, padding: "10px 12px",
+            }}>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Contrat annoncé </span>{résultat.fiche_synthese.contrat_annonce}</div>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Contrat réel </span>{résultat.fiche_synthese.contrat_reel}</div>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Écart principal </span>{résultat.fiche_synthese.ecart_principal}</div>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Risque lecteur </span>{résultat.fiche_synthese.risque_lecteur}</div>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Recommandation </span>{résultat.fiche_synthese.recommandation}</div>
+              <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Priorité </span>{résultat.fiche_synthese.priorite}</div>
+            </div>
+          )}
+
           <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Nature réelle : </span>{résultat.nature_reelle}</div>
           <div style={{ fontSize: 12.5 }}>
             <span style={{ fontWeight: 600 }}>Promesse affichée : </span>{résultat.promesse_affichee}
