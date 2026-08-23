@@ -150,6 +150,22 @@
  *     `OPENAI_API_KEY`) — deux systèmes de facturation et de paliers
  *     séparés, malgré le même compte.
  *
+ * CORRECTIF v7.2, MÊME JOUR — deuxième bug réel, après le correctif ci-dessus :
+ * "data must have required property 'fiche_synthese', data/cartographie_contexte
+ * must be object" — cette fois un objet de PREMIER NIVEAU entier manquant ou
+ * mal typé (pas juste un champ isolé dans un item de tableau, comme le
+ * a_developper manquant corrigé plus tôt). Signe que le schéma (13 champs,
+ * plusieurs tableaux imbriqués contraints) a grandi au point que useDefaults
+ * seul ne suffit plus quand l'objet parent lui-même est absent. Ajout de
+ * `combler()` : reconstruit récursivement, à partir du schéma, toute valeur
+ * manquante ou du mauvais type, à tous les niveaux — un objet incomplet
+ * reste imparfait mais n'invalide plus tout le pipeline à 3 passages. Même
+ * esprit que `normaliserTableauxNuls()` dans `analyser-unite-cursaudit`,
+ * généralisé. SIGNAL À SURVEILLER : deux bugs de conformité au schéma en
+ * deux tests consécutifs suggère que le schéma approche une limite de
+ * fiabilité en un seul passage — à garder à l'esprit avant d'ajouter encore
+ * des champs sans retour d'usage réel entre-temps.
+ *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
  * voulait un traitement "en arrière-plan avec barre de progression" — un
@@ -199,6 +215,64 @@ const CORS = {
 };
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...CORS } });
+
+// ─── Comblement défensif avant validation (réf. 60816-01, suite, 23/08/2026) ─
+// Deuxième bug réel rencontré en test, après celui du a_developper manquant :
+// "data must have required property 'fiche_synthese', data/cartographie_contexte
+// must be object" — cette fois un objet de premier niveau ENTIER manquant ou
+// mal typé (pas juste un champ isolé dans un item de tableau). Le schéma a
+// grandi (13 champs, plusieurs tableaux imbriqués contraints) au fil des
+// révisions v1→v7 ; useDefaults seul ne suffit plus quand l'objet parent
+// lui-même est absent. `combler()` reconstruit récursivement, à partir du
+// schéma, toute valeur manquante ou du mauvais type — un objet incomplet
+// reste imparfait mais n'invalide plus tout le pipeline à 3 passages après
+// coup (coûteux à refaire). Même esprit que normaliserTableauxNuls() dans
+// analyser-unite-cursaudit, généralisé pour un schéma plus riche.
+function valeurParDéfaut(schema: Record<string, unknown>): unknown {
+  if (schema.type === "array") {
+    const n = (schema.minItems as number) ?? 0;
+    const itemSchema = (schema.items as Record<string, unknown>) ?? { type: "string" };
+    return Array.from({ length: n }, () => valeurParDéfaut(itemSchema));
+  }
+  if (schema.type === "object") {
+    const obj: Record<string, unknown> = {};
+    const requis = (schema.required as string[]) ?? [];
+    const proprietes = (schema.properties as Record<string, Record<string, unknown>>) ?? {};
+    for (const clé of requis) obj[clé] = valeurParDéfaut(proprietes[clé] ?? { type: "string" });
+    return obj;
+  }
+  if (schema.default !== undefined) return schema.default;
+  if (schema.enum) return (schema.enum as unknown[])[0];
+  return "";
+}
+
+function combler(schema: Record<string, unknown>, data: unknown): unknown {
+  if (schema.type !== "object") return data;
+  const base = (typeof data === "object" && data !== null && !Array.isArray(data)) ? { ...(data as Record<string, unknown>) } : {};
+  const requis = (schema.required as string[]) ?? [];
+  const proprietes = (schema.properties as Record<string, Record<string, unknown>>) ?? {};
+  for (const clé of requis) {
+    const sousSchema = proprietes[clé] ?? { type: "string" };
+    const valeur = base[clé];
+    if (valeur === undefined || valeur === null) {
+      base[clé] = valeurParDéfaut(sousSchema);
+    } else if (sousSchema.type === "object" && typeof valeur === "object" && !Array.isArray(valeur)) {
+      base[clé] = combler(sousSchema, valeur);
+    } else if (sousSchema.type === "array" && Array.isArray(valeur)) {
+      const itemSchema = (sousSchema.items as Record<string, unknown>) ?? { type: "string" };
+      const complétée = valeur.map((item) => (itemSchema.type === "object" ? combler(itemSchema, item) : item));
+      const min = (sousSchema.minItems as number) ?? 0;
+      while (complétée.length < min) complétée.push(valeurParDéfaut(itemSchema));
+      base[clé] = complétée;
+    } else if (
+      (sousSchema.type === "object" && (typeof valeur !== "object" || Array.isArray(valeur))) ||
+      (sousSchema.type === "array" && !Array.isArray(valeur))
+    ) {
+      base[clé] = valeurParDéfaut(sousSchema);
+    }
+  }
+  return base;
+}
 
 // useDefaults + removeAdditional (réf. 60816-01, suite, 23/08/2026) — corrige
 // un vrai échec observé en test : sur un item ajouté par le passage
@@ -536,10 +610,11 @@ Deno.serve(async (req) => {
       if (!réponse.ok) throw new Error(résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
       const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
       if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use.");
+      const donnéesComblées = combler(SCHEMA_PREAUDIT_APPROFONDI, blocOutil.input);
       const valide = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
-      if (!valide(blocOutil.input)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}`);
+      if (!valide(donnéesComblées)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}`);
       return {
-        data: blocOutil.input,
+        data: donnéesComblées,
         usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
       };
     };
