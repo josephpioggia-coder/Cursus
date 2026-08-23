@@ -28,6 +28,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
+import { exporterPreauditWord } from "../lib/exportPreauditWord.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
 // Nom de fonction déployée inchangé (preaudit-global-cursaudit) même si elle
@@ -312,6 +313,17 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
             <div style={{ fontSize: 16, fontWeight: 600, color: "#5B52C4" }}>{prix.prixTTC.toFixed(2).replace(".", ",")} €</div>
             <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)" }}>TTC · {prix.pourcentage} % du prix de l'audit détaillé</div>
           </div>
+        )}
+        {audit.preaudit_statut === "termine" && résultat && (
+          <button
+            onClick={() => exporterPreauditWord(audit, résultat)}
+            style={{
+              flexShrink: 0, background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+              borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            Exporter en Word
+          </button>
         )}
       </div>
 

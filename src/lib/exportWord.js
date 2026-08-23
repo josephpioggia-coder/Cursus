@@ -201,7 +201,7 @@ function filtrerParZones(nœuds, zonesIncluses) {
 
 // Nettoie un titre de projet pour en faire un nom de fichier sûr (garde
 // lettres, chiffres, espaces → underscore).
-function nomDeFichierSûr(titre) {
+export function nomDeFichierSûr(titre) {
   return (titre || "manuscrit")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // retire les accents
     .replace(/[^\p{L}\p{N}]+/gu, "_")
