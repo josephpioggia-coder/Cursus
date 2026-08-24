@@ -40,7 +40,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
-import { segmenterTexte, extraireParagraphesDocx } from "../lib/segmenterCursAudit.js";
+import { segmenterTexte, extraireParagraphesDocxAvecChapitres } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
@@ -70,6 +70,11 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [source, setSource] = useState("coller"); // "coller" | "docx"
   const [texte, setTexte] = useState("");
   const [unitésDocx, setUnitésDocx] = useState(null); // null = rien importé
+  // Chapitres détectés à l'import .docx (réf. 60816-01, suite, 24/08/2026) —
+  // null si import non-.docx (texte collé, pas de style Word à lire) ou si
+  // aucune structure de titres répétée n'a été trouvée. Voir
+  // extraireParagraphesDocxAvecChapitres() dans segmenterCursAudit.js.
+  const [chapitresDétectés, setChapitresDétectés] = useState(null);
   const [nomFichier, setNomFichier] = useState(null);
   const [importEnCours, setImportEnCours] = useState(false);
   const [erreurImport, setErreurImport] = useState(null);
@@ -126,9 +131,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setImportEnCours(true);
     setErreurImport(null);
     try {
-      const paragraphes = await extraireParagraphesDocx(fichier);
+      const { unités: paragraphes, chapitres } = await extraireParagraphesDocxAvecChapitres(fichier);
       if (paragraphes.length === 0) { setErreurImport("Aucun texte exploitable trouvé dans ce fichier."); setImportEnCours(false); return; }
       setUnitésDocx(paragraphes);
+      setChapitresDétectés(chapitres.length > 0 ? chapitres : null);
       setNomFichier(fichier.name);
       if (!titre.trim()) setTitre(fichier.name.replace(/\.docx$/i, ""));
     } catch (e) {
@@ -162,6 +168,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
       degreIntervention: questionnaire?.degreIntervention,
       contraintesAcademiques: questionnaire?.contraintesAcademiques,
       relationIA: questionnaire?.relationIA,
+      chapitresDétectés,
     });
 
     setEnCours(false);
@@ -171,6 +178,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
   const toutRéinitialiser = () => {
     setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
+    setChapitresDétectés(null);
     setQuestionnaire(null);
   };
 
@@ -257,7 +265,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
                   {importEnCours ? "Lecture…" : "Choisir un fichier .docx"}
                 </button>
                 {nomFichier && !importEnCours && (
-                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>« {nomFichier} » — {unitésDocx?.length || 0} unités extraites</div>
+                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>
+                    « {nomFichier} » — {unitésDocx?.length || 0} unités extraites
+                    {chapitresDétectés && ` · ${chapitresDétectés.length} titres détectés (à confirmer après création, dans l'aperçu gratuit)`}
+                  </div>
                 )}
                 {erreurImport && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 10 }}>{erreurImport}</div>}
               </div>
