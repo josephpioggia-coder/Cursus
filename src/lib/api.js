@@ -474,6 +474,12 @@ export const auditsAPI = {
     // champs (aucun ne l'était avant ce jour) continue de fonctionner.
     typeDocument = null, statutTexte = null, finaliteAudit = null, questionLibre = null,
     degreIntervention = null, contraintesAcademiques = null, relationIA = null,
+    // Chapitres détectés à l'import .docx (réf. 60816-01, suite, 24/08/2026)
+    // — voir extraireParagraphesDocxAvecChapitres() dans
+    // segmenterCursAudit.js. null si texte collé ou aucune structure
+    // détectée : le pré-audit enrichi chapitre par chapitre n'est alors
+    // simplement pas proposé pour cet audit (voir CursAuditDetail.jsx).
+    chapitresDétectés = null,
   }) {
     if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
 
@@ -498,12 +504,29 @@ export const auditsAPI = {
         degre_intervention:      degreIntervention,
         contraintes_academiques: contraintesAcademiques,
         relation_ia:             relationIA,
+        chapitres_detectes:      chapitresDétectés,
       }])
       .select()
       .single();
     if (erreurAudit) return { data: null, error: erreurAudit };
 
-    const lignes = unités.map((texteSource, i) => ({ audit_id: audit.id, ordre: i + 1, texte_source: texteSource }));
+    // chapitre_index : pour chaque unité, l'index (dans chapitresDétectés)
+    // du chapitre auquel elle appartient — null si elle précède le premier
+    // titre détecté (texte avant tout chapitre) ou si aucune structure
+    // n'a été détectée pour cet audit.
+    const chapitreIndexParUnité = (i) => {
+      if (!chapitresDétectés) return null;
+      for (let c = 0; c < chapitresDétectés.length; c++) {
+        const { indexPremièreUnité, nombreUnités } = chapitresDétectés[c];
+        if (i >= indexPremièreUnité && i < indexPremièreUnité + nombreUnités) return c;
+      }
+      return null;
+    };
+
+    const lignes = unités.map((texteSource, i) => ({
+      audit_id: audit.id, ordre: i + 1, texte_source: texteSource,
+      chapitre_index: chapitreIndexParUnité(i),
+    }));
     const { error: erreurSections } = await supabase.from("audit_sections").insert(lignes);
     if (erreurSections) return { data: null, error: erreurSections };
 
