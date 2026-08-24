@@ -567,6 +567,18 @@ export const auditsAPI = {
     return { data: { audit, sections: sections || [] }, error: null };
   },
 
+  /** Confirmation du découpage en chapitres détecté à l'import (réf.
+   *  60816-01, suite, 24/08/2026) — déverrouille le pré-audit enrichi. Voir
+   *  audits.chapitres_detectes / chapitres_confirmes et ApercuGlobal dans
+   *  CursAuditDetail.jsx. */
+  async confirmerChapitres(auditId) {
+    const { error } = await supabase
+      .from("audits")
+      .update({ chapitres_confirmes: true })
+      .eq("id", auditId);
+    return { error };
+  },
+
   /** Règles de tarification actives (audit_pricing_rules) — lecture publique,
    *  voir src/lib/tarifCursAudit.js pour le calcul du prix à partir de ces règles. */
   async récupérerReglesPrix() {

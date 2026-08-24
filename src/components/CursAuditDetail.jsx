@@ -111,6 +111,67 @@ async function appelerApercuGlobal(auditId) {
   return données;
 }
 
+// Écart de taille entre chapitres jugé suspect (signe probable d'un titre
+// manqué à la détection plutôt qu'un vrai déséquilibre voulu par
+// l'auteur·ice) — réf. 60816-01, suite, 24/08/2026. Seuil arbitraire,
+// ajustable si l'usage réel montre qu'il se déclenche trop ou pas assez.
+const RATIO_TAILLE_SUSPECT = 5;
+
+function ConfirmationChapitres({ audit, onTermine }) {
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const chapitres = audit.chapitres_detectes;
+  if (!chapitres || chapitres.length === 0) return null;
+
+  const tailles = chapitres.map((c) => c.mots);
+  const tailleSuspecte = Math.max(...tailles) > RATIO_TAILLE_SUSPECT * Math.max(1, Math.min(...tailles));
+
+  const confirmer = async () => {
+    setEnCours(true);
+    setErreur(null);
+    const { error } = await auditsAPI.confirmerChapitres(audit.id);
+    if (error) setErreur(error.message);
+    else await onTermine();
+    setEnCours(false);
+  };
+
+  return (
+    <div style={{
+      border: `0.5px solid ${audit.chapitres_confirmes ? "#1D9E7580" : "#C4973A80"}`, borderRadius: 8,
+      padding: "10px 12px", marginBottom: 12, background: audit.chapitres_confirmes ? "#EAF3DE" : "#fff",
+    }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: audit.chapitres_confirmes ? "#1D9E75" : "#8A6116", marginBottom: 6 }}>
+        {audit.chapitres_confirmes ? "✓ Découpage en chapitres confirmé" : "Découpage en chapitres à confirmer"}
+      </div>
+      <div style={{ fontSize: 12, color: "var(--texte-secondaire)", marginBottom: 8 }}>
+        Nous avons détecté <strong>{chapitres.length} titres</strong> au même niveau dans votre fichier. Chaque titre confirmé sera lu individuellement par le pré-audit — ce n'est pas à nous de juger ce qui doit compter comme chapitre (préface, remerciements, etc. inclus si vous les avez mis à ce niveau) : à vous de vérifier que ce découpage correspond bien à votre livre avant de continuer.
+      </div>
+      <div style={{ display: "grid", gap: 3, marginBottom: 8, maxHeight: 160, overflowY: "auto" }}>
+        {chapitres.map((c, i) => (
+          <div key={i} style={{ fontSize: 11.5, display: "flex", justifyContent: "space-between", gap: 8 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{i + 1}. {c.titre}</span>
+            <span style={{ color: "var(--texte-tertiaire)", flexShrink: 0 }}>{c.mots.toLocaleString("fr-FR")} mots</span>
+          </div>
+        ))}
+      </div>
+      {tailleSuspecte && (
+        <div style={{ fontSize: 11.5, color: "#A32D2D", marginBottom: 8 }}>
+          ⚠️ Les tailles varient beaucoup d'un titre à l'autre — vérifiez qu'aucun titre de chapitre n'a été oublié dans votre fichier avant de confirmer.
+        </div>
+      )}
+      {!audit.chapitres_confirmes && (
+        <button onClick={confirmer} disabled={enCours} style={{
+          background: "#C4973A", color: "#fff", border: "none", borderRadius: 6,
+          padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+        }}>
+          {enCours ? "…" : "Je confirme ce découpage"}
+        </button>
+      )}
+      {erreur && <div style={{ marginTop: 6, fontSize: 11.5, color: "#A32D2D" }}>{erreur}</div>}
+    </div>
+  );
+}
+
 function ApercuGlobal({ audit, nombreMots, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -145,6 +206,8 @@ function ApercuGlobal({ audit, nombreMots, onTermine }) {
           </div>
         )}
       </div>
+
+      <ConfirmationChapitres audit={audit} onTermine={onTermine} />
 
       {audit.apercu_statut !== "termine" && (
         <button onClick={lancer} disabled={enCours} style={{
@@ -339,7 +402,13 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
         </div>
       )}
 
-      {audit.preaudit_statut === "paye" && (
+      {audit.preaudit_statut === "paye" && audit.chapitres_detectes && !audit.chapitres_confirmes && (
+        <div style={{ fontSize: 11.5, color: "#8A6116", marginTop: 8 }}>
+          Confirmez d'abord le découpage en chapitres ci-dessus (dans l'aperçu gratuit) pour débloquer le pré-audit.
+        </div>
+      )}
+
+      {audit.preaudit_statut === "paye" && (!audit.chapitres_detectes || audit.chapitres_confirmes) && (
         <>
           <button onClick={lancer} disabled={enCours} style={{
             marginTop: 10, background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
