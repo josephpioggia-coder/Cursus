@@ -102,6 +102,11 @@ async function appelerApercuGlobal(auditId) {
     body: JSON.stringify({ audit_id: auditId }),
   });
   const données = await réponse.json();
+  // "déjà_fait" (409) : l'aperçu a déjà été généré côté serveur mais l'écran
+  // affichait encore le bouton "Lancer l'aperçu" (état local pas rafraîchi
+  // après un clic précédent, ou double-clic) — pas une vraie erreur pour
+  // l'utilisateur, juste un signal de resynchroniser l'affichage.
+  if (réponse.status === 409 && données?.error === "déjà_fait") return données;
   if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
   return données;
 }
