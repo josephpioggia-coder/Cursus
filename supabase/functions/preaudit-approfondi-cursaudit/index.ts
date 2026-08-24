@@ -201,6 +201,28 @@
  * un résultat quasi vide. `combler()` reste utile pour les manques isolés ;
  * il ne doit plus jamais masquer un échec massif.
  *
+ * CORRECTIF v7.5, 24/08/2026 — signalé via un retour de GPT relayé par
+ * l'auteur du projet, vérifié dans le prompt avant d'être accepté : les
+ * `duree_estimee_travail` des 3 voies éditoriales revenaient quasiment
+ * identiques d'un livre à l'autre ("1-2 semaines", "3-6 semaines",
+ * "plusieurs mois"). Cause trouvée : ces trois exemples étaient donnés
+ * EN DUR dans le prompt — biais d'ancrage classique, Claude recopiait
+ * l'exemple au lieu de calculer. Proposition de GPT d'ajouter toute une
+ * section "Calibration du périmètre" séparée jugée disproportionnée et en
+ * partie redondante (le pré-audit lit TOUJOURS le livre entier, jamais un
+ * sous-ensemble de chapitres — un champ "périmètre évalué" dirait toujours
+ * "manuscrit complet" ; le volume et les vérifications nécessaires
+ * existent déjà via nombre de mots et `domaines_a_verifier`). Correctif
+ * plus ciblé : les exemples de durée chiffrés sont retirés du prompt,
+ * remplacés par une instruction explicite de calibrer sur des facteurs
+ * réels déjà disponibles (nombre de mots du livre, injecté dans le
+ * prompt ; nombre de chantiers de plan_intervention ; présence de
+ * domaines_a_verifier) avec interdiction explicite de recycler un
+ * gabarit à trois vitesses. Reformulation des 3 voies elles-mêmes
+ * (assumer/clarifier → rééquilibrer → recomposer autour d'une autre
+ * promesse), reprise de la proposition de GPT — plus nette que la
+ * formulation précédente, sans impact sur le schéma.
+ *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
  * voulait un traitement "en arrière-plan avec barre de progression" — un
@@ -544,7 +566,7 @@ function construireContexteQualification(audit: AuditQualification): string {
   return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
 }
 
-function construireSystemPrompt(contexteQualification: string, apercu: Record<string, unknown>): string {
+function construireSystemPrompt(contexteQualification: string, apercu: Record<string, unknown>, nombreMots: number): string {
   const priorites = (apercu?.audit_recommande as { priorites?: string[] })?.priorites ?? [];
   const risques = (apercu?.risques_globaux as string[]) ?? [];
   return (
@@ -585,7 +607,8 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
     "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
     "- ecart_promesse_execution : l'écart entre cette promesse et ce que la forme réelle tient effectivement (règle 7 : ancré dans des repères précis).\n" +
-    "- voies_editoriales : EXACTEMENT 3 voies, du moins interventionniste au plus interventionniste (ex. assumer la forme actuelle en la clarifiant ; hybride équilibré ; transformation complète vers un genre pleinement incarné) — chacune avec son ampleur_reecriture (légère/moyenne/lourde) ET duree_estimee_travail (une estimation en temps, même approximative, ex. \"1 à 2 semaines\", \"3 à 6 semaines\", \"plusieurs mois\" — utile même imprécise).\n" +
+    `Ce livre fait environ ${nombreMots} mots — sers-toi de ce chiffre réel pour calibrer, plutôt que d'un gabarit.\n\n` +
+    "- voies_editoriales : EXACTEMENT 3 voies, du moins interventionniste au plus interventionniste — assumer et clarifier le livre tel qu'il est ; le rééquilibrer pour mieux tenir sa promesse ; le recomposer autour d'une autre promesse. Chacune avec son ampleur_reecriture (légère/moyenne/lourde) ET duree_estimee_travail (une estimation en temps, même approximative). INTERDIT : ne recopie jamais un gabarit de durées toutes faites — calcule chaque duree_estimee_travail à partir de facteurs réels et propres à CE livre : le nombre de mots ci-dessus, le nombre de chantiers que tu identifieras dans plan_intervention, et si tu prévois des domaines_a_verifier qui allongent le travail (vérification documentaire, médicale, juridique, historique...). Deux livres de longueur ou de nature différentes doivent donner des durées visiblement différentes, pas les mêmes trois paliers recyclés.\n" +
     "- recommandation_principale : LA voie recommandée parmi les 3, franchement, avec la réserve explicite si l'auteur·ice vise délibérément autre chose.\n" +
     "- plan_intervention : 3 à 6 chantiers concrets (règles 1 et 7) — chacun un problème réel et nommé de CE livre et son geste_editorial, jamais \"à vérifier\".\n" +
     "- exemples_concrets : au moins 3, chacun avec probleme (ce qui se passe dans le texte), effet (ce que ça produit chez le lecteur), geste_editorial (l'action éditoriale concrète), et proposition (à quoi ça pourrait ressembler après ce geste) — sur des passages PRÉCIS du livre, pas des catégories génériques.\n" +
@@ -645,8 +668,9 @@ Deno.serve(async (req) => {
     if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
 
     const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
+    const nombreMots = texteIntegral.split(/\s+/).filter(Boolean).length;
     const contexteQualification = construireContexteQualification(audit);
-    const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {});
+    const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {}, nombreMots);
 
     const appelClaude = async (system: string, contexte: string) => {
       if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
