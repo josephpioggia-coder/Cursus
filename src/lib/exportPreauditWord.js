@@ -186,6 +186,27 @@ function sectionCartographie(carto) {
   return blocs;
 }
 
+// Pré-audit enrichi chapitre par chapitre (réf. 60816-01, suite,
+// 24/08/2026) — résultat.lecture_chapitres, une lecture brève par chapitre
+// confirmé (voir SCHEMA_LECTURE_CHAPITRE côté fonction Edge). Absent des
+// pré-audits générés avant ce chantier ou sans chapitres confirmés.
+function sectionLectureChapitres(chapitres) {
+  if (!chapitres || chapitres.length === 0) return [];
+  const blocs = [
+    titre("Lecture chapitre par chapitre"),
+    paragraphe("Une lecture rapide de chaque chapitre confirmé — repère des points d'attention, pas une correction. L'audit détaillé va plus loin, ligne par ligne."),
+  ];
+  chapitres.forEach((c, i) => {
+    blocs.push(new Paragraph({ spacing: { before: 140, after: 40 }, children: [new TextRun({ text: `${i + 1}. ${c.titre || ""}`, bold: true, color: COULEUR_ACCENT })] }));
+    blocs.push(...blocTitré("Fonction", c.lecture?.fonction, "000000"));
+    blocs.push(...blocTitré("Point fort", c.lecture?.point_fort, COULEUR_POSITIF));
+    blocs.push(...blocTitré("Point faible", c.lecture?.point_faible, "A32D2D"));
+    blocs.push(...blocTitré("À vérifier", c.lecture?.a_verifier, "C4973A"));
+    blocs.push(...blocTitré("À approfondir dans l'audit final", c.lecture?.a_approfondir_audit_final, COULEUR_ACCENT));
+  });
+  return blocs;
+}
+
 /**
  * Génère et déclenche le téléchargement du fichier Word du pré-audit.
  * @param {object} audit — l'audit tel que chargé par CursAuditDetail (utilisé pour le titre du livre).
@@ -272,6 +293,7 @@ export async function exporterPreauditWord(audit, résultat) {
   }
 
   contenu.push(...sectionCartographie(résultat.cartographie_contexte));
+  contenu.push(...sectionLectureChapitres(résultat.lecture_chapitres));
 
   const documentWord = new Document({
     sections: [{
