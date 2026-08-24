@@ -39,9 +39,9 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { auditsAPI } from "../lib/api.js";
-import { segmenterTexte, extraireParagraphesDocxAvecChapitres } from "../lib/segmenterCursAudit.js";
-import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal } from "../lib/tarifCursAudit.js";
+import { auditsAPI, misEnPageAPI } from "../lib/api.js";
+import { segmenterTexte, extraireParagraphesDocxAvecChapitres, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
+import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
 const PALIERS = [
@@ -88,6 +88,12 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [erreur, setErreur] = useState(null);
   const [résultat, setRésultat] = useState(null);
 
+  // Mise en page (réf. 60816-01, suite, 24/08/2026) — voir
+  // diagnostiquerQualitéImport() ci-dessous. null = pas encore demandée
+  // pour cet import ; sinon la ligne créée dans demandes_mise_en_page.
+  const [demandeMiseEnPage, setDemandeMiseEnPage] = useState(null);
+  const [miseEnPageEnCours, setMiseEnPageEnCours] = useState(false);
+
   useEffect(() => {
     auditsAPI.récupérerReglesPrix().then(({ data, error }) => {
       if (!error) setReglesPrix(data || []);
@@ -126,10 +132,43 @@ export default function CursAudit({ onVoirAudits } = {}) {
     return calculerPrixPreauditPourcentage(reglesPrix, prix.prixTTC);
   }, [reglesPrix, prix]);
 
+  // Diagnostic qualité d'import (réf. 60816-01, suite, 24/08/2026) —
+  // segmentation irrégulière et/ou titres quasi inexistants. Tant que
+  // l'un des deux est détecté, la création de l'audit reste bloquée :
+  // voir diagnostiquerQualitéImport() dans segmenterCursAudit.js pour le
+  // pourquoi (un correctif silencieux fausserait le nombre d'unités et
+  // le prix sans que le client comprenne pourquoi).
+  const diagnosticImport = useMemo(() => {
+    if (unités.length === 0) return null;
+    return diagnostiquerQualitéImport({ nombreMots, nombreUnités: unités.length, chapitresDétectés });
+  }, [unités.length, nombreMots, chapitresDétectés]);
+
+  const problèmeMiseEnPage = diagnosticImport?.segmentationIrrégulière
+    ? "complete"
+    : diagnosticImport?.titresQuasiInexistants
+      ? "structuration_seule"
+      : null;
+
+  const demanderMiseEnPage = async () => {
+    if (!problèmeMiseEnPage) return;
+    setMiseEnPageEnCours(true);
+    const { data, error } = await misEnPageAPI.demander({
+      nomFichier: nomFichier || titre.trim() || "texte collé",
+      type: problèmeMiseEnPage,
+      prixTTC: PRIX_MISE_EN_PAGE[problèmeMiseEnPage],
+      nombreMots,
+      nombreUnités: unités.length,
+      nombreTitresDétectés: chapitresDétectés?.length ?? 0,
+    });
+    setMiseEnPageEnCours(false);
+    if (!error) setDemandeMiseEnPage(data);
+  };
+
   const importerFichier = async (fichier) => {
     if (!fichier?.name.endsWith(".docx")) { setErreurImport("Fichier .docx requis."); return; }
     setImportEnCours(true);
     setErreurImport(null);
+    setDemandeMiseEnPage(null);
     try {
       const { unités: paragraphes, chapitres } = await extraireParagraphesDocxAvecChapitres(fichier);
       if (paragraphes.length === 0) { setErreurImport("Aucun texte exploitable trouvé dans ce fichier."); setImportEnCours(false); return; }
@@ -179,6 +218,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const toutRéinitialiser = () => {
     setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
     setChapitresDétectés(null);
+    setDemandeMiseEnPage(null);
     setQuestionnaire(null);
   };
 
@@ -277,6 +317,34 @@ export default function CursAudit({ onVoirAudits } = {}) {
             <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
           </div>
 
+          {problèmeMiseEnPage && (
+            <div style={{ background: "#FCEBEB", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 6 }}>
+                Mise en page à résoudre avant de créer cet audit
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6, marginBottom: 8 }}>
+                {diagnosticImport.segmentationIrrégulière && (
+                  <>Ce fichier semble présenter une segmentation irrégulière ({diagnosticImport.moyenneMotsParUnité.toFixed(1).replace(".", ",")} mots par unité en moyenne, probablement une ligne = un paragraphe à l'export). Cela gonfle artificiellement le nombre d'unités, donc le prix et le temps de l'audit détaillé. </>
+                )}
+                {diagnosticImport.titresQuasiInexistants && (
+                  <>Ce texte ({nombreMots.toLocaleString("fr-FR")} mots) ne présente presque aucun titre de chapitre détecté ({chapitresDétectés?.length ?? 0}) — la structure du pré-audit enrichi chapitre par chapitre ne pourra pas être proposée correctement. </>
+                )}
+                Deux options : corrigez la mise en forme vous-même dans votre traitement de texte et réimportez le fichier, ou confiez-nous cette mise en page.
+              </div>
+              {demandeMiseEnPage ? (
+                <div style={{ fontSize: 11.5, color: "#1D9E75", fontWeight: 500 }}>
+                  Demande enregistrée ({PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC). Le paiement CursAudit n'est pas encore disponible dans l'application —
+                  nous vous recontacterons pour la suite. Vous pourrez réimporter le fichier corrigé dès réception.
+                </div>
+              ) : (
+                <button onClick={demanderMiseEnPage} disabled={miseEnPageEnCours}
+                  style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#A32D2D", color: "#fff", fontSize: 12, fontWeight: 500, cursor: miseEnPageEnCours ? "default" : "pointer", fontFamily: "inherit" }}>
+                  {miseEnPageEnCours ? "Envoi…" : `Commander la mise en page — ${PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC`}
+                </button>
+              )}
+            </div>
+          )}
+
           {nombreMots > 0 && (
             <div style={{ background: "#FFFBF2", border: "0.5px solid #C4973A80", borderRadius: 8, padding: "12px 14px" }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: "#8A6116", marginBottom: 4 }}>
@@ -359,14 +427,14 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
           <button
             onClick={créer}
-            disabled={enCours || !titre.trim() || unités.length === 0 || !prix}
+            disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage}
             style={{
               padding: "10px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-              background: (enCours || !titre.trim() || unités.length === 0 || !prix) ? "#ccc" : "#7F77DD",
-              color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix) ? "default" : "pointer",
+              background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage) ? "#ccc" : "#7F77DD",
+              color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage) ? "default" : "pointer",
             }}
           >
-            {enCours ? "Création…" : "Créer l'audit (brouillon)"}
+            {enCours ? "Création…" : problèmeMiseEnPage ? "Mise en page à résoudre avant création" : "Créer l'audit (brouillon)"}
           </button>
         </div>
       )}

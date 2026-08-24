@@ -590,3 +590,32 @@ export const auditsAPI = {
   },
 };
 
+/**
+ * Mise en page (référence 60816-01, suite, 24/08/2026) — voir
+ * diagnostiquerQualitéImport() dans segmenterCursAudit.js et
+ * PRIX_MISE_EN_PAGE dans tarifCursAudit.js. Enregistre juste la demande,
+ * statut "en_attente_paiement" : CursAudit n'a pas encore de Stripe, même
+ * principe que le statut "brouillon" de l'audit détaillé lui-même —
+ * rien n'est réellement encaissé ni exécuté pour l'instant.
+ */
+export const misEnPageAPI = {
+  async demander({ nomFichier, type, prixTTC, nombreMots, nombreUnités, nombreTitresDétectés }) {
+    const uid = await userId();
+    const { data, error } = await supabase
+      .from("demandes_mise_en_page")
+      .insert([{
+        user_id:                  uid,
+        nom_fichier:               nomFichier,
+        type,
+        prix_ttc:                  prixTTC,
+        nombre_mots:                nombreMots,
+        nombre_unites:              nombreUnités,
+        nombre_titres_detectes:     nombreTitresDétectés,
+        statut:                     "en_attente_paiement",
+      }])
+      .select()
+      .single();
+    return { data, error };
+  },
+};
+

@@ -28,11 +28,15 @@
  * auditée" (une préface, des remerciements, ou un chapitre au même niveau
  * de titre reçoivent tous le même traitement, ce n'est pas à CursAudit de
  * juger ce qui "compte" comme chapitre). Un seul niveau de titre est donc
- * choisi AUTOMATIQUEMENT : celui qui a le plus grand nombre d'occurrences
- * parmi les niveaux repérés au moins deux fois (une seule occurrence à un
- * niveau donné ne suffit pas à constituer une vraie structure de
- * chapitres — probablement un sous-titre isolé, pas une division
- * répétée). Le client CONFIRME ensuite ce découpage dans l'aperçu gratuit
+ * choisi AUTOMATIQUEMENT : le plus GROSSIER (le plus haut dans la
+ * hiérarchie Word — Titre1 avant Titre2 avant Titre3, etc.) parmi les
+ * niveaux repérés au moins deux fois (une seule occurrence à un niveau
+ * donné ne suffit pas à constituer une vraie structure de chapitres —
+ * probablement un sous-titre isolé, pas une division répétée). PAS "le
+ * plus répété" (revu le 24/08/2026 — un livre à niveaux imbriqués, ex.
+ * 8 titres "FAMILLE" en Titre1 contenant 55 titres "CARTE" en Titre3,
+ * donnait 280 "chapitres" au lieu de 8 avec l'ancienne règle). Le client
+ * CONFIRME ensuite ce découpage dans l'aperçu gratuit
  * avant de pouvoir lancer le pré-audit — voir ApercuGlobal dans
  * CursAuditDetail.jsx et `audits.chapitres_confirmes`.
  */
@@ -178,12 +182,22 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
     if (niveau !== undefined) comptageParNiveau[niveau] = (comptageParNiveau[niveau] || 0) + 1;
   }
 
+  // CORRECTIF 24/08/2026 (suite) — un livre bien structuré porte souvent
+  // PLUSIEURS niveaux de titre imbriqués (ex. "FAMILLE" en Titre1, "CARTE"
+  // en Titre3 en dessous) ; le niveau fin (CARTE, largement plus nombreux)
+  // n'est PAS le niveau chapitre — c'est le niveau le plus GROSSIER (le
+  // plus haut dans la hiérarchie, donc le numéro le plus bas) qui délimite
+  // les vraies divisions du livre. Choisir "le plus répété" prenait
+  // systématiquement le niveau le plus fin (constaté sur un vrai manuscrit :
+  // 280 "CARTE" en Titre3 retenues comme chapitres au lieu des 8 "FAMILLE"
+  // en Titre1). Le niveau le plus fin reste dans les unités analysées
+  // (regroupé sous son chapitre Titre1), il n'est simplement plus confondu
+  // avec la structure de chapitres elle-même.
   let niveauChapitre = null;
-  let meilleurCompte = 1; // il en faut au moins 2 pour constituer une structure
   for (const [niveauTexte, compte] of Object.entries(comptageParNiveau)) {
     const niveau = parseInt(niveauTexte, 10);
-    if (compte > meilleurCompte || (compte === meilleurCompte && (niveauChapitre === null || niveau < niveauChapitre))) {
-      meilleurCompte = compte;
+    if (compte < 2) continue; // une seule occurrence n'est pas une structure répétée
+    if (niveauChapitre === null || niveau < niveauChapitre) {
       niveauChapitre = niveau;
     }
   }
@@ -210,4 +224,34 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
   if (chapitreCourant) chapitres.push(chapitreCourant);
 
   return { unités, chapitres, niveauChapitre };
+}
+
+/**
+ * Diagnostic qualité d'import — "mise en page" (référence 60816-01, suite,
+ * 24/08/2026). Détecte les deux problèmes signalés sur un vrai manuscrit
+ * ("Oracle du Sermon sur la montagne") : une segmentation irrégulière
+ * (le fichier a été exporté une ligne = un paragraphe, ex. 8,6 mots/unité
+ * au lieu de 30-50+ pour une prose normale) et des titres de chapitres
+ * quasi inexistants (aucun niveau de titre répété au moins 3 fois, même
+ * après la correction du niveau choisi ci-dessus). Les deux sont
+ * indépendants — un livre peut présenter l'un, l'autre, les deux ou aucun.
+ * Décision de l'auteur du projet le 24/08/2026 : ce n'est PAS un correctif
+ * silencieux côté code (fusionner les paragraphes sans rien dire au
+ * client fausserait sa perception de son propre manuscrit) — le client
+ * doit être informé et choisir : corriger lui-même et réimporter, ou
+ * commander la mise en page payante (voir MisEnPageAPI / tarifCursAudit.js
+ * pour les deux prix retenus).
+ */
+const SEUIL_MOTS_MOYEN_PAR_UNITE = 15;
+const SEUIL_MIN_UNITES_POUR_DIAGNOSTIC = 50;
+const SEUIL_MIN_MOTS_POUR_TITRES = 8000;
+const SEUIL_MIN_CHAPITRES = 3;
+
+export function diagnostiquerQualitéImport({ nombreMots, nombreUnités, chapitresDétectés }) {
+  const moyenneMotsParUnité = nombreUnités > 0 ? nombreMots / nombreUnités : 0;
+  const segmentationIrrégulière = nombreUnités > SEUIL_MIN_UNITES_POUR_DIAGNOSTIC && moyenneMotsParUnité < SEUIL_MOTS_MOYEN_PAR_UNITE;
+  const titresQuasiInexistants = nombreMots > SEUIL_MIN_MOTS_POUR_TITRES
+    && (!chapitresDétectés || chapitresDétectés.length < SEUIL_MIN_CHAPITRES);
+
+  return { segmentationIrrégulière, titresQuasiInexistants, moyenneMotsParUnité };
 }

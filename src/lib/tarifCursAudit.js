@@ -152,3 +152,30 @@ export function estimerDuréeAppelGlobal(nombreMots) {
   const minutes = Math.round(secondes / 60);
   return { secondes, texte: `environ ${minutes} min` };
 }
+
+/**
+ * Mise en page — deux problèmes de qualité d'import détectés par
+ * `diagnostiquerQualitéImport()` (segmenterCursAudit.js), chacun avec son
+ * prix, fixés par l'auteur du projet le 24/08/2026 sur la base d'un vrai
+ * manuscrit ("Oracle du Sermon sur la montagne") : un appel IA unique sur
+ * le texte entier (même ordre de grandeur que l'aperçu gratuit — quelques
+ * dizaines de secondes, coût négligeable), pas un forfait de main-d'œuvre
+ * à l'heure. Prix fixes, pas de barème par mot : le coût réel varie très
+ * peu avec la longueur du texte.
+ *  - "structuration_seule" (9,90 € TTC) : uniquement la relecture pour
+ *    regrouper les titres en chapitres/pages — le cas où la segmentation
+ *    en paragraphes est déjà saine mais les titres sont quasi inexistants
+ *    ou au mauvais niveau.
+ *  - "complete" (12,90 € TTC) : reconstruction des paragraphes fragmentés
+ *    ET structuration des titres — nécessaire dès que la segmentation est
+ *    irrégulière (on ne peut pas fiablement recaler les titres sur des
+ *    paragraphes déjà cassés).
+ * PAS ENCORE RELIÉ à un vrai paiement — CursAudit n'a pas de Stripe
+ * aujourd'hui, voir MisEnPageAPI.demander() dans api.js : la demande est
+ * juste enregistrée en base, statut "en_attente_paiement", comme le
+ * "brouillon" de l'audit détaillé lui-même.
+ */
+export const PRIX_MISE_EN_PAGE = {
+  structuration_seule: 9.90,
+  complete: 12.90,
+};
