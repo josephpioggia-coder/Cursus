@@ -238,6 +238,62 @@
  * définition du schéma, et réutilisé pour toutes les requêtes de tout le
  * cycle de vie de l'isolat.
  *
+ * v7 → v8, 24/08/2026 — PRÉ-AUDIT ENRICHI CHAPITRE PAR CHAPITRE. Décision de
+ * l'auteur du projet après le débat sur les délais des voies éditoriales
+ * (v7.5) : plutôt que de simplement stabiliser le pipeline global existant,
+ * l'enrichir d'une lecture chapitre par chapitre — livrable plus complet
+ * (10-20 pages au lieu de ~12), même prix (le coût API réel est négligeable,
+ * moins d'1€ pour tout le mois d'août sur les deux comptes API — vérifié
+ * avant de trancher).
+ *
+ * Prérequis découvert en creusant le chantier : CursAudit ne détectait
+ * jusqu'ici AUCUNE structure de chapitres (segmenterCursAudit.js le disait
+ * explicitement — "pas de détection de niveaux de titre ici"). Ajout de
+ * `extraireParagraphesDocxAvecChapitres()` (même logique éprouvée que
+ * `extraireChapitres()` dans ImportDocx.jsx), qui choisit AUTOMATIQUEMENT
+ * le niveau de titre le plus répété comme "niveau chapitre" — décision
+ * explicite de l'auteur du projet : pas de distinction Partie/Chapitre ni
+ * de tri par nature (une préface, des remerciements ou un chapitre au même
+ * niveau reçoivent le même traitement, "le client déterminera de toutes
+ * façons si oui ou non une partie doit être auditée").
+ *
+ * SÉCURITÉ CLIENT : le client doit CONFIRMER explicitement ce découpage
+ * (`audits.chapitres_confirmes`, écran dans l'aperçu gratuit — voir
+ * ConfirmationChapitres dans CursAuditDetail.jsx) avant que le pré-audit ne
+ * soit lançable — évite qu'il paie un pré-audit dont le résultat sera
+ * compromis par des titres mal placés ou manquants sans avoir eu
+ * l'occasion de le corriger avant.
+ *
+ * PIPELINE ÉTENDU : après les passages globaux (1 : brouillon Claude, 2 :
+ * critique GPT), une boucle traite chaque chapitre confirmé — une lecture
+ * Claude (schéma allégé SCHEMA_LECTURE_CHAPITRE : fonction, point fort,
+ * point faible, à vérifier, à approfondir dans l'audit final — PAS une
+ * analyse complète, l'audit détaillé fait ce travail) suivie d'une
+ * relecture GPT, chacune dans son propre appel HTTP (même principe de
+ * boucle client que les passages globaux). Le passage 3 (synthèse finale)
+ * reçoit ces lectures comme CONTEXTE pour affiner sa propre synthèse, mais
+ * ne les reproduit pas lui-même : elles sont ajoutées telles quelles au
+ * résultat final (`lecture_chapitres`), pour éviter tout risque de dérive
+ * entre ce qui a été réellement observé et ce que Claude en redirait.
+ *
+ * GPT NON BLOQUANT : signalé en test réel, un seul appel GPT peut à lui
+ * seul dépasser les 150s de Supabase (modèle à raisonnement, temps
+ * variable). Corrigé pour le passage 2 global ET pour chaque relecture de
+ * chapitre : `appellerGPTCritique()` abandonne l'appel après un délai
+ * interne (110s, sous les 150s), et le pipeline retente UNE FOIS (dans un
+ * nouvel appel HTTP séparé — deux tentatives dans le MÊME appel
+ * dépasseraient les 150s à elles seules) avant d'abandonner définitivement
+ * et de continuer sans cette critique (`GPT_STATUT_INDISPONIBLE`) — GPT
+ * reste un contrôle non essentiel, jamais un point de blocage : Claude
+ * reste seul juge de toute façon.
+ *
+ * `reasoning_effort: "low"` ajouté à tous les appels GPT (global et par
+ * chapitre) — réduit la latence pour une tâche de contrôle simple
+ * (signaler manques/redites, pas une analyse profonde). Pas `"minimal"` :
+ * un rapport de test signale un risque de non-respect du schéma JSON
+ * strict avec `minimal` sur une variante de GPT-5 (gpt-5-nano) — `"low"`
+ * reste prudent sans perdre l'essentiel du gain de vitesse.
+ *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
  * voulait un traitement "en arrière-plan avec barre de progression" — un
@@ -553,6 +609,79 @@ const SCHEMA_CRITIQUE_GPT = {
   additionalProperties: false,
 };
 
+// ─── Pré-audit enrichi chapitre par chapitre (réf. 60816-01, suite,
+// 24/08/2026) — schéma volontairement TRÈS allégé par rapport à
+// SCHEMA_PREAUDIT_APPROFONDI : ce n'est pas l'audit détaillé en miniature,
+// juste de quoi repérer les points d'attention, pas les corriger. Réutilise
+// SCHEMA_CRITIQUE_GPT pour la relecture GPT de chaque chapitre — même
+// principe (manques/redites), s'applique aussi bien à une lecture de
+// chapitre qu'au brouillon global.
+const SCHEMA_LECTURE_CHAPITRE = {
+  type: "object",
+  properties: {
+    fonction: { type: "string", default: "" },
+    point_fort: { type: "string", default: "" },
+    point_faible: { type: "string", default: "" },
+    a_verifier: { type: "string", default: "" },
+    a_approfondir_audit_final: { type: "string", default: "" },
+  },
+  required: ["fonction", "point_fort", "point_faible", "a_verifier", "a_approfondir_audit_final"],
+  additionalProperties: false,
+};
+const validerLectureChapitre = ajv.compile(SCHEMA_LECTURE_CHAPITRE);
+
+// GPT peut manquer les 150s de Supabase même sur un seul appel (observé en
+// test réel) — traité comme NON BLOQUANT plutôt que comme une erreur qui
+// arrête tout le pipeline. Une relecture manquée n'est pas grave (Claude
+// reste seul juge de toute façon) ; un pipeline bloqué l'est. Deux
+// tentatives (chacune dans son propre appel HTTP, pas dans une boucle
+// interne — deux tentatives de ~110s dans UN SEUL appel dépasseraient les
+// 150s), puis abandon.
+const DÉLAI_MAX_GPT_MS = 110_000;
+const GPT_STATUT_TENTATIVE_ÉCHOUÉE = "tentative_echouee";
+const GPT_STATUT_INDISPONIBLE = "indisponible";
+
+function critiqueEnAttente(valeur: unknown): boolean {
+  return !valeur || (valeur as { _statut?: string })._statut === GPT_STATUT_TENTATIVE_ÉCHOUÉE;
+}
+
+// Renvoie `null` si le délai est dépassé (cas non bloquant, à traiter par
+// l'appelant) — relève une vraie erreur (clé API invalide, réponse
+// malformée...) normalement, celle-là ne doit pas être avalée silencieusement.
+async function appellerGPTCritique(systemGPT: string, payload: unknown) {
+  const contrôleur = new AbortController();
+  const minuteur = setTimeout(() => contrôleur.abort(), DÉLAI_MAX_GPT_MS);
+  try {
+    const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      signal: contrôleur.signal,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: MODELE_GPT,
+        reasoning_effort: "low",
+        messages: [
+          { role: "system", content: systemGPT },
+          { role: "user", content: JSON.stringify(payload) },
+        ],
+        response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
+      }),
+    });
+    const résultatGPT = await réponseGPT.json();
+    if (!réponseGPT.ok) throw new Error(résultatGPT?.error?.message || `Échec de l'appel GPT (${réponseGPT.status}).`);
+    const contenuGPT = résultatGPT.choices?.[0]?.message?.content;
+    if (!contenuGPT) throw new Error("GPT n'a renvoyé aucun contenu.");
+    return {
+      data: JSON.parse(contenuGPT),
+      usage: { tokens_entree: résultatGPT.usage?.prompt_tokens ?? 0, tokens_sortie: résultatGPT.usage?.completion_tokens ?? 0, modele: résultatGPT.model ?? MODELE_GPT },
+    };
+  } catch (err) {
+    if (contrôleur.signal.aborted) return null;
+    throw err;
+  } finally {
+    clearTimeout(minuteur);
+  }
+}
+
 // ─── Qualification de la demande (questionnaire) — dupliqué depuis
 // analyser-unite-cursaudit/index.ts, voir ce fichier pour le détail complet
 // des champs. Reprise minimale : un paragraphe de contexte, pas de logique
@@ -675,7 +804,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques")
+      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -688,7 +817,7 @@ Deno.serve(async (req) => {
 
     const { data: sections } = await admin
       .from("audit_sections")
-      .select("texte_source")
+      .select("texte_source, chapitre_index")
       .eq("audit_id", auditId)
       .order("ordre", { ascending: true });
     if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
@@ -728,6 +857,42 @@ Deno.serve(async (req) => {
       };
     };
 
+    // Lecture d'UN chapitre (réf. 60816-01, suite, 24/08/2026) — même
+    // principe qu'appelClaude() mais avec le schéma allégé
+    // SCHEMA_LECTURE_CHAPITRE, pas le schéma complet du pré-audit.
+    const appelClaudeChapitre = async (titreChapitre: string, texteChapitre: string) => {
+      if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
+      const system =
+        "Tu relis UN chapitre (ou équivalent : préface, partie, remerciements...) d'un livre déjà lu dans son " +
+        "ensemble par ailleurs. Reste BREF — 5 champs courts, ce n'est PAS une analyse complète (l'audit " +
+        "détaillé fera ce travail ligne par ligne si le client le commande). N'INVENTE aucune correction, " +
+        "n'écris aucune proposition de réécriture ici — observe seulement ce qui est déjà là. " +
+        "a_approfondir_audit_final doit être honnête : \"rien de particulier\" est une réponse acceptable si " +
+        "c'est vraiment le cas, pas un réflexe systématique.";
+      const réponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: MODELE_CLAUDE,
+          max_tokens: 2000,
+          system,
+          messages: [{ role: "user", content: `Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
+          tools: [{ name: "lecture_chapitre", description: "Lecture brève d'un chapitre : fonction, point fort, point faible, à vérifier, à approfondir dans l'audit final.", input_schema: SCHEMA_LECTURE_CHAPITRE }],
+          tool_choice: { type: "tool", name: "lecture_chapitre" },
+        }),
+      });
+      const résultatAPI = await réponse.json();
+      if (!réponse.ok) throw new Error(résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
+      const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
+      if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use.");
+      const donnéesComblées = combler(SCHEMA_LECTURE_CHAPITRE, blocOutil.input);
+      if (!validerLectureChapitre(donnéesComblées)) throw new Error(`Lecture de chapitre non conforme au schéma : ${ajv.errorsText(validerLectureChapitre.errors)}`);
+      return {
+        data: donnéesComblées,
+        usage: { tokens_entree: résultatAPI.usage?.input_tokens ?? 0, tokens_sortie: résultatAPI.usage?.output_tokens ?? 0, modele: résultatAPI.model ?? MODELE_CLAUDE },
+      };
+    };
+
     // 3 PASSAGES EN 3 APPELS HTTP SÉPARÉS (réf. 60816-01, suite, 23/08/2026) —
     // corrige "Request idle timeout limit (150s) reached" : Supabase impose
     // 150s max pour répondre à une requête, sur tous les plans, non
@@ -751,71 +916,134 @@ Deno.serve(async (req) => {
       return json({ audit_id: auditId, etape: "brouillon", restant: true });
     }
 
-    if (!audit.preaudit_critique_gpt) {
+    const systemGPTGlobal =
+      "Tu es le second lecteur du pré-audit CursAudit. On te donne un pré-audit déjà rédigé par un premier " +
+      "moteur à partir d'un manuscrit (13 éléments : résumé exécutif, nature réelle, promesse affichée, " +
+      "écart, voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à " +
+      "couper, prochaine étape, cartographie du contexte, fiche de synthèse). Le manuscrit lui-même ne " +
+      "t'est PAS fourni — ta relecture porte sur la COHÉRENCE INTERNE et la COMPLÉTUDE du document, pas sur " +
+      "une vérification ligne à ligne contre le texte source. Signale UNIQUEMENT : des manques réels (un " +
+      "champ trop vague ou générique par rapport aux autres, une voie éditoriale sans lien avec le plan " +
+      "d'intervention, une recommandation qui ne découle pas de ce qui précède) et des redites superflues " +
+      "(la même idée répétée presque mot pour mot entre plusieurs champs). Ne réécris rien toi-même, ne " +
+      "propose pas de nouvelle version — indique seulement ce qui devrait changer, pour que le premier " +
+      "moteur amende son propre travail.";
+
+    if (critiqueEnAttente(audit.preaudit_critique_gpt)) {
       // Passage 2 — GPT relit le brouillon (PAS le manuscrit, voir note plus
-      // haut sur le plafond TPM), signale manques/redites réels, ne réécrit rien.
-      const systemGPT =
-        "Tu es le second lecteur du pré-audit CursAudit. On te donne un pré-audit déjà rédigé par un premier " +
-        "moteur à partir d'un manuscrit (13 éléments : résumé exécutif, nature réelle, promesse affichée, " +
-        "écart, voies éditoriales, recommandation, plan d'intervention, exemples concrets, à préserver, à " +
-        "couper, prochaine étape, cartographie du contexte, fiche de synthèse). Le manuscrit lui-même ne " +
-        "t'est PAS fourni — ta relecture porte sur la COHÉRENCE INTERNE et la COMPLÉTUDE du document, pas sur " +
-        "une vérification ligne à ligne contre le texte source. Signale UNIQUEMENT : des manques réels (un " +
-        "champ trop vague ou générique par rapport aux autres, une voie éditoriale sans lien avec le plan " +
-        "d'intervention, une recommandation qui ne découle pas de ce qui précède) et des redites superflues " +
-        "(la même idée répétée presque mot pour mot entre plusieurs champs). Ne réécris rien toi-même, ne " +
-        "propose pas de nouvelle version — indique seulement ce qui devrait changer, pour que le premier " +
-        "moteur amende son propre travail.";
-      const réponseGPT = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
-        body: JSON.stringify({
-          model: MODELE_GPT,
-          messages: [
-            { role: "system", content: systemGPT },
-            { role: "user", content: JSON.stringify({ preaudit_brouillon: (audit.preaudit_brouillon as { data: unknown }).data }) },
-          ],
-          response_format: { type: "json_schema", json_schema: { name: "critique_preaudit", schema: SCHEMA_CRITIQUE_GPT, strict: true } },
-        }),
-      });
-      const résultatGPT = await réponseGPT.json();
-      if (!réponseGPT.ok) throw new Error(résultatGPT?.error?.message || `Échec de l'appel GPT (${réponseGPT.status}).`);
-      const contenuGPT = résultatGPT.choices?.[0]?.message?.content;
-      if (!contenuGPT) throw new Error("GPT n'a renvoyé aucun contenu.");
-      const critiqueGPT = {
-        data: JSON.parse(contenuGPT),
-        usage: { tokens_entree: résultatGPT.usage?.prompt_tokens ?? 0, tokens_sortie: résultatGPT.usage?.completion_tokens ?? 0, modele: résultatGPT.model ?? MODELE_GPT },
-      };
+      // haut sur le plafond TPM). Non bloquant (voir appellerGPTCritique) :
+      // une critique manquée fait avancer le pipeline quand même.
+      const déjàTenté = (audit.preaudit_critique_gpt as { _statut?: string } | null)?._statut === GPT_STATUT_TENTATIVE_ÉCHOUÉE;
+      const résultatGPT = await appellerGPTCritique(systemGPTGlobal, { preaudit_brouillon: (audit.preaudit_brouillon as { data: unknown }).data });
+      const nouvelleValeur = résultatGPT ?? { _statut: déjàTenté ? GPT_STATUT_INDISPONIBLE : GPT_STATUT_TENTATIVE_ÉCHOUÉE };
       const { error: erreurMaj } = await admin
         .from("audits")
-        .update({ preaudit_critique_gpt: critiqueGPT })
+        .update({ preaudit_critique_gpt: nouvelleValeur })
         .eq("id", auditId);
       if (erreurMaj) return json({ error: erreurMaj.message }, 500);
       return json({ audit_id: auditId, etape: "critique", restant: true });
     }
 
-    // Passage 3 — Claude reprend SON PROPRE brouillon à la lumière de la critique GPT et produit la version finale.
+    // Boucle chapitre par chapitre (réf. 60816-01, suite, 24/08/2026) — un
+    // chapitre = une lecture Claude + une relecture GPT (non bloquante,
+    // même principe que le passage 2), chacune dans son propre appel HTTP.
+    // Seulement si le client a confirmé le découpage détecté à l'import
+    // (voir ConfirmationChapitres dans CursAuditDetail.jsx) — sinon le
+    // pré-audit reste une lecture globale seule, comme avant ce chantier.
+    const chapitresConfirmés = audit.chapitres_confirmes && Array.isArray(audit.chapitres_detectes)
+      ? (audit.chapitres_detectes as Array<{ titre: string; indexPremièreUnité: number; nombreUnités: number; mots: number }>)
+      : [];
+
+    if (chapitresConfirmés.length > 0) {
+      const résultatsChapitres = (
+        Array.isArray(audit.preaudit_chapitres_resultats) && audit.preaudit_chapitres_resultats.length === chapitresConfirmés.length
+          ? audit.preaudit_chapitres_resultats
+          : chapitresConfirmés.map(() => ({ lecture: null, relecture: null }))
+      ) as Array<{ lecture: { data: Record<string, unknown>; usage: unknown } | null; relecture: unknown }>;
+
+      for (let i = 0; i < chapitresConfirmés.length; i++) {
+        const chapitre = chapitresConfirmés[i];
+        const entrée = résultatsChapitres[i];
+
+        if (!entrée.lecture) {
+          const texteChapitre = sections
+            .filter((s) => (s as { chapitre_index?: number }).chapitre_index === i)
+            .map((s) => s.texte_source)
+            .join("\n\n");
+          entrée.lecture = await appelClaudeChapitre(chapitre.titre, texteChapitre || chapitre.titre);
+          const { error: erreurMaj } = await admin
+            .from("audits")
+            .update({ preaudit_chapitres_resultats: résultatsChapitres })
+            .eq("id", auditId);
+          if (erreurMaj) return json({ error: erreurMaj.message }, 500);
+          return json({ audit_id: auditId, etape: "chapitre_lecture", chapitre_numero: i + 1, chapitre_total: chapitresConfirmés.length, chapitre_titre: chapitre.titre, restant: true });
+        }
+
+        if (critiqueEnAttente(entrée.relecture)) {
+          const déjàTenté = (entrée.relecture as { _statut?: string } | null)?._statut === GPT_STATUT_TENTATIVE_ÉCHOUÉE;
+          const systemGPTChapitre =
+            "Tu relis une lecture brève d'un chapitre de livre (fonction, point fort, point faible, à " +
+            "vérifier, à approfondir dans l'audit final), pas le pré-audit complet. Signale uniquement des " +
+            "manques réels ou des redites superflues dans CETTE lecture de chapitre — ne réécris rien.";
+          const résultatGPT = await appellerGPTCritique(systemGPTChapitre, { lecture_chapitre: entrée.lecture.data });
+          entrée.relecture = résultatGPT ?? { _statut: déjàTenté ? GPT_STATUT_INDISPONIBLE : GPT_STATUT_TENTATIVE_ÉCHOUÉE };
+          const { error: erreurMaj } = await admin
+            .from("audits")
+            .update({ preaudit_chapitres_resultats: résultatsChapitres })
+            .eq("id", auditId);
+          if (erreurMaj) return json({ error: erreurMaj.message }, 500);
+          return json({ audit_id: auditId, etape: "chapitre_relecture", chapitre_numero: i + 1, chapitre_total: chapitresConfirmés.length, chapitre_titre: chapitre.titre, restant: true });
+        }
+      }
+    }
+
+    // Passage 3 — Claude reprend SON PROPRE brouillon à la lumière de la
+    // critique GPT (si elle a pu être obtenue) et des lectures chapitre par
+    // chapitre (si confirmées), et produit la version finale.
     const brouillonStocké = audit.preaudit_brouillon as { data: unknown; usage: unknown };
-    const critiqueStockée = audit.preaudit_critique_gpt as { data: unknown; usage: unknown };
+    const critiqueDisponible = audit.preaudit_critique_gpt && !(audit.preaudit_critique_gpt as { _statut?: string })._statut
+      ? (audit.preaudit_critique_gpt as { data: unknown; usage: unknown })
+      : null;
+    const lecturesChapitresPourClaude = chapitresConfirmés.length > 0
+      ? (audit.preaudit_chapitres_resultats as Array<{ lecture: { data: unknown } | null }>).map((r, i) => ({
+          titre: chapitresConfirmés[i].titre,
+          ...r.lecture?.data,
+        }))
+      : [];
     const systemAmendement =
       systemPromptInitial +
-      "\n\nTU AS DÉJÀ PRODUIT UN BROUILLON (fourni dans le message utilisateur, avec le manuscrit). Un second " +
-      "lecteur (GPT) l'a relu et propose des amendements (elements_manquants, elements_superflus), également " +
-      "fournis. Reprends TON PROPRE brouillon et produis la VERSION FINALE : intègre les remarques qui te " +
-      "semblent justifiées et utiles, ignore celles qui ne le sont pas — tu restes seul juge en dernier " +
-      "ressort, n'accepte pas une remarque simplement parce qu'elle est proposée. Ce n'est PAS une nouvelle " +
-      "génération indépendante : c'est une révision de ton propre travail, qui doit rester reconnaissable.";
+      "\n\nTU AS DÉJÀ PRODUIT UN BROUILLON (fourni dans le message utilisateur, avec le manuscrit)." +
+      (critiqueDisponible
+        ? " Un second lecteur (GPT) l'a relu et propose des amendements (elements_manquants, elements_superflus), également fournis."
+        : " Le second lecteur (GPT) n'a pas pu répondre à temps cette fois — poursuis sans son avis, tu restes de toute façon seul juge en dernier ressort.") +
+      (lecturesChapitresPourClaude.length > 0
+        ? " Tu disposes aussi de lectures rapides, chapitre par chapitre, déjà produites séparément (contexte fourni) — tu peux t'en inspirer pour affiner recommandation_principale et plan_intervention, mais NE LES REPRODUIS PAS toi-même : elles seront ajoutées telles quelles au rapport final, à part."
+        : "") +
+      " Reprends TON PROPRE brouillon et produis la VERSION FINALE : intègre les remarques qui te semblent " +
+      "justifiées et utiles, ignore celles qui ne le sont pas. Ce n'est PAS une nouvelle génération " +
+      "indépendante : c'est une révision de ton propre travail, qui doit rester reconnaissable.";
     const versionFinale = await appelClaude(
       systemAmendement,
-      JSON.stringify({ manuscrit: texteIntegral, preaudit_brouillon: brouillonStocké.data, critique_gpt: critiqueStockée.data })
+      JSON.stringify({
+        manuscrit: texteIntegral,
+        preaudit_brouillon: brouillonStocké.data,
+        critique_gpt: critiqueDisponible?.data ?? null,
+        lectures_chapitres: lecturesChapitresPourClaude.length > 0 ? lecturesChapitresPourClaude : undefined,
+      })
     );
 
     const preauditResultat = {
       ...versionFinale.data,
-      revision: { critique_gpt: critiqueStockée.data },
+      revision: { critique_gpt: critiqueDisponible?.data ?? null },
+      lecture_chapitres: chapitresConfirmés.length > 0
+        ? (audit.preaudit_chapitres_resultats as Array<{ lecture: { data: unknown } | null; relecture: unknown }>).map((r, i) => ({
+            titre: chapitresConfirmés[i].titre,
+            lecture: r.lecture?.data ?? null,
+          }))
+        : undefined,
       usage: {
         claude_brouillon: brouillonStocké.usage,
-        gpt_critique: critiqueStockée.usage,
+        gpt_critique: critiqueDisponible?.usage ?? null,
         claude_final: versionFinale.usage,
       },
       analyse_le: new Date().toISOString(),
