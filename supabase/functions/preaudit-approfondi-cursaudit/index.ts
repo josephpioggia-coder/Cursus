@@ -223,6 +223,21 @@
  * promesse), reprise de la proposition de GPT — plus nette que la
  * formulation précédente, sans impact sur le schéma.
  *
+ * CORRECTIF v7.6, MÊME JOUR — bug réel observé en test après le correctif
+ * ci-dessus : "Function failed due to not having enough compute resources"
+ * (erreur 546 de Supabase — limite de TEMPS CPU réel de 2000ms par requête
+ * dépassée, distincte du budget de 150s pour répondre à la requête HTTP).
+ * Cause trouvée : `ajv.compile(SCHEMA_PREAUDIT_APPROFONDI)` était appelé À
+ * L'INTÉRIEUR de `appelClaude()`, donc recompilé du DÉBUT à chaque appel —
+ * et `appelClaude()` est invoqué DEUX FOIS par requête (passages 1 et 3).
+ * Compiler un schéma est un vrai travail CPU (construction de fonctions de
+ * validation), pas de l'attente réseau — ce coût, payé deux fois à chaque
+ * requête pour rien (le schéma ne change jamais), épuisait le budget CPU
+ * de l'isolat Deno. Le validateur (`validerPreauditApprofondi`) est
+ * désormais compilé UNE SEULE FOIS au chargement du module, juste après la
+ * définition du schéma, et réutilisé pour toutes les requêtes de tout le
+ * cycle de vie de l'isolat.
+ *
  * PAS DE VRAIE TÂCHE DE FOND SERVEUR : un seul appel synchrone, comme pour
  * l'aperçu (phase 1). Discuté avec l'auteur du projet le 23/08/2026, qui
  * voulait un traitement "en arrière-plan avec barre de progression" — un
@@ -513,6 +528,17 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
   additionalProperties: false,
 };
 
+// Compilé UNE SEULE FOIS au chargement du module (réf. 60816-01, suite,
+// 24/08/2026) — appelClaude() est invoqué deux fois par requête (passages 1
+// et 3), et ajv.compile() recompilait le même schéma à chaque appel.
+// Recompiler un schéma est un travail CPU réel (pas de l'attente réseau) —
+// cause probable du "Function failed due to not having enough compute
+// resources" (erreur 546 de Supabase : limite de temps CPU de 2000ms par
+// requête dépassée, distincte du budget de 150s pour répondre). Compiler
+// une seule fois au démarrage de l'isolat Deno, puis réutiliser le même
+// validateur, retire ce coût du chemin critique de chaque requête.
+const validerPreauditApprofondi = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
+
 // ─── Second passage GPT (réf. 60816-01, suite, 23/08/2026) — même principe
 // que le "second lecteur" du mode 2 IA de analyser-unite-cursaudit : GPT ne
 // réécrit rien, il signale seulement des manques ou des redites réelles.
@@ -691,8 +717,7 @@ Deno.serve(async (req) => {
       const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
       if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use.");
       const donnéesComblées = combler(SCHEMA_PREAUDIT_APPROFONDI, blocOutil.input);
-      const valide = ajv.compile(SCHEMA_PREAUDIT_APPROFONDI);
-      if (!valide(donnéesComblées)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(valide.errors)}`);
+      if (!validerPreauditApprofondi(donnéesComblées)) throw new Error(`Sortie non conforme au schéma : ${ajv.errorsText(validerPreauditApprofondi.errors)}`);
       const nbChampsVides = compterChampsClésVides(donnéesComblées as Record<string, unknown>);
       if (nbChampsVides >= 3) {
         throw new Error(`Génération quasi vide (${nbChampsVides}/${CHAMPS_CLÉS_NON_VIDES.length} champs clés manquants) — échec réel, à relancer plutôt qu'à afficher.`);
