@@ -284,11 +284,27 @@ async function appelerPreauditApprofondi(auditId) {
   return données;
 }
 
-const LABELS_ETAPE_PREAUDIT = {
-  brouillon: "Passage 1/3 terminé — lancement du second avis…",
-  critique: "Passage 2/3 terminé — rédaction de la version finale…",
-  termine: "Version finale prête.",
-};
+// Libellé du bouton — réf. 60816-01, suite, 24/08/2026 : depuis le
+// pré-audit enrichi chapitre par chapitre, le nombre d'étapes n'est plus
+// fixe (dépend du nombre de chapitres confirmés), donc plus de compteur
+// "x/3" figé. `dernierRésultat` = la dernière réponse de l'API (ou null
+// avant le premier appel) ; `nbChapitres` = audit.chapitres_detectes
+// (0 si aucun, ou si non confirmé — le pipeline reste alors global seul).
+function libelléÉtapePréaudit(dernierRésultat, nbChapitres) {
+  if (!dernierRésultat) return "Lecture du livre…";
+  const { etape, chapitre_numero, chapitre_total, chapitre_titre } = dernierRésultat;
+  if (etape === "brouillon") return "Relecture du livre…";
+  if (etape === "chapitre_lecture") return `Lecture du chapitre ${chapitre_numero}/${chapitre_total} — ${chapitre_titre}…`;
+  if (etape === "chapitre_relecture") return `Relecture du chapitre ${chapitre_numero}/${chapitre_total} — ${chapitre_titre}…`;
+  // Après "critique" (pas de chapitres) ou après la relecture du DERNIER
+  // chapitre confirmé, le prochain appel est la synthèse finale — aucune
+  // étape intermédiaire ne le confirme avant que ce soit fini, donc ce
+  // libellé reste affiché pendant tout cet appel (peut prendre 1-2 minutes).
+  if (etape === "critique" || (etape === "chapitre_relecture" && chapitre_numero === chapitre_total)) {
+    return "Lecture finale globale avant rédaction…";
+  }
+  return "Rédaction en cours…";
+}
 
 // Messages illustratifs qui défilent PENDANT chaque passage, réf. 60816-01,
 // suite, 23/08/2026 — demande explicite de l'auteur du projet : ne pas
@@ -322,24 +338,38 @@ const MESSAGES_PENDANT_PREAUDIT = {
 
 function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
   const [enCours, setEnCours] = useState(false);
+  // `progression` = la dernière réponse complète de l'API (pas juste
+  // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
+  // construire un libellé réel avec le numéro/titre du chapitre en cours.
   const [progression, setProgression] = useState(null);
   const [indiceMessage, setIndiceMessage] = useState(0);
   const [erreur, setErreur] = useState(null);
   const résultat = audit.preaudit_resultat;
+  const nbChapitresConfirmés = audit.chapitres_confirmes ? (audit.chapitres_detectes?.length || 0) : 0;
 
   const prix = useMemo(
     () => (reglesPrix ? calculerPrixPreauditPourcentage(reglesPrix, audit.prix_ttc) : null),
     [reglesPrix, audit.prix_ttc]
   );
 
+  const libelléActuel = libelléÉtapePréaudit(progression, nbChapitresConfirmés);
+  // Le texte illustratif qui défile ne s'affiche que pour les phases sans
+  // signal réel granulaire (lecture globale, attente de la synthèse
+  // finale) — pendant une phase de chapitre, le libellé réel (numéro +
+  // titre) suffit déjà, un texte illustratif en plus n'ajouterait rien.
+  const cléMessages = !progression ? "attente"
+    : progression.etape === "brouillon" ? "brouillon"
+    : libelléActuel === "Lecture finale globale avant rédaction…" ? "critique"
+    : null;
+
   useEffect(() => {
     if (!enCours) return;
     setIndiceMessage(0);
     const intervalle = setInterval(() => setIndiceMessage((i) => i + 1), 3500);
     return () => clearInterval(intervalle);
-  }, [enCours, progression]);
+  }, [enCours, cléMessages]);
 
-  const messagesActuels = MESSAGES_PENDANT_PREAUDIT[progression ?? "attente"] ?? [];
+  const messagesActuels = cléMessages ? (MESSAGES_PENDANT_PREAUDIT[cléMessages] ?? []) : [];
   const messageActuel = messagesActuels.length > 0 ? messagesActuels[indiceMessage % messagesActuels.length] : null;
 
   const lancer = async () => {
@@ -347,7 +377,8 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
     setErreur(null);
     setProgression(null);
     try {
-      // Le pipeline se fait en 3 appels HTTP séparés — un par passage — pour
+      // Le pipeline se fait en plusieurs appels HTTP séparés (un par
+      // passage global, puis un par lecture/relecture de chapitre) pour
       // rester sous la limite de 150s imposée par Supabase Edge Functions
       // (voir le commentaire d'en-tête de preaudit-approfondi-cursaudit).
       // On rappelle la fonction jusqu'à ce qu'elle indique restant=false,
@@ -356,7 +387,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
       while (restant) {
         const résultatAppel = await appelerPreauditApprofondi(audit.id);
         restant = résultatAppel.restant;
-        setProgression(résultatAppel.etape);
+        setProgression(résultatAppel);
       }
       await onTermine();
     } catch (e) {
@@ -415,7 +446,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
             padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
             opacity: enCours ? 0.6 : 1,
           }}>
-            {enCours ? (LABELS_ETAPE_PREAUDIT[progression] ?? "Passage 1/3 : rédaction du brouillon…") : "Lancer le pré-audit"}
+            {enCours ? libelléActuel : "Lancer le pré-audit"}
           </button>
           {enCours && messageActuel && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
@@ -621,6 +652,27 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
                   {résultat.cartographie_contexte.valeur_ajoutee_audit_complet}
                 </div>
               )}
+            </div>
+          )}
+
+          {résultat.lecture_chapitres?.length > 0 && (
+            <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14, display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#5B52C4" }}>Lecture chapitre par chapitre</div>
+              <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
+                Une lecture rapide de chaque chapitre confirmé — repère des points d'attention, pas une correction. L'audit détaillé va plus loin, ligne par ligne.
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {résultat.lecture_chapitres.map((c, i) => (
+                  <div key={i} style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid var(--border)", borderRadius: 6, padding: "8px 10px", display: "grid", gap: 3 }}>
+                    <div style={{ fontWeight: 600 }}>{i + 1}. {c.titre}</div>
+                    {c.lecture?.fonction && <div><span style={{ fontWeight: 600, color: "var(--texte-tertiaire)" }}>Fonction — </span>{c.lecture.fonction}</div>}
+                    {c.lecture?.point_fort && <div><span style={{ fontWeight: 600, color: "#1D9E75" }}>Point fort — </span>{c.lecture.point_fort}</div>}
+                    {c.lecture?.point_faible && <div><span style={{ fontWeight: 600, color: "#A32D2D" }}>Point faible — </span>{c.lecture.point_faible}</div>}
+                    {c.lecture?.a_verifier && <div><span style={{ fontWeight: 600, color: "#C4973A" }}>À vérifier — </span>{c.lecture.a_verifier}</div>}
+                    {c.lecture?.a_approfondir_audit_final && <div><span style={{ fontWeight: 600, color: "#5B52C4" }}>À approfondir dans l'audit final — </span>{c.lecture.a_approfondir_audit_final}</div>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
