@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 2048,
+        max_tokens: 8192,
         system: SYSTEM_PREAUDIT,
         messages: [{ role: "user", content: texteIntegral }],
         tools: [{ name: "lecture_globale", description: "Synthèse structurée de la lecture globale du manuscrit.", input_schema: SCHEMA_PREAUDIT }],
@@ -144,6 +144,16 @@ Deno.serve(async (req) => {
     });
     const résultatAPI = await réponse.json();
     if (!réponse.ok) return json({ error: résultatAPI?.error?.message || `Échec de l'appel Claude (${réponse.status}).` }, 502);
+
+    // CORRECTIF 25/08/2026 — max_tokens était à 2048, bien trop bas pour un
+    // livre entier (constaté en test réel : réponse tronquée juste avant
+    // forces_globales/risques_globaux/audit_recommande, les 3 derniers
+    // champs du schéma — Claude coupé en plein milieu de sa génération,
+    // pas une "erreur de schéma" à proprement parler). Détection explicite
+    // pour un message clair plutôt que l'erreur AJV cryptique qui en résultait.
+    if (résultatAPI.stop_reason === "max_tokens") {
+      return json({ error: "La réponse de Claude a été tronquée (limite de longueur atteinte) — réessaie, ou signale-le si ça se reproduit sur ce livre." }, 502);
+    }
 
     const blocOutil = (résultatAPI.content ?? []).find((b: { type: string }) => b.type === "tool_use");
     if (!blocOutil) return json({ error: "Claude n'a renvoyé aucun bloc tool_use." }, 502);
