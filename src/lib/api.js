@@ -496,7 +496,19 @@ export const auditsAPI = {
         type_rapport:      typeRapport,
         nombre_pages:      nombrePages,
         prix_ttc:          prixTTC,
-        statut:            "brouillon",
+        // TEMPORAIRE (réf. 60816-01, suite, 25/08/2026) — statut = "paye" et
+        // preaudit_statut = "paye" dès la création, au lieu de "brouillon" /
+        // "non_demande". CursAudit n'a aucun Stripe branché : la vérification
+        // audit.statut === "paye" (orchestrer-audit-cursaudit,
+        // analyser-unite-cursaudit) et preaudit_statut === "paye"
+        // (preaudit-approfondi-cursaudit) ne protège aujourd'hui aucun
+        // paiement réel, juste une case à cocher manuellement en SQL à
+        // chaque test — pur temps perdu tant que personne ne peut payer de
+        // toute façon. À RETIRER (remettre "brouillon" / "non_demande") dès
+        // qu'un vrai flux Stripe existe pour CursAudit, sans quoi tout
+        // nouvel audit deviendrait immédiatement lancable sans paiement.
+        statut:            "paye",
+        preaudit_statut:   "paye",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
         finalite_audit:          finaliteAudit,

@@ -233,11 +233,12 @@ export default function CursAudit({ onVoirAudits } = {}) {
         <div style={{ background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 10, padding: "18px 20px" }}>
           <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé</div>
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
-            « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}, statut « brouillon ».
+            « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}.
             <br />
             Un aperçu gratuit du manuscrit est disponible dès maintenant depuis l'écran de détail de cet audit.
             <br />
-            Le paiement CursAudit n'est pas encore disponible dans l'application — l'analyse détaillée ne peut pas être lancée tant que le statut reste « brouillon ».
+            Le paiement CursAudit n'est pas encore disponible dans l'application — en attendant, cet audit est
+            directement utilisable (aucun paiement réel n'est effectué), pré-audit et analyse détaillée compris.
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button
