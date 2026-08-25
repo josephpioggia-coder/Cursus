@@ -264,6 +264,46 @@ function construireContexteQualification(audit: AuditQualification): string {
   return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
 }
 
+// Contexte issu du pré-audit déjà réalisé (réf. 60816-01, suite,
+// 25/08/2026) — jusqu'ici, l'audit détaillé analysait chaque unité de
+// façon totalement isolée, sans aucune connaissance du pré-audit payant
+// déjà produit pour ce même livre (voies éditoriales, cartographie des
+// personnages/lieux, domaines à vérifier) — vérifié : aucune référence à
+// `preaudit_resultat` n'existait avant ce jour dans ce fichier ni dans
+// analyser-unite-cursaudit. Purement additif : si aucun pré-audit n'existe
+// pour cet audit (préaudit_resultat null), renvoie une chaîne vide,
+// comportement strictement identique à avant.
+function construireContextePreaudit(preauditResultat: Record<string, unknown> | null): string {
+  if (!preauditResultat) return "";
+  const cartographie = preauditResultat.cartographie_contexte as {
+    personnages_principaux?: Array<{ nom?: string; role?: string }>;
+    lieux_principaux?: Array<{ nom?: string; fonction?: string }>;
+    domaines_a_verifier?: string[];
+  } | undefined;
+  const planIntervention = preauditResultat.plan_intervention as Array<{ chantier?: string }> | undefined;
+
+  const lignes: string[] = [
+    "Un pré-audit approfondi de CE LIVRE ENTIER a déjà été réalisé — sers-t'en comme repère de cohérence " +
+    "(mêmes noms, mêmes lieux, même diagnostic d'ensemble), pas comme une grille à recopier unité par unité :",
+  ];
+  if (preauditResultat.recommandation_principale) {
+    lignes.push(`- Recommandation d'ensemble : ${preauditResultat.recommandation_principale}`);
+  }
+  if (planIntervention && planIntervention.length > 0) {
+    lignes.push(`- Chantiers identifiés pour l'ensemble du livre : ${planIntervention.map((c) => c.chantier).filter(Boolean).join(" ; ")}`);
+  }
+  if (cartographie?.personnages_principaux && cartographie.personnages_principaux.length > 0) {
+    lignes.push(`- Personnages principaux (garde les mêmes noms/rôles) : ${cartographie.personnages_principaux.map((p) => `${p.nom} (${p.role})`).filter(Boolean).join(", ")}`);
+  }
+  if (cartographie?.lieux_principaux && cartographie.lieux_principaux.length > 0) {
+    lignes.push(`- Lieux principaux : ${cartographie.lieux_principaux.map((l) => `${l.nom} (${l.fonction})`).filter(Boolean).join(", ")}`);
+  }
+  if (cartographie?.domaines_a_verifier && cartographie.domaines_a_verifier.length > 0) {
+    lignes.push(`- Points déjà signalés à vérifier à l'échelle du livre : ${cartographie.domaines_a_verifier.join(" ; ")}`);
+  }
+  return lignes.length > 1 ? lignes.join("\n") + "\n\n" : "";
+}
+
 // ─── Synthèse éditoriale globale par unité — voir le commentaire jumeau,
 // plus détaillé, dans analyser-unite-cursaudit/index.ts.
 const EFFETS_LECTEUR = [
@@ -393,10 +433,19 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const auditId: string | undefined = body?.audit_id;
     if (!auditId) return json({ error: "audit_id est requis." }, 400);
+    // Bornage optionnel à un sous-ensemble de chapitres (réf. 60816-01,
+    // suite, 25/08/2026) — pour pouvoir tester la qualité de l'audit
+    // détaillé sur "la partie 1" d'un livre plutôt que d'attendre les 752
+    // unités/2h d'un livre entier à chaque essai. Purement additif : sans ce
+    // champ, comportement inchangé (tout le livre). Quand fourni, l'audit
+    // n'est JAMAIS marqué "termine" automatiquement (ce serait faux — il
+    // reste des unités hors du sous-ensemble demandé).
+    const chapitreMaxIndex: number | undefined =
+      typeof body?.chapitre_max_index === "number" ? body.chapitre_max_index : undefined;
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia, apercu_resultat, preaudit_resultat")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -425,14 +474,17 @@ Deno.serve(async (req) => {
     const schema = fusionnerSchemas(construireSchemaAnalyse(criteres), construireSchemaSyntheseEditoriale(autoriserProposition));
     const consigneCriteres = construireConsigneCriteres(criteres);
     const consigneSyntheseEditoriale = construireConsigneSyntheseEditoriale(autoriserProposition);
-    const contexteQualification = construireContexteQualification(audit);
+    const contexteQualification =
+      construireContexteQualification(audit) +
+      construireContextePreaudit(audit.preaudit_resultat as Record<string, unknown> | null);
 
-    const { data: sections } = await admin
+    let requeteSections = admin
       .from("audit_sections")
       .select("id, texte_source")
       .eq("audit_id", auditId)
-      .is("resultat_analyse", null)
-      .order("ordre", { ascending: true });
+      .is("resultat_analyse", null);
+    if (chapitreMaxIndex !== undefined) requeteSections = requeteSections.lte("chapitre_index", chapitreMaxIndex);
+    const { data: sections } = await requeteSections.order("ordre", { ascending: true });
     const aTraiter = sections ?? [];
 
     let traiteesCetteFois = 0;
@@ -453,24 +505,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { count: restantes } = await admin
+    // Le compte de "restantes" respecte lui aussi le bornage — sinon la
+    // boucle côté client (qui rappelle tant que restantes > 0) continuerait
+    // à traiter tout le livre malgré la demande de test partiel.
+    let requeteRestantes = admin
       .from("audit_sections")
       .select("id", { count: "exact", head: true })
       .eq("audit_id", auditId)
       .is("resultat_analyse", null);
+    if (chapitreMaxIndex !== undefined) requeteRestantes = requeteRestantes.lte("chapitre_index", chapitreMaxIndex);
+    const { count: restantes } = await requeteRestantes;
 
     // "Terminé" seulement s'il y avait réellement des unités à traiter —
     // sinon un audit sans la moindre unité (pas encore importée) serait
     // marqué terminé à tort dès le premier appel (bug réel du 16/08/2026,
     // repéré en test : restantes = 0 parce que rien n'existait, pas parce
-    // que le travail était fait).
+    // que le travail était fait). Et JAMAIS "termine" pour un appel borné à
+    // un sous-ensemble de chapitres (réf. 25/08/2026) — il reste forcément
+    // des unités non traitées hors de ce sous-ensemble.
     const { count: totalUnites } = await admin
       .from("audit_sections")
       .select("id", { count: "exact", head: true })
       .eq("audit_id", auditId);
 
     let statutFinal = audit.statut === "paye" ? "en_traitement" : audit.statut;
-    if ((restantes ?? 0) === 0 && (totalUnites ?? 0) > 0) {
+    if (chapitreMaxIndex === undefined && (restantes ?? 0) === 0 && (totalUnites ?? 0) > 0) {
       statutFinal = "termine";
       await admin.from("audits").update({ statut: "termine" }).eq("id", auditId);
     }
