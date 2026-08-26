@@ -341,7 +341,7 @@ const MESSAGES_PENDANT_PREAUDIT = {
   ],
 };
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites }) {
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
   // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
@@ -698,17 +698,28 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                 10-20 pages. Réutilise directement lancerAnalyse() du parent
                 (même bouton, même comportement) plutôt que d'en dupliquer un. */}
             {peutLancerAuditDetaille && (
-              <button
-                onClick={onLancerAuditDetaille}
-                disabled={auditDetailleEnCours}
-                style={{
-                  background: "#1D9E75", color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600,
-                  cursor: auditDetailleEnCours ? "default" : "pointer", opacity: auditDetailleEnCours ? 0.6 : 1,
-                }}
-              >
-                {auditDetailleEnCours ? "Audit détaillé en cours…" : audit.statut === "en_traitement" ? "Continuer l'audit détaillé" : "Commander l'audit détaillé"}
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                {Array.isArray(audit.chapitres_detectes) && audit.chapitres_detectes.length > 0 && (
+                  <select value={chapitreLimite} onChange={(e) => onChapitreLimiteChange(e.target.value)} disabled={auditDetailleEnCours}
+                    style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
+                    <option value="">Tout le livre ({totalUnites} unités)</option>
+                    {audit.chapitres_detectes.map((c, i) => (
+                      <option key={i} value={i}>Jusqu'à « {c.titre} » (chapitres 1–{i + 1})</option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  onClick={onLancerAuditDetaille}
+                  disabled={auditDetailleEnCours}
+                  style={{
+                    background: "#1D9E75", color: "#fff", border: "none",
+                    borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600,
+                    cursor: auditDetailleEnCours ? "default" : "pointer", opacity: auditDetailleEnCours ? 0.6 : 1,
+                  }}
+                >
+                  {auditDetailleEnCours ? "Audit détaillé en cours…" : audit.statut === "en_traitement" ? "Continuer l'audit détaillé" : "Commander l'audit détaillé"}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -944,6 +955,9 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           onLancerAuditDetaille={lancerAnalyse}
           peutLancerAuditDetaille={peutLancer}
           auditDetailleEnCours={enCours}
+          chapitreLimite={chapitreLimite}
+          onChapitreLimiteChange={setChapitreLimite}
+          totalUnites={total}
         />
       )}
 
