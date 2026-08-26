@@ -815,12 +815,30 @@ Deno.serve(async (req) => {
       return json({ error: "paiement_requis", message: `Le pré-audit a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
     }
 
-    const { data: sections } = await admin
-      .from("audit_sections")
-      .select("texte_source, chapitre_index")
-      .eq("audit_id", auditId)
-      .order("ordre", { ascending: true });
-    if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
+    // CORRECTIF 26/08/2026 — bug réel trouvé sur "À cœur retrouvé" (1442
+    // unités) : le chapitre "Remerciements" (le dernier du livre) revenait
+    // "vide" au pré-audit alors qu'il contient 1154 mots bien réels et
+    // correctement rattachés en base (chapitre_index vérifié). Cause :
+    // Supabase/PostgREST plafonne une lecture à 1000 lignes par défaut sans
+    // pagination explicite — sans erreur, juste moins de lignes que la
+    // vraie table. Ce livre a 1442 audit_sections ; ce seul select() n'en
+    // renvoyait que les 1000 premières (par `ordre`), amputant silencieusement
+    // la fin du livre — exactement là où vit le dernier chapitre. Lecture
+    // par lots de 1000 via .range() jusqu'à épuisement.
+    const TAILLE_PAGE = 1000;
+    const sections: { texte_source: string; chapitre_index: number | null }[] = [];
+    for (let page = 0; ; page++) {
+      const { data: lot } = await admin
+        .from("audit_sections")
+        .select("texte_source, chapitre_index")
+        .eq("audit_id", auditId)
+        .order("ordre", { ascending: true })
+        .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
+      if (!lot || lot.length === 0) break;
+      sections.push(...lot);
+      if (lot.length < TAILLE_PAGE) break;
+    }
+    if (sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
 
     // CORRECTIF 25/08/2026 — "Function failed due to not having enough
     // compute resources" (546) constaté en test réel sur ce pipeline malgré
