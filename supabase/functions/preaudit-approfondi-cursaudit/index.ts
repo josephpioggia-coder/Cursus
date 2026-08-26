@@ -822,10 +822,25 @@ Deno.serve(async (req) => {
       .order("ordre", { ascending: true });
     if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
 
-    const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
-    const nombreMots = texteIntegral.split(/\s+/).filter(Boolean).length;
-    const contexteQualification = construireContexteQualification(audit);
-    const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {}, nombreMots);
+    // CORRECTIF 25/08/2026 — "Function failed due to not having enough
+    // compute resources" (546) constaté en test réel sur ce pipeline malgré
+    // le correctif v7.6 (ajv.compile déplacé au chargement du module, voir
+    // plus haut). Cause probable trouvée : texteIntegral/nombreMots/
+    // systemPromptInitial étaient recalculés à CHAQUE appel HTTP, avant même
+    // de savoir quel passage allait s'exécuter — y compris pour les ~15 des
+    // ~19 appels du pipeline complet (critique GPT du brouillon, chaque
+    // lecture/relecture de chapitre) qui n'en ont pas besoin du tout. Le
+    // passage la plus coûteuse de ce calcul (join() + split(/\s+/) sur tout
+    // le texte, ~30 000 mots ici) tournait donc inutilement sur la quasi-
+    // totalité des requêtes. Déplacé dans une fonction, appelée seulement
+    // par les deux passages qui en ont réellement besoin (1 et 3).
+    const construireTexteEtPrompt = () => {
+      const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
+      const nombreMots = texteIntegral.split(/\s+/).filter(Boolean).length;
+      const contexteQualification = construireContexteQualification(audit);
+      const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {}, nombreMots);
+      return { texteIntegral, systemPromptInitial };
+    };
 
     const appelClaude = async (system: string, contexte: string) => {
       if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
@@ -907,6 +922,7 @@ Deno.serve(async (req) => {
 
     if (!audit.preaudit_brouillon) {
       // Passage 1 — Claude produit le brouillon.
+      const { texteIntegral, systemPromptInitial } = construireTexteEtPrompt();
       const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
       const { error: erreurMaj } = await admin
         .from("audits")
@@ -1000,6 +1016,7 @@ Deno.serve(async (req) => {
     // Passage 3 — Claude reprend SON PROPRE brouillon à la lumière de la
     // critique GPT (si elle a pu être obtenue) et des lectures chapitre par
     // chapitre (si confirmées), et produit la version finale.
+    const { texteIntegral, systemPromptInitial } = construireTexteEtPrompt();
     const brouillonStocké = audit.preaudit_brouillon as { data: unknown; usage: unknown };
     const critiqueDisponible = audit.preaudit_critique_gpt && !(audit.preaudit_critique_gpt as { _statut?: string })._statut
       ? (audit.preaudit_critique_gpt as { data: unknown; usage: unknown })

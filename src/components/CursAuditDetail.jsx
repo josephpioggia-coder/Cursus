@@ -64,7 +64,12 @@ function humaniserCle(cle) {
   return cle.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
-async function appelerOrchestrateur(auditId, signal) {
+// chapitreMaxIndex (réf. 60816-01, suite, 25/08/2026) — optionnel, pour
+// tester l'audit détaillé sur "la partie 1" d'un livre (les premiers
+// chapitres confirmés) plutôt que d'attendre les 752 unités/2h d'un livre
+// entier à chaque essai. Voir orchestrer-audit-cursaudit : quand fourni,
+// l'audit n'est jamais marqué "termine" (il reste des unités hors scope).
+async function appelerOrchestrateur(auditId, signal, chapitreMaxIndex) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
@@ -77,7 +82,7 @@ async function appelerOrchestrateur(auditId, signal) {
       "Authorization": `Bearer ${token}`,
       "apikey": SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify({ audit_id: auditId }),
+    body: JSON.stringify({ audit_id: auditId, ...(chapitreMaxIndex !== undefined ? { chapitre_max_index: chapitreMaxIndex } : {}) }),
   });
   const données = await réponse.json();
   if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
@@ -336,7 +341,7 @@ const MESSAGES_PENDANT_PREAUDIT = {
   ],
 };
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours }) {
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
   // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
@@ -676,39 +681,35 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
             </div>
           )}
 
-          {résultat.revision?.critique_gpt && (
-            <details style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 4 }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Second avis (contrôle GPT) pris en compte pour cette version</summary>
-              <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                {résultat.revision.critique_gpt.verdict_global && (
-                  <div>{résultat.revision.critique_gpt.verdict_global}</div>
-                )}
-                {résultat.revision.critique_gpt.elements_manquants?.length > 0 && (
-                  <div>
-                    <span style={{ fontWeight: 600 }}>Manques signalés : </span>
-                    {résultat.revision.critique_gpt.elements_manquants.join(" · ")}
-                  </div>
-                )}
-                {résultat.revision.critique_gpt.elements_superflus?.length > 0 && (
-                  <div>
-                    <span style={{ fontWeight: 600 }}>Redites signalées : </span>
-                    {résultat.revision.critique_gpt.elements_superflus.join(" · ")}
-                  </div>
-                )}
-              </div>
-            </details>
-          )}
-
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
             <button
               onClick={() => exporterPreauditWord(audit, résultat)}
               style={{
-                background: "#5B52C4", color: "#fff", border: "none",
+                background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
                 borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
               }}
             >
               Exporter en Word
             </button>
+            {/* Signalé par l'auteur du projet le 26/08/2026 : arrivé au bout
+                du rapport de pré-audit, aucun bouton n'était visible pour
+                passer à l'audit détaillé — le seul existant est tout en
+                haut de l'écran, hors de vue après avoir lu un rapport de
+                10-20 pages. Réutilise directement lancerAnalyse() du parent
+                (même bouton, même comportement) plutôt que d'en dupliquer un. */}
+            {peutLancerAuditDetaille && (
+              <button
+                onClick={onLancerAuditDetaille}
+                disabled={auditDetailleEnCours}
+                style={{
+                  background: "#1D9E75", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600,
+                  cursor: auditDetailleEnCours ? "default" : "pointer", opacity: auditDetailleEnCours ? 0.6 : 1,
+                }}
+              >
+                {auditDetailleEnCours ? "Audit détaillé en cours…" : audit.statut === "en_traitement" ? "Continuer l'audit détaillé" : "Commander l'audit détaillé"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -806,6 +807,11 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   const [page, setPage] = useState(1);
   const [enCours, setEnCours] = useState(false);
   const [progression, setProgression] = useState(null);
+  // Bornage optionnel à un sous-ensemble de chapitres pour tester l'audit
+  // détaillé sans attendre le livre entier (réf. 60816-01, suite,
+  // 25/08/2026) — "" = tout le livre, sinon l'index (0-based) du dernier
+  // chapitre confirmé à inclure. Voir appelerOrchestrateur ci-dessus.
+  const [chapitreLimite, setChapitreLimite] = useState("");
 
   const charger = useCallback(async () => {
     const { data, error } = await auditsAPI.récupérerAvecSections(auditId);
@@ -856,10 +862,11 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   const lancerAnalyse = async () => {
     setEnCours(true);
     setErreur(null);
+    const limite = chapitreLimite === "" ? undefined : Number(chapitreLimite);
     try {
       let restantes = 1;
       while (restantes > 0) {
-        const résultat = await appelerOrchestrateur(auditId);
+        const résultat = await appelerOrchestrateur(auditId, undefined, limite);
         restantes = résultat.restantes ?? 0;
         setProgression({ traitées: résultat.traitees_cette_fois, échouées: résultat.echouees_cette_fois, restantes });
       }
@@ -898,13 +905,24 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           </p>
         </div>
         {peutLancer && (
-          <button onClick={lancerAnalyse} disabled={enCours} style={{
-            background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
-            padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
-            opacity: enCours ? 0.6 : 1, flexShrink: 0,
-          }}>
-            {enCours ? "Analyse en cours…" : audit.statut === "en_traitement" ? "Continuer l'analyse" : "Lancer l'analyse"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+            {Array.isArray(audit.chapitres_detectes) && audit.chapitres_detectes.length > 0 && (
+              <select value={chapitreLimite} onChange={(e) => setChapitreLimite(e.target.value)} disabled={enCours}
+                style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
+                <option value="">Tout le livre ({total} unités)</option>
+                {audit.chapitres_detectes.map((c, i) => (
+                  <option key={i} value={i}>Jusqu'à « {c.titre} » (chapitres 1–{i + 1})</option>
+                ))}
+              </select>
+            )}
+            <button onClick={lancerAnalyse} disabled={enCours} style={{
+              background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
+              padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
+              opacity: enCours ? 0.6 : 1,
+            }}>
+              {enCours ? "Analyse en cours…" : audit.statut === "en_traitement" ? "Continuer l'analyse" : "Lancer l'analyse"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -919,7 +937,14 @@ export default function CursAuditDetail({ auditId, onRetour }) {
       )}
 
       {audit.apercu_statut === "termine" && (
-        <PreauditApprofondi audit={audit} reglesPrix={reglesPrix} onTermine={charger} />
+        <PreauditApprofondi
+          audit={audit}
+          reglesPrix={reglesPrix}
+          onTermine={charger}
+          onLancerAuditDetaille={lancerAnalyse}
+          peutLancerAuditDetaille={peutLancer}
+          auditDetailleEnCours={enCours}
+        />
       )}
 
       {erreur && (

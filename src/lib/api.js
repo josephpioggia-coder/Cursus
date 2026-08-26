@@ -496,7 +496,19 @@ export const auditsAPI = {
         type_rapport:      typeRapport,
         nombre_pages:      nombrePages,
         prix_ttc:          prixTTC,
-        statut:            "brouillon",
+        // TEMPORAIRE (réf. 60816-01, suite, 25/08/2026) — statut = "paye" et
+        // preaudit_statut = "paye" dès la création, au lieu de "brouillon" /
+        // "non_demande". CursAudit n'a aucun Stripe branché : la vérification
+        // audit.statut === "paye" (orchestrer-audit-cursaudit,
+        // analyser-unite-cursaudit) et preaudit_statut === "paye"
+        // (preaudit-approfondi-cursaudit) ne protège aujourd'hui aucun
+        // paiement réel, juste une case à cocher manuellement en SQL à
+        // chaque test — pur temps perdu tant que personne ne peut payer de
+        // toute façon. À RETIRER (remettre "brouillon" / "non_demande") dès
+        // qu'un vrai flux Stripe existe pour CursAudit, sans quoi tout
+        // nouvel audit deviendrait immédiatement lancable sans paiement.
+        statut:            "paye",
+        preaudit_statut:   "paye",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
         finalite_audit:          finaliteAudit,
@@ -586,6 +598,35 @@ export const auditsAPI = {
       .from("audit_pricing_rules")
       .select("categorie, cle, libelle, valeur_numerique")
       .eq("actif", true);
+    return { data, error };
+  },
+};
+
+/**
+ * Mise en page (référence 60816-01, suite, 24/08/2026) — voir
+ * diagnostiquerQualitéImport() dans segmenterCursAudit.js et
+ * PRIX_MISE_EN_PAGE dans tarifCursAudit.js. Enregistre juste la demande,
+ * statut "en_attente_paiement" : CursAudit n'a pas encore de Stripe, même
+ * principe que le statut "brouillon" de l'audit détaillé lui-même —
+ * rien n'est réellement encaissé ni exécuté pour l'instant.
+ */
+export const misEnPageAPI = {
+  async demander({ nomFichier, type, prixTTC, nombreMots, nombreUnités, nombreTitresDétectés }) {
+    const uid = await userId();
+    const { data, error } = await supabase
+      .from("demandes_mise_en_page")
+      .insert([{
+        user_id:                  uid,
+        nom_fichier:               nomFichier,
+        type,
+        prix_ttc:                  prixTTC,
+        nombre_mots:                nombreMots,
+        nombre_unites:              nombreUnités,
+        nombre_titres_detectes:     nombreTitresDétectés,
+        statut:                     "en_attente_paiement",
+      }])
+      .select()
+      .single();
     return { data, error };
   },
 };

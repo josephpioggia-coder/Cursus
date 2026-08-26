@@ -35,13 +35,38 @@ import { useState } from "react";
 const TYPES_DOCUMENT = [
   "Mémoire / TFE / travail académique",
   "Manuscrit de livre",
+  "Biographie / autobiographie",
   "Article",
   "Essai",
   "Rapport professionnel",
   "Dossier personnel",
   "Scène / extrait autonome",
   "Correspondance / message",
+  "Poésie",
+  "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)",
+  "Autre (à préciser)",
 ];
+
+// Poésie (référence 60816-01, suite, 24/08/2026) — signalé par l'auteur du
+// projet : l'audit d'un poème (rimes, mètre, forme) demande un travail de
+// conception plus subtil qu'un audit de prose, que le moteur actuel
+// (analyser-unite-cursaudit) ne sait pas faire — pas de dimensions
+// dédiées à la scansion ou au schéma de rimes. Plutôt que de laisser
+// croire à un audit compétent sur ce point, ce type de document est
+// explicitement marqué "à l'étude" et bloque la validation du
+// questionnaire — voir estPoésie ci-dessous.
+//
+// Format alternatif / Autre (référence 60816-01, suite, 24/08/2026) —
+// signalé par l'auteur du projet à propos d'un livret-oracle (préface,
+// mode d'emploi, cartes courtes regroupées par famille) : ni un manuscrit
+// classique, ni un des types déjà listés. Plutôt que de forcer ce genre de
+// contenu (livret de cartes, posts réseaux sociaux…) dans une case
+// inadaptée, "Format alternatif" regroupe les contenus structurés en
+// entrées courtes/non linéaires — le moteur n'a besoin d'aucune dimension
+// dédiée pour ça (il segmente déjà en unités), juste d'un rappel dans le
+// prompt de ne pas juger l'absence d'arc narratif continu comme un défaut.
+// "Autre (à préciser)" couvre le reste : un champ libre, la précision du
+// client remplace alors "Autre" comme valeur envoyée au moteur.
 
 const STATUTS_TEXTE = [
   "Un brouillon de travail",
@@ -96,6 +121,7 @@ function Checkbox({ checked, onChange, label }) {
 
 export default function CursAuditQuestionnaire({ onValider }) {
   const [typeDocument, setTypeDocument] = useState("");
+  const [autrePrécision, setAutrePrécision] = useState("");
   const [statutTexte, setStatutTexte] = useState("");
   const [finalites, setFinalites] = useState([]);
   const [questionLibre, setQuestionLibre] = useState("");
@@ -110,17 +136,28 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const [erreur, setErreur] = useState(null);
 
   const estAcadémique = typeDocument === "Mémoire / TFE / travail académique";
+  const estPoésie = typeDocument === "Poésie";
+  const estFormatAlternatif = typeDocument === "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)";
+  const estAutre = typeDocument === "Autre (à préciser)";
 
   const basculerFinalité = (f) => setFinalites((liste) => liste.includes(f) ? liste.filter((x) => x !== f) : [...liste, f]);
   const basculerCondition = (c) => setConditionsIA((liste) => liste.includes(c) ? liste.filter((x) => x !== c) : [...liste, c]);
 
   const valider = () => {
+    if (estPoésie) {
+      setErreur("La poésie est un type de projet à l'étude chez Cursus, pas encore disponible — voir le message ci-dessus.");
+      return;
+    }
     if (!typeDocument || !statutTexte || finalites.length === 0 || !questionLibre.trim() || !degreIntervention) {
       setErreur("Merci de répondre aux questions 1 à 5 (question libre incluse) avant de continuer.");
       return;
     }
+    if (estAutre && !autrePrécision.trim()) {
+      setErreur("Merci de préciser le type de document.");
+      return;
+    }
     onValider({
-      typeDocument,
+      typeDocument: estAutre ? autrePrécision.trim() : typeDocument,
       statutTexte,
       finaliteAudit: finalites,
       questionLibre: questionLibre.trim(),
@@ -148,6 +185,38 @@ export default function CursAuditQuestionnaire({ onValider }) {
           <option value="">— Choisir —</option>
           {TYPES_DOCUMENT.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
+        {estPoésie && (
+          <div style={{ background: "#FBE9E9", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 4 }}>
+              Type de projet à l'étude — pas encore disponible
+            </div>
+            <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
+              Auditer un poème correctement demande de respecter sa forme — rimé ou non, structuré
+              selon un mètre ou une forme connue (sonnet, haïku, alexandrins…) ou délibérément
+              destructuré. CursAudit ne sait pas encore faire cette distinction : plutôt que de
+              lancer un audit générique de prose sur un poème et risquer de juger une rupture de
+              rythme voulue comme une erreur, ce type de projet reste à l'étude chez nous pour
+              l'instant. Choisissez un autre type de document ci-dessus, ou revenez plus tard.
+            </div>
+          </div>
+        )}
+        {estFormatAlternatif && (
+          <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
+            <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
+              Un contenu de ce type (livret de cartes, oracle, posts réseaux sociaux…) est fait
+              d'entrées courtes et autonomes plutôt que d'un fil narratif continu — CursAudit en
+              tient compte et ne signalera pas l'absence d'arc narratif comme un défaut.
+            </div>
+          </div>
+        )}
+        {estAutre && (
+          <input
+            style={{ ...champStyle, marginTop: 8 }}
+            value={autrePrécision}
+            onChange={(e) => setAutrePrécision(e.target.value)}
+            placeholder="Précisez le type de document"
+          />
+        )}
       </div>
 
       <div>
@@ -246,9 +315,9 @@ export default function CursAuditQuestionnaire({ onValider }) {
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13 }}>{erreur}</div>
       )}
 
-      <button onClick={valider} style={{
-        background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
-        padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+      <button onClick={valider} disabled={estPoésie} style={{
+        background: estPoésie ? "#ccc" : "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
+        padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: estPoésie ? "default" : "pointer", fontFamily: "inherit",
       }}>
         Continuer
       </button>
