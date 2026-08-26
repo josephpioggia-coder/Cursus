@@ -72,21 +72,68 @@ interface AppelMoteurIAParams {
 interface UsageIA { tokens_entree: number; tokens_sortie: number; modele: string }
 interface AppelMoteurIAResultat { data: unknown; usage: UsageIA }
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+// CORRECTIF 26/08/2026 — rattrapage d'un champ isolé manquant (réf.
+// 60816-01, suite). Bug réel constaté en test : une unité entière rejetée
+// en échec parce que geste_editorial n'avait pas son "commentaire" —
+// aucun mécanisme ici pour rattraper un oubli isolé de l'IA, contrairement
+// à preaudit-approfondi-cursaudit (corrigé le 24/08 avec le même principe :
+// useDefaults + removeAdditional + combler()). Porté ici à l'identique :
+// useDefaults comble une valeur par défaut au niveau du schéma,
+// removeAdditional supprime une clé en trop plutôt que de rejeter, et
+// combler() comble récursivement un champ requis manquant (objet, tableau
+// ou scalaire) AVANT même la validation — un item incomplet reste
+// imparfait, mais ne fait plus échouer toute l'unité pour un oubli isolé.
+const ajv = new Ajv({ allErrors: true, strict: false, useDefaults: true, removeAdditional: true });
 
 function validerContreSchema(data: unknown, schema: Record<string, unknown>): void {
   const valide = ajv.compile(schema);
   if (!valide(data)) throw new Error(`Sortie IA non conforme au schéma attendu : ${ajv.errorsText(valide.errors)}`);
 }
 
-function normaliserTableauxNuls(schema: Record<string, unknown>, data: unknown): unknown {
-  if (data === null || typeof data !== "object" || Array.isArray(data)) return data;
-  const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
-  const résultat: Record<string, unknown> = { ...(data as Record<string, unknown>) };
-  for (const [cle, sousSchema] of Object.entries(props)) {
-    if (sousSchema.type === "array" && (résultat[cle] === null || résultat[cle] === undefined)) résultat[cle] = [];
+function valeurParDéfaut(schema: Record<string, unknown>): unknown {
+  if (schema.type === "array") {
+    const n = (schema.minItems as number) ?? 0;
+    const itemSchema = (schema.items as Record<string, unknown>) ?? { type: "string" };
+    return Array.from({ length: n }, () => valeurParDéfaut(itemSchema));
   }
-  return résultat;
+  if (schema.type === "object") {
+    const obj: Record<string, unknown> = {};
+    const requis = (schema.required as string[]) ?? [];
+    const proprietes = (schema.properties as Record<string, Record<string, unknown>>) ?? {};
+    for (const clé of requis) obj[clé] = valeurParDéfaut(proprietes[clé] ?? { type: "string" });
+    return obj;
+  }
+  if (schema.default !== undefined) return schema.default;
+  if (schema.enum) return (schema.enum as unknown[])[0];
+  return "";
+}
+
+function combler(schema: Record<string, unknown>, data: unknown): unknown {
+  if (schema.type !== "object") return data;
+  const base = (typeof data === "object" && data !== null && !Array.isArray(data)) ? { ...(data as Record<string, unknown>) } : {};
+  const requis = (schema.required as string[]) ?? [];
+  const proprietes = (schema.properties as Record<string, Record<string, unknown>>) ?? {};
+  for (const clé of requis) {
+    const sousSchema = proprietes[clé] ?? { type: "string" };
+    const valeur = base[clé];
+    if (valeur === undefined || valeur === null) {
+      base[clé] = valeurParDéfaut(sousSchema);
+    } else if (sousSchema.type === "object" && typeof valeur === "object" && !Array.isArray(valeur)) {
+      base[clé] = combler(sousSchema, valeur);
+    } else if (sousSchema.type === "array" && Array.isArray(valeur)) {
+      const itemSchema = (sousSchema.items as Record<string, unknown>) ?? { type: "string" };
+      const complétée = valeur.map((item) => (itemSchema.type === "object" ? combler(itemSchema, item) : item));
+      const min = (sousSchema.minItems as number) ?? 0;
+      while (complétée.length < min) complétée.push(valeurParDéfaut(itemSchema));
+      base[clé] = complétée;
+    } else if (
+      (sousSchema.type === "object" && (typeof valeur !== "object" || Array.isArray(valeur))) ||
+      (sousSchema.type === "array" && !Array.isArray(valeur))
+    ) {
+      base[clé] = valeurParDéfaut(sousSchema);
+    }
+  }
+  return base;
 }
 
 async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
@@ -115,7 +162,7 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
   }
   const blocOutil = (résultat.content ?? []).find((bloc: { type: string }) => bloc.type === "tool_use");
   if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
-  const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, blocOutil.input);
+  const donneesNormalisees = combler(params.schema_sortie, blocOutil.input);
   validerContreSchema(donneesNormalisees, params.schema_sortie);
   return {
     data: donneesNormalisees,
@@ -144,7 +191,7 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
   } catch {
     throw new Error("Sortie GPT non parsable en JSON malgré response_format json_schema.");
   }
-  const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, data);
+  const donneesNormalisees = combler(params.schema_sortie, data);
   validerContreSchema(donneesNormalisees, params.schema_sortie);
   return {
     data: donneesNormalisees,
