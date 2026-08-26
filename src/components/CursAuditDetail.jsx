@@ -27,7 +27,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
-import { extraireParagraphesDocxAvecChapitres } from "../lib/segmenterCursAudit.js";
+import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
 import { exporterPreauditWord } from "../lib/exportPreauditWord.js";
 
@@ -131,8 +131,23 @@ function ConfirmationChapitres({ audit, onTermine }) {
   // détection (ex. la fin du titre "II" détectée comme un chapitre à
   // part) n'avait aucun moyen d'être corrigé — pas de bouton pour dire
   // non, rouvrir le livre, corriger, et le réinsérer. Voir
-  // auditsAPI.remplacerContenu().
+  // auditsAPI.remplacerContenu(). Sélection multi-niveaux ajoutée le
+  // 26/08/2026, même mécanisme et même raison qu'à la création
+  // (CursAudit.jsx) : un seul niveau auto-choisi ne convenait pas à un
+  // livre à parties ET chapitres imbriqués (ex. parties en Titre1,
+  // chapitres en Titre2, les deux réels) — infosRéimport reste `null`
+  // tant qu'aucun fichier n'a été choisi.
   const inputFichierRef = useRef(null);
+  const [infosRéimport, setInfosRéimport] = useState(null);
+  const [niveauxDisponibles, setNiveauxDisponibles] = useState([]);
+  const [niveauxRetenus, setNiveauxRetenus] = useState([]);
+  const [nomFichierRéimport, setNomFichierRéimport] = useState(null);
+
+  const aperçuRéimport = useMemo(() => {
+    if (!infosRéimport) return null;
+    return regrouperParNiveaux(infosRéimport, niveauxRetenus);
+  }, [infosRéimport, niveauxRetenus]);
+
   const chapitres = audit.chapitres_detectes;
   if (!chapitres || chapitres.length === 0) return null;
 
@@ -148,21 +163,43 @@ function ConfirmationChapitres({ audit, onTermine }) {
     setEnCours(false);
   };
 
-  const réimporter = async (fichier) => {
+  const choisirFichier = async (fichier) => {
     if (!fichier?.name.endsWith(".docx")) { setErreur("Fichier .docx requis."); return; }
     setEnCours(true);
     setErreur(null);
     try {
-      const { unités, chapitres: nouveauxChapitres } = await extraireParagraphesDocxAvecChapitres(fichier);
-      if (unités.length === 0) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); setEnCours(false); return; }
-      const { error } = await auditsAPI.remplacerContenu(audit.id, {
-        unités, chapitresDétectés: nouveauxChapitres.length > 0 ? nouveauxChapitres : null,
-      });
-      if (error) setErreur(error.message);
-      else await onTermine();
+      const { infos, niveauxDisponibles: niveaux } = await analyserStructureDocx(fichier);
+      if (!infos.some((i) => i.texte)) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); setEnCours(false); return; }
+      setInfosRéimport(infos);
+      setNiveauxDisponibles(niveaux);
+      setNiveauxRetenus(niveaux.length > 0 ? [niveaux[0].niveau] : []);
+      setNomFichierRéimport(fichier.name);
     } catch (e) {
       setErreur("Impossible de lire ce fichier : " + e.message);
     }
+    setEnCours(false);
+  };
+
+  const basculerNiveauRéimport = (niveau) => {
+    setNiveauxRetenus((prev) =>
+      prev.includes(niveau) ? prev.filter((n) => n !== niveau) : [...prev, niveau].sort((a, b) => a - b)
+    );
+  };
+
+  const annulerRéimport = () => {
+    setInfosRéimport(null); setNiveauxDisponibles([]); setNiveauxRetenus([]); setNomFichierRéimport(null); setErreur(null);
+  };
+
+  const validerRéimport = async () => {
+    if (!aperçuRéimport || aperçuRéimport.unités.length === 0) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); return; }
+    setEnCours(true);
+    setErreur(null);
+    const { error } = await auditsAPI.remplacerContenu(audit.id, {
+      unités: aperçuRéimport.unités,
+      chapitresDétectés: aperçuRéimport.chapitres.length > 0 ? aperçuRéimport.chapitres : null,
+    });
+    if (error) setErreur(error.message);
+    else await onTermine();
     setEnCours(false);
   };
 
@@ -190,7 +227,7 @@ function ConfirmationChapitres({ audit, onTermine }) {
           ⚠️ Les tailles varient beaucoup d'un titre à l'autre — vérifiez qu'aucun titre de chapitre n'a été oublié dans votre fichier avant de confirmer.
         </div>
       )}
-      {!audit.chapitres_confirmes && (
+      {!audit.chapitres_confirmes && !infosRéimport && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={confirmer} disabled={enCours} style={{
             background: "#C4973A", color: "#fff", border: "none", borderRadius: 6,
@@ -199,13 +236,43 @@ function ConfirmationChapitres({ audit, onTermine }) {
             {enCours ? "…" : "Je confirme ce découpage"}
           </button>
           <input ref={inputFichierRef} type="file" accept=".docx" style={{ display: "none" }}
-            onChange={(e) => réimporter(e.target.files[0])} />
+            onChange={(e) => choisirFichier(e.target.files[0])} />
           <button onClick={() => inputFichierRef.current?.click()} disabled={enCours} style={{
             background: "transparent", color: "#8A6116", border: "0.5px solid #C4973A80", borderRadius: 6,
             padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: enCours ? "default" : "pointer",
           }}>
             Ce n'est pas correct — importer un fichier corrigé
           </button>
+        </div>
+      )}
+      {infosRéimport && (
+        <div style={{ marginTop: 4, borderTop: "0.5px solid #C4973A40", paddingTop: 8 }}>
+          <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginBottom: 6 }}>
+            « {nomFichierRéimport} » — niveaux de titre à retenir comme divisions :
+          </div>
+          {niveauxDisponibles.map(({ niveau, nombre }) => (
+            <label key={niveau} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "2px 0", cursor: "pointer" }}>
+              <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRéimport(niveau)} />
+              Niveau {niveau} ({nombre} occurrence{nombre > 1 ? "s" : ""})
+            </label>
+          ))}
+          <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", margin: "6px 0" }}>
+            {aperçuRéimport.unités.length} unités, {aperçuRéimport.chapitres.length} titre{aperçuRéimport.chapitres.length > 1 ? "s" : ""} avec cette sélection.
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={validerRéimport} disabled={enCours} style={{
+              background: "#C4973A", color: "#fff", border: "none", borderRadius: 6,
+              padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+            }}>
+              {enCours ? "…" : "Valider ce réimport"}
+            </button>
+            <button onClick={annulerRéimport} disabled={enCours} style={{
+              background: "transparent", color: "var(--texte-tertiaire)", border: "0.5px solid var(--border)", borderRadius: 6,
+              padding: "6px 14px", fontSize: 12, cursor: enCours ? "default" : "pointer",
+            }}>
+              Annuler
+            </button>
+          </div>
         </div>
       )}
       {erreur && <div style={{ marginTop: 6, fontSize: 11.5, color: "#A32D2D" }}>{erreur}</div>}
@@ -788,7 +855,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                     style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
                     <option value="">Tout le livre ({totalUnites} unités)</option>
                     {audit.chapitres_detectes.map((c, i) => (
-                      <option key={i} value={i}>Jusqu'à « {c.titre} » (chapitres 1–{i + 1})</option>
+                      <option key={i} value={i}>Jusqu'à « {c.titre} » ({i + 1} chapitre{i + 1 > 1 ? "s" : ""})</option>
                     ))}
                   </select>
                 )}
@@ -1014,7 +1081,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
                 style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
                 <option value="">Tout le livre ({total} unités)</option>
                 {audit.chapitres_detectes.map((c, i) => (
-                  <option key={i} value={i}>Jusqu'à « {c.titre} » (chapitres 1–{i + 1})</option>
+                  <option key={i} value={i}>Jusqu'à « {c.titre} » ({i + 1} chapitre{i + 1 > 1 ? "s" : ""})</option>
                 ))}
               </select>
             )}

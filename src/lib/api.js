@@ -569,14 +569,27 @@ export const auditsAPI = {
       .single();
     if (erreurAudit) return { data: null, error: erreurAudit };
 
-    const { data: sections, error: erreurSections } = await supabase
-      .from("audit_sections")
-      .select("*")
-      .eq("audit_id", auditId)
-      .order("ordre", { ascending: true });
-    if (erreurSections) return { data: null, error: erreurSections };
+    // CORRECTIF 26/08/2026 — bug réel trouvé sur "À cœur retrouvé" (1442
+    // unités affichées comme "1000 unités" partout dans l'écran de détail) :
+    // Supabase/PostgREST plafonne une lecture à 1000 lignes sans pagination
+    // explicite, sans erreur — juste moins de lignes que la vraie table.
+    // Lecture par lots de 1000 via .range() jusqu'à épuisement.
+    const TAILLE_PAGE = 1000;
+    const sections = [];
+    for (let page = 0; ; page++) {
+      const { data: lot, error: erreurSections } = await supabase
+        .from("audit_sections")
+        .select("*")
+        .eq("audit_id", auditId)
+        .order("ordre", { ascending: true })
+        .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
+      if (erreurSections) return { data: null, error: erreurSections };
+      if (!lot || lot.length === 0) break;
+      sections.push(...lot);
+      if (lot.length < TAILLE_PAGE) break;
+    }
 
-    return { data: { audit, sections: sections || [] }, error: null };
+    return { data: { audit, sections }, error: null };
   },
 
   /** Confirmation du découpage en chapitres détecté à l'import (réf.

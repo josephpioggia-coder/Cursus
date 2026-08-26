@@ -121,12 +121,28 @@ Deno.serve(async (req) => {
       return json({ error: "déjà_fait", message: "L'aperçu global a déjà été généré pour cet audit." }, 409);
     }
 
-    const { data: sections } = await admin
-      .from("audit_sections")
-      .select("texte_source")
-      .eq("audit_id", auditId)
-      .order("ordre", { ascending: true });
-    if (!sections || sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
+    // CORRECTIF 26/08/2026 — bug réel trouvé sur "À cœur retrouvé" (1442
+    // unités) : Supabase/PostgREST plafonne une lecture à 1000 lignes par
+    // défaut si on ne pagine pas explicitement — sans erreur, juste moins de
+    // lignes que la vraie table. Un seul select() ici ne renvoyait donc que
+    // les 1000 premières unités (dans l'ordre), amputant l'aperçu des ~30%
+    // de fin de ce livre sans avertissement. Lecture par lots de 1000 via
+    // .range() jusqu'à épuisement, pour lire la table entière quelle que
+    // soit sa taille.
+    const TAILLE_PAGE = 1000;
+    const sections: { texte_source: string }[] = [];
+    for (let page = 0; ; page++) {
+      const { data: lot } = await admin
+        .from("audit_sections")
+        .select("texte_source")
+        .eq("audit_id", auditId)
+        .order("ordre", { ascending: true })
+        .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
+      if (!lot || lot.length === 0) break;
+      sections.push(...lot);
+      if (lot.length < TAILLE_PAGE) break;
+    }
+    if (sections.length === 0) return json({ error: "Aucune unité dans cet audit." }, 400);
 
     const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
 

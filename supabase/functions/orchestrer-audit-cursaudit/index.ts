@@ -85,8 +85,24 @@ interface AppelMoteurIAResultat { data: unknown; usage: UsageIA }
 // imparfait, mais ne fait plus échouer toute l'unité pour un oubli isolé.
 const ajv = new Ajv({ allErrors: true, strict: false, useDefaults: true, removeAdditional: true });
 
+// CORRECTIF 26/08/2026 — même famille de bug que "Function failed due to
+// not having enough compute resources" déjà rencontré et corrigé sur
+// preaudit-approfondi-cursaudit (v7.6) : compiler un schéma AJV est un vrai
+// travail CPU, pas de l'attente réseau. Ici, validerContreSchema()
+// recompilait le schéma à CHAQUE unité traitée (jusqu'à plusieurs dizaines
+// par appel, dans le budget de 25s) — largement pire que le cas déjà
+// corrigé ailleurs (compilé 2 fois par requête). Le schéma de l'analyse
+// (construit dynamiquement selon le palier, mais IDENTIQUE pour toutes les
+// unités d'un même appel) et SCHEMA_CONTROLE_GPT (constant) sont désormais
+// mis en cache par référence d'objet — compilés une seule fois, réutilisés
+// pour chaque unité du lot.
+const validateursCompilés = new WeakMap<object, ReturnType<typeof ajv.compile>>();
 function validerContreSchema(data: unknown, schema: Record<string, unknown>): void {
-  const valide = ajv.compile(schema);
+  let valide = validateursCompilés.get(schema);
+  if (!valide) {
+    valide = ajv.compile(schema);
+    validateursCompilés.set(schema, valide);
+  }
   if (!valide(data)) throw new Error(`Sortie IA non conforme au schéma attendu : ${ajv.errorsText(valide.errors)}`);
 }
 
@@ -540,14 +556,29 @@ Deno.serve(async (req) => {
       construireContexteQualification(audit) +
       construireContextePreaudit(audit.preaudit_resultat as Record<string, unknown> | null);
 
-    let requeteSections = admin
-      .from("audit_sections")
-      .select("id, texte_source")
-      .eq("audit_id", auditId)
-      .is("resultat_analyse", null);
-    if (chapitreMaxIndex !== undefined) requeteSections = requeteSections.lte("chapitre_index", chapitreMaxIndex);
-    const { data: sections } = await requeteSections.order("ordre", { ascending: true });
-    const aTraiter = sections ?? [];
+    // CORRECTIF 26/08/2026 — même bug que preaudit-approfondi-cursaudit :
+    // Supabase/PostgREST plafonne une lecture à 1000 lignes sans pagination
+    // explicite. Sans réel effet fonctionnel ici (chaque appel ne traite de
+    // toute façon qu'un lot borné par BUDGET_MS, et le prochain appel
+    // rechargera les unités encore non traitées) mais corrigé par cohérence
+    // — un livre à plus de 1000 unités non traitées ne doit pas dépendre de
+    // cette compensation accidentelle. Lecture par lots de 1000 via .range().
+    const TAILLE_PAGE = 1000;
+    const aTraiter: { id: string; texte_source: string }[] = [];
+    for (let page = 0; ; page++) {
+      let requeteSections = admin
+        .from("audit_sections")
+        .select("id, texte_source")
+        .eq("audit_id", auditId)
+        .is("resultat_analyse", null);
+      if (chapitreMaxIndex !== undefined) requeteSections = requeteSections.lte("chapitre_index", chapitreMaxIndex);
+      const { data: lot } = await requeteSections
+        .order("ordre", { ascending: true })
+        .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
+      if (!lot || lot.length === 0) break;
+      aTraiter.push(...lot);
+      if (lot.length < TAILLE_PAGE) break;
+    }
 
     let traiteesCetteFois = 0;
     let echoueesCetteFois = 0;
