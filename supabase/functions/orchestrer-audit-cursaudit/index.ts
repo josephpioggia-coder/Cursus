@@ -106,6 +106,13 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
   });
   const résultat = await réponse.json();
   if (!réponse.ok) throw new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
+  // Détection explicite de troncature (réf. 60816-01, suite, 26/08/2026) —
+  // pour un message d'erreur clair sur cette section précise plutôt qu'une
+  // erreur de schéma cryptique si la réponse est coupée en plein milieu
+  // (voir le correctif du même jour sur max_tokens de l'analyse par unité).
+  if (résultat.stop_reason === "max_tokens") {
+    throw new Error("Réponse de l'IA tronquée (limite de longueur atteinte) pour cette unité.");
+  }
   const blocOutil = (résultat.content ?? []).find((bloc: { type: string }) => bloc.type === "tool_use");
   if (!blocOutil) throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
   const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, blocOutil.input);
@@ -390,9 +397,17 @@ async function analyserUneSection(
     "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
     consigneCriteres + "\n\n" + consigneSyntheseEditoriale;
 
+  // CORRECTIF 26/08/2026 — 76% d'échec constaté en test réel (57/75 unités),
+  // même famille de bug que le correctif du matin sur l'aperçu : max_tokens
+  // par défaut (4096, voir appellerMoteurIAStructure) coupait la réponse en
+  // plein milieu. Le contexte du pré-audit ajouté aujourd'hui (voir
+  // construireContextePreaudit) rend les réponses de Claude nettement plus
+  // riches et sourcées (constaté sur un vrai exemple), poussant plus
+  // d'analyses au-delà de l'ancienne limite. Porté à 8192, même valeur que
+  // le correctif de ce matin.
   const { data: analyse, usage: usageClaude } = await appellerMoteurIAStructure({
     moteur: "claude", modele: MODELE_CLAUDE, role: "analyseur_cursaudit",
-    schema_sortie: schema, system: systemClaude, contexte: section.texte_source,
+    schema_sortie: schema, system: systemClaude, contexte: section.texte_source, max_tokens: 8192,
   });
 
   let controleGPT: unknown = null;
