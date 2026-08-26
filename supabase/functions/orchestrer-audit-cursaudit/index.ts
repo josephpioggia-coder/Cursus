@@ -163,7 +163,19 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       max_tokens: params.max_tokens ?? 4096,
       system: params.system,
       messages: [{ role: "user", content: params.contexte }],
-      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],
+      // CORRECTIF 26/08/2026 — vraie cure plutôt qu'un simple garde-fou après
+      // coup (voir compterCritèresVides ci-dessous, qui ne fait que détecter
+      // le problème) : `strict: true` fait garantir par l'API Claude
+      // elle-même que `tool_use.input` respecte EXACTEMENT le schéma (tous
+      // les champs requis présents, à tous les niveaux) avant même de nous
+      // répondre — au lieu de laisser Claude omettre des critères et de le
+      // découvrir seulement après coup via combler()/validerContreSchema().
+      // L'appel GPT (appellerGPTMoteur, plus bas) avait déjà `strict: true`
+      // depuis le début ; seul l'appel Claude ne l'avait pas. Le schéma
+      // fusionné (fusionnerSchemas) est déjà conforme aux exigences du mode
+      // strict (additionalProperties: false + required complet à tous les
+      // niveaux, vérifié avant d'activer ceci).
+      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie, strict: true }],
       tool_choice: { type: "tool", name: nomOutil },
     }),
   });
