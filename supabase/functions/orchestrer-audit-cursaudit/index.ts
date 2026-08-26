@@ -85,8 +85,24 @@ interface AppelMoteurIAResultat { data: unknown; usage: UsageIA }
 // imparfait, mais ne fait plus échouer toute l'unité pour un oubli isolé.
 const ajv = new Ajv({ allErrors: true, strict: false, useDefaults: true, removeAdditional: true });
 
+// CORRECTIF 26/08/2026 — même famille de bug que "Function failed due to
+// not having enough compute resources" déjà rencontré et corrigé sur
+// preaudit-approfondi-cursaudit (v7.6) : compiler un schéma AJV est un vrai
+// travail CPU, pas de l'attente réseau. Ici, validerContreSchema()
+// recompilait le schéma à CHAQUE unité traitée (jusqu'à plusieurs dizaines
+// par appel, dans le budget de 25s) — largement pire que le cas déjà
+// corrigé ailleurs (compilé 2 fois par requête). Le schéma de l'analyse
+// (construit dynamiquement selon le palier, mais IDENTIQUE pour toutes les
+// unités d'un même appel) et SCHEMA_CONTROLE_GPT (constant) sont désormais
+// mis en cache par référence d'objet — compilés une seule fois, réutilisés
+// pour chaque unité du lot.
+const validateursCompilés = new WeakMap<object, ReturnType<typeof ajv.compile>>();
 function validerContreSchema(data: unknown, schema: Record<string, unknown>): void {
-  const valide = ajv.compile(schema);
+  let valide = validateursCompilés.get(schema);
+  if (!valide) {
+    valide = ajv.compile(schema);
+    validateursCompilés.set(schema, valide);
+  }
   if (!valide(data)) throw new Error(`Sortie IA non conforme au schéma attendu : ${ajv.errorsText(valide.errors)}`);
 }
 
