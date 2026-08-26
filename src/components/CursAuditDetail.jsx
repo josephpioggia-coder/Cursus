@@ -341,7 +341,7 @@ const MESSAGES_PENDANT_PREAUDIT = {
   ],
 };
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours }) {
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
   // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
@@ -704,16 +704,35 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine }) {
             </details>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
             <button
               onClick={() => exporterPreauditWord(audit, résultat)}
               style={{
-                background: "#5B52C4", color: "#fff", border: "none",
+                background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
                 borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
               }}
             >
               Exporter en Word
             </button>
+            {/* Signalé par l'auteur du projet le 26/08/2026 : arrivé au bout
+                du rapport de pré-audit, aucun bouton n'était visible pour
+                passer à l'audit détaillé — le seul existant est tout en
+                haut de l'écran, hors de vue après avoir lu un rapport de
+                10-20 pages. Réutilise directement lancerAnalyse() du parent
+                (même bouton, même comportement) plutôt que d'en dupliquer un. */}
+            {peutLancerAuditDetaille && (
+              <button
+                onClick={onLancerAuditDetaille}
+                disabled={auditDetailleEnCours}
+                style={{
+                  background: "#1D9E75", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600,
+                  cursor: auditDetailleEnCours ? "default" : "pointer", opacity: auditDetailleEnCours ? 0.6 : 1,
+                }}
+              >
+                {auditDetailleEnCours ? "Audit détaillé en cours…" : audit.statut === "en_traitement" ? "Continuer l'audit détaillé" : "Commander l'audit détaillé"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -941,7 +960,14 @@ export default function CursAuditDetail({ auditId, onRetour }) {
       )}
 
       {audit.apercu_statut === "termine" && (
-        <PreauditApprofondi audit={audit} reglesPrix={reglesPrix} onTermine={charger} />
+        <PreauditApprofondi
+          audit={audit}
+          reglesPrix={reglesPrix}
+          onTermine={charger}
+          onLancerAuditDetaille={lancerAnalyse}
+          peutLancerAuditDetaille={peutLancer}
+          auditDetailleEnCours={enCours}
+        />
       )}
 
       {erreur && (
