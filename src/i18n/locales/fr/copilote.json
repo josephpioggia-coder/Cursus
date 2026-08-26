@@ -60,7 +60,11 @@
     "envoyer": "Envoyer",
     "micro": "Dicter la question",
     "microArreter": "Arrêter la dictée",
-    "enEcoute": "🔴 À l'écoute…"
+    "enEcoute": "🔴 À l'écoute…",
+    "transcription": "Transcription en cours…",
+    "microRefuse": "Micro indisponible ou accès refusé.",
+    "microErreur": "La transcription a échoué. Réessayez.",
+    "microSessionExpiree": "Session expirée — reconnectez-vous puis réessayez."
   }
 }
 
