@@ -40,7 +40,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { auditsAPI, misEnPageAPI } from "../lib/api.js";
-import { segmenterTexte, extraireParagraphesDocxAvecChapitres, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
+import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
 
@@ -69,12 +69,31 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [titre, setTitre] = useState("");
   const [source, setSource] = useState("coller"); // "coller" | "docx"
   const [texte, setTexte] = useState("");
-  const [unitésDocx, setUnitésDocx] = useState(null); // null = rien importé
-  // Chapitres détectés à l'import .docx (réf. 60816-01, suite, 24/08/2026) —
-  // null si import non-.docx (texte collé, pas de style Word à lire) ou si
-  // aucune structure de titres répétée n'a été trouvée. Voir
-  // extraireParagraphesDocxAvecChapitres() dans segmenterCursAudit.js.
-  const [chapitresDétectés, setChapitresDétectés] = useState(null);
+  // Lecture brute du .docx (réf. 60816-01, suite, 26/08/2026) — un seul
+  // passage sur le fichier à l'import ; le regroupement en unités/chapitres
+  // se recalcule ensuite (voir plus bas) à chaque changement des niveaux
+  // de titre retenus par le client, sans relire le fichier. Voir
+  // analyserStructureDocx() / regrouperParNiveaux() dans segmenterCursAudit.js.
+  const [infosDocx, setInfosDocx] = useState(null); // null = rien importé
+  const [niveauxDisponibles, setNiveauxDisponibles] = useState([]); // [{niveau, nombre}]
+  // Niveaux de titre cochés par le client comme divisions (chapitres/parties)
+  // — plusieurs à la fois possible (demande de l'auteur du projet le
+  // 26/08/2026 : certains livres ont du contenu réel directement sous le
+  // niveau le plus grossier — une "partie" avec un avant-propos avant ses
+  // chapitres — d'autres n'en ont aucun ; un seul niveau auto-choisi ne
+  // convient donc pas à tous les cas). Coché par défaut à l'import : le
+  // niveau le plus grossier seul, pour préserver le comportement historique.
+  const [niveauxRetenus, setNiveauxRetenus] = useState([]);
+
+  // Regroupement dérivé — recalculé sans relire le fichier à chaque
+  // changement de niveauxRetenus. chapitresDétectés reste `null` si import
+  // non-.docx (texte collé, pas de style Word à lire) ou si aucune
+  // structure de titres répétée n'a été trouvée, comme avant.
+  const { unitésDocx, chapitresDétectés } = useMemo(() => {
+    if (!infosDocx) return { unitésDocx: null, chapitresDétectés: null };
+    const { unités: u, chapitres } = regrouperParNiveaux(infosDocx, niveauxRetenus);
+    return { unitésDocx: u, chapitresDétectés: chapitres.length > 0 ? chapitres : null };
+  }, [infosDocx, niveauxRetenus]);
   const [nomFichier, setNomFichier] = useState(null);
   const [importEnCours, setImportEnCours] = useState(false);
   const [erreurImport, setErreurImport] = useState(null);
@@ -170,16 +189,25 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setErreurImport(null);
     setDemandeMiseEnPage(null);
     try {
-      const { unités: paragraphes, chapitres } = await extraireParagraphesDocxAvecChapitres(fichier);
-      if (paragraphes.length === 0) { setErreurImport("Aucun texte exploitable trouvé dans ce fichier."); setImportEnCours(false); return; }
-      setUnitésDocx(paragraphes);
-      setChapitresDétectés(chapitres.length > 0 ? chapitres : null);
+      const { infos, niveauxDisponibles: niveaux } = await analyserStructureDocx(fichier);
+      if (!infos.some((i) => i.texte)) { setErreurImport("Aucun texte exploitable trouvé dans ce fichier."); setImportEnCours(false); return; }
+      setInfosDocx(infos);
+      setNiveauxDisponibles(niveaux);
+      // Niveau le plus grossier coché par défaut — même comportement qu'avant
+      // l'introduction de la sélection multiple.
+      setNiveauxRetenus(niveaux.length > 0 ? [niveaux[0].niveau] : []);
       setNomFichier(fichier.name);
       if (!titre.trim()) setTitre(fichier.name.replace(/\.docx$/i, ""));
     } catch (e) {
       setErreurImport("Impossible de lire ce fichier : " + e.message);
     }
     setImportEnCours(false);
+  };
+
+  const basculerNiveauRetenu = (niveau) => {
+    setNiveauxRetenus((prev) =>
+      prev.includes(niveau) ? prev.filter((n) => n !== niveau) : [...prev, niveau].sort((a, b) => a - b)
+    );
   };
 
   const créer = async () => {
@@ -216,8 +244,8 @@ export default function CursAudit({ onVoirAudits } = {}) {
   };
 
   const toutRéinitialiser = () => {
-    setRésultat(null); setTitre(""); setTexte(""); setUnitésDocx(null); setNomFichier(null); setSource("coller");
-    setChapitresDétectés(null);
+    setRésultat(null); setTitre(""); setTexte(""); setNomFichier(null); setSource("coller");
+    setInfosDocx(null); setNiveauxDisponibles([]); setNiveauxRetenus([]);
     setDemandeMiseEnPage(null);
     setQuestionnaire(null);
   };
@@ -309,6 +337,19 @@ export default function CursAudit({ onVoirAudits } = {}) {
                   <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>
                     « {nomFichier} » — {unitésDocx?.length || 0} unités extraites
                     {chapitresDétectés && ` · ${chapitresDétectés.length} titres détectés (à confirmer après création, dans l'aperçu gratuit)`}
+                  </div>
+                )}
+                {niveauxDisponibles.length > 0 && !importEnCours && (
+                  <div style={{ marginTop: 10, textAlign: "left" }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 4 }}>
+                      Niveaux de titre à retenir comme divisions (chapitres/parties) :
+                    </div>
+                    {niveauxDisponibles.map(({ niveau, nombre }) => (
+                      <label key={niveau} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "3px 0", cursor: "pointer" }}>
+                        <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRetenu(niveau)} />
+                        Niveau {niveau} ({nombre} occurrence{nombre > 1 ? "s" : ""})
+                      </label>
+                    ))}
                   </div>
                 )}
                 {erreurImport && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 10 }}>{erreurImport}</div>}

@@ -137,19 +137,23 @@ const STYLES_IGNORÉS = new Set([
 ]);
 
 /**
- * Variante de extraireParagraphesDocx() qui détecte aussi les chapitres —
- * voir le commentaire d'en-tête du fichier pour le principe (un seul
- * niveau choisi automatiquement, pas de distinction Partie/Chapitre).
- * Renvoie { unités, chapitres, niveauChapitre } :
- *  - unités : mêmes unités de texte qu'extraireParagraphesDocx() (les
- *    paragraphes de titre eux-mêmes n'en font pas partie — un titre isolé
- *    de quelques mots n'apporte rien à auditer en tant que tel).
- *  - chapitres : [{ titre, indexPremièreUnité, nombreUnités, mots }], dans
- *    l'ordre du document. Vide si aucune structure de titres répétée n'a
- *    été détectée (niveauChapitre reste alors `null`).
- *  - niveauChapitre : le niveau de titre (1-based) choisi, ou `null`.
+ * Lecture brute d'un .docx — un seul passage sur le document, sans encore
+ * choisir de niveau de titre. Renvoie { infos, niveauxDisponibles } :
+ *  - infos : [{ texte, niveau }] pour chaque paragraphe, dans l'ordre du
+ *    document (niveau 1-based, `undefined` pour un paragraphe sans titre).
+ *  - niveauxDisponibles : [{ niveau, nombre }] pour chaque niveau de titre
+ *    apparu au moins deux fois (une seule occurrence n'est pas une
+ *    structure répétée), trié du plus grossier (niveau 1) au plus fin.
+ *
+ * Séparée de extraireParagraphesDocxAvecChapitres() le 26/08/2026 (réf.
+ * 60816-01, suite) : le choix du/des niveau(x) à retenir comme divisions
+ * ne peut plus être automatique à lui seul dans tous les cas — voir
+ * regrouperParNiveaux() ci-dessous. `analyserStructureDocx` fait la
+ * lecture une fois ; regrouperParNiveaux() peut ensuite être rappelée
+ * plusieurs fois (à chaque changement de sélection du client) sans
+ * relire le fichier.
  */
-export async function extraireParagraphesDocxAvecChapitres(fichier) {
+export async function analyserStructureDocx(fichier) {
   const JSZip = await chargerJSZip();
   const zip = await JSZip.loadAsync(await fichier.arrayBuffer());
   const xml = await zip.file("word/document.xml").async("string");
@@ -160,10 +164,6 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
   const ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   const paras = Array.from(doc.getElementsByTagNameNS(ns, "p"));
 
-  // Passage 1 — relever le niveau de chaque paragraphe de titre, compter
-  // les occurrences par niveau pour choisir automatiquement "le" niveau
-  // chapitre (celui qui revient le plus souvent, à condition d'apparaître
-  // au moins deux fois — une seule occurrence n'est pas une structure).
   const infos = [];
   const comptageParNiveau = {};
   for (const p of paras) {
@@ -182,33 +182,38 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
     if (niveau !== undefined) comptageParNiveau[niveau] = (comptageParNiveau[niveau] || 0) + 1;
   }
 
-  // CORRECTIF 24/08/2026 (suite) — un livre bien structuré porte souvent
-  // PLUSIEURS niveaux de titre imbriqués (ex. "FAMILLE" en Titre1, "CARTE"
-  // en Titre3 en dessous) ; le niveau fin (CARTE, largement plus nombreux)
-  // n'est PAS le niveau chapitre — c'est le niveau le plus GROSSIER (le
-  // plus haut dans la hiérarchie, donc le numéro le plus bas) qui délimite
-  // les vraies divisions du livre. Choisir "le plus répété" prenait
-  // systématiquement le niveau le plus fin (constaté sur un vrai manuscrit :
-  // 280 "CARTE" en Titre3 retenues comme chapitres au lieu des 8 "FAMILLE"
-  // en Titre1). Le niveau le plus fin reste dans les unités analysées
-  // (regroupé sous son chapitre Titre1), il n'est simplement plus confondu
-  // avec la structure de chapitres elle-même.
-  let niveauChapitre = null;
-  for (const [niveauTexte, compte] of Object.entries(comptageParNiveau)) {
-    const niveau = parseInt(niveauTexte, 10);
-    if (compte < 2) continue; // une seule occurrence n'est pas une structure répétée
-    if (niveauChapitre === null || niveau < niveauChapitre) {
-      niveauChapitre = niveau;
-    }
-  }
+  const niveauxDisponibles = Object.entries(comptageParNiveau)
+    .map(([niveauTexte, nombre]) => ({ niveau: parseInt(niveauTexte, 10), nombre }))
+    .filter(({ nombre }) => nombre >= 2) // une seule occurrence n'est pas une structure répétée
+    .sort((a, b) => a.niveau - b.niveau);
 
-  // Passage 2 — regrouper les unités par chapitre selon le niveau choisi.
+  return { infos, niveauxDisponibles };
+}
+
+/**
+ * Regroupe les unités selon un ENSEMBLE de niveaux de titre retenus comme
+ * divisions (ajouté le 26/08/2026, réf. 60816-01, suite — demande de
+ * l'auteur du projet : certains livres ont du contenu réel directement
+ * sous le niveau le plus grossier, ex. un avant-propos sous une "partie"
+ * avant que ses chapitres ne commencent ; d'autres n'en ont aucun. Un seul
+ * niveau auto-choisi ne convient donc pas à tous les cas — le client doit
+ * pouvoir cocher plusieurs niveaux). Pas de hiérarchie imbriquée : tout
+ * niveau retenu délimite une division dans UNE SEULE liste à plat, dans
+ * l'ordre du document — cocher un niveau sans contenu propre en dessous
+ * ne fait qu'ajouter une entrée quasi vide, sans rien casser.
+ *
+ * `niveauxRetenus` : tableau ou Set de niveaux (1-based) à traiter comme
+ * frontières. Renvoie { unités, chapitres } — même forme qu'avant.
+ */
+export function regrouperParNiveaux(infos, niveauxRetenus) {
+  const retenus = niveauxRetenus instanceof Set ? niveauxRetenus : new Set(niveauxRetenus);
+
   const unités = [];
   const chapitres = [];
   let chapitreCourant = null;
   for (const { texte, niveau } of infos) {
     if (!texte) continue;
-    if (niveauChapitre !== null && niveau === niveauChapitre) {
+    if (niveau !== undefined && retenus.has(niveau)) {
       if (chapitreCourant) chapitres.push(chapitreCourant);
       chapitreCourant = { titre: texte, indexPremièreUnité: unités.length, nombreUnités: 0, mots: 0 };
       continue;
@@ -222,6 +227,42 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
     }
   }
   if (chapitreCourant) chapitres.push(chapitreCourant);
+
+  return { unités, chapitres };
+}
+
+/**
+ * Variante de extraireParagraphesDocx() qui détecte aussi les chapitres —
+ * voir le commentaire d'en-tête du fichier pour le principe (un seul
+ * niveau choisi automatiquement, pas de distinction Partie/Chapitre).
+ * Conservée telle quelle (wrapper autour de analyserStructureDocx() +
+ * regrouperParNiveaux()) pour tout appelant qui n'a pas besoin du choix
+ * multi-niveaux — voir CursAudit.jsx pour l'écran qui, lui, appelle
+ * directement les deux fonctions séparées.
+ * Renvoie { unités, chapitres, niveauChapitre } :
+ *  - unités : mêmes unités de texte qu'extraireParagraphesDocx() (les
+ *    paragraphes de titre eux-mêmes n'en font pas partie — un titre isolé
+ *    de quelques mots n'apporte rien à auditer en tant que tel).
+ *  - chapitres : [{ titre, indexPremièreUnité, nombreUnités, mots }], dans
+ *    l'ordre du document. Vide si aucune structure de titres répétée n'a
+ *    été détectée (niveauChapitre reste alors `null`).
+ *  - niveauChapitre : le niveau de titre (1-based) choisi, ou `null`.
+ */
+export async function extraireParagraphesDocxAvecChapitres(fichier) {
+  const { infos, niveauxDisponibles } = await analyserStructureDocx(fichier);
+
+  // CORRECTIF 24/08/2026 (suite) — un livre bien structuré porte souvent
+  // PLUSIEURS niveaux de titre imbriqués (ex. "FAMILLE" en Titre1, "CARTE"
+  // en Titre3 en dessous) ; le niveau fin (CARTE, largement plus nombreux)
+  // n'est PAS le niveau chapitre — c'est le niveau le plus GROSSIER (le
+  // plus haut dans la hiérarchie, donc le numéro le plus bas) qui délimite
+  // les vraies divisions du livre par défaut. Choisir "le plus répété"
+  // prenait systématiquement le niveau le plus fin (constaté sur un vrai
+  // manuscrit : 280 "CARTE" en Titre3 retenues comme chapitres au lieu des
+  // 8 "FAMILLE" en Titre1).
+  const niveauChapitre = niveauxDisponibles.length > 0 ? niveauxDisponibles[0].niveau : null;
+
+  const { unités, chapitres } = regrouperParNiveaux(infos, niveauChapitre !== null ? [niveauChapitre] : []);
 
   return { unités, chapitres, niveauChapitre };
 }
