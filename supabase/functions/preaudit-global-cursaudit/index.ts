@@ -154,7 +154,11 @@ Deno.serve(async (req) => {
         max_tokens: 8192,
         system: SYSTEM_PREAUDIT,
         messages: [{ role: "user", content: texteIntegral }],
-        tools: [{ name: "lecture_globale", description: "Synthèse structurée de la lecture globale du manuscrit.", input_schema: SCHEMA_PREAUDIT }],
+        // CORRECTIF 26/08/2026 — même correctif que les autres fonctions
+        // CursAudit : strict: true fait garantir par l'API Claude
+        // elle-même la conformité complète au schéma avant de répondre,
+        // au lieu de la découvrir après coup via ajv.
+        tools: [{ name: "lecture_globale", description: "Synthèse structurée de la lecture globale du manuscrit.", input_schema: SCHEMA_PREAUDIT, strict: true }],
         tool_choice: { type: "tool", name: "lecture_globale" },
       }),
     });

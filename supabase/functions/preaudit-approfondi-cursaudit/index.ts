@@ -870,7 +870,14 @@ Deno.serve(async (req) => {
           max_tokens: 24000,
           system,
           messages: [{ role: "user", content: contexte }],
-          tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale (3 voies, plan d'intervention, exemples actionnables, prochaine étape honnête) et une cartographie compacte du contexte du livre (personnages, lieux, sensoriel, objets/motifs, domaines à vérifier, voix, densité).", input_schema: SCHEMA_PREAUDIT_APPROFONDI }],
+          // CORRECTIF 26/08/2026 — vraie cure plutôt qu'un simple garde-fou
+          // après coup (CHAMPS_CLÉS_NON_VIDES ne fait que détecter le
+          // problème une fois produit) : strict: true fait garantir par
+          // l'API Claude elle-même la conformité complète au schéma avant
+          // de répondre. Même correctif que orchestrer-audit-cursaudit et
+          // analyser-unite-cursaudit, où l'appel GPT jumeau avait déjà
+          // strict: true depuis le début.
+          tools: [{ name: "preaudit_approfondi", description: "Plan de décision éditoriale (3 voies, plan d'intervention, exemples actionnables, prochaine étape honnête) et une cartographie compacte du contexte du livre (personnages, lieux, sensoriel, objets/motifs, domaines à vérifier, voix, densité).", input_schema: SCHEMA_PREAUDIT_APPROFONDI, strict: true }],
           tool_choice: { type: "tool", name: "preaudit_approfondi" },
         }),
       });
@@ -910,7 +917,8 @@ Deno.serve(async (req) => {
           max_tokens: 2000,
           system,
           messages: [{ role: "user", content: `Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
-          tools: [{ name: "lecture_chapitre", description: "Lecture brève d'un chapitre : fonction, point fort, point faible, à vérifier, à approfondir dans l'audit final.", input_schema: SCHEMA_LECTURE_CHAPITRE }],
+          // CORRECTIF 26/08/2026 — voir la note jumelle sur appelClaude() ci-dessus.
+          tools: [{ name: "lecture_chapitre", description: "Lecture brève d'un chapitre : fonction, point fort, point faible, à vérifier, à approfondir dans l'audit final.", input_schema: SCHEMA_LECTURE_CHAPITRE, strict: true }],
           tool_choice: { type: "tool", name: "lecture_chapitre" },
         }),
       });

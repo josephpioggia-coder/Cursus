@@ -102,7 +102,11 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       max_tokens: params.max_tokens ?? 4096,
       system: params.system,
       messages: [{ role: "user", content: params.contexte }],
-      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],
+      // CORRECTIF 26/08/2026 — même correctif que orchestrer-audit-cursaudit :
+      // `strict: true` fait garantir par l'API Claude elle-même la conformité
+      // complète de tool_use.input, au lieu de découvrir des champs omis
+      // seulement après coup. L'appel GPT (plus bas) avait déjà strict: true.
+      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie, strict: true }],
       tool_choice: { type: "tool", name: nomOutil },
     }),
   });
