@@ -9,28 +9,76 @@
     "bouton": "Aide",
     "titre": "Centre d'aide",
     "vide": "Aucune question pour l'instant.",
-    "pied": "Vous ne trouvez pas votre reponse ? Ecrivez a bonjour@cursus.pro"
+    "pied": "Vous ne trouvez pas votre reponse ? Ecrivez a bonjour@cursus.pro",
+    "familleGenerale": "Général",
+    "pasTrouve": "Vous ne trouvez pas votre réponse ?",
+    "placeholderQuestion": "Décrivez votre problème…",
+    "demander": "Demander",
+    "enCours": "…",
+    "transfererEmail": "✉ Transférer cette question à Joseph par email",
+    "sessionExpiree": "Votre session a expiré — reconnectez-vous puis réessayez.",
+    "erreurAssistance": "Impossible de contacter l'assistant pour le moment."
   },
   "faq": [
     {
+      "famille": "Cap du projet (questionnaire ADN)",
       "question": "Comment revenir a une question precedente dans le questionnaire ADN ?",
       "reponse": "Sous le bouton Suivant, cliquez sur Question precedente. Vos reponses ne sont jamais perdues, meme en revenant en arriere."
     },
     {
+      "famille": "Cap du projet (questionnaire ADN)",
       "question": "Le questionnaire affiche une erreur de connexion, que faire ?",
       "reponse": "Vos reponses precedentes sont deja enregistrees. Cliquez sur le bouton Recharger la page, ou faites Ctrl+Shift+R."
     },
     {
+      "famille": "Cap du projet (questionnaire ADN)",
       "question": "Puis-je reporter le questionnaire ADN a plus tard ?",
       "reponse": "Oui. Cliquez sur Reporter a plus tard : vos reponses sont conservees, et le questionnaire reprendra ou vous vous etes arrete."
     },
     {
+      "famille": "Gestion des projets",
       "question": "Comment changer le genre ou la couleur de mon projet ?",
       "reponse": "Ouvrez le formulaire du projet et modifiez le champ Genre. La couleur suit automatiquement le genre choisi, sauf si vous cliquez vous-meme sur une autre pastille de couleur."
     },
     {
+      "famille": "Co-pilote IA",
       "question": "Le co-pilote IA affiche une erreur de session",
       "reponse": "Votre session a probablement expire. Deconnectez-vous puis reconnectez-vous ; vos projets et vos textes restent intacts."
+    },
+    {
+      "famille": "Co-pilote IA",
+      "question": "Comment poser une question de suivi sur une suggestion du co-pilote ?",
+      "reponse": "Cliquez sur l'icone en forme de bulle a cote du bouton copier, sur n'importe quelle carte de suggestion, personnage ou coherence. Un fil de discussion s'ouvre sous la carte, sans relancer une analyse complete."
+    },
+    {
+      "famille": "Co-pilote IA",
+      "question": "A quoi sert le mode Auto du co-pilote ?",
+      "reponse": "Active, il relance une analyse automatiquement toutes les 10 minutes pendant que vous ecrivez. Le bouton Forcer une analyse maintenant reste toujours disponible a cote pour ne pas attendre le prochain cycle."
+    },
+    {
+      "famille": "Co-pilote IA",
+      "question": "Le co-pilote refuse de traiter un passage de mon texte",
+      "reponse": "Certains passages tres explicites peuvent etre declines par l'IA, independamment du sujet aborde : un temoignage sur une agression n'est jamais refuse en soi, seule une ecriture tres graphique de l'acte peut l'etre. Le reste du texte n'est jamais affecte, et vous restez entierement libre d'ecrire ce que vous voulez dans votre manuscrit."
+    },
+    {
+      "famille": "Co-pilote IA",
+      "question": "Une suggestion attribue une qualite ou un trait a quelqu'un que je n'ai pas ecrit moi-meme",
+      "reponse": "Signalez-le via le fil de dialogue de la carte concernee (icone bulle). Le co-pilote est instruit a ne jamais inventer de caracterisation sur une personne nommee ; en cas d'ecart, il est prevu qu'il reconnaisse l'erreur sans detour si vous le reprenez."
+    },
+    {
+      "famille": "Co-pilote IA",
+      "question": "Le bouton micro pour dicter une question n'apparait pas",
+      "reponse": "La dictee vocale n'est disponible que sur les navigateurs qui la supportent (Chrome, Edge). Sur Firefox notamment, le bouton n'apparait pas : ce n'est pas un bug, c'est une limite du navigateur lui-meme. Vous pouvez toujours taper votre question normalement."
+    },
+    {
+      "famille": "Structure du manuscrit",
+      "question": "Apres avoir promu ou retrograde un chapitre, il change de place tout seul",
+      "reponse": "Ce probleme est corrige (14/08/2026) : la position d'un element promu ou retrograde se stabilise desormais correctement, meme apres un rechargement de la page."
+    },
+    {
+      "famille": "Structure du manuscrit",
+      "question": "Les fleches monter/descendre ne deplacent pas le bon element",
+      "reponse": "Corrige en meme temps que le probleme de promotion/retrogradation (meme cause technique). Si ca se reproduit, contactez le support via le bouton ci-dessous."
     }
   ],
 
@@ -139,3 +187,4 @@
     "selectionnerChapitreOuScene": "Selectionnez un chapitre ou une scene dans la structure pour commencer a ecrire."
   }
 }
+
