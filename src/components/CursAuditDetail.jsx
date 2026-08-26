@@ -180,7 +180,14 @@ function ConfirmationChapitres({ audit, onTermine }) {
 function ApercuGlobal({ audit, nombreMots, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
+  // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — une fois le
+  // rapport lu, permet de le replier pour retrouver vite les boutons
+  // d'action en dessous sans avoir à scroller devant tout le texte.
+  // Jamais replié pendant que ça tourne : c'est là que s'affiche le seul
+  // signal d'avancement réel.
+  const [replié, setReplié] = useState(false);
   const résultat = audit.apercu_resultat;
+  const ouvert = !replié || enCours;
 
   const lancer = async () => {
     setEnCours(true);
@@ -198,10 +205,25 @@ function ApercuGlobal({ audit, nombreMots, onTermine }) {
   return (
     <div style={{ border: "0.5px solid #C4973A80", borderRadius: 10, padding: "16px 18px", marginBottom: 16, background: "#FFFBF2" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 600, color: "#8A6116", marginBottom: 2 }}>Aperçu gratuit du manuscrit</div>
-          <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            Une vue d'ensemble rapide avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <button
+            onClick={() => setReplié((r) => !r)}
+            disabled={enCours}
+            aria-label={replié ? "Déplier" : "Replier"}
+            style={{
+              background: "none", border: "none", padding: "2px 0", marginTop: 1, fontSize: 11,
+              color: "#8A6116", cursor: enCours ? "default" : "pointer", lineHeight: 1, flexShrink: 0,
+            }}
+          >
+            {ouvert ? "▼" : "▶"}
+          </button>
+          <div>
+            <div style={{ fontWeight: 600, color: "#8A6116", marginBottom: 2 }}>Aperçu gratuit du manuscrit</div>
+            {ouvert && (
+              <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+                Une vue d'ensemble rapide avant l'audit détaillé — nature du texte, colonne vertébrale, tensions et risques à l'échelle du livre entier.
+              </div>
+            )}
           </div>
         </div>
         {audit.apercu_statut !== "termine" && (
@@ -212,54 +234,58 @@ function ApercuGlobal({ audit, nombreMots, onTermine }) {
         )}
       </div>
 
-      <ConfirmationChapitres audit={audit} onTermine={onTermine} />
+      {ouvert && (
+        <>
+          <ConfirmationChapitres audit={audit} onTermine={onTermine} />
 
-      {audit.apercu_statut !== "termine" && (
-        <button onClick={lancer} disabled={enCours} style={{
-          marginTop: 10, background: "#C4973A", color: "#fff", border: "none", borderRadius: 8,
-          padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
-          opacity: enCours ? 0.6 : 1,
-        }}>
-          {enCours ? "Analyse en cours… (moins d'une minute en général)" : "Lancer l'aperçu"}
-        </button>
-      )}
-
-      {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
-
-      {audit.apercu_statut === "termine" && résultat && (
-        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 12.5 }}>
-            <span style={{ fontWeight: 600 }}>Genre apparent : </span>{résultat.genre_apparent}
-            {résultat.genre_reel_probable && résultat.genre_reel_probable !== résultat.genre_apparent && (
-              <span style={{ color: "var(--texte-tertiaire)" }}> (forme réelle probable : {résultat.genre_reel_probable})</span>
-            )}
-          </div>
-          <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
-          {résultat.tension_principale && (
-            <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Tension principale : </span>{résultat.tension_principale}</div>
+          {audit.apercu_statut !== "termine" && (
+            <button onClick={lancer} disabled={enCours} style={{
+              marginTop: 10, background: "#C4973A", color: "#fff", border: "none", borderRadius: 8,
+              padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+              opacity: enCours ? 0.6 : 1,
+            }}>
+              {enCours ? "Analyse en cours… (moins d'une minute en général)" : "Lancer l'aperçu"}
+            </button>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>Forces globales</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                {(résultat.forces_globales || []).map((f, i) => <li key={i}>{f}</li>)}
-              </ul>
-            </div>
-            <div>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>Risques globaux</div>
-              <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
-                {(résultat.risques_globaux || []).map((r, i) => <li key={i}>{r}</li>)}
-              </ul>
-            </div>
-          </div>
-          {résultat.audit_recommande && (
-            <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #C4973A50", borderRadius: 6, padding: "8px 10px" }}>
-              <span style={{ fontWeight: 600 }}>Recommandation pour l'audit détaillé : </span>
-              palier {résultat.audit_recommande.palier}
-              {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
+
+          {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
+
+          {audit.apercu_statut === "termine" && résultat && (
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              <div style={{ fontSize: 12.5 }}>
+                <span style={{ fontWeight: 600 }}>Genre apparent : </span>{résultat.genre_apparent}
+                {résultat.genre_reel_probable && résultat.genre_reel_probable !== résultat.genre_apparent && (
+                  <span style={{ color: "var(--texte-tertiaire)" }}> (forme réelle probable : {résultat.genre_reel_probable})</span>
+                )}
+              </div>
+              <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Colonne vertébrale : </span>{résultat.colonne_vertebrale}</div>
+              {résultat.tension_principale && (
+                <div style={{ fontSize: 12.5 }}><span style={{ fontWeight: 600 }}>Tension principale : </span>{résultat.tension_principale}</div>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "#1D9E75", marginBottom: 3 }}>Forces globales</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                    {(résultat.forces_globales || []).map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "#A32D2D", marginBottom: 3 }}>Risques globaux</div>
+                  <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                    {(résultat.risques_globaux || []).map((r, i) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
+              </div>
+              {résultat.audit_recommande && (
+                <div style={{ fontSize: 12.5, background: "#fff", border: "0.5px solid #C4973A50", borderRadius: 6, padding: "8px 10px" }}>
+                  <span style={{ fontWeight: 600 }}>Recommandation pour l'audit détaillé : </span>
+                  palier {résultat.audit_recommande.palier}
+                  {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );
@@ -351,6 +377,12 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   const [erreur, setErreur] = useState(null);
   const résultat = audit.preaudit_resultat;
   const nbChapitresConfirmés = audit.chapitres_confirmes ? (audit.chapitres_detectes?.length || 0) : 0;
+  // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — voir le
+  // commentaire jumeau dans ApercuGlobal. Jamais replié pendant que le
+  // pré-audit OU l'audit détaillé tourne : les deux affichent leur seul
+  // signal d'avancement réel dans ce bloc.
+  const [replié, setReplié] = useState(false);
+  const ouvert = !replié || enCours || auditDetailleEnCours;
 
   const prix = useMemo(
     () => (reglesPrix ? calculerPrixPreauditPourcentage(reglesPrix, audit.prix_ttc) : null),
@@ -406,10 +438,25 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   return (
     <div style={{ border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#F7F6FD" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Rapport de décision éditoriale (pré-audit)</div>
-          <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-            Pas un diagnostic qui constate — un plan : trois voies éditoriales, un plan d'intervention en chantiers concrets, des exemples actionnables, une prochaine étape.
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <button
+            onClick={() => setReplié((r) => !r)}
+            disabled={enCours || auditDetailleEnCours}
+            aria-label={replié ? "Déplier" : "Replier"}
+            style={{
+              background: "none", border: "none", padding: "2px 0", marginTop: 1, fontSize: 11,
+              color: "#5B52C4", cursor: (enCours || auditDetailleEnCours) ? "default" : "pointer", lineHeight: 1, flexShrink: 0,
+            }}
+          >
+            {ouvert ? "▼" : "▶"}
+          </button>
+          <div>
+            <div style={{ fontWeight: 600, color: "#5B52C4", marginBottom: 2 }}>Rapport de décision éditoriale (pré-audit)</div>
+            {ouvert && (
+              <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+                Pas un diagnostic qui constate — un plan : trois voies éditoriales, un plan d'intervention en chantiers concrets, des exemples actionnables, une prochaine étape.
+              </div>
+            )}
           </div>
         </div>
         {audit.preaudit_statut !== "termine" && prix && (
@@ -431,6 +478,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
         )}
       </div>
 
+      {ouvert && <>
       {audit.preaudit_statut === "non_demande" && (
         <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
           Paiement CursAudit pas encore disponible dans l'application — statut à positionner manuellement (SQL) en attendant.
@@ -724,6 +772,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }
