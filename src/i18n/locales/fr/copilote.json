@@ -22,7 +22,7 @@
     "texteTronque": "Ce texte dépasse 4000 caractères : seul le début a été analysé. Le reste du chapitre n'a pas été pris en compte."
   },
   "selection": {
-    "analyserSelection": "Sélection ({{count}} mots)",
+    "analyserSelection": "Sélection ({{count}} caractères)",
     "analyserTout": "Tout le chapitre",
     "texteTropVolumineux": "Ce texte fait {{count}} caractères — trop volumineux pour garantir une analyse complète. Réduisez la partie surlignée (par exemple une section plutôt que tout le chapitre) avant de relancer."
   },
@@ -51,6 +51,20 @@
   },
   "coherence": {
     "aucunProbleme": "✓ Aucun problème détecté."
+  },
+  "dialogue": {
+    "ouvrir": "Poser une question sur ce point",
+    "vous": "Vous",
+    "copilote": "Co-pilote",
+    "placeholder": "Qu'aimeriez-vous voir préciser ?",
+    "envoyer": "Envoyer",
+    "micro": "Dicter la question",
+    "microArreter": "Arrêter la dictée",
+    "enEcoute": "🔴 À l'écoute…",
+    "transcription": "Transcription en cours…",
+    "microRefuse": "Micro indisponible ou accès refusé.",
+    "microErreur": "La transcription a échoué. Réessayez.",
+    "microSessionExpiree": "Session expirée — reconnectez-vous puis réessayez."
   }
 }
 
