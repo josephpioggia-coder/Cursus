@@ -24,9 +24,10 @@
  * manuellement en SQL pour l'instant, voir docs/cursaudit-tarification.md).
  */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
+import { extraireParagraphesDocxAvecChapitres } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
 import { exporterPreauditWord } from "../lib/exportPreauditWord.js";
 
@@ -125,6 +126,13 @@ const RATIO_TAILLE_SUSPECT = 5;
 function ConfirmationChapitres({ audit, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
+  // Réimport d'un fichier corrigé (réf. 60816-01, suite, 26/08/2026) —
+  // signalé par l'auteur du projet : un titre coupé en deux à la
+  // détection (ex. la fin du titre "II" détectée comme un chapitre à
+  // part) n'avait aucun moyen d'être corrigé — pas de bouton pour dire
+  // non, rouvrir le livre, corriger, et le réinsérer. Voir
+  // auditsAPI.remplacerContenu().
+  const inputFichierRef = useRef(null);
   const chapitres = audit.chapitres_detectes;
   if (!chapitres || chapitres.length === 0) return null;
 
@@ -137,6 +145,24 @@ function ConfirmationChapitres({ audit, onTermine }) {
     const { error } = await auditsAPI.confirmerChapitres(audit.id);
     if (error) setErreur(error.message);
     else await onTermine();
+    setEnCours(false);
+  };
+
+  const réimporter = async (fichier) => {
+    if (!fichier?.name.endsWith(".docx")) { setErreur("Fichier .docx requis."); return; }
+    setEnCours(true);
+    setErreur(null);
+    try {
+      const { unités, chapitres: nouveauxChapitres } = await extraireParagraphesDocxAvecChapitres(fichier);
+      if (unités.length === 0) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); setEnCours(false); return; }
+      const { error } = await auditsAPI.remplacerContenu(audit.id, {
+        unités, chapitresDétectés: nouveauxChapitres.length > 0 ? nouveauxChapitres : null,
+      });
+      if (error) setErreur(error.message);
+      else await onTermine();
+    } catch (e) {
+      setErreur("Impossible de lire ce fichier : " + e.message);
+    }
     setEnCours(false);
   };
 
@@ -165,12 +191,22 @@ function ConfirmationChapitres({ audit, onTermine }) {
         </div>
       )}
       {!audit.chapitres_confirmes && (
-        <button onClick={confirmer} disabled={enCours} style={{
-          background: "#C4973A", color: "#fff", border: "none", borderRadius: 6,
-          padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
-        }}>
-          {enCours ? "…" : "Je confirme ce découpage"}
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button onClick={confirmer} disabled={enCours} style={{
+            background: "#C4973A", color: "#fff", border: "none", borderRadius: 6,
+            padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+          }}>
+            {enCours ? "…" : "Je confirme ce découpage"}
+          </button>
+          <input ref={inputFichierRef} type="file" accept=".docx" style={{ display: "none" }}
+            onChange={(e) => réimporter(e.target.files[0])} />
+          <button onClick={() => inputFichierRef.current?.click()} disabled={enCours} style={{
+            background: "transparent", color: "#8A6116", border: "0.5px solid #C4973A80", borderRadius: 6,
+            padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: enCours ? "default" : "pointer",
+          }}>
+            Ce n'est pas correct — importer un fichier corrigé
+          </button>
+        </div>
       )}
       {erreur && <div style={{ marginTop: 6, fontSize: 11.5, color: "#A32D2D" }}>{erreur}</div>}
     </div>

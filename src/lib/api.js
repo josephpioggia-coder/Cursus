@@ -591,6 +591,76 @@ export const auditsAPI = {
     return { error };
   },
 
+  /**
+   * Remplace le contenu d'un audit par un fichier .docx corrigé (réf.
+   * 60816-01, suite, 26/08/2026) — signalé par l'auteur du projet : un
+   * titre de chapitre coupé en deux à la détection n'avait aucun moyen
+   * d'être corrigé sans repartir de zéro (recréer tout l'audit). Réservé
+   * à AVANT confirmation (chapitres_confirmes = false) : une fois
+   * confirmé, le pré-audit peut déjà être en cours ou terminé sur
+   * l'ancien contenu, remplacer les unités sous ses pieds serait
+   * incohérent — dans ce cas, créer un nouvel audit reste la bonne voie.
+   *
+   * Supprime les anciennes audit_sections (avec leurs éventuels résultats
+   * d'audit détaillé déjà calculés — sur l'ancien texte, donc plus
+   * valables) et les remplace par les nouvelles. Réinitialise aussi
+   * l'aperçu et le pré-audit s'ils avaient déjà tourné, puisqu'ils
+   * portaient sur l'ancien texte.
+   *
+   * Ne recalcule PAS le prix (nombre_pages/prix_ttc restent ceux de la
+   * création) — limite assumée : un fichier corrigé change rarement
+   * significativement le nombre d'unités, et recalculer exigerait de
+   * transmettre les règles de tarification jusqu'ici. À corriger si
+   * l'écart s'avère réellement gênant en usage.
+   */
+  async remplacerContenu(auditId, { unités, chapitresDétectés }) {
+    if (!unités || unités.length === 0) return { error: { message: "Aucune unité détectée." } };
+
+    const { data: audit, error: erreurLecture } = await supabase
+      .from("audits")
+      .select("id, chapitres_confirmes")
+      .eq("id", auditId)
+      .maybeSingle();
+    if (erreurLecture) return { error: erreurLecture };
+    if (!audit) return { error: { message: "Audit introuvable." } };
+    if (audit.chapitres_confirmes) {
+      return { error: { message: "Le découpage est déjà confirmé — créez un nouvel audit plutôt que de remplacer celui-ci." } };
+    }
+
+    const { error: erreurSuppression } = await supabase.from("audit_sections").delete().eq("audit_id", auditId);
+    if (erreurSuppression) return { error: erreurSuppression };
+
+    const chapitreIndexParUnité = (i) => {
+      if (!chapitresDétectés) return null;
+      for (let c = 0; c < chapitresDétectés.length; c++) {
+        const { indexPremièreUnité, nombreUnités } = chapitresDétectés[c];
+        if (i >= indexPremièreUnité && i < indexPremièreUnité + nombreUnités) return c;
+      }
+      return null;
+    };
+    const lignes = unités.map((texteSource, i) => ({
+      audit_id: auditId, ordre: i + 1, texte_source: texteSource,
+      chapitre_index: chapitreIndexParUnité(i),
+    }));
+    const { error: erreurInsertion } = await supabase.from("audit_sections").insert(lignes);
+    if (erreurInsertion) return { error: erreurInsertion };
+
+    const { error: erreurMaj } = await supabase
+      .from("audits")
+      .update({
+        chapitres_detectes: chapitresDétectés,
+        chapitres_confirmes: false,
+        apercu_statut: "non_demande",
+        apercu_resultat: null,
+        preaudit_brouillon: null,
+        preaudit_critique_gpt: null,
+        preaudit_chapitres_resultats: null,
+        preaudit_resultat: null,
+      })
+      .eq("id", auditId);
+    return { error: erreurMaj };
+  },
+
   /** Règles de tarification actives (audit_pricing_rules) — lecture publique,
    *  voir src/lib/tarifCursAudit.js pour le calcul du prix à partir de ces règles. */
   async récupérerReglesPrix() {
