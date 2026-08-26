@@ -215,6 +215,27 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
   };
 }
 
+// ─── Garde-fou contre une analyse quasi vide (réf. 60816-01, suite,
+// 26/08/2026) — bug réel constaté en production sur "À cœur retrouvé" :
+// Claude omettait la quasi-totalité des critères pour certaines unités,
+// combler() les comblait silencieusement en vide, et le résultat était
+// enregistré comme un succès normal — un critère par critère "Enoncé type —",
+// "Source trace —", etc. sans aucune valeur ni commentaire, affiché comme si
+// l'unité avait vraiment été analysée. Même famille de bug que le v7.4 déjà
+// corrigé sur preaudit-approfondi-cursaudit (CHAMPS_CLÉS_NON_VIDES), jamais
+// porté ici. Si plus de la moitié des critères actifs reviennent sans
+// valeur NI commentaire après comblement, l'unité est rejetée en erreur
+// (donc marquée "échec", pas "terminée" à tort) plutôt qu'enregistrée.
+function compterCritèresVides(analyse: Record<string, unknown>, criteres: CritereActif[]): number {
+  return criteres.filter((c) => {
+    const entrée = analyse[c.output_key] as { valeur?: unknown; commentaire?: string } | undefined;
+    const valeur = entrée?.valeur;
+    const valeurVide = valeur === undefined || valeur === "" || (Array.isArray(valeur) && valeur.length === 0);
+    const commentaireVide = !entrée?.commentaire || entrée.commentaire.trim() === "";
+    return valeurVide && commentaireVide;
+  }).length;
+}
+
 async function appellerMoteurIAStructure(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (params.moteur === "claude") return appellerClaudeMoteur(params);
   if (params.moteur === "gpt") return appellerGPTMoteur(params);
@@ -472,6 +493,11 @@ async function analyserUneSection(
     moteur: "claude", modele: MODELE_CLAUDE, role: "analyseur_cursaudit",
     schema_sortie: schema, system: systemClaude, contexte: section.texte_source, max_tokens: 8192,
   });
+
+  const nbCritèresVides = compterCritèresVides(analyse as Record<string, unknown>, criteres);
+  if (criteres.length > 0 && nbCritèresVides > criteres.length / 2) {
+    throw new Error(`Analyse quasi vide (${nbCritèresVides}/${criteres.length} critères sans valeur ni commentaire) — échec réel, à relancer plutôt qu'à enregistrer.`);
+  }
 
   let controleGPT: unknown = null;
   let usageGPT: UsageIA | null = null;
