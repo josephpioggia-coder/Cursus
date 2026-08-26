@@ -880,8 +880,15 @@ export default function CursAuditDetail({ auditId, onRetour }) {
         const résultat = await appelerOrchestrateur(auditId, undefined, limite);
         restantes = résultat.restantes ?? 0;
         setProgression({ traitées: résultat.traitees_cette_fois, échouées: résultat.echouees_cette_fois, restantes });
+        // CORRECTIF 26/08/2026 — charger() n'était appelé qu'APRÈS la fin de
+        // toute la boucle (potentiellement ~2h sur un livre entier) : pendant
+        // tout ce temps, "X / total analysées" restait figé à sa valeur de
+        // départ, seule la ligne "Dernier lot" changeait — signalé par
+        // l'auteur du projet comme illisible ("je ne sais pas où ça en
+        // est"). Rafraîchi maintenant après CHAQUE lot, pour un vrai
+        // compteur qui avance en direct.
+        await charger();
       }
-      await charger();
     } catch (e) {
       setErreur(e.message);
     } finally {
@@ -965,9 +972,10 @@ export default function CursAuditDetail({ auditId, onRetour }) {
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13, marginBottom: 16 }}>{erreur}</div>
       )}
 
-      {progression && (
-        <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", marginBottom: 16 }}>
-          Dernier lot : {progression.traitées} traitée(s), {progression.échouées} échec(s), {progression.restantes} restante(s).
+      {enCours && progression && (
+        <div style={{ background: "#EFF3FF", border: "0.5px solid #4C6FE780", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "var(--texte-secondaire)" }}>
+          <div style={{ fontWeight: 600, color: "#4C6FE7", marginBottom: 2 }}>Audit détaillé en cours — ne ferme pas cet onglet</div>
+          {analysées} / {total} unités analysées jusqu'ici{échouées > 0 ? ` (${échouées} échec(s))` : ""} · encore {progression.restantes} restante(s).
         </div>
       )}
 
