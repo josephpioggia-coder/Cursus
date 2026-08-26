@@ -681,29 +681,6 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
             </div>
           )}
 
-          {résultat.revision?.critique_gpt && (
-            <details style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 4 }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Second avis (contrôle GPT) pris en compte pour cette version</summary>
-              <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-                {résultat.revision.critique_gpt.verdict_global && (
-                  <div>{résultat.revision.critique_gpt.verdict_global}</div>
-                )}
-                {résultat.revision.critique_gpt.elements_manquants?.length > 0 && (
-                  <div>
-                    <span style={{ fontWeight: 600 }}>Manques signalés : </span>
-                    {résultat.revision.critique_gpt.elements_manquants.join(" · ")}
-                  </div>
-                )}
-                {résultat.revision.critique_gpt.elements_superflus?.length > 0 && (
-                  <div>
-                    <span style={{ fontWeight: 600 }}>Redites signalées : </span>
-                    {résultat.revision.critique_gpt.elements_superflus.join(" · ")}
-                  </div>
-                )}
-              </div>
-            </details>
-          )}
-
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
             <button
               onClick={() => exporterPreauditWord(audit, résultat)}
