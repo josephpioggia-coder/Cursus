@@ -39,6 +39,7 @@ const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1
 // action manuelle supplémentaire côté Supabase Dashboard, pas nécessaire ici.
 const APERCU_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-global-cursaudit";
 const PREAUDIT_APPROFONDI_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/preaudit-approfondi-cursaudit";
+const FICHE_ACTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/fiche-action-preaudit-cursaudit";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const CATEGORIES_DIAGNOSTIC = [
@@ -419,6 +420,31 @@ async function appelerPreauditApprofondi(auditId) {
   return données;
 }
 
+// Fiche d'action éditoriale — second document, réf. 60816-01, suite,
+// 27/08/2026 : demandé par l'auteur du projet après un test réel où le
+// pré-audit complet d'un texte de deux pages avait produit un rapport de
+// plusieurs dizaines de pages — le pré-audit reste utile en base/annexe,
+// mais ne donne pas de fiche courte et actionnable. Un seul appel, ne relit
+// jamais le manuscrit (voir fiche-action-preaudit-cursaudit/index.ts).
+async function appelerFicheAction(auditId) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
+
+  const réponse = await fetch(FICHE_ACTION_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ audit_id: auditId }),
+  });
+  const donnéesFiche = await réponse.json();
+  if (!réponse.ok) throw new Error(donnéesFiche?.message || donnéesFiche?.error || `HTTP ${réponse.status}`);
+  return donnéesFiche;
+}
+
 // Libellé du bouton — réf. 60816-01, suite, 24/08/2026 : depuis le
 // pré-audit enrichi chapitre par chapitre, le nombre d'étapes n'est plus
 // fixe (dépend du nombre de chapitres confirmés), donc plus de compteur
@@ -479,6 +505,8 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   const [progression, setProgression] = useState(null);
   const [indiceMessage, setIndiceMessage] = useState(0);
   const [erreur, setErreur] = useState(null);
+  const [ficheActionEnCours, setFicheActionEnCours] = useState(false);
+  const [erreurFicheAction, setErreurFicheAction] = useState(null);
   const résultat = audit.preaudit_resultat;
   const nbChapitresConfirmés = audit.chapitres_confirmes ? (audit.chapitres_detectes?.length || 0) : 0;
   // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — voir le
@@ -539,6 +567,19 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
     }
   };
 
+  const lancerFicheAction = async () => {
+    setFicheActionEnCours(true);
+    setErreurFicheAction(null);
+    try {
+      await appelerFicheAction(audit.id);
+      await onTermine();
+    } catch (e) {
+      setErreurFicheAction(e.message);
+    } finally {
+      setFicheActionEnCours(false);
+    }
+  };
+
   return (
     <div style={{ border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", marginBottom: 24, background: "#F7F6FD" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -570,15 +611,34 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
           </div>
         )}
         {audit.preaudit_statut === "termine" && résultat && (
-          <button
-            onClick={() => exporterPreauditWord(audit, résultat)}
-            style={{
-              flexShrink: 0, background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
-              borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-            }}
-          >
-            Exporter en Word
-          </button>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            {/* Réf. 60816-01, suite, 27/08/2026 — second document demandé
+                par l'auteur du projet : le pré-audit complet reste utile en
+                base/annexe, mais une fiche courte et actionnable manquait.
+                Ne relit jamais le manuscrit, voir appelerFicheAction(). */}
+            {audit.fiche_action_statut !== "termine" && (
+              <button
+                onClick={lancerFicheAction}
+                disabled={ficheActionEnCours}
+                style={{
+                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                  borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                  cursor: ficheActionEnCours ? "default" : "pointer", opacity: ficheActionEnCours ? 0.6 : 1,
+                }}
+              >
+                {ficheActionEnCours ? "Génération…" : "Générer la fiche d'action"}
+              </button>
+            )}
+            <button
+              onClick={() => exporterPreauditWord(audit, résultat)}
+              style={{
+                background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              Exporter en Word
+            </button>
+          </div>
         )}
       </div>
 
@@ -619,6 +679,62 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
       )}
 
       {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
+      {erreurFicheAction && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreurFicheAction}</div>}
+
+      {audit.fiche_action_statut === "termine" && audit.fiche_action_resultat && (
+        <div style={{ marginTop: 12, background: "#fff", border: "1px solid #1D9E7580", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
+          <div style={{ fontWeight: 600, color: "#1D9E75", fontSize: 12.5 }}>Fiche d'action éditoriale — court et actionnable</div>
+          {audit.fiche_action_resultat.diagnostic && (
+            <div style={{ fontSize: 13, lineHeight: 1.5 }}>{audit.fiche_action_resultat.diagnostic}</div>
+          )}
+          {audit.fiche_action_resultat.forces?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Ce qui tient déjà</div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+                {audit.fiche_action_resultat.forces.map((f, i) => <li key={i}>{f}</li>)}
+              </ul>
+            </div>
+          )}
+          {audit.fiche_action_resultat.points_a_traiter?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Points à traiter</div>
+              <div style={{ display: "grid", gap: 6 }}>
+                {audit.fiche_action_resultat.points_a_traiter.map((p, i) => (
+                  <div key={i} style={{ fontSize: 12.5, lineHeight: 1.5, background: "#F7F6FD", borderRadius: 6, padding: "6px 8px" }}>
+                    <strong>{p.constat}</strong> — {p.impact_lecteur}
+                    <div style={{ color: "#5B52C4", marginTop: 2 }}>→ {p.geste_concret}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {audit.fiche_action_resultat.priorites?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Priorités de réécriture</div>
+              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+                {[...audit.fiche_action_resultat.priorites].sort((a, b) => a.rang.localeCompare(b.rang)).map((p, i) => <li key={i}>{p.action}</li>)}
+              </ol>
+            </div>
+          )}
+          {audit.fiche_action_resultat.risque_principal && (
+            <div style={{ fontSize: 12.5, color: "#A32D2D" }}><strong>Risque si rien ne change —</strong> {audit.fiche_action_resultat.risque_principal}</div>
+          )}
+          {audit.fiche_action_resultat.action_immediate && (
+            <div style={{ fontSize: 12.5, background: "#EAF3DE", borderRadius: 6, padding: "6px 8px" }}><strong>Première action —</strong> {audit.fiche_action_resultat.action_immediate}</div>
+          )}
+          {audit.fiche_action_resultat.a_eviter?.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>À éviter</div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+                {audit.fiche_action_resultat.a_eviter.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", fontStyle: "italic" }}>
+            Le détail complet reste disponible ci-dessous et dans l'export Word.
+          </div>
+        </div>
+      )}
 
       {audit.preaudit_statut === "termine" && résultat && (
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
