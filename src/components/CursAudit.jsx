@@ -38,7 +38,7 @@
  *    trois paliers fixes.
  */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI, misEnPageAPI } from "../lib/api.js";
 import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
@@ -113,11 +113,21 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [demandeMiseEnPage, setDemandeMiseEnPage] = useState(null);
   const [miseEnPageEnCours, setMiseEnPageEnCours] = useState(false);
 
-  useEffect(() => {
+  // CORRECTIF 27/08/2026 — bug réel signalé par l'auteur du projet : quand
+  // ce chargement échoue, rien ne le signalait — reglesPrix restait à null
+  // pour toujours, prix restait null, et le bouton "Créer l'audit" restait
+  // désactivé SANS AUCUNE explication visible à l'écran. Ajout d'un état
+  // d'erreur affiché avec un bouton pour réessayer, au lieu d'un échec
+  // silencieux.
+  const [erreurReglesPrix, setErreurReglesPrix] = useState(null);
+  const chargerReglesPrix = useCallback(() => {
+    setErreurReglesPrix(null);
     auditsAPI.récupérerReglesPrix().then(({ data, error }) => {
-      if (!error) setReglesPrix(data || []);
+      if (error) setErreurReglesPrix(error.message || "Impossible de charger les règles de tarification.");
+      else setReglesPrix(data || []);
     });
   }, []);
+  useEffect(() => { chargerReglesPrix(); }, [chargerReglesPrix]);
 
   const unités = useMemo(() => {
     if (source === "docx") return unitésDocx || [];
@@ -465,6 +475,15 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
           {erreur && (
             <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "#A32D2D" }}>{erreur}</div>
+          )}
+
+          {erreurReglesPrix && (
+            <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 12px", fontSize: 12, color: "#A32D2D", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <span>Impossible de charger les tarifs — le bouton ci-dessous reste désactivé tant que ce n'est pas résolu ({erreurReglesPrix})</span>
+              <button onClick={chargerReglesPrix} style={{ background: "#A32D2D", color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                Réessayer
+              </button>
+            </div>
           )}
 
           <button
