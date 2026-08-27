@@ -583,6 +583,47 @@ function FicheActionAffichage({ titre, fiche }) {
   );
 }
 
+// Fiche exécutive — réf. 60816-01, suite, 27/08/2026. Réaction de l'auteur
+// du projet à la synthèse de l'audit détaillé une fois développée sur ~8000
+// mots : un document de cette ampleur (le "rapport consolidé", ci-dessous)
+// a besoin d'une page de pilotage d'une à deux pages au-dessus, pas d'un
+// remplacement plus court. Ne fait AUCUN appel supplémentaire : c'est une
+// vue condensée du même résultat déjà reçu (rapport consolidé ou fiche
+// d'action pré-audit), pas un second document généré séparément.
+function FicheExecutive({ fiche }) {
+  if (!fiche) return null;
+  const troisPremièresPriorités = [...(fiche.priorites ?? [])].sort((a, b) => a.rang.localeCompare(b.rang)).slice(0, 3);
+  const troisPremiersAÉviter = (fiche.a_eviter ?? []).slice(0, 3);
+  return (
+    <div style={{ marginTop: 12, background: "#F7F6FD", border: "1px solid #5B52C480", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
+      <div style={{ fontWeight: 600, color: "#5B52C4", fontSize: 12.5 }}>Fiche exécutive — à lire en premier</div>
+      {fiche.diagnostic && <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>}
+      {troisPremièresPriorités.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Priorités</div>
+          <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+            {troisPremièresPriorités.map((p, i) => <li key={i}>{p.action}</li>)}
+          </ol>
+        </div>
+      )}
+      {fiche.action_immediate && (
+        <div style={{ fontSize: 12.5, background: "#EAF3DE", borderRadius: 6, padding: "6px 8px" }}><strong>Première action —</strong> {fiche.action_immediate}</div>
+      )}
+      {fiche.risque_principal && (
+        <div style={{ fontSize: 12.5, color: "#A32D2D" }}><strong>Risque principal —</strong> {fiche.risque_principal}</div>
+      )}
+      {troisPremiersAÉviter.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>À éviter</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, lineHeight: 1.6 }}>
+            {troisPremiersAÉviter.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites }) {
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
@@ -1348,11 +1389,17 @@ export default function CursAuditDetail({ auditId, onRetour }) {
                 explicite. Voir exportAuditDetailleWord.js. */}
             {audit.statut === "termine" && (
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                {/* Réf. 60816-01, suite, 27/08/2026 — équivalent de la fiche
-                    d'action du pré-audit, côté audit détaillé. Voir
-                    synthese-audit-detaille-cursaudit/index.ts. Toujours
-                    affiché (même une fois "termine") pour permettre de
-                    relancer sans passer par une remise à zéro SQL manuelle. */}
+                {/* Réf. 60816-01, suite, 27/08/2026 — "rapport consolidé"
+                    côté affichage (nom retenu par l'auteur du projet : un
+                    vrai document d'orientation de 15-30 pages pour un audit
+                    détaillé vendu cher, pas une "synthèse courte" — voir la
+                    FicheExecutive au-dessus pour la vraie page de pilotage
+                    d'1-2 pages). Les noms internes (fonction Supabase,
+                    colonnes DB, variables JS) restent "synthese_audit_*"
+                    pour ne pas redéployer/remigrer — seul le libellé
+                    utilisateur change. Toujours affiché (même une fois
+                    "termine") pour permettre de relancer sans passer par une
+                    remise à zéro SQL manuelle. */}
                 <button
                   onClick={lancerSynthese}
                   disabled={syntheseEnCours}
@@ -1365,8 +1412,8 @@ export default function CursAuditDetail({ auditId, onRetour }) {
                   {syntheseEnCours
                     ? `Génération… (${syntheseChrono} s)`
                     : audit.synthese_audit_statut === "termine"
-                      ? "Régénérer la synthèse (audit détaillé)"
-                      : "Générer la synthèse (audit détaillé)"}
+                      ? "Régénérer le rapport consolidé (audit détaillé)"
+                      : "Générer le rapport consolidé (audit détaillé)"}
                 </button>
                 <button
                   onClick={() => exporterAuditDetailleWord(audit, sections)}
@@ -1386,12 +1433,15 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           {syntheseEnCours && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#5B52C4", flexShrink: 0, animation: "syntheseChronoPulse 1.2s ease-in-out infinite" }} />
-              Génération de la synthèse en cours ({syntheseChrono} s) — sur un livre de cette taille, cela peut prendre plusieurs minutes, ne ferme pas cette page.
+              Génération du rapport consolidé en cours ({syntheseChrono} s) — sur un livre de cette taille, cela peut prendre plusieurs minutes, ne ferme pas cette page.
               <style>{"@keyframes syntheseChronoPulse { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }"}</style>
             </div>
           )}
           {audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat && (
-            <FicheActionAffichage titre="Synthèse de l'audit détaillé — court et actionnable" fiche={audit.synthese_audit_resultat} />
+            <>
+              <FicheExecutive fiche={audit.synthese_audit_resultat} />
+              <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} />
+            </>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, marginTop: 12 }}>
             {CATEGORIES_DIAGNOSTIC.map((c) => {
