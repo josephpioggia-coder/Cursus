@@ -445,7 +445,13 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     ecart_promesse_execution: { type: "string", default: "" },
     voies_editoriales: {
       type: "array",
-      minItems: 3,
+      // CORRECTIF 27/08/2026 — l'API Claude rejette strict:true dès qu'un
+      // tableau a minItems hors {0,1} : "For 'array' type, 'minItems'
+      // values other than 0 or 1 are not supported". minItems abaissé à 1
+      // partout dans ce schéma (maxItems reste inchangé, non concerné par
+      // cette limite) ; le nombre exact reste imposé par la consigne en
+      // langage naturel ("EXACTEMENT 3 voies", voir construireSystemPrompt).
+      minItems: 1,
       maxItems: 3,
       items: {
         type: "object",
@@ -462,7 +468,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     recommandation_principale: { type: "string", default: "" },
     plan_intervention: {
       type: "array",
-      minItems: 3,
+      minItems: 1,
       maxItems: 6,
       items: {
         type: "object",
@@ -476,7 +482,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     },
     exemples_concrets: {
       type: "array",
-      minItems: 3,
+      minItems: 1,
       items: {
         type: "object",
         properties: {
@@ -497,7 +503,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
       properties: {
         personnages_principaux: {
           type: "array",
-          minItems: 2,
+          minItems: 1,
           maxItems: 5,
           items: {
             type: "object",
@@ -538,7 +544,7 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         },
         objets_motifs: {
           type: "array",
-          minItems: 2,
+          minItems: 1,
           maxItems: 5,
           items: {
             type: "object",
