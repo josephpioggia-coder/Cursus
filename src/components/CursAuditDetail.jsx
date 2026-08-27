@@ -30,6 +30,7 @@ import { supabase } from "../lib/supabase.js";
 import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
 import { exporterPreauditWord } from "../lib/exportPreauditWord.js";
+import { exporterAuditDetailleWord } from "../lib/exportAuditDetailleWord.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
 // Nom de fonction déployée inchangé (preaudit-global-cursaudit) même si elle
@@ -1093,6 +1094,21 @@ export default function CursAuditDetail({ auditId, onRetour }) {
               {enCours ? "Analyse en cours…" : audit.statut === "en_traitement" ? "Continuer l'analyse" : "Lancer l'analyse"}
             </button>
           </div>
+        )}
+        {/* Signalé par l'auteur du projet le 27/08/2026 : une fois l'audit
+            détaillé terminé, rien n'était proposé — juste le statut affiché
+            plus haut, sans moyen d'en sortir un document. Voir
+            exportAuditDetailleWord.js. */}
+        {audit.statut === "termine" && (
+          <button
+            onClick={() => exporterAuditDetailleWord(audit, sections)}
+            style={{
+              background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+              borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+            }}
+          >
+            Exporter en Word
+          </button>
         )}
       </div>
 
