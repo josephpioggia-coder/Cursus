@@ -176,31 +176,40 @@ function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyé
     "Tu reçois les diagnostics déjà produits, unité par unité, par l'audit détaillé d'un livre entier. Pour " +
     "chaque unité : ses catégories (recevable/à nuancer/à sourcer/à reformuler/à vérifier) et le commentaire " +
     "qui justifie ce diagnostic. Tu ne relis pas le texte source du livre. Tu ne refais pas l'audit. Tu " +
-    "produis une fiche d'action éditoriale courte, lisible, priorisée et directement exploitable — l'objectif " +
-    "est de transformer des centaines de diagnostics isolés en décisions de travail pour l'auteur·ice, pas de " +
-    "les résumer platement.\n\n" +
+    "produis une fiche d'action éditoriale complète, structurée, priorisée et directement exploitable — " +
+    "l'objectif est de transformer des centaines de diagnostics isolés en un vrai document de travail pour " +
+    "l'auteur·ice, à la hauteur d'un livre entier, pas un résumé expédié.\n\n" +
     noteÉchantillon +
     "RÈGLES NON NÉGOCIABLES :\n" +
     "- Ne reprends jamais un diagnostic unité par unité, ne résume pas mécaniquement la liste reçue.\n" +
     "- Regroupe les constats récurrents à travers le livre (le même problème répété dans des dizaines " +
-    "d'unités devient UN SEUL point à traiter, pas une liste).\n" +
+    "d'unités devient UN SEUL point à traiter, développé et illustré, pas une liste).\n" +
     "- Écarte les alertes isolées sans enjeu réel — ne garde que ce qui change effectivement le travail de " +
     "réécriture à l'échelle du livre entier.\n" +
-    "- Chaque point retenu contient un geste concret, jamais un simple constat.\n" +
+    "- Chaque point retenu contient un geste concret développé, jamais un simple constat en une ligne.\n" +
     "- N'invente aucun problème absent des diagnostics reçus.\n" +
-    `- Ce document ne doit JAMAIS dépasser environ ${plafondMots} mots au total (texte source : ` +
-    `${nombreMots} mots, ${nombreUnitésTotal} unités analysées) — reste concis, en points denses, jamais en ` +
-    "paragraphes développés.\n\n" +
+    `- Ce document doit se rapprocher autant que possible de ${plafondMots} mots au total sans le dépasser ` +
+    `(texte source : ${nombreMots} mots, ${nombreUnitésTotal} unités analysées). SUR UN LIVRE DE CETTE ` +
+    "AMPLEUR, UN DOCUMENT DE DEUX PAGES EST UN ÉCHEC : développe chaque section sur plusieurs phrases, " +
+    "appuie-toi sur des exemples concrets tirés des diagnostics reçus, ne te limite jamais à des puces " +
+    "minimalistes.\n\n" +
     "Produis :\n" +
-    "1. diagnostic : une phrase — l'état d'ensemble du livre, ce qui domine dans les diagnostics reçus.\n" +
-    "2. forces : 3 à 5 forces concrètes qui reviennent dans les unités \"recevable\", sans flatterie générale.\n" +
-    "3. points_a_traiter : 3 à 7 points maximum, chacun un problème RÉCURRENT (pas isolé) avec constat, " +
-    "impact_lecteur, et geste_concret.\n" +
-    "4. priorites : classement en rang \"1\"/\"2\"/\"3\" (1 = le plus urgent), chacun avec l'action correspondante.\n" +
-    "5. risque_principal : une phrase nette — ce qui se passe si rien ne change à l'échelle du livre entier.\n" +
-    "6. action_immediate : une seule action, tranchée, immédiatement applicable — la toute première chose à " +
-    "faire.\n" +
-    "7. a_eviter : 1 à 3 fausses bonnes idées à éviter."
+    "1. diagnostic : deux à quatre phrases développées — l'état d'ensemble du livre, ce qui domine dans les " +
+    "diagnostics reçus.\n" +
+    "2. forces : 5 à 12 forces concrètes qui reviennent dans les unités \"recevable\", chacune développée en " +
+    "une à deux phrases, sans flatterie générale.\n" +
+    "3. points_a_traiter : PAS de maximum arbitraire — un point par problème RÉCURRENT distinct identifié " +
+    "dans les diagnostics (sur un livre de plusieurs centaines d'unités, attends-toi à en identifier une " +
+    "quinzaine à une trentaine, pas 3 à 7). Chaque point : constat développé avec exemples tirés des " +
+    "diagnostics, impact_lecteur développé, et geste_concret développé et actionnable — plusieurs phrases " +
+    "par champ, jamais une ligne.\n" +
+    "4. priorites : classement en rang \"1\"/\"2\"/\"3\" (1 = le plus urgent), chacun avec l'action " +
+    "correspondante développée sur plusieurs phrases.\n" +
+    "5. risque_principal : deux à trois phrases nettes — ce qui se passe si rien ne change à l'échelle du " +
+    "livre entier.\n" +
+    "6. action_immediate : une seule action, tranchée, immédiatement applicable, expliquée en plusieurs " +
+    "phrases — la toute première chose à faire.\n" +
+    "7. a_eviter : 3 à 6 fausses bonnes idées à éviter, chacune développée en une à deux phrases."
   );
 }
 
@@ -267,7 +276,7 @@ Deno.serve(async (req) => {
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
-        max_tokens: 4096,
+        max_tokens: 16000,
         system: construireSystemPrompt(diagnostics.length, diagnosticsEnvoyés.length, nombreMots, plafondMots),
         messages: [{ role: "user", content: JSON.stringify(diagnosticsEnvoyés) }],
         tools: [{
