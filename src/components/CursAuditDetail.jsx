@@ -593,6 +593,16 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   const [erreur, setErreur] = useState(null);
   const [ficheActionEnCours, setFicheActionEnCours] = useState(false);
   const [erreurFicheAction, setErreurFicheAction] = useState(null);
+  // Chrono visible pendant la génération — réf. 60816-01, suite, 27/08/2026 :
+  // sans repère de temps qui avance, un appel de plusieurs dizaines de
+  // secondes donne l'impression que la page est plantée.
+  const [ficheActionChrono, setFicheActionChrono] = useState(0);
+  useEffect(() => {
+    if (!ficheActionEnCours) { setFicheActionChrono(0); return; }
+    const début = Date.now();
+    const intervalle = setInterval(() => setFicheActionChrono(Math.floor((Date.now() - début) / 1000)), 1000);
+    return () => clearInterval(intervalle);
+  }, [ficheActionEnCours]);
   const résultat = audit.preaudit_resultat;
   const nbChapitresConfirmés = audit.chapitres_confirmes ? (audit.chapitres_detectes?.length || 0) : 0;
   // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — voir le
@@ -702,19 +712,26 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                 par l'auteur du projet : le pré-audit complet reste utile en
                 base/annexe, mais une fiche courte et actionnable manquait.
                 Ne relit jamais le manuscrit, voir appelerFicheAction(). */}
-            {audit.fiche_action_statut !== "termine" && (
-              <button
-                onClick={lancerFicheAction}
-                disabled={ficheActionEnCours}
-                style={{
-                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
-                  borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600,
-                  cursor: ficheActionEnCours ? "default" : "pointer", opacity: ficheActionEnCours ? 0.6 : 1,
-                }}
-              >
-                {ficheActionEnCours ? "Génération…" : "Générer la fiche d'action (pré-audit)"}
-              </button>
-            )}
+            {/* Réf. 60816-01, suite, 27/08/2026 — le bouton restait affiché
+                seulement tant que fiche_action_statut !== "termine" : une
+                fois généré, plus aucun moyen de relancer sans passer par une
+                remise à zéro SQL manuelle. Toujours affiché désormais, avec
+                un libellé "Régénérer" une fois le premier résultat obtenu. */}
+            <button
+              onClick={lancerFicheAction}
+              disabled={ficheActionEnCours}
+              style={{
+                background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                cursor: ficheActionEnCours ? "default" : "pointer", opacity: ficheActionEnCours ? 0.6 : 1,
+              }}
+            >
+              {ficheActionEnCours
+                ? `Génération… (${ficheActionChrono} s)`
+                : audit.fiche_action_statut === "termine"
+                  ? "Régénérer la fiche d'action (pré-audit)"
+                  : "Générer la fiche d'action (pré-audit)"}
+            </button>
             <button
               onClick={() => exporterPreauditWord(audit, résultat)}
               style={{
@@ -766,6 +783,13 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
 
       {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
       {erreurFicheAction && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreurFicheAction}</div>}
+      {ficheActionEnCours && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#5B52C4", flexShrink: 0, animation: "preauditPulse 1.2s ease-in-out infinite" }} />
+          Génération de la fiche d'action en cours ({ficheActionChrono} s) — peut prendre une à deux minutes, ne ferme pas cette page.
+          <style>{"@keyframes preauditPulse { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }"}</style>
+        </div>
+      )}
 
       {audit.fiche_action_statut === "termine" && audit.fiche_action_resultat && (
         <FicheActionAffichage titre="Fiche d'action éditoriale (pré-audit) — court et actionnable" fiche={audit.fiche_action_resultat} />
@@ -1129,6 +1153,16 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   const [chapitreLimite, setChapitreLimite] = useState("");
   const [syntheseEnCours, setSyntheseEnCours] = useState(false);
   const [erreurSynthese, setErreurSynthese] = useState(null);
+  // Chrono visible pendant la génération — même raison que dans
+  // PreauditApprofondi : un appel de plusieurs dizaines de secondes sans
+  // aucun repère donne l'impression que la page est plantée.
+  const [syntheseChrono, setSyntheseChrono] = useState(0);
+  useEffect(() => {
+    if (!syntheseEnCours) { setSyntheseChrono(0); return; }
+    const début = Date.now();
+    const intervalle = setInterval(() => setSyntheseChrono(Math.floor((Date.now() - début) / 1000)), 1000);
+    return () => clearInterval(intervalle);
+  }, [syntheseEnCours]);
 
   const charger = useCallback(async () => {
     const { data, error } = await auditsAPI.récupérerAvecSections(auditId);
@@ -1316,20 +1350,24 @@ export default function CursAuditDetail({ auditId, onRetour }) {
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 {/* Réf. 60816-01, suite, 27/08/2026 — équivalent de la fiche
                     d'action du pré-audit, côté audit détaillé. Voir
-                    synthese-audit-detaille-cursaudit/index.ts. */}
-                {audit.synthese_audit_statut !== "termine" && (
-                  <button
-                    onClick={lancerSynthese}
-                    disabled={syntheseEnCours}
-                    style={{
-                      background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
-                      borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600,
-                      cursor: syntheseEnCours ? "default" : "pointer", opacity: syntheseEnCours ? 0.6 : 1,
-                    }}
-                  >
-                    {syntheseEnCours ? "Génération…" : "Générer la synthèse (audit détaillé)"}
-                  </button>
-                )}
+                    synthese-audit-detaille-cursaudit/index.ts. Toujours
+                    affiché (même une fois "termine") pour permettre de
+                    relancer sans passer par une remise à zéro SQL manuelle. */}
+                <button
+                  onClick={lancerSynthese}
+                  disabled={syntheseEnCours}
+                  style={{
+                    background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                    borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600,
+                    cursor: syntheseEnCours ? "default" : "pointer", opacity: syntheseEnCours ? 0.6 : 1,
+                  }}
+                >
+                  {syntheseEnCours
+                    ? `Génération… (${syntheseChrono} s)`
+                    : audit.synthese_audit_statut === "termine"
+                      ? "Régénérer la synthèse (audit détaillé)"
+                      : "Générer la synthèse (audit détaillé)"}
+                </button>
                 <button
                   onClick={() => exporterAuditDetailleWord(audit, sections)}
                   style={{
@@ -1344,6 +1382,13 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           </div>
           {erreurSynthese && (
             <div style={{ marginBottom: 12, fontSize: 12, color: "#A32D2D" }}>{erreurSynthese}</div>
+          )}
+          {syntheseEnCours && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#5B52C4", flexShrink: 0, animation: "syntheseChronoPulse 1.2s ease-in-out infinite" }} />
+              Génération de la synthèse en cours ({syntheseChrono} s) — sur un livre de cette taille, cela peut prendre plusieurs minutes, ne ferme pas cette page.
+              <style>{"@keyframes syntheseChronoPulse { 0%, 100% { opacity: 0.25; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }"}</style>
+            </div>
           )}
           {audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat && (
             <FicheActionAffichage titre="Synthèse de l'audit détaillé — court et actionnable" fiche={audit.synthese_audit_resultat} />
