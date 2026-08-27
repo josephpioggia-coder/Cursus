@@ -626,7 +626,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                   cursor: ficheActionEnCours ? "default" : "pointer", opacity: ficheActionEnCours ? 0.6 : 1,
                 }}
               >
-                {ficheActionEnCours ? "Génération…" : "Générer la fiche d'action"}
+                {ficheActionEnCours ? "Génération…" : "Générer la fiche d'action (pré-audit)"}
               </button>
             )}
             <button
@@ -636,7 +636,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                 borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
               }}
             >
-              Exporter en Word
+              Exporter le pré-audit (Word)
             </button>
           </div>
         )}
@@ -957,7 +957,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
                 borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
               }}
             >
-              Exporter en Word
+              Exporter le pré-audit (Word)
             </button>
             {/* Signalé par l'auteur du projet le 26/08/2026 : arrivé au bout
                 du rapport de pré-audit, aucun bouton n'était visible pour
@@ -1211,21 +1211,6 @@ export default function CursAuditDetail({ auditId, onRetour }) {
             </button>
           </div>
         )}
-        {/* Signalé par l'auteur du projet le 27/08/2026 : une fois l'audit
-            détaillé terminé, rien n'était proposé — juste le statut affiché
-            plus haut, sans moyen d'en sortir un document. Voir
-            exportAuditDetailleWord.js. */}
-        {audit.statut === "termine" && (
-          <button
-            onClick={() => exporterAuditDetailleWord(audit, sections)}
-            style={{
-              background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
-              borderRadius: 8, padding: "9px 18px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", flexShrink: 0,
-            }}
-          >
-            Exporter en Word
-          </button>
-        )}
       </div>
 
       {!peutLancer && audit.statut === "brouillon" && (
@@ -1265,8 +1250,29 @@ export default function CursAuditDetail({ auditId, onRetour }) {
 
       {total > 0 && (
         <>
-          <div style={{ fontSize: 12, color: "var(--texte-tertiaire)", marginBottom: 8 }}>
-            {analysées} / {total} analysée{total > 1 ? "s" : ""}{échouées > 0 ? ` · ${échouées} échec(s)` : ""}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+              {analysées} / {total} analysée{total > 1 ? "s" : ""}{échouées > 0 ? ` · ${échouées} échec(s)` : ""}
+            </div>
+            {/* Signalé par l'auteur du projet le 27/08/2026 : une fois l'audit
+                détaillé terminé, rien n'était proposé pour l'exporter — puis,
+                une fois ajouté, le bouton était placé trop loin du relevé des
+                analyses (tout en haut) et son libellé générique ("Exporter en
+                Word") était impossible à distinguer de celui du pré-audit
+                (deux libellés identiques sur le même écran). Déplacé ici,
+                juste à côté du relevé qu'il exporte, avec un libellé
+                explicite. Voir exportAuditDetailleWord.js. */}
+            {audit.statut === "termine" && (
+              <button
+                onClick={() => exporterAuditDetailleWord(audit, sections)}
+                style={{
+                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                  borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0,
+                }}
+              >
+                Exporter l'audit détaillé (Word)
+              </button>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
             {CATEGORIES_DIAGNOSTIC.map((c) => {
