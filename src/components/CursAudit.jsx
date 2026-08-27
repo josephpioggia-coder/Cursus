@@ -61,14 +61,38 @@ const TYPES_RAPPORT = [
   { id: "Rapport complet", nom: "Rapport complet" },
 ];
 
+// CORRECTIF 27/08/2026 — perte réelle de travail signalée par l'auteur du
+// projet : un texte collé entièrement dans ce formulaire n'existe QUE dans
+// l'état React tant que "Créer l'audit" n'a pas réussi — aucune sauvegarde
+// entre-temps. Le bug du bouton silencieusement désactivé (voir plus haut)
+// a fait perdre un texte collé en entier lors d'un rechargement de page.
+// Sauvegarde du brouillon dans localStorage à chaque changement, restauré
+// à l'ouverture — protège contre un rechargement accidentel ou un bouton
+// bloqué, quelle qu'en soit la cause future. Uniquement le texte collé et
+// les réglages (pas le fichier .docx importé ni sa structure de chapitres,
+// qui ne peuvent pas survivre à un rechargement de toute façon — le client
+// devra réimporter le fichier si la perte survient pendant un import docx).
+const CLÉ_BROUILLON = "cursaudit_brouillon";
+function lireBrouillon() {
+  try {
+    const brut = localStorage.getItem(CLÉ_BROUILLON);
+    return brut ? JSON.parse(brut) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CursAudit({ onVoirAudits } = {}) {
+  const brouillonInitial = useMemo(() => lireBrouillon(), []);
+  const [brouillonRestauré] = useState(() => !!(brouillonInitial?.texte || brouillonInitial?.titre));
+
   // Questionnaire de qualification (22/08/2026) — porte d'entrée obligatoire
   // avant le texte, voir CursAuditQuestionnaire.jsx. null = pas encore rempli.
-  const [questionnaire, setQuestionnaire] = useState(null);
+  const [questionnaire, setQuestionnaire] = useState(() => brouillonInitial?.questionnaire ?? null);
 
-  const [titre, setTitre] = useState("");
-  const [source, setSource] = useState("coller"); // "coller" | "docx"
-  const [texte, setTexte] = useState("");
+  const [titre, setTitre] = useState(() => brouillonInitial?.titre ?? "");
+  const [source, setSource] = useState(() => brouillonInitial?.source ?? "coller"); // "coller" | "docx"
+  const [texte, setTexte] = useState(() => brouillonInitial?.texte ?? "");
   // Lecture brute du .docx (réf. 60816-01, suite, 26/08/2026) — un seul
   // passage sur le fichier à l'import ; le regroupement en unités/chapitres
   // se recalcule ensuite (voir plus bas) à chaque changement des niveaux
@@ -99,9 +123,9 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [erreurImport, setErreurImport] = useState(null);
   const inputFichierRef = useRef(null);
 
-  const [palier, setPalier] = useState("essentiel");
-  const [modeIA, setModeIA] = useState("1 IA");
-  const [typeRapport, setTypeRapport] = useState("Aucun");
+  const [palier, setPalier] = useState(() => brouillonInitial?.palier ?? "essentiel");
+  const [modeIA, setModeIA] = useState(() => brouillonInitial?.modeIA ?? "1 IA");
+  const [typeRapport, setTypeRapport] = useState(() => brouillonInitial?.typeRapport ?? "Aucun");
   const [reglesPrix, setReglesPrix] = useState(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -128,6 +152,24 @@ export default function CursAudit({ onVoirAudits } = {}) {
     });
   }, []);
   useEffect(() => { chargerReglesPrix(); }, [chargerReglesPrix]);
+
+  // Sauvegarde continue du brouillon (voir CLÉ_BROUILLON plus haut) — pas
+  // tant que l'audit est déjà créé (résultat non nul), pour ne pas
+  // réenregistrer un brouillon obsolète après coup.
+  useEffect(() => {
+    if (résultat) return;
+    try {
+      localStorage.setItem(CLÉ_BROUILLON, JSON.stringify({ questionnaire, titre, source, texte, palier, modeIA, typeRapport }));
+    } catch {
+      // localStorage indisponible (navigation privée, quota...) — le
+      // brouillon ne survivra pas à un rechargement, mais ça ne doit pas
+      // faire planter le formulaire pour autant.
+    }
+  }, [résultat, questionnaire, titre, source, texte, palier, modeIA, typeRapport]);
+
+  const viderBrouillon = () => {
+    try { localStorage.removeItem(CLÉ_BROUILLON); } catch { /* voir plus haut */ }
+  };
 
   const unités = useMemo(() => {
     if (source === "docx") return unitésDocx || [];
@@ -250,10 +292,12 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
     setEnCours(false);
     if (error) { setErreur(error.message || "Erreur lors de la création de l'audit."); return; }
+    viderBrouillon();
     setRésultat(data);
   };
 
   const toutRéinitialiser = () => {
+    viderBrouillon();
     setRésultat(null); setTitre(""); setTexte(""); setNomFichier(null); setSource("coller");
     setInfosDocx(null); setNiveauxDisponibles([]); setNiveauxRetenus([]);
     setDemandeMiseEnPage(null);
@@ -266,6 +310,15 @@ export default function CursAudit({ onVoirAudits } = {}) {
       <p style={{ fontSize: 13, color: "var(--texte-tertiaire)", marginBottom: 24 }}>
         Créer un nouvel audit — collez un texte ou importez un fichier Word, choisissez la profondeur d'analyse.
       </p>
+
+      {brouillonRestauré && !résultat && (
+        <div style={{ background: "#EFF3FF", border: "0.5px solid #4C6FE780", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "var(--texte-secondaire)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span>Brouillon restauré depuis ta dernière visite (texte collé et réglages conservés automatiquement, pour ne pas perdre ton travail).</span>
+          <button onClick={toutRéinitialiser} style={{ background: "transparent", color: "#4C6FE7", border: "0.5px solid #4C6FE780", borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+            Repartir de zéro
+          </button>
+        </div>
+      )}
 
       {résultat ? (
         <div style={{ background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 10, padding: "18px 20px" }}>
