@@ -445,14 +445,16 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     ecart_promesse_execution: { type: "string", default: "" },
     voies_editoriales: {
       type: "array",
-      // CORRECTIF 27/08/2026 — l'API Claude rejette strict:true dès qu'un
-      // tableau a minItems hors {0,1} : "For 'array' type, 'minItems'
-      // values other than 0 or 1 are not supported". minItems abaissé à 1
-      // partout dans ce schéma (maxItems reste inchangé, non concerné par
-      // cette limite) ; le nombre exact reste imposé par la consigne en
-      // langage naturel ("EXACTEMENT 3 voies", voir construireSystemPrompt).
+      // CORRECTIF 27/08/2026 (deux erreurs réelles successives avec
+      // strict:true, découvertes une par une côté API Claude, pas
+      // documentées à l'avance) — sur un tableau : minItems doit être 0 ou 1
+      // ("values other than 0 or 1 are not supported"), et maxItems n'est
+      // PAS supporté du tout ("property 'maxItems' is not supported"),
+      // quelle que soit sa valeur. Les deux retirés/ramenés à 1 partout dans
+      // ce schéma ; le nombre exact ou la fourchette reste imposé par la
+      // consigne en langage naturel ("EXACTEMENT 3 voies", voir
+      // construireSystemPrompt) et par combler() en filet de sécurité.
       minItems: 1,
-      maxItems: 3,
       items: {
         type: "object",
         properties: {
@@ -469,7 +471,6 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
     plan_intervention: {
       type: "array",
       minItems: 1,
-      maxItems: 6,
       items: {
         type: "object",
         properties: {
@@ -504,7 +505,6 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         personnages_principaux: {
           type: "array",
           minItems: 1,
-          maxItems: 5,
           items: {
             type: "object",
             properties: {
@@ -520,7 +520,6 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         lieux_principaux: {
           type: "array",
           minItems: 1,
-          maxItems: 4,
           items: {
             type: "object",
             properties: {
@@ -545,7 +544,6 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
         objets_motifs: {
           type: "array",
           minItems: 1,
-          maxItems: 5,
           items: {
             type: "object",
             properties: {
