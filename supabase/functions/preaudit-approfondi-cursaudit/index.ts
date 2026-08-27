@@ -321,6 +321,16 @@
  * Comme pour l'audit détaillé, aucun flux Stripe n'existe encore — le
  * statut se positionne manuellement (SQL) en attendant.
  *
+ * RÈGLE 8 AJOUTÉE PUIS RETIRÉE, 27/08/2026, MÊME JOUR — une 8e règle
+ * imposant de proportionner CE pré-audit complet au volume du texte source
+ * (constat réel : un texte de 1400 mots avait produit un rapport de
+ * plusieurs dizaines de pages) a été ajoutée, puis retirée une fois la
+ * fiche d'action éditoriale construite (voir fiche-action-preaudit-cursaudit,
+ * nouveau le même jour) : décision finale de l'auteur du projet — CE
+ * pré-audit reste volontairement exhaustif, riche, une base analytique /
+ * annexe ; c'est la fiche d'action qui porte désormais la contrainte de
+ * concision et d'actionnabilité, pas ce document-ci. Retour à SEPT règles.
+ *
  * SECRETS REQUIS : ANTHROPIC_KEY, OPENAI_API_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place).
  */
 
@@ -735,7 +745,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "ÉDITORIALE — pas un diagnostic qui constate, un outil qui aide l'auteur·ice à transformer son livre. " +
     "Le test à te poser en permanence : après avoir lu ta réponse, l'auteur·ice peut-il/elle faire cinq " +
     "modifications concrètes dans son manuscrit ? Si la réponse est non, ce n'est pas encore assez utile.\n\n" +
-    "HUIT RÈGLES NON NÉGOCIABLES, établies après plusieurs essais successifs :\n" +
+    "SEPT RÈGLES NON NÉGOCIABLES, établies après plusieurs essais successifs :\n" +
     "1. Aucun \"il faudra vérifier ça dans l'audit détaillé\". Chaque chantier du plan d'intervention et " +
     "chaque exemple concret porte un geste éditorial que l'auteur·ice peut appliquer MAINTENANT, avec ou " +
     "sans commander l'audit détaillé ensuite.\n" +
@@ -755,15 +765,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "7. ANCRE CHAQUE AFFIRMATION IMPORTANTE dans un repère concret et nommé du texte (une scène précise, " +
     "une porte/un chapitre, un dialogue identifiable) — jamais une généralité flottante. C'est déjà ce que " +
     "probleme doit faire dans exemples_concrets ; applique la même exigence dans ecart_promesse_execution " +
-    "et dans chaque chantier de plan_intervention.\n" +
-    "8. PROPORTIONNE TOUT AU VOLUME RÉEL DU TEXTE — bug réel constaté le 27/08/2026 : un texte de 1400 mots " +
-    "(deux pages) a produit un rapport de plusieurs dizaines de pages, avec autant de voies/chantiers/exemples " +
-    "qu'un livre entier. Le nombre de mots ci-dessous n'est pas qu'un repère pour duree_estimee_travail : il " +
-    "gouverne la LONGUEUR de chaque champ ET le nombre d'éléments dans chaque liste. Sur un texte court " +
-    "(quelques pages à quelques dizaines de pages), reste au minimum autorisé par chaque champ (3 chantiers " +
-    "et non 6, 3 exemples et non plus, 2 personnages et non 5) et écris chaque champ en 2-3 phrases maximum, " +
-    "jamais un paragraphe développé — le rapport ne doit jamais dépasser, en substance, ce que le texte " +
-    "source justifie réellement. Ne développe davantage QUE si le livre est effectivement long et le justifie.\n\n" +
+    "et dans chaque chantier de plan_intervention.\n\n" +
     `${contexteQualification}` +
     `Colonne vertébrale déjà repérée par l'aperçu : ${apercu?.colonne_vertebrale ?? "non disponible"}\n` +
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
