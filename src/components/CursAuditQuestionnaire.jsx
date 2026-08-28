@@ -33,6 +33,7 @@
 import { useState, useEffect } from "react";
 import { auditsAPI } from "../lib/api.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
+import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
   NATURE_PROJET, OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
   ATTENTES_CURSUS, CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
@@ -277,6 +278,8 @@ export default function CursAuditQuestionnaire({ onValider }) {
           pour qui il est écrit, ni jusqu'où elle a le droit d'intervenir.
         </p>
       </div>
+
+      <ProfilAuteur />
 
       {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
           docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
