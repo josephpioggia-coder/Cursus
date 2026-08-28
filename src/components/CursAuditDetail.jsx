@@ -527,12 +527,24 @@ const MESSAGES_PENDANT_PREAUDIT = {
 // risque_principal/action_immediate/a_eviter) pour la fiche d'action du
 // pré-audit ET la synthèse de l'audit détaillé — un seul rendu, deux
 // sources (fiche-action-preaudit-cursaudit / synthese-audit-detaille-cursaudit).
-function FicheActionAffichage({ titre, fiche }) {
+// Réf. 60816-01, suite, 28/08/2026 — signalé après un vrai constat de
+// redondance à l'écran : quand ce composant est affiché juste après une
+// FicheExecutive (cas de l'audit détaillé), `diagnostic`, `risque_principal`
+// et `action_immediate` apparaissaient mot pour mot deux fois de suite sur
+// la même page — la FicheExecutive les affiche déjà. `masquerResumeCourt`
+// les masque ici dans ce cas précis ; resterait affiché normalement pour la
+// fiche d'action du pré-audit, qui n'a pas de FicheExecutive au-dessus.
+function FicheActionAffichage({ titre, fiche, masquerResumeCourt = false }) {
   return (
     <div style={{ marginTop: 12, background: "#fff", border: "1px solid #1D9E7580", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
       <div style={{ fontWeight: 600, color: "#1D9E75", fontSize: 12.5 }}>{titre}</div>
-      {fiche.diagnostic && (
+      {!masquerResumeCourt && fiche.diagnostic && (
         <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>
+      )}
+      {masquerResumeCourt && (
+        <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", fontStyle: "italic" }}>
+          Diagnostic, risque principal et première action déjà résumés dans la fiche exécutive ci-dessus — détail complet ci-dessous.
+        </div>
       )}
       {fiche.forces?.length > 0 && (
         <div>
@@ -563,10 +575,10 @@ function FicheActionAffichage({ titre, fiche }) {
           </ol>
         </div>
       )}
-      {fiche.risque_principal && (
+      {!masquerResumeCourt && fiche.risque_principal && (
         <div style={{ fontSize: 12.5, color: "#A32D2D" }}><strong>Risque si rien ne change —</strong> {fiche.risque_principal}</div>
       )}
-      {fiche.action_immediate && (
+      {!masquerResumeCourt && fiche.action_immediate && (
         <div style={{ fontSize: 12.5, background: "#EAF3DE", borderRadius: 6, padding: "6px 8px" }}><strong>Première action —</strong> {fiche.action_immediate}</div>
       )}
       {fiche.a_eviter?.length > 0 && (
@@ -1505,7 +1517,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           {audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat && (
             <>
               <FicheExecutive fiche={audit.synthese_audit_resultat} />
-              <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} />
+              <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} masquerResumeCourt />
             </>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, marginTop: 12 }}>
