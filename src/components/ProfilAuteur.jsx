@@ -24,6 +24,7 @@
 import { useState, useEffect } from "react";
 import { profilAuteurAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
+import { analyserStructureDocx } from "../lib/segmenterCursAudit.js";
 
 const EXTRACTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/extraire-profil-cursus";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -95,6 +96,36 @@ export default function ProfilAuteur() {
     }
   };
 
+  // Import de fichier — réf. 60816-01, suite, 28/08/2026, signalé par
+  // l'auteur du projet : le copier-coller manuel n'est pas un "import"
+  // suffisant. .docx et .txt seulement — PAS de .pdf : aucune bibliothèque
+  // d'extraction PDF dans ce projet aujourd'hui, l'ajouter proprement est
+  // un vrai chantier séparé, pas un ajustement rapide. Réutilise
+  // analyserStructureDocx() (segmenterCursAudit.js), déjà éprouvée pour
+  // l'import du manuscrit — ici on ne garde que le texte brut de chaque
+  // paragraphe, la structure de chapitres ne sert à rien pour un CV.
+  const importerFichier = async (fichier) => {
+    if (!fichier) return;
+    setErreur(null);
+    setMessage(null);
+    try {
+      if (fichier.name.endsWith(".docx")) {
+        const { infos } = await analyserStructureDocx(fichier);
+        const texte = infos.map((i) => i.texte).filter(Boolean).join("\n");
+        if (!texte) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); return; }
+        setTexteSourceBrut(texte);
+      } else if (fichier.name.endsWith(".txt")) {
+        setTexteSourceBrut(await fichier.text());
+      } else {
+        setErreur("Format non pris en charge — utilise un .docx ou un .txt. Le PDF n'est pas encore supporté : convertis-le en .docx, ou colle le texte directement dans le champ ci-dessous.");
+        return;
+      }
+      setMessage("Fichier importé — clique \"Extraire automatiquement\" pour préremplir les champs.");
+    } catch (e) {
+      setErreur("Impossible de lire ce fichier : " + e.message);
+    }
+  };
+
   const enregistrer = async () => {
     setEnregistrementEnCours(true);
     setErreur(null);
@@ -133,7 +164,18 @@ export default function ProfilAuteur() {
           </p>
 
           <div>
-            <label style={labelStyle}>Coller un CV ou un profil LinkedIn (texte)</label>
+            <label style={labelStyle}>Importer un fichier (.docx ou .txt — pas de .pdf pour l'instant)</label>
+            <label style={{
+              display: "inline-block", background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", marginBottom: 12,
+            }}>
+              Choisir un fichier (CV, export LinkedIn…)
+              <input type="file" accept=".docx,.txt" style={{ display: "none" }} onChange={(e) => importerFichier(e.target.files[0])} />
+            </label>
+          </div>
+
+          <div>
+            <label style={labelStyle}>...ou coller un CV / un profil LinkedIn (texte)</label>
             <textarea
               style={{ ...champStyle, minHeight: 90, resize: "vertical" }}
               value={texteSourceBrut}
