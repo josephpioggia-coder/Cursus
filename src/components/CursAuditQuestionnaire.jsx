@@ -30,7 +30,13 @@
  * réellement à la place de l'auteur⋅ice n'est pas implémenté.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { auditsAPI } from "../lib/api.js";
+import { nomDeFichierSûr } from "../lib/exportWord.js";
+import {
+  NATURE_PROJET, OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
+  ATTENTES_CURSUS, CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
+} from "../lib/taxonomieContratIntentionCursAudit.js";
 
 const TYPES_DOCUMENT = [
   "Mémoire / TFE / travail académique",
@@ -119,7 +125,96 @@ function Checkbox({ checked, onChange, label }) {
   );
 }
 
+// Groupe de cases à cocher réutilisable — Bloc A/B du contrat d'intention
+// (réf. 60816-01, suite, 28/08/2026), 6 listes différentes, même motif.
+function GroupeCases({ options, valeurs, onBasculer }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+      {options.map((o) => (
+        <Checkbox key={o} checked={valeurs.includes(o)} onChange={() => onBasculer(o)} label={o} />
+      ))}
+    </div>
+  );
+}
+
+
 export default function CursAuditQuestionnaire({ onValider }) {
+  // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
+  // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
+  // Bloc distinct du reste du questionnaire ci-dessous (inchangé, garde
+  // ses propres champs typeDocument/statutTexte/... pour ne rien casser
+  // du câblage existant côté moteur d'analyse) — première version testable
+  // du mécanisme, sans les niveaux 3-4 de la taxonomie ni les méta-champs
+  // (importance/certitude/challenge) de l'architecture complète.
+  const [ouEnEtesVous, setOuEnEtesVous] = useState("");
+  const [famille, setFamille] = useState("");
+  const [sousCategorie, setSousCategorie] = useState("");
+  const [natureAutre, setNatureAutre] = useState("");
+  const [objectifs, setObjectifs] = useState([]);
+  const [destinataires, setDestinataires] = useState([]);
+  const [attentesCursus, setAttentesCursus] = useState([]);
+  const [criteresReussite, setCriteresReussite] = useState([]);
+  const [ceQueVousEspérezDécouvrir, setCeQueVousEspérezDécouvrir] = useState([]);
+  const [contratsPrécédents, setContratsPrécédents] = useState(null);
+  const [contratChoisi, setContratChoisi] = useState("");
+
+  useEffect(() => {
+    auditsAPI.listerContratsIntention().then(({ data }) => setContratsPrécédents(data || []));
+  }, []);
+
+  const sousCategoriesDisponibles = NATURE_PROJET.find((f) => f.famille === famille)?.sousCategories ?? [];
+
+  const appliquerContrat = (c) => {
+    if (!c) return;
+    setOuEnEtesVous(c.ouEnEtesVous || "");
+    setFamille(c.natureProjet?.famille || "");
+    setSousCategorie(c.natureProjet?.sousCategorie || "");
+    setNatureAutre(c.natureProjet?.autre || "");
+    setObjectifs(c.objectifs || []);
+    setDestinataires(c.destinataires || []);
+    setAttentesCursus(c.attentesCursus || []);
+    setCriteresReussite(c.criteresReussite || []);
+    setCeQueVousEspérezDécouvrir(c.ceQueVousEspérezDécouvrir || []);
+  };
+
+  const choisirContratPrécédent = (id) => {
+    setContratChoisi(id);
+    const trouvé = contratsPrécédents?.find((a) => a.id === id);
+    if (trouvé) appliquerContrat(trouvé.contrat_intention);
+  };
+
+  const contratIntentionActuel = () => ({
+    ouEnEtesVous,
+    natureProjet: { famille, sousCategorie, autre: famille === "Autre" ? natureAutre : "" },
+    objectifs, destinataires, attentesCursus, criteresReussite,
+    ceQueVousEspérezDécouvrir,
+  });
+
+  const exporterContratJSON = () => {
+    const blob = new Blob([JSON.stringify(contratIntentionActuel(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const lien = document.createElement("a");
+    lien.href = url;
+    lien.download = `contrat_intention_${nomDeFichierSûr(famille || "brouillon")}.json`;
+    document.body.appendChild(lien);
+    lien.click();
+    document.body.removeChild(lien);
+    URL.revokeObjectURL(url);
+  };
+
+  const importerContratJSON = (fichier) => {
+    if (!fichier) return;
+    const lecteur = new FileReader();
+    lecteur.onload = () => {
+      try {
+        appliquerContrat(JSON.parse(lecteur.result));
+      } catch {
+        setErreur("Fichier JSON invalide — impossible de lire ce contrat d'intention.");
+      }
+    };
+    lecteur.readAsText(fichier);
+  };
+
   const [typeDocument, setTypeDocument] = useState("");
   const [autrePrécision, setAutrePrécision] = useState("");
   const [statutTexte, setStatutTexte] = useState("");
@@ -142,6 +237,9 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
   const basculerFinalité = (f) => setFinalites((liste) => liste.includes(f) ? liste.filter((x) => x !== f) : [...liste, f]);
   const basculerCondition = (c) => setConditionsIA((liste) => liste.includes(c) ? liste.filter((x) => x !== c) : [...liste, c]);
+  // Bloc du contrat d'intention : un seul générateur de bascule pour les 5
+  // listes à cases multiples, plutôt que 5 fonctions identiques.
+  const basculeur = (setListe) => (valeur) => setListe((l) => l.includes(valeur) ? l.filter((x) => x !== valeur) : [...l, valeur]);
 
   const valider = () => {
     if (estPoésie) {
@@ -164,6 +262,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       degreIntervention,
       contraintesAcademiques: estAcadémique ? { autorisationIA, conditions: conditionsIA } : null,
       relationIA: { adresse, ton, posture, longueur, role },
+      contratIntention: (famille || ouEnEtesVous) ? contratIntentionActuel() : null,
     });
   };
 
@@ -177,6 +276,106 @@ export default function CursAuditQuestionnaire({ onValider }) {
           Sans ce cadrage, l'IA analyse un texte sans savoir ce qu'il est censé être,
           pour qui il est écrit, ni jusqu'où elle a le droit d'intervenir.
         </p>
+      </div>
+
+      {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
+          docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
+          Bloc distinct des questions 1-10 ci-dessous (elles restent
+          inchangées) : "qu'écrivez-vous et pourquoi", pas "que peut faire
+          Cursus". Entièrement optionnel — ne bloque jamais la validation,
+          contrairement aux questions 1 à 5 historiques. */}
+      <div style={{ background: "#F7F6FD", border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", display: "grid", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#5B52C4", marginBottom: 4 }}>
+            Contrat d'intention — premier essai, tout est facultatif
+          </div>
+          <p style={{ fontSize: 12, color: "var(--texte-tertiaire)", lineHeight: 1.6 }}>
+            Pas "quel genre de livre", mais "quelle transformation cherchez-vous". Sert de brief déclaré
+            à l'audit, en plus de ce que l'IA déduit du texte lui-même.
+          </p>
+        </div>
+
+        {contratsPrécédents && contratsPrécédents.length > 0 && (
+          <div>
+            <label style={labelStyle}>Réutiliser les réponses d'un audit précédent</label>
+            <select style={champStyle} value={contratChoisi} onChange={(e) => choisirContratPrécédent(e.target.value)}>
+              <option value="">— Ne pas réutiliser —</option>
+              {contratsPrécédents.map((c) => (
+                <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label style={labelStyle}>0. Où en êtes-vous dans ce projet ?</label>
+          <select style={champStyle} value={ouEnEtesVous} onChange={(e) => setOuEnEtesVous(e.target.value)}>
+            <option value="">— Choisir —</option>
+            {OU_EN_ETES_VOUS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label style={labelStyle}>Nature du projet</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <select style={champStyle} value={famille} onChange={(e) => { setFamille(e.target.value); setSousCategorie(""); }}>
+              <option value="">— Famille —</option>
+              {NATURE_PROJET.map((f) => <option key={f.famille} value={f.famille}>{f.famille}</option>)}
+              <option value="Autre">Autre</option>
+            </select>
+            {famille && famille !== "Autre" && (
+              <select style={champStyle} value={sousCategorie} onChange={(e) => setSousCategorie(e.target.value)}>
+                <option value="">— Sous-catégorie —</option>
+                {sousCategoriesDisponibles.map((s) => <option key={s} value={s}>{s}</option>)}
+                <option value="Autre">Autre</option>
+              </select>
+            )}
+            {famille === "Autre" && (
+              <input style={champStyle} value={natureAutre} onChange={(e) => setNatureAutre(e.target.value)} placeholder="Précisez" />
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label style={labelStyle}>Pourquoi écrivez-vous ? (plusieurs choix possibles)</label>
+          <GroupeCases options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Pour qui écrivez-vous ?</label>
+          <GroupeCases options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Qu'attendez-vous de Cursus ?</label>
+          <GroupeCases options={ATTENTES_CURSUS} valeurs={attentesCursus} onBasculer={basculeur(setAttentesCursus)} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>À quoi reconnaîtrez-vous que ce projet est réussi ?</label>
+          <GroupeCases options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Qu'espérez-vous découvrir que vous ignorez encore ?</label>
+          <GroupeCases options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} />
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button type="button" onClick={exporterContratJSON} style={{
+            background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Exporter ce contrat (JSON)
+          </button>
+          <label style={{
+            background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Importer un contrat (JSON)
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => importerContratJSON(e.target.files[0])} />
+          </label>
+        </div>
       </div>
 
       <div>

@@ -287,6 +287,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
       degreIntervention: questionnaire?.degreIntervention,
       contraintesAcademiques: questionnaire?.contraintesAcademiques,
       relationIA: questionnaire?.relationIA,
+      contratIntention: questionnaire?.contratIntention,
       chapitresDétectés,
     });
 
