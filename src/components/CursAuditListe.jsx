@@ -20,13 +20,32 @@ const STATUTS = {
 export default function CursAuditListe({ onOuvrir, onNouveau }) {
   const [audits, setAudits] = useState(null);
   const [erreur, setErreur] = useState(null);
+  // Suppression — réf. 60816-01, suite, 28/08/2026, demande explicite de
+  // l'auteur du projet : aucun moyen jusqu'ici de nettoyer un audit de
+  // test ou un doublon (plusieurs constatés en base, ex. "À cœur
+  // retrouvé"). window.confirm garde le geste réversible-avant-clic sans
+  // construire une modale dédiée pour une action ponctuelle.
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
 
-  useEffect(() => {
+  const charger = () => {
     auditsAPI.lister().then(({ data, error }) => {
       if (error) { setErreur(error.message || "Erreur de chargement."); return; }
       setAudits(data || []);
     });
-  }, []);
+  };
+
+  useEffect(charger, []);
+
+  const supprimer = async (e, audit) => {
+    e.stopPropagation();
+    if (!window.confirm(`Supprimer définitivement l'audit "${audit.titre}" ? Cette action est irréversible.`)) return;
+    setSuppressionEnCours(audit.id);
+    const { error } = await auditsAPI.supprimer(audit.id);
+    setSuppressionEnCours(null);
+    if (error) { setErreur(error.message || "Échec de la suppression."); return; }
+    setErreur(null);
+    charger();
+  };
 
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto" }}>
@@ -73,6 +92,7 @@ export default function CursAuditListe({ onOuvrir, onNouveau }) {
                 <th style={{ padding: "8px 10px" }}>Prix</th>
                 <th style={{ padding: "8px 10px" }}>Statut</th>
                 <th style={{ padding: "8px 10px" }}>Créé le</th>
+                <th style={{ padding: "8px 10px" }}></th>
               </tr>
             </thead>
             <tbody>
@@ -91,6 +111,20 @@ export default function CursAuditListe({ onOuvrir, onNouveau }) {
                     </td>
                     <td style={{ padding: "10px", color: "var(--texte-tertiaire)" }}>
                       {a.cree_le ? new Date(a.cree_le).toLocaleDateString("fr-FR") : "—"}
+                    </td>
+                    <td style={{ padding: "10px", textAlign: "right" }}>
+                      <button
+                        onClick={(e) => supprimer(e, a)}
+                        disabled={suppressionEnCours === a.id}
+                        title="Supprimer cet audit"
+                        style={{
+                          background: "none", border: "none", cursor: suppressionEnCours === a.id ? "default" : "pointer",
+                          color: "var(--texte-tertiaire)", fontSize: 13, padding: "2px 6px",
+                          opacity: suppressionEnCours === a.id ? 0.5 : 1,
+                        }}
+                      >
+                        {suppressionEnCours === a.id ? "…" : "🗑"}
+                      </button>
                     </td>
                   </tr>
                 );

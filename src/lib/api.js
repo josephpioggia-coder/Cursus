@@ -560,6 +560,23 @@ export const auditsAPI = {
     return { data, error };
   },
 
+  /**
+   * Supprime définitivement un audit et ses unités (référence 60816-01,
+   * suite, 28/08/2026 — n'existait pas jusqu'ici, aucun moyen de nettoyer
+   * un audit de test ou un doublon). Supprime d'abord `audit_sections`
+   * (contrainte de clé étrangère), puis la ligne `audits` elle-même.
+   * RLS impose déjà que seul le propriétaire peut supprimer sa propre
+   * ligne ; on filtre aussi sur `user_id` ici pour ne jamais dépendre
+   * silencieusement que de la politique RLS.
+   */
+  async supprimer(auditId) {
+    const uid = await userId();
+    const { error: erreurSections } = await supabase.from("audit_sections").delete().eq("audit_id", auditId);
+    if (erreurSections) return { error: erreurSections };
+    const { error } = await supabase.from("audits").delete().eq("id", auditId).eq("user_id", uid);
+    return { error };
+  },
+
   /** Récupère un audit et ses unités (avec leurs résultats s'ils existent) */
   async récupérerAvecSections(auditId) {
     const { data: audit, error: erreurAudit } = await supabase
