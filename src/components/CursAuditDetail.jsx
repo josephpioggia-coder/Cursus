@@ -31,6 +31,7 @@ import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCurs
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
 import { exporterPreauditWord } from "../lib/exportPreauditWord.js";
 import { exporterAuditDetailleWord } from "../lib/exportAuditDetailleWord.js";
+import { exporterFicheActionWord } from "../lib/exportFicheActionWord.js";
 
 const ORCHESTRATEUR_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/orchestrer-audit-cursaudit";
 // Nom de fonction déployée inchangé (preaudit-global-cursaudit) même si elle
@@ -782,6 +783,19 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
             >
               Exporter le pré-audit (Word)
             </button>
+            {/* Réf. 60816-01, suite, 28/08/2026 — manquait : la fiche
+                d'action était consultable à l'écran mais pas exportable. */}
+            {audit.fiche_action_statut === "termine" && audit.fiche_action_resultat && (
+              <button
+                onClick={() => exporterFicheActionWord(audit, audit.fiche_action_resultat, { titreDocument: "Fiche d'action éditoriale (pré-audit)", prefixeFichier: "fiche_action" })}
+                style={{
+                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                  borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                Exporter la fiche d'action (Word)
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -1424,6 +1438,19 @@ export default function CursAuditDetail({ auditId, onRetour }) {
                 >
                   Exporter l'audit détaillé (Word)
                 </button>
+                {/* Réf. 60816-01, suite, 28/08/2026 — manquait : le rapport
+                    consolidé était consultable à l'écran mais pas exportable. */}
+                {audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat && (
+                  <button
+                    onClick={() => exporterFicheActionWord(audit, audit.synthese_audit_resultat, { titreDocument: "Rapport consolidé de l'audit détaillé", prefixeFichier: "rapport_consolide" })}
+                    style={{
+                      background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80",
+                      borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    }}
+                  >
+                    Exporter le rapport consolidé (Word)
+                  </button>
+                )}
               </div>
             )}
           </div>
