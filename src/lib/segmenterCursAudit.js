@@ -211,18 +211,42 @@ export function regrouperParNiveaux(infos, niveauxRetenus) {
   const unités = [];
   const chapitres = [];
   let chapitreCourant = null;
+  // CORRECTIF 28/08/2026 (réf. 60816-01, suite) — bug confirmé sur un
+  // audit réel (752 unités, 294 quasi vides = 39 %) : un paragraphe stylé
+  // en titre Word mais dont le niveau n'est PAS retenu comme frontière de
+  // chapitre (ex. les sous-titres répétés "Le contexte", "L'application",
+  // "Les mauvaises interprétations", "Question personnelle" à l'intérieur
+  // de chaque carte d'un jeu de 56 cartes) tombait dans le même traitement
+  // que le texte normal — devenait donc sa propre unité, quasiment vide
+  // (juste le libellé), pendant que le paragraphe réel qui le suit
+  // devenait une unité séparée sans contexte. Envoyé tel quel à l'IA,
+  // "Question personnelle" seul produit une analyse qui ne peut que
+  // signaler l'absence de texte à auditer — confirmé en usage réel. Tout
+  // titre non retenu comme frontière est désormais préfixé au contenu qui
+  // le suit plutôt que de devenir sa propre unité.
+  let titresEnAttente = "";
   for (const { texte, niveau } of infos) {
     if (!texte) continue;
     if (niveau !== undefined && retenus.has(niveau)) {
       if (chapitreCourant) chapitres.push(chapitreCourant);
       chapitreCourant = { titre: texte, indexPremièreUnité: unités.length, nombreUnités: 0, mots: 0 };
+      titresEnAttente = "";
+      continue;
+    }
+    if (niveau !== undefined) {
+      // Titre non retenu comme frontière (ex. sous-titre de rubrique) —
+      // mis de côté pour être rattaché au prochain contenu réel plutôt
+      // que traité comme une unité à part.
+      titresEnAttente = titresEnAttente ? `${titresEnAttente}\n${texte}` : texte;
       continue;
     }
     if (texte.length >= LONGUEUR_MIN_UNITE) {
-      unités.push(texte);
+      const texteAvecTitres = titresEnAttente ? `${titresEnAttente}\n${texte}` : texte;
+      titresEnAttente = "";
+      unités.push(texteAvecTitres);
       if (chapitreCourant) {
         chapitreCourant.nombreUnités += 1;
-        chapitreCourant.mots += texte.split(/\s+/).filter(Boolean).length;
+        chapitreCourant.mots += texteAvecTitres.split(/\s+/).filter(Boolean).length;
       }
     }
   }

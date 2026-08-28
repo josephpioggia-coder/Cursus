@@ -527,12 +527,24 @@ const MESSAGES_PENDANT_PREAUDIT = {
 // risque_principal/action_immediate/a_eviter) pour la fiche d'action du
 // pré-audit ET la synthèse de l'audit détaillé — un seul rendu, deux
 // sources (fiche-action-preaudit-cursaudit / synthese-audit-detaille-cursaudit).
-function FicheActionAffichage({ titre, fiche }) {
+// Réf. 60816-01, suite, 28/08/2026 — signalé après un vrai constat de
+// redondance à l'écran : quand ce composant est affiché juste après une
+// FicheExecutive (cas de l'audit détaillé), `diagnostic`, `risque_principal`
+// et `action_immediate` apparaissaient mot pour mot deux fois de suite sur
+// la même page — la FicheExecutive les affiche déjà. `masquerResumeCourt`
+// les masque ici dans ce cas précis ; resterait affiché normalement pour la
+// fiche d'action du pré-audit, qui n'a pas de FicheExecutive au-dessus.
+function FicheActionAffichage({ titre, fiche, masquerResumeCourt = false }) {
   return (
     <div style={{ marginTop: 12, background: "#fff", border: "1px solid #1D9E7580", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
       <div style={{ fontWeight: 600, color: "#1D9E75", fontSize: 12.5 }}>{titre}</div>
-      {fiche.diagnostic && (
+      {!masquerResumeCourt && fiche.diagnostic && (
         <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>
+      )}
+      {masquerResumeCourt && (
+        <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", fontStyle: "italic" }}>
+          Diagnostic, risque principal et première action déjà résumés dans la fiche exécutive ci-dessus — détail complet ci-dessous.
+        </div>
       )}
       {fiche.forces?.length > 0 && (
         <div>
@@ -563,10 +575,10 @@ function FicheActionAffichage({ titre, fiche }) {
           </ol>
         </div>
       )}
-      {fiche.risque_principal && (
+      {!masquerResumeCourt && fiche.risque_principal && (
         <div style={{ fontSize: 12.5, color: "#A32D2D" }}><strong>Risque si rien ne change —</strong> {fiche.risque_principal}</div>
       )}
-      {fiche.action_immediate && (
+      {!masquerResumeCourt && fiche.action_immediate && (
         <div style={{ fontSize: 12.5, background: "#EAF3DE", borderRadius: 6, padding: "6px 8px" }}><strong>Première action —</strong> {fiche.action_immediate}</div>
       )}
       {fiche.a_eviter?.length > 0 && (
@@ -591,13 +603,41 @@ function FicheActionAffichage({ titre, fiche }) {
 // remplacement plus court. Ne fait AUCUN appel supplémentaire : c'est une
 // vue condensée du même résultat déjà reçu (rapport consolidé ou fiche
 // d'action pré-audit), pas un second document généré séparément.
+// Réf. 60816-01, suite, 28/08/2026 — signalé après un incident réel :
+// deux exports Word du même rapport, générés à des moments différents
+// (273 puis potentiellement plus d'unités analysées), pris pour deux
+// documents différents faute d'indication du "instantané" que chacun
+// représente. Affiche désormais explicitement à partir de combien
+// d'unités le document a été produit et quand — jamais deux générations
+// ne pourront plus se confondre silencieusement.
+function libelléInstantané(fiche) {
+  if (!fiche) return null;
+  const morceaux = [];
+  if (typeof fiche.nombre_unites_total === "number") {
+    const échantillonné = typeof fiche.nombre_unites_echantillonnees === "number" && fiche.nombre_unites_echantillonnees < fiche.nombre_unites_total;
+    morceaux.push(
+      `généré à partir de ${fiche.nombre_unites_total} unité${fiche.nombre_unites_total > 1 ? "s" : ""} analysée${fiche.nombre_unites_total > 1 ? "s" : ""}` +
+      (échantillonné ? ` (échantillon de ${fiche.nombre_unites_echantillonnees})` : "")
+    );
+  }
+  if (fiche.analyse_le) {
+    const d = new Date(fiche.analyse_le);
+    morceaux.push(`le ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
+  }
+  return morceaux.length > 0 ? morceaux.join(", ") : null;
+}
+
 function FicheExecutive({ fiche }) {
   if (!fiche) return null;
   const troisPremièresPriorités = [...(fiche.priorites ?? [])].sort((a, b) => a.rang.localeCompare(b.rang)).slice(0, 3);
   const troisPremiersAÉviter = (fiche.a_eviter ?? []).slice(0, 3);
+  const instantané = libelléInstantané(fiche);
   return (
     <div style={{ marginTop: 12, background: "#F7F6FD", border: "1px solid #5B52C480", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
-      <div style={{ fontWeight: 600, color: "#5B52C4", fontSize: 12.5 }}>Fiche exécutive — à lire en premier</div>
+      <div>
+        <div style={{ fontWeight: 600, color: "#5B52C4", fontSize: 12.5 }}>Fiche exécutive — à lire en premier</div>
+        {instantané && <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)", marginTop: 1 }}>{instantané}</div>}
+      </div>
       {fiche.diagnostic && <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>}
       {troisPremièresPriorités.length > 0 && (
         <div>
@@ -1315,7 +1355,17 @@ export default function CursAuditDetail({ auditId, onRetour }) {
 
   if (!audit) return <div style={{ padding: "28px 32px", fontSize: 13, color: "var(--texte-tertiaire)" }}>Chargement…</div>;
 
-  const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement";
+  // Réf. 60816-01, suite, 28/08/2026 — bouton introuvable après un
+  // incident réel : remettre à zéro en SQL des unités en échec (voir
+  // l'audit "Oracle du Sermon sur la montagne", 479 échecs réinitialisés)
+  // laisse `audits.statut` à "termine" (jamais repassé à "en_traitement"
+  // automatiquement par une simple remise à zéro de `audit_sections`),
+  // alors que des unités non traitées existent à nouveau — le bouton
+  // "Continuer l'analyse" restait invisible malgré du travail réel en
+  // attente. Autorisé aussi quand statut = "termine" mais qu'il reste
+  // des unités sans résultat (ni succès, ni échec enregistré).
+  const nonTraitées = total - analysées - échouées;
+  const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement" || (audit.statut === "termine" && nonTraitées > 0);
 
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 920 }}>
@@ -1346,7 +1396,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
               padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
               opacity: enCours ? 0.6 : 1,
             }}>
-              {enCours ? "Analyse en cours…" : audit.statut === "en_traitement" ? "Continuer l'analyse" : "Lancer l'analyse"}
+              {enCours ? "Analyse en cours…" : (audit.statut === "en_traitement" || nonTraitées > 0) ? "Continuer l'analyse" : "Lancer l'analyse"}
             </button>
           </div>
         )}
@@ -1467,7 +1517,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           {audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat && (
             <>
               <FicheExecutive fiche={audit.synthese_audit_resultat} />
-              <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} />
+              <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} masquerResumeCourt />
             </>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, marginTop: 12 }}>

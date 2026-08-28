@@ -565,14 +565,21 @@ Deno.serve(async (req) => {
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
-    if (audit.statut !== "paye" && audit.statut !== "en_traitement") {
-      return json({ error: "statut_invalide", message: `Cet audit a le statut "${audit.statut}", ni payé ni en traitement.` }, 409);
+    // Réf. 60816-01, suite, 28/08/2026 — "termine" accepté en plus de
+    // "payé"/"en_traitement" : un audit remis à zéro (unités en échec
+    // réinitialisées via SQL après incident, ex. schéma non conforme
+    // avant strict:true) reste marqué "termine" tant que personne n'a
+    // relancé le traitement — cette fonction doit pouvoir reprendre le
+    // travail restant plutôt que de rejeter l'appel avec un 409 alors que
+    // des `audit_sections` sans résultat existent bel et bien.
+    if (audit.statut !== "paye" && audit.statut !== "en_traitement" && audit.statut !== "termine") {
+      return json({ error: "statut_invalide", message: `Cet audit a le statut "${audit.statut}", ni payé, ni en traitement, ni terminé.` }, 409);
     }
     if (MODES_NON_IMPLEMENTES.includes(audit.mode_ia)) {
       return json({ error: "mode_non_implemente", message: `Le mode "${audit.mode_ia}" n'est pas encore implémenté.` }, 501);
     }
 
-    if (audit.statut === "paye") {
+    if (audit.statut === "paye" || audit.statut === "termine") {
       await admin.from("audits").update({ statut: "en_traitement" }).eq("id", auditId);
     }
 
@@ -659,7 +666,7 @@ Deno.serve(async (req) => {
       .select("id", { count: "exact", head: true })
       .eq("audit_id", auditId);
 
-    let statutFinal = audit.statut === "paye" ? "en_traitement" : audit.statut;
+    let statutFinal = (audit.statut === "paye" || audit.statut === "termine") ? "en_traitement" : audit.statut;
     if (chapitreMaxIndex === undefined && (restantes ?? 0) === 0 && (totalUnites ?? 0) > 0) {
       statutFinal = "termine";
       await admin.from("audits").update({ statut: "termine" }).eq("id", auditId);
