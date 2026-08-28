@@ -1343,7 +1343,17 @@ export default function CursAuditDetail({ auditId, onRetour }) {
 
   if (!audit) return <div style={{ padding: "28px 32px", fontSize: 13, color: "var(--texte-tertiaire)" }}>Chargement…</div>;
 
-  const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement";
+  // Réf. 60816-01, suite, 28/08/2026 — bouton introuvable après un
+  // incident réel : remettre à zéro en SQL des unités en échec (voir
+  // l'audit "Oracle du Sermon sur la montagne", 479 échecs réinitialisés)
+  // laisse `audits.statut` à "termine" (jamais repassé à "en_traitement"
+  // automatiquement par une simple remise à zéro de `audit_sections`),
+  // alors que des unités non traitées existent à nouveau — le bouton
+  // "Continuer l'analyse" restait invisible malgré du travail réel en
+  // attente. Autorisé aussi quand statut = "termine" mais qu'il reste
+  // des unités sans résultat (ni succès, ni échec enregistré).
+  const nonTraitées = total - analysées - échouées;
+  const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement" || (audit.statut === "termine" && nonTraitées > 0);
 
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 920 }}>
@@ -1374,7 +1384,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
               padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
               opacity: enCours ? 0.6 : 1,
             }}>
-              {enCours ? "Analyse en cours…" : audit.statut === "en_traitement" ? "Continuer l'analyse" : "Lancer l'analyse"}
+              {enCours ? "Analyse en cours…" : (audit.statut === "en_traitement" || nonTraitées > 0) ? "Continuer l'analyse" : "Lancer l'analyse"}
             </button>
           </div>
         )}
