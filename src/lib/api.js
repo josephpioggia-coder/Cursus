@@ -474,6 +474,14 @@ export const auditsAPI = {
     // champs (aucun ne l'était avant ce jour) continue de fonctionner.
     typeDocument = null, statutTexte = null, finaliteAudit = null, questionLibre = null,
     degreIntervention = null, contraintesAcademiques = null, relationIA = null,
+    // Contrat d'intention (réf. 60816-01, suite, 28/08/2026) — voir
+    // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
+    // Objet libre { ouEnEtesVous, natureProjet: {famille, sousCategorie,
+    // autre}, objectifs, destinataires, attentesCursus, criteresReussite,
+    // ceQueVousEsperezDecouvrir } — voir CursAuditQuestionnaire.jsx.
+    // Optionnel : null pour tout audit créé avant ce jour ou sans ce bloc
+    // rempli.
+    contratIntention = null,
     // Chapitres détectés à l'import .docx (réf. 60816-01, suite, 24/08/2026)
     // — voir extraireParagraphesDocxAvecChapitres() dans
     // segmenterCursAudit.js. null si texte collé ou aucune structure
@@ -516,6 +524,7 @@ export const auditsAPI = {
         degre_intervention:      degreIntervention,
         contraintes_academiques: contraintesAcademiques,
         relation_ia:             relationIA,
+        contrat_intention:       contratIntention,
         chapitres_detectes:      chapitresDétectés,
       }])
       .select()
@@ -556,6 +565,21 @@ export const auditsAPI = {
     const { data, error } = await supabase
       .from("audits")
       .select("*")
+      .order("cree_le", { ascending: false });
+    return { data, error };
+  },
+
+  /**
+   * Liste les contrats d'intention déjà remplis sur d'anciens audits de
+   * l'utilisateur (réf. 60816-01, suite, 28/08/2026) — pour le sélecteur
+   * "Réutiliser les réponses d'un audit précédent" du questionnaire.
+   * Évite d'avoir à repasser les mêmes questions à chaque nouvel audit.
+   */
+  async listerContratsIntention() {
+    const { data, error } = await supabase
+      .from("audits")
+      .select("id, titre, contrat_intention, cree_le")
+      .not("contrat_intention", "is", null)
       .order("cree_le", { ascending: false });
     return { data, error };
   },
