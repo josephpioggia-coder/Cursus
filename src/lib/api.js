@@ -452,6 +452,47 @@ export const usageIAAPI = {
   },
 };
 
+// ─── PROFIL AUTEUR (référence 60816-01, suite, 28/08/2026) ──────────────────
+// Une ligne par utilisateur (table profils_auteur), pas par audit/projet —
+// rempli une fois, réutilisé partout (CursAudit aujourd'hui, CursEdit à
+// suivre). Voir ProfilAuteur.jsx et 2026-08-28-profil-auteur.sql.
+
+export const profilAuteurAPI = {
+  /** Récupère le profil de l'utilisateur connecté, ou null s'il n'en a jamais rempli. */
+  async récupérer() {
+    const uid = await userId();
+    if (!uid) return { data: null, error: { message: "Non connecté." } };
+    const { data, error } = await supabase
+      .from("profils_auteur")
+      .select("*")
+      .eq("user_id", uid)
+      .maybeSingle();
+    return { data, error };
+  },
+
+  /** Crée ou met à jour le profil de l'utilisateur connecté (upsert sur user_id, clé primaire). */
+  async enregistrer(champs) {
+    const uid = await userId();
+    if (!uid) return { data: null, error: { message: "Non connecté." } };
+    const { data, error } = await supabase
+      .from("profils_auteur")
+      .upsert([{
+        user_id:           uid,
+        profession:        champs.profession || null,
+        identite_genre:    champs.identiteGenre || null,
+        tranche_age:       champs.trancheAge || null,
+        niveau_etudes:     champs.niveauEtudes || null,
+        matieres_etudiees: champs.matieresEtudiees || null,
+        texte_source_brut: champs.texteSourceBrut || null,
+        resume_parcours:   champs.resumeParcours || null,
+        mis_a_jour_le:     new Date().toISOString(),
+      }])
+      .select()
+      .single();
+    return { data, error };
+  },
+};
+
 // ─── AUDITS (CursAudit) — référence 60816-01 ────────────────────────────────
 // Écriture directe via RLS (auth.uid() = user_id) : pas besoin d'Edge Function
 // pour la simple création, contrairement à l'analyse elle-même qui appelle

@@ -717,7 +717,23 @@ interface AuditQualification {
   contraintes_academiques: { autorisationIA?: string; conditions?: string[] } | null;
 }
 
-function construireContexteQualification(audit: AuditQualification): string {
+// Profil auteur — réf. 60816-01, suite, 28/08/2026 (table profils_auteur,
+// voir ProfilAuteur.jsx). Entièrement optionnel côté auteur·ice ; injecté
+// ici SEULEMENT si au moins un champ est renseigné — jamais une ligne
+// vide ou "non précisé" qui n'apporterait rien au prompt. Demande
+// explicite de l'auteur du projet : savoir qu'un auteur écrivant sur son
+// métier l'exerce réellement a une vraie valeur pour juger la
+// crédibilité professionnelle du texte ; l'identité (genre, âge) compte
+// notamment pour une autobiographie ou un livre professionnel.
+interface ProfilAuteur {
+  profession: string | null;
+  identite_genre: string | null;
+  tranche_age: string | null;
+  niveau_etudes: string | null;
+  matieres_etudiees: string | null;
+}
+
+function construireContexteQualification(audit: AuditQualification, profil: ProfilAuteur | null): string {
   const lignes: string[] = [];
   if (audit.type_document) lignes.push(`Type de document : ${audit.type_document}.`);
   if (audit.finalite_audit && audit.finalite_audit.length > 0) {
@@ -731,6 +747,16 @@ function construireContexteQualification(audit: AuditQualification): string {
     lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail — reste strictement au diagnostic, aucune proposition ni reformulation.");
   } else if (audit.contraintes_academiques?.conditions && audit.contraintes_academiques.conditions.length > 0) {
     lignes.push(`Conditions académiques à respecter : ${audit.contraintes_academiques.conditions.join(", ")}.`);
+  }
+  const profilLignes: string[] = [];
+  if (profil?.profession) profilLignes.push(`profession : ${profil.profession}`);
+  if (profil?.identite_genre) profilLignes.push(`identité : ${profil.identite_genre}`);
+  if (profil?.tranche_age) profilLignes.push(`tranche d'âge : ${profil.tranche_age}`);
+  if (profil?.niveau_etudes) profilLignes.push(`niveau d'études : ${profil.niveau_etudes}`);
+  if (profil?.matieres_etudiees) profilLignes.push(`domaines étudiés : ${profil.matieres_etudiees}`);
+  if (profilLignes.length > 0) {
+    lignes.push(`Profil de l'auteur·ice (${profilLignes.join(", ")}) — utile pour juger la crédibilité ` +
+      "des affirmations professionnelles ou personnelles du texte, jamais pour préjuger de sa qualité littéraire.");
   }
   return lignes.length > 0 ? lignes.join("\n") + "\n\n" : "";
 }
@@ -829,6 +855,14 @@ Deno.serve(async (req) => {
       return json({ error: "paiement_requis", message: `Le pré-audit a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
     }
 
+    // Profil auteur optionnel (réf. 60816-01, suite, 28/08/2026) — table
+    // séparée, une ligne par utilisateur, peut ne pas exister du tout.
+    const { data: profilAuteur } = await admin
+      .from("profils_auteur")
+      .select("profession, identite_genre, tranche_age, niveau_etudes, matieres_etudiees")
+      .eq("user_id", userId)
+      .maybeSingle();
+
     // CORRECTIF 26/08/2026 — bug réel trouvé sur "À cœur retrouvé" (1442
     // unités) : le chapitre "Remerciements" (le dernier du livre) revenait
     // "vide" au pré-audit alors qu'il contient 1154 mots bien réels et
@@ -869,7 +903,7 @@ Deno.serve(async (req) => {
     const construireTexteEtPrompt = () => {
       const texteIntegral = sections.map((s) => s.texte_source).join("\n\n");
       const nombreMots = texteIntegral.split(/\s+/).filter(Boolean).length;
-      const contexteQualification = construireContexteQualification(audit);
+      const contexteQualification = construireContexteQualification(audit, profilAuteur);
       const systemPromptInitial = construireSystemPrompt(contexteQualification, audit.apercu_resultat ?? {}, nombreMots);
       return { texteIntegral, systemPromptInitial };
     };
