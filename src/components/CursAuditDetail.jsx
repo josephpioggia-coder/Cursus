@@ -591,13 +591,41 @@ function FicheActionAffichage({ titre, fiche }) {
 // remplacement plus court. Ne fait AUCUN appel supplémentaire : c'est une
 // vue condensée du même résultat déjà reçu (rapport consolidé ou fiche
 // d'action pré-audit), pas un second document généré séparément.
+// Réf. 60816-01, suite, 28/08/2026 — signalé après un incident réel :
+// deux exports Word du même rapport, générés à des moments différents
+// (273 puis potentiellement plus d'unités analysées), pris pour deux
+// documents différents faute d'indication du "instantané" que chacun
+// représente. Affiche désormais explicitement à partir de combien
+// d'unités le document a été produit et quand — jamais deux générations
+// ne pourront plus se confondre silencieusement.
+function libelléInstantané(fiche) {
+  if (!fiche) return null;
+  const morceaux = [];
+  if (typeof fiche.nombre_unites_total === "number") {
+    const échantillonné = typeof fiche.nombre_unites_echantillonnees === "number" && fiche.nombre_unites_echantillonnees < fiche.nombre_unites_total;
+    morceaux.push(
+      `généré à partir de ${fiche.nombre_unites_total} unité${fiche.nombre_unites_total > 1 ? "s" : ""} analysée${fiche.nombre_unites_total > 1 ? "s" : ""}` +
+      (échantillonné ? ` (échantillon de ${fiche.nombre_unites_echantillonnees})` : "")
+    );
+  }
+  if (fiche.analyse_le) {
+    const d = new Date(fiche.analyse_le);
+    morceaux.push(`le ${d.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} à ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`);
+  }
+  return morceaux.length > 0 ? morceaux.join(", ") : null;
+}
+
 function FicheExecutive({ fiche }) {
   if (!fiche) return null;
   const troisPremièresPriorités = [...(fiche.priorites ?? [])].sort((a, b) => a.rang.localeCompare(b.rang)).slice(0, 3);
   const troisPremiersAÉviter = (fiche.a_eviter ?? []).slice(0, 3);
+  const instantané = libelléInstantané(fiche);
   return (
     <div style={{ marginTop: 12, background: "#F7F6FD", border: "1px solid #5B52C480", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
-      <div style={{ fontWeight: 600, color: "#5B52C4", fontSize: 12.5 }}>Fiche exécutive — à lire en premier</div>
+      <div>
+        <div style={{ fontWeight: 600, color: "#5B52C4", fontSize: 12.5 }}>Fiche exécutive — à lire en premier</div>
+        {instantané && <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)", marginTop: 1 }}>{instantané}</div>}
+      </div>
       {fiche.diagnostic && <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>}
       {troisPremièresPriorités.length > 0 && (
         <div>
