@@ -82,6 +82,30 @@
  * préoccupations disparates en une question naturelle est un vrai travail
  * de synthèse en langage, pas une simple sélection dans un arbre.
  *
+ * DEUX AJOUTS, MÊME JOUR (3e correctif, demande explicite de l'auteur du
+ * projet) :
+ *  1. Niveau 3 sur "Nature du projet" — "Roman ne reprend pas encore les
+ *     différents types existants". Voir nomSousCategorie()/sousGenresDe()
+ *     dans taxonomieContratIntentionCursAudit.js : un élément de
+ *     sousCategories peut désormais être soit une chaîne simple, soit
+ *     `{ nom, sousGenres }`. Seul "Roman" est détaillé pour l'instant (liste
+ *     rédigée directement dans ce fichier, la liste de 47 sous-genres
+ *     élaborée le 28/08/2026 avec ChatGPT n'ayant jamais été commitée au
+ *     dépôt et n'ayant pas pu être retrouvée) — le mécanisme est générique,
+ *     approfondir une autre branche (Religion → Christianisme, par exemple)
+ *     est un ajout de données, pas de code.
+ *  2. "Autre, à préciser" sur les 5 questions à cases (Pourquoi/pour qui
+ *     écrivez-vous, Qu'attendez-vous de l'audit, critère de réussite, ce
+ *     que vous espérez découvrir) — jusqu'ici seule "Nature du projet"
+ *     l'avait. Voir `useAutre()`/`GroupeCasesAvecAutre` : chaque "Autre" a
+ *     son propre état séparé (jamais fusionné dans le tableau de cases
+ *     coché, pour rester fidèlement réimportable) — sauf celui de
+ *     "Qu'attendez-vous de cet audit ?", qui EST fusionné dans
+ *     `finaliteAudit` au moment de valider() (seul champ de ce groupe lu
+ *     directement par les 3 fonctions d'analyse au premier niveau ; les 4
+ *     autres "Autre" sont recombinés côté serveur dans
+ *     construireContexteQualification à partir de `contrat_intention`).
+ *
  * Repère (question → fonction dans l'audit → type de réponse), pour
  * mémoire plutôt que pour l'UI :
  *   Profil de l'auteur          → crédibilité/contexte de l'auteur·ice   → texte libre + champs
@@ -123,6 +147,7 @@ import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
   NATURE_PROJET, OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
   CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
+  nomSousCategorie, sousGenresDe,
 } from "../lib/taxonomieContratIntentionCursAudit.js";
 
 // Sous-catégories de la nouvelle taxonomie faites d'entrées courtes et
@@ -235,6 +260,37 @@ function GroupeCases({ options, valeurs, onBasculer }) {
   );
 }
 
+// Case "Autre, à préciser" pour un état booléen + texte — réf. 60816-01,
+// suite, 29/08/2026, demande explicite de l'auteur du projet : chaque
+// question à cases (objectifs, destinataires, finalités, critères de
+// réussite, ce que vous espérez découvrir) doit pouvoir ouvrir une réponse
+// personnelle, pas seulement les listes prédéfinies. Petit hook pour éviter
+// de répéter la même paire d'états 5 fois.
+function useAutre() {
+  const [actif, setActif] = useState(false);
+  const [texte, setTexte] = useState("");
+  return { actif, setActif, texte, setTexte };
+}
+
+function GroupeCasesAvecAutre({ options, valeurs, onBasculer, autre }) {
+  return (
+    <>
+      <GroupeCases options={options} valeurs={valeurs} onBasculer={onBasculer} />
+      <div style={{ marginTop: 2 }}>
+        <Checkbox checked={autre.actif} onChange={() => autre.setActif((v) => !v)} label="Autre, à préciser" />
+        {autre.actif && (
+          <input
+            style={{ ...champStyle, marginTop: 6 }}
+            value={autre.texte}
+            onChange={(e) => autre.setTexte(e.target.value)}
+            placeholder="Précisez"
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function CursAuditQuestionnaire({ onValider }) {
   // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
   // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
@@ -245,10 +301,24 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const [famille, setFamille] = useState("");
   const [sousCategorie, setSousCategorie] = useState("");
   const [natureAutre, setNatureAutre] = useState("");
+  // Niveau 3 (réf. 60816-01, suite, 29/08/2026, demande explicite de
+  // l'auteur du projet : "Roman ne reprend pas encore les différents types
+  // existants") — uniquement présent quand la sous-catégorie choisie a des
+  // sousGenres (voir taxonomieContratIntentionCursAudit.js). "Autre" a son
+  // propre champ, comme famille/sousCategorie.
+  const [sousGenre, setSousGenre] = useState("");
+  const [sousGenreAutre, setSousGenreAutre] = useState("");
   const [objectifs, setObjectifs] = useState([]);
   const [destinataires, setDestinataires] = useState([]);
   const [criteresReussite, setCriteresReussite] = useState([]);
   const [ceQueVousEspérezDécouvrir, setCeQueVousEspérezDécouvrir] = useState([]);
+  // "Autre, à préciser" pour chacune des 5 questions à cases — réf.
+  // 60816-01, suite, 29/08/2026, demande explicite de l'auteur du projet.
+  const objectifsAutre = useAutre();
+  const destinatairesAutre = useAutre();
+  const finalitesAutre = useAutre();
+  const criteresReussiteAutre = useAutre();
+  const espérezDécouvrirAutre = useAutre();
   const [contratsPrécédents, setContratsPrécédents] = useState(null);
   const [contratChoisi, setContratChoisi] = useState("");
 
@@ -266,12 +336,16 @@ export default function CursAuditQuestionnaire({ onValider }) {
   }, []);
 
   const sousCategoriesDisponibles = NATURE_PROJET.find((f) => f.famille === famille)?.sousCategories ?? [];
+  const sousCategorieSélectionnée = sousCategoriesDisponibles.find((s) => nomSousCategorie(s) === sousCategorie);
+  const sousGenresDisponibles = sousCategorieSélectionnée ? sousGenresDe(sousCategorieSélectionnée) : null;
 
   const appliquerContrat = (c) => {
     if (!c) return;
     setOuEnEtesVous(c.ouEnEtesVous || "");
     setFamille(c.natureProjet?.famille || "");
     setSousCategorie(c.natureProjet?.sousCategorie || "");
+    setSousGenre(c.natureProjet?.sousGenre || "");
+    setSousGenreAutre(c.natureProjet?.sousGenreAutre || "");
     setNatureAutre(c.natureProjet?.autre || "");
     setObjectifs(c.objectifs || []);
     setDestinataires(c.destinataires || []);
@@ -281,6 +355,13 @@ export default function CursAuditQuestionnaire({ onValider }) {
     if (c.attentesCursus?.length > 0) setFinalites((f) => [...new Set([...f, ...c.attentesCursus])]);
     setCriteresReussite(c.criteresReussite || []);
     setCeQueVousEspérezDécouvrir(c.ceQueVousEspérezDécouvrir || []);
+    // "Autre, à préciser" des 5 questions à cases — réf. 60816-01, suite,
+    // 29/08/2026.
+    objectifsAutre.setTexte(c.objectifsAutre || ""); objectifsAutre.setActif(!!c.objectifsAutre);
+    destinatairesAutre.setTexte(c.destinatairesAutre || ""); destinatairesAutre.setActif(!!c.destinatairesAutre);
+    finalitesAutre.setTexte(c.attentesCursusAutre || ""); finalitesAutre.setActif(!!c.attentesCursusAutre);
+    criteresReussiteAutre.setTexte(c.criteresReussiteAutre || ""); criteresReussiteAutre.setActif(!!c.criteresReussiteAutre);
+    espérezDécouvrirAutre.setTexte(c.ceQueVousEspérezDécouvrirAutre || ""); espérezDécouvrirAutre.setActif(!!c.ceQueVousEspérezDécouvrirAutre);
     // Réf. 60816-01, suite, 29/08/2026 — signalé par l'auteur du projet :
     // exporter un contrat sans la question précise fait perdre l'information
     // la plus centrale ("boussole de l'audit") en cas de réimport. Ajoutée
@@ -299,7 +380,15 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
   const contratIntentionActuel = () => ({
     ouEnEtesVous,
-    natureProjet: { famille, sousCategorie, autre: famille === "Autre" ? natureAutre : "" },
+    natureProjet: {
+      famille, sousCategorie,
+      // Niveau 3 (réf. 60816-01, suite, 29/08/2026) — présent seulement si
+      // la sous-catégorie a des sous-genres et que l'auteur·ice en a choisi
+      // un (ou précisé "Autre" à ce niveau).
+      sousGenre: sousGenresDisponibles ? sousGenre : "",
+      sousGenreAutre: sousGenresDisponibles && sousGenre === "Autre" ? sousGenreAutre.trim() : "",
+      autre: famille === "Autre" ? natureAutre : "",
+    },
     objectifs, destinataires,
     // Fusionné avec "Que veux-tu obtenir ?" le 28/08/2026 (doublon signalé
     // par l'auteur du projet) — mêmes valeurs que `finalites`, pas un
@@ -307,6 +396,17 @@ export default function CursAuditQuestionnaire({ onValider }) {
     attentesCursus: finalites,
     criteresReussite,
     ceQueVousEspérezDécouvrir,
+    // "Autre, à préciser" des 5 questions à cases — réf. 60816-01, suite,
+    // 29/08/2026, demande explicite de l'auteur du projet. Champs séparés
+    // (pas fusionnés dans les tableaux ci-dessus) pour rester fidèlement
+    // réimportables sans risque de doublon sur un second export — voir
+    // construireContexteQualification côté serveur pour où ils sont
+    // effectivement recombinés dans le prompt.
+    objectifsAutre: objectifsAutre.actif ? objectifsAutre.texte.trim() : "",
+    destinatairesAutre: destinatairesAutre.actif ? destinatairesAutre.texte.trim() : "",
+    attentesCursusAutre: finalitesAutre.actif ? finalitesAutre.texte.trim() : "",
+    criteresReussiteAutre: criteresReussiteAutre.actif ? criteresReussiteAutre.texte.trim() : "",
+    ceQueVousEspérezDécouvrirAutre: espérezDécouvrirAutre.actif ? espérezDécouvrirAutre.texte.trim() : "",
     // Ajouté le 29/08/2026 (voir appliquerContrat) — sans ce champ, exporter
     // puis réimporter un contrat perdait la question précise posée à
     // CursAudit, pourtant la pièce la plus centrale du cadrage.
@@ -425,15 +525,35 @@ export default function CursAuditQuestionnaire({ onValider }) {
       setErreur("La poésie est un type de projet à l'étude chez Cursus, pas encore disponible — voir le message dans \"Nature du projet\".");
       return;
     }
-    if (!natureRenseignée || !ouEnEtesVous || finalites.length === 0 || !questionLibre.trim() || !degreIntervention) {
+    // "Autre" de "Qu'attendez-vous de cet audit ?" fusionné ici (réf.
+    // 60816-01, suite, 29/08/2026) : contrairement aux 4 autres questions à
+    // cases, celle-ci alimente aussi `finaliteAudit`, un champ obligatoire
+    // au premier niveau, lu directement par les 3 fonctions d'analyse
+    // (`audit.finalite_audit`) — `contratIntention.attentesCursus` n'est
+    // qu'une copie archivée, jamais relue par le moteur. Sans cette fusion,
+    // préciser "Autre" ici n'aurait eu aucun effet réel sur l'analyse.
+    const finalitesAvecAutre = finalitesAutre.actif && finalitesAutre.texte.trim()
+      ? [...finalites, finalitesAutre.texte.trim()]
+      : finalites;
+    if (!natureRenseignée || !ouEnEtesVous || finalitesAvecAutre.length === 0 || !questionLibre.trim() || !degreIntervention) {
       setErreur("Merci de compléter la nature du projet, où vous en êtes, ce que vous voulez obtenir et la question libre avant de continuer.");
       return;
     }
-    const typeDocument = famille === "Autre" ? natureAutre.trim() : (sousCategorie ? `${sousCategorie} (${famille})` : famille);
+    // Niveau 3 (réf. 60816-01, suite, 29/08/2026) — inclus dans typeDocument
+    // (chaîne libre injectée au moteur d'analyse, jamais comparée
+    // strictement — voir docblock en tête de fichier) quand renseigné.
+    const sousGenreRetenu = sousGenresDisponibles
+      ? (sousGenre === "Autre" ? sousGenreAutre.trim() : sousGenre)
+      : "";
+    const typeDocument = famille === "Autre"
+      ? natureAutre.trim()
+      : (sousCategorie
+        ? `${sousGenreRetenu ? `${sousGenreRetenu} — ` : ""}${sousCategorie} (${famille})`
+        : famille);
     onValider({
       typeDocument,
       statutTexte: ouEnEtesVous,
-      finaliteAudit: finalites,
+      finaliteAudit: finalitesAvecAutre,
       questionLibre: questionLibre.trim(),
       degreIntervention,
       contraintesAcademiques: estTravailAcademique ? { autorisationIA, conditions: conditionsIA } : null,
@@ -521,15 +641,22 @@ export default function CursAuditQuestionnaire({ onValider }) {
         <div>
           <label style={labelStyle}>Nature du projet *</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <select style={champStyle} value={famille} onChange={(e) => { setFamille(e.target.value); setSousCategorie(""); }}>
+            <select style={champStyle} value={famille} onChange={(e) => {
+              setFamille(e.target.value); setSousCategorie(""); setSousGenre(""); setSousGenreAutre("");
+            }}>
               <option value="">— Famille —</option>
               {NATURE_PROJET.map((f) => <option key={f.famille} value={f.famille}>{f.famille}</option>)}
               <option value="Autre">Autre</option>
             </select>
             {famille && famille !== "Autre" && (
-              <select style={champStyle} value={sousCategorie} onChange={(e) => setSousCategorie(e.target.value)}>
+              <select style={champStyle} value={sousCategorie} onChange={(e) => {
+                setSousCategorie(e.target.value); setSousGenre(""); setSousGenreAutre("");
+              }}>
                 <option value="">— Sous-catégorie —</option>
-                {sousCategoriesDisponibles.map((s) => <option key={s} value={s}>{s}</option>)}
+                {sousCategoriesDisponibles.map((s) => {
+                  const nom = nomSousCategorie(s);
+                  return <option key={nom} value={nom}>{nom}</option>;
+                })}
                 <option value="Autre">Autre</option>
               </select>
             )}
@@ -537,6 +664,30 @@ export default function CursAuditQuestionnaire({ onValider }) {
               <input style={champStyle} value={natureAutre} onChange={(e) => setNatureAutre(e.target.value)} placeholder="Précisez" />
             )}
           </div>
+          {/* Niveau 3 — réf. 60816-01, suite, 29/08/2026, demande explicite
+              de l'auteur du projet ("Roman ne reprend pas encore les
+              différents types existants"). Uniquement affiché quand la
+              sous-catégorie choisie a des sous-genres (voir
+              taxonomieContratIntentionCursAudit.js — pour l'instant, seul
+              "Roman" en a). */}
+          {sousGenresDisponibles && (
+            <div style={{ marginTop: 10 }}>
+              <label style={labelStyle}>Quel type de {sousCategorie} ?</label>
+              <select style={champStyle} value={sousGenre} onChange={(e) => setSousGenre(e.target.value)}>
+                <option value="">— Choisir —</option>
+                {sousGenresDisponibles.map((sg) => <option key={sg} value={sg}>{sg}</option>)}
+                <option value="Autre">Autre</option>
+              </select>
+              {sousGenre === "Autre" && (
+                <input
+                  style={{ ...champStyle, marginTop: 8 }}
+                  value={sousGenreAutre}
+                  onChange={(e) => setSousGenreAutre(e.target.value)}
+                  placeholder="Précisez"
+                />
+              )}
+            </div>
+          )}
           {estPoésie && (
             <div style={{ background: "#FBE9E9", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 4 }}>
@@ -565,27 +716,27 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
         <div>
           <label style={labelStyle}>Pourquoi écrivez-vous ?</label>
-          <GroupeCases options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} />
+          <GroupeCasesAvecAutre options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} autre={objectifsAutre} />
         </div>
 
         <div>
           <label style={labelStyle}>Pour qui écrivez-vous ?</label>
-          <GroupeCases options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} />
+          <GroupeCasesAvecAutre options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} autre={destinatairesAutre} />
         </div>
 
         <div>
           <label style={labelStyle}>Qu'attendez-vous de cet audit ? *</label>
-          <GroupeCases options={FINALITES} valeurs={finalites} onBasculer={basculerFinalité} />
+          <GroupeCasesAvecAutre options={FINALITES} valeurs={finalites} onBasculer={basculerFinalité} autre={finalitesAutre} />
         </div>
 
         <div>
           <label style={labelStyle}>À quoi reconnaîtrez-vous que ce projet est réussi ?</label>
-          <GroupeCases options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} />
+          <GroupeCasesAvecAutre options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} autre={criteresReussiteAutre} />
         </div>
 
         <div>
           <label style={labelStyle}>Qu'espérez-vous découvrir que vous ignorez encore ?</label>
-          <GroupeCases options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} />
+          <GroupeCasesAvecAutre options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} autre={espérezDécouvrirAutre} />
         </div>
 
         <div>

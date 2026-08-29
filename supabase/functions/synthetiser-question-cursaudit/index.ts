@@ -87,6 +87,14 @@ interface ContratIntentionEnvoye {
   attentesCursus?: string[];
   criteresReussite?: string[];
   ceQueVousEspérezDécouvrir?: string[];
+  // "Autre, à préciser" de chacune des questions à cases — réf. 60816-01,
+  // suite, 29/08/2026. Voir le commentaire jumeau dans
+  // analyser-unite-cursaudit/index.ts.
+  objectifsAutre?: string;
+  destinatairesAutre?: string;
+  attentesCursusAutre?: string;
+  criteresReussiteAutre?: string;
+  ceQueVousEspérezDécouvrirAutre?: string;
 }
 
 function construireContexte(
@@ -112,11 +120,16 @@ function construireContexte(
     lignes.push(`Nature du projet : ${nature}.`);
   }
   if (c?.ouEnEtesVous) lignes.push(`Où en est l'auteur·ice dans ce projet : ${c.ouEnEtesVous}.`);
-  if (c?.objectifs && c.objectifs.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${c.objectifs.join(", ")}.`);
-  if (c?.destinataires && c.destinataires.length > 0) lignes.push(`Pour qui ce texte est écrit : ${c.destinataires.join(", ")}.`);
-  if (c?.attentesCursus && c.attentesCursus.length > 0) lignes.push(`Ce que l'auteur·ice attend de cet audit : ${c.attentesCursus.join(", ")}.`);
-  if (c?.criteresReussite && c.criteresReussite.length > 0) lignes.push(`Ce qui ferait de ce projet une réussite : ${c.criteresReussite.join(", ")}.`);
-  if (c?.ceQueVousEspérezDécouvrir && c.ceQueVousEspérezDécouvrir.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir : ${c.ceQueVousEspérezDécouvrir.join(", ")}.`);
+  const objectifsComplets = [...(c?.objectifs ?? []), ...(c?.objectifsAutre ? [c.objectifsAutre] : [])];
+  if (objectifsComplets.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${objectifsComplets.join(", ")}.`);
+  const destinatairesComplets = [...(c?.destinataires ?? []), ...(c?.destinatairesAutre ? [c.destinatairesAutre] : [])];
+  if (destinatairesComplets.length > 0) lignes.push(`Pour qui ce texte est écrit : ${destinatairesComplets.join(", ")}.`);
+  const attentesComplets = [...(c?.attentesCursus ?? []), ...(c?.attentesCursusAutre ? [c.attentesCursusAutre] : [])];
+  if (attentesComplets.length > 0) lignes.push(`Ce que l'auteur·ice attend de cet audit : ${attentesComplets.join(", ")}.`);
+  const criteresReussiteComplets = [...(c?.criteresReussite ?? []), ...(c?.criteresReussiteAutre ? [c.criteresReussiteAutre] : [])];
+  if (criteresReussiteComplets.length > 0) lignes.push(`Ce qui ferait de ce projet une réussite : ${criteresReussiteComplets.join(", ")}.`);
+  const espérezDécouvrirComplets = [...(c?.ceQueVousEspérezDécouvrir ?? []), ...(c?.ceQueVousEspérezDécouvrirAutre ? [c.ceQueVousEspérezDécouvrirAutre] : [])];
+  if (espérezDécouvrirComplets.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir : ${espérezDécouvrirComplets.join(", ")}.`);
   if (preoccupations.length > 0) lignes.push(`Préoccupations éditoriales cochées pour cette question précise : ${preoccupations.join(" / ")}.`);
   if (preoccupationAutre) lignes.push(`Préoccupation supplémentaire précisée librement par l'auteur·ice : "${preoccupationAutre}"`);
   return lignes.join("\n");
