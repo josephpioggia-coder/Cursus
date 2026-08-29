@@ -63,10 +63,24 @@
  * plus centrale du cadrage ("si je veux exporter, j'ai besoin de cette
  * information aussi", demande explicite de l'auteur du projet). Déplacée
  * dans le bloc, juste avant les boutons Exporter/Importer, et ajoutée à
- * `contratIntentionActuel()`/`appliquerContrat()`. Garde délibérément la
- * forme d'un champ texte plutôt que de cases à cocher — les exemples
- * affichés au-dessus (formulation exacte proposée par l'auteur du projet)
- * servent d'inspiration sans "enfermer l'utilisateur" dans une liste fermée.
+ * `contratIntentionActuel()`/`appliquerContrat()`.
+ *
+ * FLUX EN 3 ÉTAPES, MÊME JOUR (2e correctif, demande explicite de l'auteur
+ * du projet avec GPT) — remplace le champ texte + exemples ci-dessus par :
+ * (1) des cases à cocher de préoccupations éditoriales concrètes
+ * (PREOCCUPATIONS_QUESTION_PRECISE, + "Autre, à préciser"), (2) un appel à
+ * la nouvelle Edge Function `synthetiser-question-cursaudit` (bouton
+ * "Proposer ma question centrale") qui combine ces cases avec le profil
+ * auteur et le reste du contrat d'intention en UNE question cohérente, (3)
+ * un champ "Question centrale validée" — préremplit par la proposition,
+ * mais toujours librement modifiable — qui reste `questionLibre`, la même
+ * variable qu'avant. SEULE étape de tout ce questionnaire à appeler l'IA
+ * (voir la note "RUPTURE ASSUMÉE" dans synthetiser-question-cursaudit/index.ts) :
+ * le reste (taxonomie, cases à cocher) reste 100% statique, décision
+ * assumée le 28/08/2026 pour éviter la fragilité observée ce jour-là
+ * (NetworkError, sorties mal formées, latence) — ici, combiner des
+ * préoccupations disparates en une question naturelle est un vrai travail
+ * de synthèse en langage, pas une simple sélection dans un arbre.
  *
  * Repère (question → fonction dans l'audit → type de réponse), pour
  * mémoire plutôt que pour l'UI :
@@ -102,7 +116,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { auditsAPI } from "../lib/api.js";
+import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
+import { supabase } from "../lib/supabase.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
 import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
@@ -172,6 +187,30 @@ const CONDITIONS_IA_ACADEMIQUE = [
   "Obligation de déclaration",
 ];
 
+// Préoccupations éditoriales pour "Quelle est la question précise que vous
+// voulez poser à CursAudit ?" (réf. 60816-01, suite, 29/08/2026, demande
+// explicite de l'auteur du projet, avec GPT). Sert de SIGNAL à cocher, pas
+// de question finale : combinées par synthetiser-question-cursaudit (voir
+// ce fichier) en une seule question centrale que l'auteur·ice valide ou
+// modifie ensuite — voir "Question centrale validée" plus bas.
+const PREOCCUPATIONS_QUESTION_PRECISE = [
+  "Mon texte tient-il sa promesse ?",
+  "Le lecteur comprend-il ce que je veux transmettre ?",
+  "Le genre réel de mon texte correspond-il au genre que j'annonce ?",
+  "Le texte est-il cohérent dans sa structure et sa progression ?",
+  "Le ton est-il adapté au public visé ?",
+  "Les passages personnels sont-ils suffisamment clairs, incarnés et utiles au projet ?",
+  "Le texte est-il trop intime, trop explicatif ou trop démonstratif ?",
+  "Y a-t-il des passages qui fragilisent la confiance du lecteur ?",
+  "Le texte comporte-t-il des affirmations à sourcer, nuancer ou vérifier ?",
+  "Qu'est-ce que je devrais couper, déplacer ou développer en priorité ?",
+  "Quelle est la meilleure forme éditoriale pour ce projet ?",
+  "Ce texte est-il prêt à être montré à un lecteur, un éditeur ou un professionnel ?",
+];
+
+const SYNTHESE_QUESTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/synthetiser-question-cursaudit";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 const labelStyle = { display: "block", fontSize: 12.5, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 6 };
 const champStyle = { width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" };
 
@@ -217,6 +256,15 @@ export default function CursAuditQuestionnaire({ onValider }) {
     auditsAPI.listerContratsIntention().then(({ data }) => setContratsPrécédents(data || []));
   }, []);
 
+  // Profil auteur — réf. 60816-01, suite, 29/08/2026. ProfilAuteur.jsx a son
+  // propre état interne pour son propre affichage ; ce composant-ci a
+  // besoin d'une copie en lecture seule pour l'envoyer, avec le contrat
+  // d'intention, à synthetiser-question-cursaudit (voir proposerQuestionCentrale).
+  const [profil, setProfil] = useState(null);
+  useEffect(() => {
+    profilAuteurAPI.récupérer().then(({ data }) => setProfil(data || null));
+  }, []);
+
   const sousCategoriesDisponibles = NATURE_PROJET.find((f) => f.famille === famille)?.sousCategories ?? [];
 
   const appliquerContrat = (c) => {
@@ -238,6 +286,9 @@ export default function CursAuditQuestionnaire({ onValider }) {
     // la plus centrale ("boussole de l'audit") en cas de réimport. Ajoutée
     // au contrat lui-même plutôt que de rester un champ isolé, à part.
     setQuestionLibre(c.questionLibre || "");
+    setPreoccupations(c.preoccupations || []);
+    setPreoccupationAutre(c.preoccupationAutre || "");
+    setPreoccupationAutreActive(!!c.preoccupationAutre);
   };
 
   const choisirContratPrécédent = (id) => {
@@ -260,6 +311,8 @@ export default function CursAuditQuestionnaire({ onValider }) {
     // puis réimporter un contrat perdait la question précise posée à
     // CursAudit, pourtant la pièce la plus centrale du cadrage.
     questionLibre: questionLibre.trim(),
+    preoccupations,
+    preoccupationAutre: preoccupationAutreActive ? preoccupationAutre.trim() : "",
   });
 
   const exporterContratJSON = () => {
@@ -289,6 +342,18 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
   const [finalites, setFinalites] = useState([]);
   const [questionLibre, setQuestionLibre] = useState("");
+  // Question précise — flux en 3 étapes réf. 60816-01, suite, 29/08/2026
+  // (demande explicite de l'auteur du projet, avec GPT) : (1) cases à
+  // cocher de préoccupations éditoriales, (2) synthetiser-question-cursaudit
+  // propose une question centrale à partir de ces cases + profil + contrat
+  // d'intention, (3) l'auteur·ice valide ou modifie cette proposition dans
+  // "Question centrale validée" (toujours `questionLibre` ci-dessus — pas
+  // un second état, la proposition ne fait que le préremplir).
+  const [preoccupations, setPreoccupations] = useState([]);
+  const [preoccupationAutreActive, setPreoccupationAutreActive] = useState(false);
+  const [preoccupationAutre, setPreoccupationAutre] = useState("");
+  const [syntheseQuestionEnCours, setSyntheseQuestionEnCours] = useState(false);
+  const [erreurSyntheseQuestion, setErreurSyntheseQuestion] = useState(null);
   const [degreIntervention, setDegreIntervention] = useState("");
   // Travail académique — réf. 60816-01, suite, 28/08/2026. Devenu une case
   // à cocher indépendante lors de la fusion avec le contrat d'intention :
@@ -316,6 +381,44 @@ export default function CursAuditQuestionnaire({ onValider }) {
   // Bloc du contrat d'intention : un seul générateur de bascule pour les 5
   // listes à cases multiples, plutôt que 5 fonctions identiques.
   const basculeur = (setListe) => (valeur) => setListe((l) => l.includes(valeur) ? l.filter((x) => x !== valeur) : [...l, valeur]);
+  const basculerPreoccupation = basculeur(setPreoccupations);
+
+  // Étape 2 du flux "question précise" (réf. 60816-01, suite, 29/08/2026) —
+  // seul appel IA de tout ce questionnaire, par ailleurs 100% statique (voir
+  // docblock en tête de fichier et synthetiser-question-cursaudit/index.ts).
+  const proposerQuestionCentrale = async () => {
+    if (preoccupations.length === 0 && !(preoccupationAutreActive && preoccupationAutre.trim())) {
+      setErreurSyntheseQuestion("Cochez au moins une préoccupation, ou précisez \"Autre\", avant de demander une proposition.");
+      return;
+    }
+    setSyntheseQuestionEnCours(true);
+    setErreurSyntheseQuestion(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Session absente — recharge la page et reconnecte-toi.");
+      const réponse = await fetch(SYNTHESE_QUESTION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "apikey": SUPABASE_ANON_KEY },
+        body: JSON.stringify({
+          profil: profil ? {
+            profession: profil.profession, identiteGenre: profil.identite_genre, trancheAge: profil.tranche_age,
+            niveauEtudes: profil.niveau_etudes, matieresEtudiees: profil.matieres_etudiees,
+          } : null,
+          contratIntention: contratIntentionActuel(),
+          preoccupations,
+          preoccupationAutre: preoccupationAutreActive ? preoccupationAutre.trim() : "",
+        }),
+      });
+      const données = await réponse.json();
+      if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
+      setQuestionLibre(données.question_proposee || "");
+    } catch (e) {
+      setErreurSyntheseQuestion(e.message);
+    } finally {
+      setSyntheseQuestionEnCours(false);
+    }
+  };
 
   const valider = () => {
     if (estPoésie) {
@@ -488,18 +591,45 @@ export default function CursAuditQuestionnaire({ onValider }) {
         <div>
           <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
           <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: "0 0 8px" }}>
-            Formulez votre question principale à CursAudit. Exemples :
+            Cochez ce qui vous préoccupe — CursAudit vous proposera une question centrale à partir de vos
+            réponses, que vous pourrez valider ou modifier librement.
           </p>
-          <ul style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.8, margin: "0 0 10px", paddingLeft: 18 }}>
-            <li>Mon texte tient-il sa promesse ?</li>
-            <li>À quel genre appartient-il réellement ?</li>
-            <li>Où perd-il le lecteur ?</li>
-            <li>Que dois-je retravailler en priorité ?</li>
-            <li>Le texte est-il publiable en l'état ?</li>
-            <li>Ce que je veux transmettre est-il compréhensible ?</li>
-            <li>Le niveau d'intime, de preuve ou de pédagogie est-il juste ?</li>
-          </ul>
-          <label style={{ ...labelStyle, fontWeight: 600 }}>Ma question principale :</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+            {PREOCCUPATIONS_QUESTION_PRECISE.map((p) => (
+              <Checkbox key={p} checked={preoccupations.includes(p)} onChange={() => basculerPreoccupation(p)} label={p} />
+            ))}
+          </div>
+          <div style={{ marginTop: 4 }}>
+            <Checkbox
+              checked={preoccupationAutreActive}
+              onChange={() => setPreoccupationAutreActive((v) => !v)}
+              label="Autre, à préciser"
+            />
+            {preoccupationAutreActive && (
+              <input
+                style={{ ...champStyle, marginTop: 6 }}
+                value={preoccupationAutre}
+                onChange={(e) => setPreoccupationAutre(e.target.value)}
+                placeholder="Précisez votre préoccupation"
+              />
+            )}
+          </div>
+
+          <button type="button" onClick={proposerQuestionCentrale} disabled={syntheseQuestionEnCours} style={{
+            marginTop: 10, background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: syntheseQuestionEnCours ? "default" : "pointer", fontFamily: "inherit",
+          }}>
+            {syntheseQuestionEnCours ? "CursAudit formule une proposition…" : "Proposer ma question centrale"}
+          </button>
+          {erreurSyntheseQuestion && (
+            <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 6 }}>{erreurSyntheseQuestion}</div>
+          )}
+
+          <label style={{ ...labelStyle, fontWeight: 600, marginTop: 14 }}>Question centrale validée</label>
+          <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "0 0 6px" }}>
+            Reprenez ou modifiez librement la proposition ci-dessus — ce texte devient la boussole de
+            l'analyse.
+          </p>
           <textarea
             style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
             value={questionLibre}
