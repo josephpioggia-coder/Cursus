@@ -42,7 +42,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI, misEnPageAPI } from "../lib/api.js";
 import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
-import CursAuditQuestionnaire from "./CursAuditQuestionnaire.jsx";
+import CursAuditQuestionnaire, { CLÉ_BROUILLON_QUESTIONNAIRE } from "./CursAuditQuestionnaire.jsx";
 
 const PALIERS = [
   { id: "essentiel", nom: "Essentiel", dimensions: 8, description: "Lecture exhaustive, coût minimal." },
@@ -168,7 +168,14 @@ export default function CursAudit({ onVoirAudits } = {}) {
   }, [résultat, questionnaire, titre, source, texte, palier, modeIA, typeRapport]);
 
   const viderBrouillon = () => {
-    try { localStorage.removeItem(CLÉ_BROUILLON); } catch { /* voir plus haut */ }
+    try {
+      localStorage.removeItem(CLÉ_BROUILLON);
+      // Réf. 60816-01, suite, 29/08/2026 — le brouillon du questionnaire
+      // (CursAuditQuestionnaire.jsx) est autonome, mais doit être effacé en
+      // même temps que celui-ci (audit créé, ou "repartir de zéro") pour
+      // qu'un brouillon obsolète ne préremplisse pas le prochain parcours.
+      localStorage.removeItem(CLÉ_BROUILLON_QUESTIONNAIRE);
+    } catch { /* voir plus haut */ }
   };
 
   const unités = useMemo(() => {

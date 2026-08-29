@@ -134,7 +134,7 @@
  * l'auteur⋅ice n'est pas implémenté.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
@@ -144,6 +144,30 @@ import {
   CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
   optionsSuivantes, noeudAtteint, STATUTS_AIDE_GENERIQUE,
 } from "../lib/taxonomieContratIntentionCursAudit.js";
+
+// Brouillon du QUESTIONNAIRE lui-même — réf. 60816-01, suite, 29/08/2026,
+// bug réel signalé par l'auteur du projet : le brouillon de CursAudit.jsx
+// (CLÉ_BROUILLON là-bas) ne sauvegarde que le résultat FINAL du
+// questionnaire (l'objet renvoyé à onValider une fois toutes les questions
+// passées) — jamais les réponses en cours de saisie pendant qu'on avance
+// dans le parcours "une question à la fois". Revenir sur cet écran (retour
+// arrière, rechargement, fermeture d'onglet) avant d'avoir fini reperdait
+// tout, sans aucun message d'erreur. Corrigé en donnant à ce composant son
+// propre brouillon, autonome, sur le même principe que celui de
+// CursAudit.jsx (sauvegarde continue à chaque changement, lu une seule
+// fois à l'initialisation). Exportée pour que CursAudit.jsx l'efface en
+// même temps que son propre brouillon (audit créé, ou "repartir de zéro")
+// — sinon un brouillon de questionnaire obsolète prérempleirait le
+// parcours d'un audit sans rapport.
+export const CLÉ_BROUILLON_QUESTIONNAIRE = "cursaudit_questionnaire_brouillon";
+function lireBrouillonQuestionnaire() {
+  try {
+    const brut = localStorage.getItem(CLÉ_BROUILLON_QUESTIONNAIRE);
+    return brut ? JSON.parse(brut) : null;
+  } catch {
+    return null;
+  }
+}
 
 // Fusionne l'ancienne FINALITES avec ATTENTES_CURSUS du contrat d'intention
 // (réf. 60816-01, suite, 28/08/2026) — signalé par l'auteur du projet :
@@ -251,9 +275,9 @@ function GroupeCases({ options, valeurs, onBasculer }) {
 // réussite, ce que vous espérez découvrir) doit pouvoir ouvrir une réponse
 // personnelle, pas seulement les listes prédéfinies. Petit hook pour éviter
 // de répéter la même paire d'états 5 fois.
-function useAutre() {
-  const [actif, setActif] = useState(false);
-  const [texte, setTexte] = useState("");
+function useAutre(initial) {
+  const [actif, setActif] = useState(() => initial?.actif ?? false);
+  const [texte, setTexte] = useState(() => initial?.texte ?? "");
   return { actif, setActif, texte, setTexte };
 }
 
@@ -381,31 +405,38 @@ function calculerÉtapesClés(estTravailAcademique) {
 }
 
 export default function CursAuditQuestionnaire({ onValider }) {
+  // Brouillon du questionnaire lui-même (voir CLÉ_BROUILLON_QUESTIONNAIRE
+  // en tête de fichier) — lu UNE SEULE FOIS à l'initialisation, jamais
+  // recalculé ensuite (useMemo avec dépendances vides), pour ne pas
+  // écraser la saisie en cours si le composant se re-rendait pour une
+  // autre raison.
+  const brouillonInitial = useMemo(() => lireBrouillonQuestionnaire(), []);
+
   // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
   // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
-  const [ouEnEtesVous, setOuEnEtesVous] = useState("");
+  const [ouEnEtesVous, setOuEnEtesVous] = useState(() => brouillonInitial?.ouEnEtesVous ?? "");
   // Nature du projet — réf. 60816-01, suite, 29/08/2026, arbre complet
   // niveaux 1 à 4 (voir SélecteurNature ci-dessus et le docblock en tête de
   // fichier). `cheminNature` : tableau de { nom, autre }, un élément par
   // niveau choisi.
-  const [cheminNature, setCheminNature] = useState([]);
-  const [objectifs, setObjectifs] = useState([]);
-  const [destinataires, setDestinataires] = useState([]);
-  const [criteresReussite, setCriteresReussite] = useState([]);
-  const [ceQueVousEspérezDécouvrir, setCeQueVousEspérezDécouvrir] = useState([]);
+  const [cheminNature, setCheminNature] = useState(() => brouillonInitial?.cheminNature ?? []);
+  const [objectifs, setObjectifs] = useState(() => brouillonInitial?.objectifs ?? []);
+  const [destinataires, setDestinataires] = useState(() => brouillonInitial?.destinataires ?? []);
+  const [criteresReussite, setCriteresReussite] = useState(() => brouillonInitial?.criteresReussite ?? []);
+  const [ceQueVousEspérezDécouvrir, setCeQueVousEspérezDécouvrir] = useState(() => brouillonInitial?.ceQueVousEspérezDécouvrir ?? []);
   // "Autre, à préciser" pour chacune des 5 questions à cases — réf.
   // 60816-01, suite, 29/08/2026, demande explicite de l'auteur du projet.
-  const objectifsAutre = useAutre();
-  const destinatairesAutre = useAutre();
-  const finalitesAutre = useAutre();
-  const criteresReussiteAutre = useAutre();
-  const espérezDécouvrirAutre = useAutre();
+  const objectifsAutre = useAutre(brouillonInitial?.objectifsAutre);
+  const destinatairesAutre = useAutre(brouillonInitial?.destinatairesAutre);
+  const finalitesAutre = useAutre(brouillonInitial?.finalitesAutre);
+  const criteresReussiteAutre = useAutre(brouillonInitial?.criteresReussiteAutre);
+  const espérezDécouvrirAutre = useAutre(brouillonInitial?.espérezDécouvrirAutre);
   const [contratsPrécédents, setContratsPrécédents] = useState(null);
   const [contratChoisi, setContratChoisi] = useState("");
 
   // Parcours "une question à la fois" — réf. 60816-01, suite, 29/08/2026
   // (voir docblock en tête de fichier).
-  const [étapeIndex, setÉtapeIndex] = useState(0);
+  const [étapeIndex, setÉtapeIndex] = useState(() => brouillonInitial?.étapeIndex ?? 0);
 
   useEffect(() => {
     auditsAPI.listerContratsIntention().then(({ data }) => setContratsPrécédents(data || []));
@@ -513,8 +544,8 @@ export default function CursAuditQuestionnaire({ onValider }) {
     lecteur.readAsText(fichier);
   };
 
-  const [finalites, setFinalites] = useState([]);
-  const [questionLibre, setQuestionLibre] = useState("");
+  const [finalites, setFinalites] = useState(() => brouillonInitial?.finalites ?? []);
+  const [questionLibre, setQuestionLibre] = useState(() => brouillonInitial?.questionLibre ?? "");
   // Question précise — flux en 3 étapes réf. 60816-01, suite, 29/08/2026
   // (demande explicite de l'auteur du projet, avec GPT) : (1) cases à
   // cocher de préoccupations éditoriales, (2) synthetiser-question-cursaudit
@@ -522,26 +553,60 @@ export default function CursAuditQuestionnaire({ onValider }) {
   // d'intention, (3) l'auteur·ice valide ou modifie cette proposition dans
   // "Question centrale validée" (toujours `questionLibre` ci-dessus — pas
   // un second état, la proposition ne fait que le préremplir).
-  const [preoccupations, setPreoccupations] = useState([]);
-  const [preoccupationAutreActive, setPreoccupationAutreActive] = useState(false);
-  const [preoccupationAutre, setPreoccupationAutre] = useState("");
+  const [preoccupations, setPreoccupations] = useState(() => brouillonInitial?.preoccupations ?? []);
+  const [preoccupationAutreActive, setPreoccupationAutreActive] = useState(() => brouillonInitial?.preoccupationAutreActive ?? false);
+  const [preoccupationAutre, setPreoccupationAutre] = useState(() => brouillonInitial?.preoccupationAutre ?? "");
   const [syntheseQuestionEnCours, setSyntheseQuestionEnCours] = useState(false);
   const [erreurSyntheseQuestion, setErreurSyntheseQuestion] = useState(null);
-  const [degreIntervention, setDegreIntervention] = useState("");
+  const [degreIntervention, setDegreIntervention] = useState(() => brouillonInitial?.degreIntervention ?? "");
   // Travail académique — réf. 60816-01, suite, 28/08/2026. Devenu une case
   // à cocher indépendante lors de la fusion avec le contrat d'intention :
   // un mémoire/TFE peut relever de n'importe quelle famille de la
   // taxonomie (essai, témoignage, rapport...), ce n'est pas une nature de
   // projet en soi mais une contrainte transversale.
-  const [estTravailAcademique, setEstTravailAcademique] = useState(false);
-  const [autorisationIA, setAutorisationIA] = useState("");
-  const [conditionsIA, setConditionsIA] = useState([]);
-  const [adresse, setAdresse] = useState("tu");
-  const [ton, setTon] = useState("direct");
-  const [posture, setPosture] = useState("accompagnant");
-  const [longueur, setLongueur] = useState("détaillé");
-  const [role, setRole] = useState("lecteur expert");
+  const [estTravailAcademique, setEstTravailAcademique] = useState(() => brouillonInitial?.estTravailAcademique ?? false);
+  const [autorisationIA, setAutorisationIA] = useState(() => brouillonInitial?.autorisationIA ?? "");
+  const [conditionsIA, setConditionsIA] = useState(() => brouillonInitial?.conditionsIA ?? []);
+  const [adresse, setAdresse] = useState(() => brouillonInitial?.adresse ?? "tu");
+  const [ton, setTon] = useState(() => brouillonInitial?.ton ?? "direct");
+  const [posture, setPosture] = useState(() => brouillonInitial?.posture ?? "accompagnant");
+  const [longueur, setLongueur] = useState(() => brouillonInitial?.longueur ?? "détaillé");
+  const [role, setRole] = useState(() => brouillonInitial?.role ?? "lecteur expert");
   const [erreur, setErreur] = useState(null);
+
+  // Sauvegarde continue du brouillon du questionnaire (voir
+  // CLÉ_BROUILLON_QUESTIONNAIRE en tête de fichier) — corrige le bug réel
+  // signalé par l'auteur du projet : sans ceci, revenir sur cet écran avant
+  // d'avoir terminé (retour arrière, rechargement) reperdait tout ce qui
+  // avait déjà été rempli, sans aucun avertissement.
+  useEffect(() => {
+    const brouillon = {
+      étapeIndex, ouEnEtesVous, cheminNature, objectifs, destinataires, criteresReussite, ceQueVousEspérezDécouvrir,
+      objectifsAutre: { actif: objectifsAutre.actif, texte: objectifsAutre.texte },
+      destinatairesAutre: { actif: destinatairesAutre.actif, texte: destinatairesAutre.texte },
+      finalitesAutre: { actif: finalitesAutre.actif, texte: finalitesAutre.texte },
+      criteresReussiteAutre: { actif: criteresReussiteAutre.actif, texte: criteresReussiteAutre.texte },
+      espérezDécouvrirAutre: { actif: espérezDécouvrirAutre.actif, texte: espérezDécouvrirAutre.texte },
+      finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
+      degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
+      adresse, ton, posture, longueur, role,
+    };
+    try {
+      localStorage.setItem(CLÉ_BROUILLON_QUESTIONNAIRE, JSON.stringify(brouillon));
+    } catch {
+      // localStorage indisponible (navigation privée, quota...) — le
+      // brouillon ne survivra pas à un rechargement, mais ça ne doit pas
+      // faire planter le questionnaire pour autant.
+    }
+  }, [
+    étapeIndex, ouEnEtesVous, cheminNature, objectifs, destinataires, criteresReussite, ceQueVousEspérezDécouvrir,
+    objectifsAutre.actif, objectifsAutre.texte, destinatairesAutre.actif, destinatairesAutre.texte,
+    finalitesAutre.actif, finalitesAutre.texte, criteresReussiteAutre.actif, criteresReussiteAutre.texte,
+    espérezDécouvrirAutre.actif, espérezDécouvrirAutre.texte,
+    finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
+    degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
+    adresse, ton, posture, longueur, role,
+  ]);
 
   // Nature du projet requise dès le niveau 1 — les niveaux suivants
   // affinent mais ne bloquent jamais (réf. 60816-01, suite, 29/08/2026,
