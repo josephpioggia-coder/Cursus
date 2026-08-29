@@ -29,7 +29,14 @@ export const NATURE_PROJET = [
     sousCategories: ["Roman", "Nouvelle", "Conte", "Théâtre", "Scénario", "Bande dessinée", "Manga / Webtoon", "Album illustré", "Fiction interactive"],
   },
   {
-    famille: "Défendre une idée",
+    // Renommé le 28/08/2026 (demande explicite de l'auteur du projet,
+    // à propos de "L'Oracle du Sermon sur la montagne") : "Défendre une
+    // idée" présupposait une posture argumentative qui ne correspond pas
+    // à un projet spirituel/méditatif (accompagner une pratique, ouvrir
+    // un chemin, proposer une intériorisation — pas défendre une thèse).
+    // Définition de référence : "transmettre une pensée, une sagesse ou
+    // une pratique", condensée ici pour la liste déroulante.
+    famille: "Transmettre / accompagner",
     sousCategories: ["Essai", "Philosophie", "Religion", "Spiritualité", "Sciences humaines", "Sciences", "Politique", "Société", "Histoire"],
   },
   {
