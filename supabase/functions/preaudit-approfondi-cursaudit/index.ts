@@ -873,9 +873,13 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
 // relance), rien n'empêchait de refaire cet appel indéfiniment. Le
 // compteur ci-dessous est incrémenté à chaque échec et remis à zéro à
 // chaque passage réussi (voir chaque `.update(...)` plus bas) ; au-delà du
-// seuil, la fonction refuse de relancer un appel IA tant que le compteur
-// n'a pas été remis à zéro manuellement (SQL) après vérification humaine.
+// seuil, la fonction refuse de relancer un appel IA pendant un délai de
+// refroidissement — PAS un blocage permanent (voir correctif juste en
+// dessous du chargement de l'audit) : un vrai client qui subit 3 échecs
+// transitoires par malchance doit pouvoir reprendre tout seul, pas rester
+// coincé en attendant une intervention manuelle en base.
 const SEUIL_ECHECS_MAX = 3;
+const DÉLAI_REFROIDISSEMENT_MS = 30 * 60 * 1000; // 30 minutes
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -913,11 +917,28 @@ Deno.serve(async (req) => {
     if (audit.preaudit_statut !== "paye") {
       return json({ error: "paiement_requis", message: `Le pré-audit a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
     }
+    // Réf. 60816-01, suite, 30/08/2026 — CORRECTIF suite à un retour de
+    // l'auteur du projet : un blocage permanent (nécessitant une remise à
+    // zéro manuelle en SQL) laisserait un vrai client bloqué sans recours
+    // dès qu'un problème transitoire se répète 3 fois par malchance — le
+    // même défaut que d'autres blocages secs déjà corrigés ailleurs dans ce
+    // projet. Le blocage est donc temporaire : passé le délai de
+    // refroidissement, une nouvelle tentative redevient possible d'elle-même,
+    // sans intervention. Ce qu'il empêche reste le même : une boucle de
+    // relances rapprochées (client bloqué, onglet resté ouvert) qui
+    // refacturerait l'appel le plus coûteux du pipeline en continu.
     if ((audit.ia_echecs_consecutifs ?? 0) >= SEUIL_ECHECS_MAX) {
-      return json({
-        error: "trop_d_echecs_consecutifs",
-        message: `Ce pré-audit a échoué ${audit.ia_echecs_consecutifs} fois de suite sans succès entre-temps (dernier échec : ${audit.ia_dernier_echec_le}). Traitement bloqué par sécurité pour éviter une boucle de relances coûteuse. Vérifiez la cause avant de remettre "ia_echecs_consecutifs" à 0 pour cet audit.`,
-      }, 429);
+      const dernierÉchecMs = audit.ia_dernier_echec_le ? new Date(audit.ia_dernier_echec_le).getTime() : 0;
+      const attenteRestanteMs = dernierÉchecMs + DÉLAI_REFROIDISSEMENT_MS - Date.now();
+      if (attenteRestanteMs > 0) {
+        return json({
+          error: "trop_d_echecs_consecutifs",
+          message: `Ce pré-audit a échoué ${audit.ia_echecs_consecutifs} fois de suite. Nouvelle tentative possible dans environ ${Math.ceil(attenteRestanteMs / 60000)} minute(s) — délai de sécurité pour éviter une boucle de relances coûteuse pendant qu'un problème se répète.`,
+        }, 429);
+      }
+      // Le délai est écoulé : on retente. Le compteur n'est remis à 0 que
+      // par un vrai succès (voir chaque `.update(...)` plus bas) — un
+      // nouvel échec ici prolongera simplement le refroidissement.
     }
 
     // Profil auteur optionnel (réf. 60816-01, suite, 28/08/2026) — table

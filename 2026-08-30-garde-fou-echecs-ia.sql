@@ -21,6 +21,14 @@
 -- Ces deux colonnes permettent à la fonction de refuser de continuer
 -- au-delà d'un nombre d'échecs consécutifs raisonnable, plutôt que de
 -- compter sur une supervision humaine 24h/24 pour s'en apercevoir.
+--
+-- CORRECTIF le jour même, sur retour de l'auteur du projet : un blocage
+-- permanent (nécessitant une remise à zéro manuelle en SQL) laisserait un
+-- vrai client bloqué sans recours si 3 échecs transitoires s'enchaînent
+-- par malchance. Le blocage appliqué côté fonction est donc temporaire
+-- (délai de refroidissement, voir DÉLAI_REFROIDISSEMENT_MS dans le code) —
+-- ces colonnes restent les mêmes, seule la lecture qu'en fait la fonction
+-- a changé.
 
 alter table audits
   add column ia_echecs_consecutifs integer not null default 0,
