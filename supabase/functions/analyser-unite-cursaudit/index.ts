@@ -251,6 +251,14 @@ interface ContratIntention {
   destinataires?: string[];
   criteresReussite?: string[];
   ceQueVousEspérezDécouvrir?: string[];
+  // "Autre, à préciser" de chacune des 4 questions ci-dessus — réf.
+  // 60816-01, suite, 29/08/2026. (La 5e, "Qu'attendez-vous de cet audit ?",
+  // a son "Autre" déjà fusionné côté client dans `finalite_audit`, plus bas
+  // dans AuditQualification — pas de champ séparé ici pour elle.)
+  objectifsAutre?: string;
+  destinatairesAutre?: string;
+  criteresReussiteAutre?: string;
+  ceQueVousEspérezDécouvrirAutre?: string;
 }
 
 interface AuditQualification {
@@ -301,10 +309,14 @@ function construireContexteQualification(audit: AuditQualification, profil: Prof
   }
   const c = audit.contrat_intention;
   if (c?.ouEnEtesVous) lignes.push(`Où en est l'auteur·ice dans ce projet : ${c.ouEnEtesVous}.`);
-  if (c?.objectifs && c.objectifs.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${c.objectifs.join(", ")}.`);
-  if (c?.destinataires && c.destinataires.length > 0) lignes.push(`Pour qui ce texte est écrit : ${c.destinataires.join(", ")}.`);
-  if (c?.criteresReussite && c.criteresReussite.length > 0) lignes.push(`Ce qui ferait, pour l'auteur·ice, de ce projet une réussite : ${c.criteresReussite.join(", ")}.`);
-  if (c?.ceQueVousEspérezDécouvrir && c.ceQueVousEspérezDécouvrir.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir en écrivant, que ton analyse peut éclairer : ${c.ceQueVousEspérezDécouvrir.join(", ")}.`);
+  const objectifsComplets = [...(c?.objectifs ?? []), ...(c?.objectifsAutre ? [c.objectifsAutre] : [])];
+  if (objectifsComplets.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${objectifsComplets.join(", ")}.`);
+  const destinatairesComplets = [...(c?.destinataires ?? []), ...(c?.destinatairesAutre ? [c.destinatairesAutre] : [])];
+  if (destinatairesComplets.length > 0) lignes.push(`Pour qui ce texte est écrit : ${destinatairesComplets.join(", ")}.`);
+  const criteresReussiteComplets = [...(c?.criteresReussite ?? []), ...(c?.criteresReussiteAutre ? [c.criteresReussiteAutre] : [])];
+  if (criteresReussiteComplets.length > 0) lignes.push(`Ce qui ferait, pour l'auteur·ice, de ce projet une réussite : ${criteresReussiteComplets.join(", ")}.`);
+  const espérezDécouvrirComplets = [...(c?.ceQueVousEspérezDécouvrir ?? []), ...(c?.ceQueVousEspérezDécouvrirAutre ? [c.ceQueVousEspérezDécouvrirAutre] : [])];
+  if (espérezDécouvrirComplets.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir en écrivant, que ton analyse peut éclairer : ${espérezDécouvrirComplets.join(", ")}.`);
   const profilLignes: string[] = [];
   if (profil?.profession) profilLignes.push(`profession : ${profil.profession}`);
   if (profil?.identite_genre) profilLignes.push(`identité : ${profil.identite_genre}`);

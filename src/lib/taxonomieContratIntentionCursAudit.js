@@ -13,10 +13,27 @@
  * PORTÉE DE CETTE PREMIÈRE VERSION (28/08/2026) : seuls les niveaux 1 et 2
  * de la famille "Nature du projet" sont couverts ici — pas de niveau 3/4
  * (ex. les 47 sous-genres de Roman, les 4 niveaux de Religion→Christianisme
- * détaillés dans la conversation d'origine). Suffisant pour tester le
- * mécanisme du questionnaire de bout en bout ; approfondir des branches
- * précises est un chantier de contenu, pas de code, à faire au besoin sans
- * changer cette structure de données.
+ * détaillés dans la conversation d'origine, non retrouvée — jamais commitée
+ * au dépôt). Suffisant pour tester le mécanisme du questionnaire de bout en
+ * bout ; approfondir des branches précises est un chantier de contenu, pas
+ * de code, à faire au besoin sans changer cette structure de données.
+ *
+ * NIVEAU 3 AJOUTÉ, 29/08/2026 — demande explicite de l'auteur du projet
+ * ("Roman ne reprend pas encore les différents types existants") : un
+ * élément de `sousCategories` est soit une simple chaîne (comme avant), soit
+ * un objet `{ nom, sousGenres }` quand ce nœud a besoin d'un niveau
+ * supplémentaire (voir `nomSousCategorie()`/`sousGenresDe()` plus bas,
+ * utilisés par CursAuditQuestionnaire.jsx pour rester compatible avec les
+ * deux formes sans casser les familles qui n'ont pas ce niveau). Seul
+ * "Roman" est détaillé pour l'instant, avec une liste de sous-genres
+ * rédigée directement ici (la liste de 47 entrées mentionnée ci-dessus,
+ * élaborée avec ChatGPT le 28/08/2026, n'a jamais été commitée au dépôt et
+ * n'a pas pu être retrouvée — à remplacer si l'auteur du projet la
+ * retrouve). "Autre" toujours disponible à ce niveau aussi, comme partout
+ * ailleurs dans cet arbre. Le mécanisme est générique : ajouter un niveau 3
+ * (ou creuser Religion → Christianisme, par exemple) sur n'importe quelle
+ * autre branche ne demande qu'une modification de données ici, aucun
+ * changement de code.
  */
 
 export const NATURE_PROJET = [
@@ -26,7 +43,21 @@ export const NATURE_PROJET = [
   },
   {
     famille: "Imaginer une histoire",
-    sousCategories: ["Roman", "Nouvelle", "Conte", "Théâtre", "Scénario", "Bande dessinée", "Manga / Webtoon", "Album illustré", "Fiction interactive"],
+    sousCategories: [
+      {
+        nom: "Roman",
+        sousGenres: [
+          "Roman policier", "Roman noir", "Thriller", "Roman d'espionnage",
+          "Roman de science-fiction", "Dystopie / anticipation", "Fantasy", "Roman fantastique",
+          "Roman d'horreur", "Roman historique", "Roman de guerre", "Roman d'aventure",
+          "Romance / roman sentimental", "Roman érotique", "Roman initiatique", "Roman social",
+          "Roman psychologique", "Roman choral", "Saga familiale", "Roman contemporain",
+          "Roman young adult", "Roman épistolaire", "Uchronie", "Roman gothique",
+          "Roman post-apocalyptique", "Roman régionaliste / de terroir",
+        ],
+      },
+      "Nouvelle", "Conte", "Théâtre", "Scénario", "Bande dessinée", "Manga / Webtoon", "Album illustré", "Fiction interactive",
+    ],
   },
   {
     // Renommé le 28/08/2026 (demande explicite de l'auteur du projet,
@@ -109,3 +140,14 @@ export const CE_QUE_VOUS_ESPEREZ_DECOUVRIR = [
   "ce que cette histoire a changé", "ce que je n'ai jamais compris", "ce que je veux transmettre",
   "ce que je cache", "ce que je ne vois pas encore",
 ];
+
+// Un élément de `sousCategories` est soit une chaîne simple, soit un objet
+// `{ nom, sousGenres }` (voir docblock en tête de fichier, 29/08/2026) — ces
+// deux fonctions abstraient la différence pour le code appelant.
+export function nomSousCategorie(sousCategorie) {
+  return typeof sousCategorie === "string" ? sousCategorie : sousCategorie.nom;
+}
+
+export function sousGenresDe(sousCategorie) {
+  return typeof sousCategorie === "string" ? null : (sousCategorie.sousGenres || null);
+}
