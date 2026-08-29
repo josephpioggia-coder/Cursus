@@ -88,12 +88,14 @@ export const DESTINATAIRES = [
   "des personnes vivant une situation similaire", "une communauté particulière",
 ];
 
-export const ATTENTES_CURSUS = [
-  "structurer mes idées", "mieux écrire", "améliorer le style", "rendre mon texte plus fluide",
-  "trouver mes incohérences", "vérifier mes arguments", "approfondir ma réflexion",
-  "comprendre ce que j'écris", "comprendre ce que je vis", "mieux toucher mon lecteur",
-  "préparer la publication", "tout analyser",
-];
+// ATTENTES_CURSUS fusionnée dans FINALITES (CursAuditQuestionnaire.jsx) le
+// 28/08/2026 — signalé par l'auteur du projet : "Qu'attendez-vous de
+// Cursus ?" et l'ancienne "Que veux-tu obtenir ?" faisaient largement
+// doublon (structurer mes idées / améliorer la structure, rendre mon texte
+// plus fluide / fluidifier, trouver mes incohérences / vérifier la
+// cohérence...). Une seule liste désormais, qui alimente à la fois
+// finaliteAudit (obligatoire, injecté au moteur d'analyse) et
+// contratIntention.attentesCursus (même valeurs, pas de second état).
 
 export const CRITERES_REUSSITE = [
   "j'aurai compris quelque chose", "je me sentirai en paix",
