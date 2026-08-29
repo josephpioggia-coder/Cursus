@@ -81,7 +81,13 @@ interface ProfilEnvoye {
 
 interface ContratIntentionEnvoye {
   ouEnEtesVous?: string;
-  natureProjet?: { famille?: string; sousCategorie?: string; autre?: string };
+  // Réf. 60816-01, suite, 29/08/2026 — remplace l'ancienne forme
+  // { famille, sousCategorie, autre } (arbre à 3 niveaux fixes) : la
+  // taxonomie est passée à un arbre générique niveaux 1-4 (voir
+  // taxonomieContratIntentionCursAudit.js côté client), donc le client
+  // envoie directement un libellé prêt à l'emploi plutôt que de faire
+  // connaître la forme de l'arbre à cette fonction.
+  natureProjet?: { label?: string };
   objectifs?: string[];
   destinataires?: string[];
   attentesCursus?: string[];
@@ -113,12 +119,7 @@ function construireContexte(
     if (profil.matieresEtudiees) p.push(`domaines étudiés : ${profil.matieresEtudiees}`);
     if (p.length > 0) lignes.push(`Profil de l'auteur·ice : ${p.join(", ")}.`);
   }
-  if (c?.natureProjet?.famille) {
-    const nature = c.natureProjet.sousCategorie
-      ? `${c.natureProjet.sousCategorie} (${c.natureProjet.famille})`
-      : (c.natureProjet.autre || c.natureProjet.famille);
-    lignes.push(`Nature du projet : ${nature}.`);
-  }
+  if (c?.natureProjet?.label) lignes.push(`Nature du projet : ${c.natureProjet.label}.`);
   if (c?.ouEnEtesVous) lignes.push(`Où en est l'auteur·ice dans ce projet : ${c.ouEnEtesVous}.`);
   const objectifsComplets = [...(c?.objectifs ?? []), ...(c?.objectifsAutre ? [c.objectifsAutre] : [])];
   if (objectifsComplets.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${objectifsComplets.join(", ")}.`);
