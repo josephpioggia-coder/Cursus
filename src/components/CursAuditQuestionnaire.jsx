@@ -44,6 +44,44 @@
  *    l'écran de création (CursAudit.jsx), affichés juste après ce
  *    questionnaire.
  *
+ * RESTRUCTURATION EN "BLOC DE CADRAGE ÉDITORIAL" (réf. 60816-01, suite,
+ * 29/08/2026) — demande explicite de l'auteur du projet : la première
+ * partie du questionnaire n'est pas une formalité avant l'audit, c'est la
+ * boussole de l'audit. Un seul bloc cohérent, dans cet ordre : (1) Profil
+ * de l'auteur, (2) Pourquoi/pour qui écrivez-vous, (3) Qu'attendez-vous de
+ * cet audit, (4) À quoi reconnaîtrez-vous que ce projet est réussi, (5)
+ * Qu'espérez-vous découvrir que vous ignorez encore, (6) la question
+ * précise posée à CursAudit. "Qu'attendez-vous de cet audit ?" (FINALITES)
+ * vivait auparavant HORS du bloc "Contrat d'intention" — déplacé dedans,
+ * entre "Pour qui écrivez-vous" et "À quoi reconnaîtrez-vous...", pour
+ * suivre cet ordre. La mention "(plusieurs choix possibles)", répétée sur
+ * chaque question, remplacée par une seule ligne en tête de bloc. La
+ * question libre (6) garde délibérément la forme d'un champ texte plutôt
+ * que de cases à cocher — des exemples affichés au-dessus servent
+ * d'inspiration sans "enfermer l'utilisateur" dans une liste fermée.
+ *
+ * Repère (question → fonction dans l'audit → type de réponse), pour
+ * mémoire plutôt que pour l'UI :
+ *   Profil de l'auteur          → crédibilité/contexte de l'auteur·ice   → texte libre + champs
+ *   Pourquoi/pour qui écrivez   → intention + lecteur visé              → cases à cocher + "Autre"
+ *   Qu'attendez-vous de l'audit → attentes vis-à-vis de CursAudit       → cases à cocher + "Autre"
+ *   Critère de réussite         → ce que "réussi" veut dire pour vous   → cases à cocher + "Autre"
+ *   Ce que vous espérez découvrir → angle d'analyse à explorer          → cases à cocher + "Autre"
+ *   Question précise à CursAudit → question centrale posée à l'audit   → texte libre (obligatoire)
+ *
+ * PAS ENCORE FAIT (chantier distinct, plus large) — demande explicite de
+ * l'auteur du projet : faire remonter un encadré "Cadre de lecture retenu
+ * par CursAudit" (profil auteur utilisé, intention principale, lecteur
+ * visé, attente principale, critère de réussite, question centrale,
+ * conséquence sur l'analyse) DANS la sortie de l'audit lui-même (pré-audit
+ * et/ou rapport consolidé), pas seulement dans ce formulaire. Cela suppose
+ * que les Edge Functions de génération (au moins
+ * preaudit-approfondi-cursaudit, potentiellement orchestrer-audit-cursaudit
+ * / analyser-unite-cursaudit) lisent `contrat_intention` (actuellement
+ * seul `profils_auteur` est câblé côté prompt) et produisent un champ
+ * structuré dédié en sortie — portée nettement plus large qu'un
+ * réagencement de formulaire, à traiter comme un chantier à part.
+ *
  * CE QUE LES RÉPONSES CHANGENT RÉELLEMENT côté moteur d'analyse
  * (analyser-unite-cursaudit / orchestrer-audit-cursaudit) : la question
  * libre et le degré d'intervention sont injectés dans le prompt système
@@ -311,6 +349,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
             Pas "quel genre de livre", mais "quelle transformation cherchez-vous". Sert de brief déclaré
             à l'audit, en plus de ce que l'IA déduit du texte lui-même.
           </p>
+          <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", fontStyle: "italic", marginTop: 6 }}>
+            Certaines questions ci-dessous permettent plusieurs réponses. Vous pouvez aussi choisir
+            « Autre » et préciser librement.
+          </p>
         </div>
 
         {contratsPrécédents && contratsPrécédents.length > 0 && (
@@ -379,13 +421,18 @@ export default function CursAuditQuestionnaire({ onValider }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Pourquoi écrivez-vous ? (plusieurs choix possibles)</label>
+          <label style={labelStyle}>Pourquoi écrivez-vous ?</label>
           <GroupeCases options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} />
         </div>
 
         <div>
           <label style={labelStyle}>Pour qui écrivez-vous ?</label>
           <GroupeCases options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} />
+        </div>
+
+        <div>
+          <label style={labelStyle}>Qu'attendez-vous de cet audit ? *</label>
+          <GroupeCases options={FINALITES} valeurs={finalites} onBasculer={basculerFinalité} />
         </div>
 
         <div>
@@ -416,16 +463,20 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>Qu'attendez-vous de cet audit ? * (plusieurs choix possibles)</label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-          {FINALITES.map((f) => (
-            <Checkbox key={f} checked={finalites.includes(f)} onChange={() => basculerFinalité(f)} label={f} />
-          ))}
-        </div>
-      </div>
-
-      <div>
         <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
+        <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: "0 0 8px" }}>
+          Quelques exemples pour vous aider à la formuler — libre à vous de poser toute autre question :
+        </p>
+        <ul style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.8, margin: "0 0 10px", paddingLeft: 18 }}>
+          <li>Ce texte remplit-il son objectif ?</li>
+          <li>Ai-je un problème de structure ou seulement de style ?</li>
+          <li>Ma thèse principale est-elle suffisamment démontrée ?</li>
+          <li>Ce texte donne-t-il envie de continuer à lire ?</li>
+          <li>Ai-je oublié quelque chose d'important ?</li>
+          <li>Ce texte est-il fidèle à ce que je veux vraiment dire ?</li>
+          <li>Ce texte est-il prêt à être montré à quelqu'un d'autre ?</li>
+        </ul>
+        <label style={{ ...labelStyle, fontWeight: 600 }}>Ma question principale :</label>
         <textarea
           style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
           value={questionLibre}
@@ -458,13 +509,20 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
       {estTravailAcademique && (
         <div style={{ background: "var(--fond, #F7F4EF)", padding: "14px 16px", borderRadius: 8 }}>
-          <label style={labelStyle}>Ton établissement autorise-t-il l'usage de l'IA ?</label>
+          <label style={labelStyle}>Votre établissement autorise-t-il l'usage de l'IA ?</label>
           <select style={{ ...champStyle, marginBottom: conditionsIA.length >= 0 && autorisationIA === "Oui" ? 12 : 0 }} value={autorisationIA} onChange={(e) => setAutorisationIA(e.target.value)}>
             <option value="">— Choisir —</option>
             <option value="Oui">Oui</option>
             <option value="Non">Non</option>
             <option value="Je ne sais pas">Je ne sais pas</option>
           </select>
+          {(autorisationIA === "Non" || autorisationIA === "Je ne sais pas") && (
+            <p style={{ fontSize: 11.5, color: "#8A6116", marginTop: 8, lineHeight: 1.5 }}>
+              CursAudit restera strictement au diagnostic sur ce texte : aucune proposition ni reformulation,
+              quel que soit le degré d'intervention choisi plus haut — cette limite est appliquée
+              automatiquement par le moteur d'analyse, pas seulement affichée ici.
+            </p>
+          )}
           {autorisationIA === "Oui" && (
             <div>
               <label style={{ ...labelStyle, marginTop: 12 }}>À quelles conditions ?</label>
