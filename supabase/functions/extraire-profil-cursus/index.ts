@@ -90,9 +90,14 @@ const SCHEMA_PROFIL = {
 const validerProfil = ajv.compile(SCHEMA_PROFIL);
 
 const SYSTEM_PROMPT =
-  "Tu extrais un profil auteur à partir d'un texte brut (CV ou profil LinkedIn collé par l'auteur·ice). " +
-  "Ne réponds JAMAIS sur la base d'une supposition : si une information n'est pas présente dans le texte, " +
-  "laisse le champ correspondant vide plutôt que de l'inventer.\n\n" +
+  "Tu extrais un profil auteur à partir d'un texte brut (CV et/ou profil LinkedIn collés ou importés par " +
+  "l'auteur·ice). Ne réponds JAMAIS sur la base d'une supposition : si une information n'est pas présente " +
+  "dans le texte, laisse le champ correspondant vide plutôt que de l'inventer.\n\n" +
+  "IMPORTANT — le texte peut contenir PLUSIEURS sources concaténées (marquées par des séparateurs " +
+  "\"--- nom du fichier ---\"), par exemple un CV suivi d'un export LinkedIn, avec des informations " +
+  "redondantes ou complémentaires. Fusionne ces sources en un seul profil cohérent : ne duplique jamais une " +
+  "information répétée dans plusieurs sources, et complète les champs en croisant les sources entre elles " +
+  "quand l'une précise ce que l'autre ne fait qu'évoquer.\n\n" +
   "Produis :\n" +
   "1. profession : le métier ou la profession actuelle/principale de l'auteur·ice, en quelques mots.\n" +
   "2. niveau_etudes : le niveau d'études le plus élevé mentionné (ex. \"Master\", \"Doctorat\", \"Autodidacte\").\n" +
