@@ -36,19 +36,34 @@
  *    l'écran de création (CursAudit.jsx), affichés juste après ce
  *    questionnaire.
  *
+ * REFONTE EN "UNE QUESTION À LA FOIS", 29/08/2026 — demande explicite de
+ * l'auteur du projet : présenter le questionnaire comme un sondage type
+ * SurveyMonkey (une question par écran, curseur de progression, bouton
+ * "Valider" qui fait apparaître la question suivante) plutôt qu'une longue
+ * page à faire défiler, pour donner l'impression d'un parcours plus court.
+ * AUCUN changement de logique de données : mêmes états, mêmes règles de
+ * validation, même payload final — uniquement le RENDU qui change.
+ * `ÉTAPES_CLÉS` (calculé à chaque rendu à partir de `estTravailAcademique`,
+ * la seule chose qui fait varier le nombre d'étapes) fixe l'ordre ; chaque
+ * clé a un titre (`TITRES_ÉTAPE`), un rendu (`renderContenuÉtape`) et,
+ * pour celles qui ont une exigence réelle, une règle de validation
+ * (`étapeEstValide`) — sinon "Valider" avance sans condition (cohérent
+ * avec le principe "ne jamais bloquer l'auteur·ice" déjà appliqué à la
+ * taxonomie). La dernière étape appelle `valider()` (logique de soumission
+ * inchangée) au lieu de simplement avancer. Exporter/Importer le contrat
+ * JSON déplacés : Importer sur la première étape (pour sauter tout le
+ * parcours d'un coup), Exporter sur la dernière (pour sauvegarder ce qui
+ * vient d'être rempli).
+ *
  * RESTRUCTURATION EN "BLOC DE CADRAGE ÉDITORIAL" (réf. 60816-01, suite,
- * 29/08/2026) — demande explicite de l'auteur du projet : la première
- * partie du questionnaire n'est pas une formalité avant l'audit, c'est la
- * boussole de l'audit. Un seul bloc cohérent, dans cet ordre : (1) Profil
- * de l'auteur, (2) Pourquoi/pour qui écrivez-vous, (3) Qu'attendez-vous de
- * cet audit, (4) À quoi reconnaîtrez-vous que ce projet est réussi, (5)
- * Qu'espérez-vous découvrir que vous ignorez encore, (6) la question
- * précise posée à CursAudit. La mention "(plusieurs choix possibles)",
- * répétée sur chaque question, remplacée par une seule ligne en tête de
- * bloc. La question précise (6) vit dans le bloc, juste avant les boutons
- * Exporter/Importer, et fait partie de `contratIntentionActuel()` —
- * exporter puis réimporter un contrat ne perd plus cette information,
- * pourtant la pièce la plus centrale du cadrage.
+ * 29/08/2026, ANTÉRIEURE à la refonte en questions séparées ci-dessus,
+ * conservée pour l'ordre logique des questions) — demande explicite de
+ * l'auteur du projet : la première partie du questionnaire n'est pas une
+ * formalité avant l'audit, c'est la boussole de l'audit. Ordre : (1)
+ * Profil de l'auteur, (2) Pourquoi/pour qui écrivez-vous, (3) Qu'attendez-
+ * vous de cet audit, (4) À quoi reconnaîtrez-vous que ce projet est
+ * réussi, (5) Qu'espérez-vous découvrir que vous ignorez encore, (6) la
+ * question précise posée à CursAudit.
  *
  * FLUX EN 3 ÉTAPES POUR LA QUESTION PRÉCISE, MÊME JOUR (demande explicite
  * de l'auteur du projet avec GPT) : (1) des cases à cocher de
@@ -76,32 +91,20 @@
  * premier niveau ; les 4 autres "Autre" sont recombinés côté serveur dans
  * construireContexteQualification à partir de `contrat_intention`).
  *
- * NATURE DU PROJET REMPLACÉE INTÉGRALEMENT, 29/08/2026 — l'auteur du
- * projet a signalé deux manques réels : (1) le niveau 3 ajouté plus tôt
- * dans la journée (seul "Roman" détaillé, avec une liste de sous-genres
- * rédigée à la main faute de retrouver l'originale) ne couvrait ni les
- * autres familles, ni un vrai niveau 4 ; (2) au niveau 2 (et parfois 3),
- * choisir "Autre" n'ouvrait aucun champ de précision — bug réel, pas
- * seulement un manque de contenu. L'auteur du projet a alors fourni
- * taxonomie_cursus_niveaux_1_a_4.xlsx (élaboré avec ChatGPT) : l'arbre
- * COMPLET niveaux 1 à 4, 9 familles, 415 chemins. Voir
+ * NATURE DU PROJET REMPLACÉE INTÉGRALEMENT, 29/08/2026 — arbre complet
+ * niveaux 1 à 4 fourni par l'auteur du projet (taxonomie_cursus_niveaux_1_a_4.xlsx,
+ * élaboré avec ChatGPT), 9 familles, 415 chemins. Voir
  * taxonomieContratIntentionCursAudit.js pour la structure de données et
  * son docblock (statuts, principe "ne jamais bloquer l'auteur·ice",
  * réponse à "est-ce Copilot qui crée les niveaux suivants dynamiquement ?"
  * — non, l'arbre est fixe, "Autre" arrête juste la descente).
- * `SélecteurNature` remplace tout l'ancien mécanisme famille/sousCategorie/
- * sousGenre par une navigation générique à N niveaux (`optionsSuivantes()`/
- * `noeudAtteint()`), avec "Autre" + champ texte à CHAQUE niveau — corrige
- * structurellement le bug de "Autre" muet, plus possible de l'oublier à un
- * niveau puisqu'il n'y a plus qu'UN SEUL endroit du code qui rend un
- * niveau. CHANGEMENT DE COMPORTEMENT réel : l'ancien blocage de "Poésie" à
- * la validation est retiré — la nouvelle taxonomie classe la plupart des
- * formes poétiques "prêt" (voir STATUTS_AIDE_GENERIQUE), et le principe
- * explicite de la source est de ne jamais bloquer. Le message informatif
- * "format non linéaire" (post réseaux sociaux, livre-jeu...) est retiré de
- * la même façon, faute d'équivalent direct dans la nouvelle donnée — à
- * réintroduire via le champ `aide` d'un nœud si un besoin réel se
- * manifeste.
+ * `SélecteurNature` navigue l'arbre à N niveaux génériquement
+ * (`optionsSuivantes()`/`noeudAtteint()`), avec "Autre" + champ texte à
+ * CHAQUE niveau. Le blocage de "Poésie" à la validation a été retiré (la
+ * nouvelle taxonomie classe la plupart des formes poétiques "prêt", et son
+ * principe explicite est de ne jamais bloquer) ; le message "format non
+ * linéaire" a été réintégré via le champ `aide` des feuilles concernées
+ * (Fiction interactive, Oracle / jeu de cartes, Posts réseaux sociaux).
  *
  * Repère (question → fonction dans l'audit → type de réponse), pour
  * mémoire plutôt que pour l'UI :
@@ -342,6 +345,41 @@ function SélecteurNature({ chemin, onChemin }) {
   );
 }
 
+// Titres affichés en tête de chaque écran du parcours "une question à la
+// fois" — réf. 60816-01, suite, 29/08/2026 (voir docblock en tête de
+// fichier). "academique_conditions" n'apparaît que si estTravailAcademique
+// (voir calculerÉtapesClés plus bas).
+const TITRES_ÉTAPE = {
+  intro: "Avant de commencer",
+  ou_en_etes_vous: "Où en êtes-vous dans ce projet ?",
+  nature_projet: "Quelle est la nature de votre projet ?",
+  pourquoi: "Pourquoi écrivez-vous ?",
+  pour_qui: "Pour qui écrivez-vous ?",
+  attentes_audit: "Qu'attendez-vous de cet audit ?",
+  critere_reussite: "À quoi reconnaîtrez-vous que ce projet est réussi ?",
+  espoir_decouverte: "Qu'espérez-vous découvrir que vous ignorez encore ?",
+  question_precise: "Quelle est la question précise que vous voulez poser à CursAudit ?",
+  degre_intervention: "Que peut faire CursAudit ?",
+  academique_choix: "Ce texte est-il un travail académique ?",
+  academique_conditions: "Votre établissement autorise-t-il l'usage de l'IA ?",
+  relation_ia: "Comment voulez-vous que l'IA vous parle ?",
+};
+
+// Ordre du parcours — réf. 60816-01, suite, 29/08/2026. "academique_conditions"
+// n'est inséré que si l'étape précédente (academique_choix) a été cochée ;
+// calculé à chaque rendu, jamais figé, pour rester toujours cohérent avec
+// la réponse déjà donnée.
+function calculerÉtapesClés(estTravailAcademique) {
+  const étapes = [
+    "intro", "ou_en_etes_vous", "nature_projet", "pourquoi", "pour_qui",
+    "attentes_audit", "critere_reussite", "espoir_decouverte", "question_precise",
+    "degre_intervention", "academique_choix",
+  ];
+  if (estTravailAcademique) étapes.push("academique_conditions");
+  étapes.push("relation_ia");
+  return étapes;
+}
+
 export default function CursAuditQuestionnaire({ onValider }) {
   // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
   // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
@@ -364,6 +402,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const espérezDécouvrirAutre = useAutre();
   const [contratsPrécédents, setContratsPrécédents] = useState(null);
   const [contratChoisi, setContratChoisi] = useState("");
+
+  // Parcours "une question à la fois" — réf. 60816-01, suite, 29/08/2026
+  // (voir docblock en tête de fichier).
+  const [étapeIndex, setÉtapeIndex] = useState(0);
 
   useEffect(() => {
     auditsAPI.listerContratsIntention().then(({ data }) => setContratsPrécédents(data || []));
@@ -579,273 +621,332 @@ export default function CursAuditQuestionnaire({ onValider }) {
     });
   };
 
-  return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--texte-primaire)", marginBottom: 4 }}>
-          Avant de commencer — quelques questions sur votre audit
-        </div>
-        <p style={{ fontSize: 12.5, color: "var(--texte-tertiaire)", lineHeight: 1.6 }}>
-          Sans ce cadrage, l'IA analyse un texte sans savoir ce qu'il est censé être,
-          pour qui il est écrit, ni jusqu'où elle a le droit d'intervenir.
-        </p>
-      </div>
+  // ─── Parcours "une question à la fois" (réf. 60816-01, suite, 29/08/2026,
+  // voir docblock en tête de fichier) — la validation par étape ne change
+  // aucune règle : elle applique juste, une à une, les mêmes conditions déjà
+  // vérifiées globalement dans valider() ci-dessus.
+  const étapesClés = calculerÉtapesClés(estTravailAcademique);
+  const étapeActuelle = étapesClés[étapeIndex];
 
-      {/* Note de continuité profil/projet — réf. 60816-01, suite,
-          29/08/2026, demande explicite de l'auteur du projet : présentée
-          comme une continuité d'accompagnement, jamais comme une
-          obligation. Explique la portée réelle des deux blocs qui suivent
-          (ProfilAuteur = niveau compte, réutilisable dans CursAudit ET
-          CursEdit ; contrat d'intention = niveau projet, associé à CE
-          texte, repris plus tard dans CursEdit pour ce même manuscrit —
-          bridge CursAudit↔CursEdit pas encore construit à ce jour, mais
-          cette note fixe l'intention produit dès maintenant). */}
-      <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 16px" }}>
-        <p style={{ fontSize: 12, color: "var(--texte-secondaire)", lineHeight: 1.7, margin: 0 }}>
-          Ces informations servent de cadre de travail.
-          <br /><br />
-          Votre profil auteur pourra être réutilisé dans vos futurs projets Cursus.
-          <br /><br />
-          Les informations propres à ce projet resteront associées à ce texte et pourront être reprises
-          plus tard dans CursEdit pour accompagner l'écriture, la réécriture ou la structuration du
-          manuscrit.
-          <br /><br />
-          Vous pourrez les modifier à tout moment.
-        </p>
-      </div>
+  const étapeEstValide = (clé) => {
+    switch (clé) {
+      case "ou_en_etes_vous": return !!ouEnEtesVous;
+      case "nature_projet": return natureRenseignée;
+      case "attentes_audit": return finalites.length > 0 || (finalitesAutre.actif && finalitesAutre.texte.trim());
+      case "question_precise": return !!questionLibre.trim();
+      case "degre_intervention": return !!degreIntervention;
+      default: return true;
+    }
+  };
 
-      <ProfilAuteur />
+  const MESSAGES_ERREUR_ÉTAPE = {
+    ou_en_etes_vous: "Merci d'indiquer où vous en êtes dans ce projet.",
+    nature_projet: "Merci de préciser au moins le premier niveau de la nature de votre projet.",
+    attentes_audit: "Merci de cocher au moins une réponse, ou de préciser \"Autre\".",
+    question_precise: "Merci de renseigner votre question centrale avant de continuer.",
+    degre_intervention: "Merci de choisir ce que CursAudit peut faire.",
+  };
 
-      {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026, fusionné
-          avec l'ancienne classification "type de document" le même jour
-          (voir docblock en tête de fichier). Seul bloc qui classe le
-          document désormais. */}
-      <div style={{ background: "#F7F6FD", border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", display: "grid", gap: 16 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#5B52C4", marginBottom: 4 }}>
-            Contrat d'intention
-          </div>
-          <p style={{ fontSize: 12, color: "var(--texte-tertiaire)", lineHeight: 1.6 }}>
-            Pas "quel genre de livre", mais "quelle transformation cherchez-vous". Sert de brief déclaré
-            à l'audit, en plus de ce que l'IA déduit du texte lui-même.
-          </p>
-          <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", fontStyle: "italic", marginTop: 6 }}>
-            Certaines questions ci-dessous permettent plusieurs réponses. Vous pouvez aussi choisir
-            « Autre » et préciser librement.
-          </p>
-        </div>
+  const étapeSuivante = () => {
+    if (!étapeEstValide(étapeActuelle)) {
+      setErreur(MESSAGES_ERREUR_ÉTAPE[étapeActuelle] || "Merci de compléter cette réponse avant de continuer.");
+      return;
+    }
+    setErreur(null);
+    if (étapeIndex === étapesClés.length - 1) {
+      valider();
+    } else {
+      setÉtapeIndex((i) => i + 1);
+    }
+  };
 
-        {contratsPrécédents && contratsPrécédents.length > 0 && (
-          <div>
-            <label style={labelStyle}>Réutiliser les réponses d'un audit précédent</label>
-            <select style={champStyle} value={contratChoisi} onChange={(e) => choisirContratPrécédent(e.target.value)}>
-              <option value="">— Ne pas réutiliser —</option>
-              {contratsPrécédents.map((c) => (
-                <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
-              ))}
-            </select>
-          </div>
-        )}
+  const étapePrécédente = () => {
+    setErreur(null);
+    setÉtapeIndex((i) => Math.max(0, i - 1));
+  };
 
-        <div>
-          <label style={labelStyle}>Où en êtes-vous dans ce projet ? *</label>
-          <select style={champStyle} value={ouEnEtesVous} onChange={(e) => setOuEnEtesVous(e.target.value)}>
-            <option value="">— Choisir —</option>
-            {OU_EN_ETES_VOUS.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label style={labelStyle}>Nature du projet *</label>
-          <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "0 0 8px" }}>
-            Précisez autant de niveaux que vous le pouvez — le premier suffit pour continuer, les
-            suivants affinent l'analyse sans être obligatoires.
-          </p>
-          <SélecteurNature chemin={cheminNature} onChemin={setCheminNature} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Pourquoi écrivez-vous ?</label>
-          <GroupeCasesAvecAutre options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} autre={objectifsAutre} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Pour qui écrivez-vous ?</label>
-          <GroupeCasesAvecAutre options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} autre={destinatairesAutre} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Qu'attendez-vous de cet audit ? *</label>
-          <GroupeCasesAvecAutre options={FINALITES} valeurs={finalites} onBasculer={basculerFinalité} autre={finalitesAutre} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>À quoi reconnaîtrez-vous que ce projet est réussi ?</label>
-          <GroupeCasesAvecAutre options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} autre={criteresReussiteAutre} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Qu'espérez-vous découvrir que vous ignorez encore ?</label>
-          <GroupeCasesAvecAutre options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} autre={espérezDécouvrirAutre} />
-        </div>
-
-        <div>
-          <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
-          <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: "0 0 8px" }}>
-            Cochez ce qui vous préoccupe — CursAudit vous proposera une question centrale à partir de vos
-            réponses, que vous pourrez valider ou modifier librement.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-            {PREOCCUPATIONS_QUESTION_PRECISE.map((p) => (
-              <Checkbox key={p} checked={preoccupations.includes(p)} onChange={() => basculerPreoccupation(p)} label={p} />
-            ))}
-          </div>
-          <div style={{ marginTop: 4 }}>
-            <Checkbox
-              checked={preoccupationAutreActive}
-              onChange={() => setPreoccupationAutreActive((v) => !v)}
-              label="Autre, à préciser"
-            />
-            {preoccupationAutreActive && (
-              <input
-                style={{ ...champStyle, marginTop: 6 }}
-                value={preoccupationAutre}
-                onChange={(e) => setPreoccupationAutre(e.target.value)}
-                placeholder="Précisez votre préoccupation"
-              />
-            )}
-          </div>
-
-          <button type="button" onClick={proposerQuestionCentrale} disabled={syntheseQuestionEnCours} style={{
-            marginTop: 10, background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
-            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: syntheseQuestionEnCours ? "default" : "pointer", fontFamily: "inherit",
-          }}>
-            {syntheseQuestionEnCours ? "CursAudit formule une proposition…" : "Proposer ma question centrale"}
-          </button>
-          {erreurSyntheseQuestion && (
-            <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 6 }}>{erreurSyntheseQuestion}</div>
-          )}
-
-          <label style={{ ...labelStyle, fontWeight: 600, marginTop: 14 }}>Question centrale validée</label>
-          <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "0 0 6px" }}>
-            Reprenez ou modifiez librement la proposition ci-dessus — ce texte devient la boussole de
-            l'analyse.
-          </p>
-          <textarea
-            style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
-            value={questionLibre}
-            onChange={(e) => setQuestionLibre(e.target.value)}
-            placeholder="Ex. : Est-ce que mon mémoire répond bien à ma problématique ?"
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" onClick={exporterContratJSON} style={{
-            background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
-            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            Exporter ce contrat (JSON)
-          </button>
-          <label style={{
-            background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
-            padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-          }}>
-            Importer un contrat (JSON)
-            <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => importerContratJSON(e.target.files[0])} />
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <label style={labelStyle}>Que peut faire CursAudit ? *</label>
-        <select style={champStyle} value={degreIntervention} onChange={(e) => setDegreIntervention(e.target.value)}>
-          <option value="">— Choisir —</option>
-          {DEGRES_INTERVENTION.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-        </select>
-      </div>
-
-      <div>
-        <Checkbox
-          checked={estTravailAcademique}
-          onChange={() => setEstTravailAcademique((v) => !v)}
-          label="Ce texte est un mémoire, un TFE ou un autre travail académique soumis aux règles d'un établissement"
-        />
-        {estTravailAcademique && (
-          <p style={{ fontSize: 11.5, color: "#8A6116", marginTop: 6, lineHeight: 1.5 }}>
-            Limite pour un travail académique : CursAudit peut diagnostiquer, questionner, structurer,
-            signaler — il ne doit pas écrire le travail à la place de l'étudiant⋅e.
-          </p>
-        )}
-      </div>
-
-      {estTravailAcademique && (
-        <div style={{ background: "var(--fond, #F7F4EF)", padding: "14px 16px", borderRadius: 8 }}>
-          <label style={labelStyle}>Votre établissement autorise-t-il l'usage de l'IA ?</label>
-          <select style={{ ...champStyle, marginBottom: conditionsIA.length >= 0 && autorisationIA === "Oui" ? 12 : 0 }} value={autorisationIA} onChange={(e) => setAutorisationIA(e.target.value)}>
-            <option value="">— Choisir —</option>
-            <option value="Oui">Oui</option>
-            <option value="Non">Non</option>
-            <option value="Je ne sais pas">Je ne sais pas</option>
-          </select>
-          {(autorisationIA === "Non" || autorisationIA === "Je ne sais pas") && (
-            <p style={{ fontSize: 11.5, color: "#8A6116", marginTop: 8, lineHeight: 1.5 }}>
-              CursAudit restera strictement au diagnostic sur ce texte : aucune proposition ni reformulation,
-              quel que soit le degré d'intervention choisi plus haut — cette limite est appliquée
-              automatiquement par le moteur d'analyse, pas seulement affichée ici.
+  const renderContenuÉtape = (clé) => {
+    switch (clé) {
+      case "intro":
+        return (
+          <>
+            <p style={{ fontSize: 12.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: 0 }}>
+              Sans ce cadrage, l'IA analyse un texte sans savoir ce qu'il est censé être, pour qui il est
+              écrit, ni jusqu'où elle a le droit d'intervenir.
             </p>
-          )}
-          {autorisationIA === "Oui" && (
-            <div>
-              <label style={{ ...labelStyle, marginTop: 12 }}>À quelles conditions ?</label>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-                {CONDITIONS_IA_ACADEMIQUE.map((c) => (
-                  <Checkbox key={c} checked={conditionsIA.includes(c)} onChange={() => basculerCondition(c)} label={c} />
-                ))}
-              </div>
+            {/* Note de continuité profil/projet — réf. 60816-01, suite,
+                29/08/2026, demande explicite de l'auteur du projet :
+                présentée comme une continuité d'accompagnement, jamais
+                comme une obligation. */}
+            <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 16px" }}>
+              <p style={{ fontSize: 12, color: "var(--texte-secondaire)", lineHeight: 1.7, margin: 0 }}>
+                Ces informations servent de cadre de travail.
+                <br /><br />
+                Votre profil auteur pourra être réutilisé dans vos futurs projets Cursus.
+                <br /><br />
+                Les informations propres à ce projet resteront associées à ce texte et pourront être
+                reprises plus tard dans CursEdit pour accompagner l'écriture, la réécriture ou la
+                structuration du manuscrit.
+                <br /><br />
+                Vous pourrez les modifier à tout moment.
+              </p>
             </div>
-          )}
-        </div>
-      )}
+            <ProfilAuteur />
+            {contratsPrécédents && contratsPrécédents.length > 0 && (
+              <div>
+                <label style={labelStyle}>Réutiliser les réponses d'un audit précédent</label>
+                <select style={champStyle} value={contratChoisi} onChange={(e) => choisirContratPrécédent(e.target.value)}>
+                  <option value="">— Ne pas réutiliser —</option>
+                  {contratsPrécédents.map((c) => (
+                    <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Ou importer un contrat déjà exporté (JSON) pour sauter tout ce parcours</label>
+              <label style={{
+                display: "inline-block", background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+                padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Importer un contrat (JSON)
+                <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => { importerContratJSON(e.target.files[0]); e.target.value = ""; }} />
+              </label>
+            </div>
+          </>
+        );
 
+      case "ou_en_etes_vous":
+        return (
+          <>
+            <p style={{ fontSize: 12, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: 0 }}>
+              Pas "quel genre de livre", mais "quelle transformation cherchez-vous" — les questions qui
+              suivent servent de brief déclaré à l'audit, en plus de ce que l'IA déduit du texte lui-même.
+            </p>
+            <select style={champStyle} value={ouEnEtesVous} onChange={(e) => setOuEnEtesVous(e.target.value)}>
+              <option value="">— Choisir —</option>
+              {OU_EN_ETES_VOUS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </>
+        );
+
+      case "nature_projet":
+        return (
+          <>
+            <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: 0 }}>
+              Précisez autant de niveaux que vous le pouvez — le premier suffit pour continuer, les
+              suivants affinent l'analyse sans être obligatoires.
+            </p>
+            <SélecteurNature chemin={cheminNature} onChemin={setCheminNature} />
+          </>
+        );
+
+      case "pourquoi":
+        return <GroupeCasesAvecAutre options={OBJECTIFS} valeurs={objectifs} onBasculer={basculeur(setObjectifs)} autre={objectifsAutre} />;
+
+      case "pour_qui":
+        return <GroupeCasesAvecAutre options={DESTINATAIRES} valeurs={destinataires} onBasculer={basculeur(setDestinataires)} autre={destinatairesAutre} />;
+
+      case "attentes_audit":
+        return <GroupeCasesAvecAutre options={FINALITES} valeurs={finalites} onBasculer={basculerFinalité} autre={finalitesAutre} />;
+
+      case "critere_reussite":
+        return <GroupeCasesAvecAutre options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} autre={criteresReussiteAutre} />;
+
+      case "espoir_decouverte":
+        return <GroupeCasesAvecAutre options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} autre={espérezDécouvrirAutre} />;
+
+      case "question_precise":
+        return (
+          <>
+            <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: 0 }}>
+              Cochez ce qui vous préoccupe — CursAudit vous proposera une question centrale à partir de
+              vos réponses, que vous pourrez valider ou modifier librement.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+              {PREOCCUPATIONS_QUESTION_PRECISE.map((p) => (
+                <Checkbox key={p} checked={preoccupations.includes(p)} onChange={() => basculerPreoccupation(p)} label={p} />
+              ))}
+            </div>
+            <div>
+              <Checkbox
+                checked={preoccupationAutreActive}
+                onChange={() => setPreoccupationAutreActive((v) => !v)}
+                label="Autre, à préciser"
+              />
+              {preoccupationAutreActive && (
+                <input
+                  style={{ ...champStyle, marginTop: 6 }}
+                  value={preoccupationAutre}
+                  onChange={(e) => setPreoccupationAutre(e.target.value)}
+                  placeholder="Précisez votre préoccupation"
+                />
+              )}
+            </div>
+            <button type="button" onClick={proposerQuestionCentrale} disabled={syntheseQuestionEnCours} style={{
+              background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: syntheseQuestionEnCours ? "default" : "pointer", fontFamily: "inherit",
+              justifySelf: "start",
+            }}>
+              {syntheseQuestionEnCours ? "CursAudit formule une proposition…" : "Proposer ma question centrale"}
+            </button>
+            {erreurSyntheseQuestion && (
+              <div style={{ fontSize: 11.5, color: "#A32D2D" }}>{erreurSyntheseQuestion}</div>
+            )}
+            <div>
+              <label style={{ ...labelStyle, fontWeight: 600 }}>Question centrale validée</label>
+              <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "0 0 6px" }}>
+                Reprenez ou modifiez librement la proposition ci-dessus — ce texte devient la boussole de
+                l'analyse.
+              </p>
+              <textarea
+                style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
+                value={questionLibre}
+                onChange={(e) => setQuestionLibre(e.target.value)}
+                placeholder="Ex. : Est-ce que mon mémoire répond bien à ma problématique ?"
+              />
+            </div>
+          </>
+        );
+
+      case "degre_intervention":
+        return (
+          <select style={champStyle} value={degreIntervention} onChange={(e) => setDegreIntervention(e.target.value)}>
+            <option value="">— Choisir —</option>
+            {DEGRES_INTERVENTION.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+          </select>
+        );
+
+      case "academique_choix":
+        return (
+          <>
+            <Checkbox
+              checked={estTravailAcademique}
+              onChange={() => setEstTravailAcademique((v) => !v)}
+              label="Ce texte est un mémoire, un TFE ou un autre travail académique soumis aux règles d'un établissement"
+            />
+            {estTravailAcademique && (
+              <p style={{ fontSize: 11.5, color: "#8A6116", lineHeight: 1.5, margin: 0 }}>
+                Limite pour un travail académique : CursAudit peut diagnostiquer, questionner, structurer,
+                signaler — il ne doit pas écrire le travail à la place de l'étudiant⋅e.
+              </p>
+            )}
+          </>
+        );
+
+      case "academique_conditions":
+        return (
+          <>
+            <select style={champStyle} value={autorisationIA} onChange={(e) => setAutorisationIA(e.target.value)}>
+              <option value="">— Choisir —</option>
+              <option value="Oui">Oui</option>
+              <option value="Non">Non</option>
+              <option value="Je ne sais pas">Je ne sais pas</option>
+            </select>
+            {(autorisationIA === "Non" || autorisationIA === "Je ne sais pas") && (
+              <p style={{ fontSize: 11.5, color: "#8A6116", lineHeight: 1.5, margin: 0 }}>
+                CursAudit restera strictement au diagnostic sur ce texte : aucune proposition ni
+                reformulation, quel que soit le degré d'intervention choisi précédemment — cette limite
+                est appliquée automatiquement par le moteur d'analyse, pas seulement affichée ici.
+              </p>
+            )}
+            {autorisationIA === "Oui" && (
+              <div>
+                <label style={labelStyle}>À quelles conditions ?</label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                  {CONDITIONS_IA_ACADEMIQUE.map((c) => (
+                    <Checkbox key={c} checked={conditionsIA.includes(c)} onChange={() => basculerCondition(c)} label={c} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        );
+
+      case "relation_ia":
+        return (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <select style={champStyle} value={adresse} onChange={(e) => setAdresse(e.target.value)}>
+                <option value="tu">Tutoiement</option>
+                <option value="vous">Vouvoiement</option>
+              </select>
+              <select style={champStyle} value={ton} onChange={(e) => setTon(e.target.value)}>
+                <option value="direct">Ton direct</option>
+                <option value="diplomatique">Ton diplomatique</option>
+              </select>
+              <select style={champStyle} value={posture} onChange={(e) => setPosture(e.target.value)}>
+                <option value="critique">Critique</option>
+                <option value="accompagnant">Accompagnant</option>
+                <option value="contradicteur">Contradicteur</option>
+              </select>
+              <select style={champStyle} value={longueur} onChange={(e) => setLongueur(e.target.value)}>
+                <option value="court">Réponses courtes</option>
+                <option value="détaillé">Réponses détaillées</option>
+              </select>
+              <select style={champStyle} value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="éditeur">Plutôt éditeur</option>
+                <option value="auditeur">Plutôt auditeur</option>
+                <option value="coach">Plutôt coach</option>
+                <option value="lecteur expert">Plutôt lecteur expert</option>
+              </select>
+            </div>
+            <button type="button" onClick={exporterContratJSON} style={{
+              background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+              justifySelf: "start",
+            }}>
+              Sauvegarder mes réponses (JSON)
+            </button>
+          </>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 16, maxWidth: 560, margin: "0 auto" }}>
       <div>
-        <label style={labelStyle}>Comment voulez-vous que l'IA vous parle ?</label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <select style={champStyle} value={adresse} onChange={(e) => setAdresse(e.target.value)}>
-            <option value="tu">Tutoiement</option>
-            <option value="vous">Vouvoiement</option>
-          </select>
-          <select style={champStyle} value={ton} onChange={(e) => setTon(e.target.value)}>
-            <option value="direct">Ton direct</option>
-            <option value="diplomatique">Ton diplomatique</option>
-          </select>
-          <select style={champStyle} value={posture} onChange={(e) => setPosture(e.target.value)}>
-            <option value="critique">Critique</option>
-            <option value="accompagnant">Accompagnant</option>
-            <option value="contradicteur">Contradicteur</option>
-          </select>
-          <select style={champStyle} value={longueur} onChange={(e) => setLongueur(e.target.value)}>
-            <option value="court">Réponses courtes</option>
-            <option value="détaillé">Réponses détaillées</option>
-          </select>
-          <select style={champStyle} value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="éditeur">Plutôt éditeur</option>
-            <option value="auditeur">Plutôt auditeur</option>
-            <option value="coach">Plutôt coach</option>
-            <option value="lecteur expert">Plutôt lecteur expert</option>
-          </select>
+        <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginBottom: 6 }}>
+          Question {étapeIndex + 1} / {étapesClés.length}
         </div>
+        <div style={{ height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden" }}>
+          <div style={{
+            height: "100%", width: `${((étapeIndex + 1) / étapesClés.length) * 100}%`,
+            background: "#1D9E75", transition: "width 0.2s ease",
+          }} />
+        </div>
+      </div>
+
+      <div style={{ background: "#fff", border: "0.5px solid var(--border)", borderRadius: 12, padding: "22px 24px", display: "grid", gap: 14 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "var(--texte-primaire)" }}>
+          {TITRES_ÉTAPE[étapeActuelle]}
+        </div>
+        {renderContenuÉtape(étapeActuelle)}
       </div>
 
       {erreur && (
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13 }}>{erreur}</div>
       )}
 
-      <button onClick={valider} style={{
-        background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
-        padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
-      }}>
-        Continuer
-      </button>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+        {étapeIndex > 0 ? (
+          <button type="button" onClick={étapePrécédente} style={{
+            background: "none", border: "1px solid var(--border)", borderRadius: 8,
+            padding: "10px 18px", fontSize: 13, color: "var(--texte-secondaire)", cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Précédent
+          </button>
+        ) : <div />}
+        <button onClick={étapeSuivante} style={{
+          background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
+          padding: "10px 26px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+        }}>
+          {étapeIndex === étapesClés.length - 1 ? "Continuer" : "Valider"}
+        </button>
+      </div>
     </div>
   );
 }
