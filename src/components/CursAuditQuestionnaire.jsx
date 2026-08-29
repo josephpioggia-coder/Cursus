@@ -55,10 +55,18 @@
  * vivait auparavant HORS du bloc "Contrat d'intention" — déplacé dedans,
  * entre "Pour qui écrivez-vous" et "À quoi reconnaîtrez-vous...", pour
  * suivre cet ordre. La mention "(plusieurs choix possibles)", répétée sur
- * chaque question, remplacée par une seule ligne en tête de bloc. La
- * question libre (6) garde délibérément la forme d'un champ texte plutôt
- * que de cases à cocher — des exemples affichés au-dessus servent
- * d'inspiration sans "enfermer l'utilisateur" dans une liste fermée.
+ * chaque question, remplacée par une seule ligne en tête de bloc.
+ *
+ * CORRECTIF, MÊME JOUR — la question précise (6) restait physiquement HORS
+ * du bloc violet et, surtout, hors de `contratIntentionActuel()` : exporter
+ * puis réimporter un contrat perdait cette question, pourtant la pièce la
+ * plus centrale du cadrage ("si je veux exporter, j'ai besoin de cette
+ * information aussi", demande explicite de l'auteur du projet). Déplacée
+ * dans le bloc, juste avant les boutons Exporter/Importer, et ajoutée à
+ * `contratIntentionActuel()`/`appliquerContrat()`. Garde délibérément la
+ * forme d'un champ texte plutôt que de cases à cocher — les exemples
+ * affichés au-dessus (formulation exacte proposée par l'auteur du projet)
+ * servent d'inspiration sans "enfermer l'utilisateur" dans une liste fermée.
  *
  * Repère (question → fonction dans l'audit → type de réponse), pour
  * mémoire plutôt que pour l'UI :
@@ -225,6 +233,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
     if (c.attentesCursus?.length > 0) setFinalites((f) => [...new Set([...f, ...c.attentesCursus])]);
     setCriteresReussite(c.criteresReussite || []);
     setCeQueVousEspérezDécouvrir(c.ceQueVousEspérezDécouvrir || []);
+    // Réf. 60816-01, suite, 29/08/2026 — signalé par l'auteur du projet :
+    // exporter un contrat sans la question précise fait perdre l'information
+    // la plus centrale ("boussole de l'audit") en cas de réimport. Ajoutée
+    // au contrat lui-même plutôt que de rester un champ isolé, à part.
+    setQuestionLibre(c.questionLibre || "");
   };
 
   const choisirContratPrécédent = (id) => {
@@ -243,6 +256,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
     attentesCursus: finalites,
     criteresReussite,
     ceQueVousEspérezDécouvrir,
+    // Ajouté le 29/08/2026 (voir appliquerContrat) — sans ce champ, exporter
+    // puis réimporter un contrat perdait la question précise posée à
+    // CursAudit, pourtant la pièce la plus centrale du cadrage.
+    questionLibre: questionLibre.trim(),
   });
 
   const exporterContratJSON = () => {
@@ -445,6 +462,29 @@ export default function CursAuditQuestionnaire({ onValider }) {
           <GroupeCases options={CE_QUE_VOUS_ESPEREZ_DECOUVRIR} valeurs={ceQueVousEspérezDécouvrir} onBasculer={basculeur(setCeQueVousEspérezDécouvrir)} />
         </div>
 
+        <div>
+          <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
+          <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: "0 0 8px" }}>
+            Formulez votre question principale à CursAudit. Exemples :
+          </p>
+          <ul style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.8, margin: "0 0 10px", paddingLeft: 18 }}>
+            <li>Mon texte tient-il sa promesse ?</li>
+            <li>À quel genre appartient-il réellement ?</li>
+            <li>Où perd-il le lecteur ?</li>
+            <li>Que dois-je retravailler en priorité ?</li>
+            <li>Le texte est-il publiable en l'état ?</li>
+            <li>Ce que je veux transmettre est-il compréhensible ?</li>
+            <li>Le niveau d'intime, de preuve ou de pédagogie est-il juste ?</li>
+          </ul>
+          <label style={{ ...labelStyle, fontWeight: 600 }}>Ma question principale :</label>
+          <textarea
+            style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
+            value={questionLibre}
+            onChange={(e) => setQuestionLibre(e.target.value)}
+            placeholder="Ex. : Est-ce que mon mémoire répond bien à ma problématique ?"
+          />
+        </div>
+
         <div style={{ display: "flex", gap: 10 }}>
           <button type="button" onClick={exporterContratJSON} style={{
             background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
@@ -460,29 +500,6 @@ export default function CursAuditQuestionnaire({ onValider }) {
             <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => importerContratJSON(e.target.files[0])} />
           </label>
         </div>
-      </div>
-
-      <div>
-        <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
-        <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: "0 0 8px" }}>
-          Quelques exemples pour vous aider à la formuler — libre à vous de poser toute autre question :
-        </p>
-        <ul style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.8, margin: "0 0 10px", paddingLeft: 18 }}>
-          <li>Ce texte remplit-il son objectif ?</li>
-          <li>Ai-je un problème de structure ou seulement de style ?</li>
-          <li>Ma thèse principale est-elle suffisamment démontrée ?</li>
-          <li>Ce texte donne-t-il envie de continuer à lire ?</li>
-          <li>Ai-je oublié quelque chose d'important ?</li>
-          <li>Ce texte est-il fidèle à ce que je veux vraiment dire ?</li>
-          <li>Ce texte est-il prêt à être montré à quelqu'un d'autre ?</li>
-        </ul>
-        <label style={{ ...labelStyle, fontWeight: 600 }}>Ma question principale :</label>
-        <textarea
-          style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
-          value={questionLibre}
-          onChange={(e) => setQuestionLibre(e.target.value)}
-          placeholder="Ex. : Est-ce que mon mémoire répond bien à ma problématique ?"
-        />
       </div>
 
       <div>
