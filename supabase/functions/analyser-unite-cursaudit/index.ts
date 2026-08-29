@@ -246,7 +246,12 @@ const AUTORISATION_IA_INCERTAINE_OU_REFUSEE = new Set(["Non", "Je ne sais pas"])
 
 interface ContratIntention {
   ouEnEtesVous?: string;
-  natureProjet?: { famille?: string; sousCategorie?: string; autre?: string };
+  // Réf. 60816-01, suite, 29/08/2026 — jamais lu (natureProjet n'est
+  // pas utilisé dans construireContexteQualification, seul type_document
+  // au premier niveau l'est) ; forme mise à jour par cohérence avec le
+  // nouvel arbre niveaux 1-4 côté client (voir
+  // taxonomieContratIntentionCursAudit.js), sans effet fonctionnel ici.
+  natureProjet?: { label?: string };
   objectifs?: string[];
   destinataires?: string[];
   criteresReussite?: string[];

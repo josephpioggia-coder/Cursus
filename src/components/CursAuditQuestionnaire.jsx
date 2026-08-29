@@ -13,26 +13,18 @@
  * signalé par l'auteur du projet : les questions "quel type de document"
  * et "ce texte est-il..." faisaient doublon avec "Nature du projet" et "Où
  * en êtes-vous" du bloc contrat d'intention. Fusionnées : la taxonomie du
- * contrat d'intention (famille/sous-catégorie) est désormais LA SEULE
- * classification du document, envoyée telle quelle comme `type_document`
- * au moteur d'analyse (qui ne fait qu'injecter cette chaîne dans son
- * prompt, aucune comparaison stricte côté serveur — vérifié). Ce qui
- * dépendait de valeurs exactes de l'ancienne liste plate a été réexprimé
- * sur la nouvelle taxonomie :
- *  - Poésie (bloque la validation, moteur non prêt) → sousCategorie === "Poésie".
- *  - Format non linéaire (message informatif, pas de blocage) → un
- *    ensemble de sous-catégories désormais plus précis que l'ancien
- *    "Format alternatif" fourre-tout (voir SOUS_CATEGORIES_NON_LINEAIRES).
- *  - Mémoire/TFE académique (bloc "établissement autorise l'IA ?") →
- *    n'existe dans AUCUNE branche de la nouvelle taxonomie (un TFE peut
- *    être un essai, un rapport, un témoignage...) : devient une case à
- *    cocher indépendante, transversale à la nature du projet.
- *  - "Autre (à préciser)" → déjà géré nativement par la taxonomie à deux
- *    niveaux (famille ET sous-catégorie peuvent valoir "Autre").
+ * contrat d'intention est désormais LA SEULE classification du document,
+ * envoyée telle quelle comme `type_document` au moteur d'analyse (qui ne
+ * fait qu'injecter cette chaîne dans son prompt, aucune comparaison stricte
+ * côté serveur — vérifié).
  * "Ce texte est-il..." (statut_texte) a été vérifié comme jamais lu par
  * aucune Edge Function (grep sur tout supabase/functions) — supprimé sans
  * remplacement fonctionnel, sa valeur est désormais directement celle de
  * "Où en êtes-vous" (ouEnEtesVous), plus riche et déjà présente.
+ * Mémoire/TFE académique (bloc "établissement autorise l'IA ?") →
+ * n'existe dans AUCUNE branche de la taxonomie (un TFE peut être un essai,
+ * un rapport, un témoignage...) : reste une case à cocher indépendante,
+ * transversale à la nature du projet.
  *
  * CE QUI N'EST PAS ICI (limites assumées) :
  *  - Section 6 ("préserver ma voix", comparaison à des pages de référence)
@@ -51,60 +43,65 @@
  * de l'auteur, (2) Pourquoi/pour qui écrivez-vous, (3) Qu'attendez-vous de
  * cet audit, (4) À quoi reconnaîtrez-vous que ce projet est réussi, (5)
  * Qu'espérez-vous découvrir que vous ignorez encore, (6) la question
- * précise posée à CursAudit. "Qu'attendez-vous de cet audit ?" (FINALITES)
- * vivait auparavant HORS du bloc "Contrat d'intention" — déplacé dedans,
- * entre "Pour qui écrivez-vous" et "À quoi reconnaîtrez-vous...", pour
- * suivre cet ordre. La mention "(plusieurs choix possibles)", répétée sur
- * chaque question, remplacée par une seule ligne en tête de bloc.
+ * précise posée à CursAudit. La mention "(plusieurs choix possibles)",
+ * répétée sur chaque question, remplacée par une seule ligne en tête de
+ * bloc. La question précise (6) vit dans le bloc, juste avant les boutons
+ * Exporter/Importer, et fait partie de `contratIntentionActuel()` —
+ * exporter puis réimporter un contrat ne perd plus cette information,
+ * pourtant la pièce la plus centrale du cadrage.
  *
- * CORRECTIF, MÊME JOUR — la question précise (6) restait physiquement HORS
- * du bloc violet et, surtout, hors de `contratIntentionActuel()` : exporter
- * puis réimporter un contrat perdait cette question, pourtant la pièce la
- * plus centrale du cadrage ("si je veux exporter, j'ai besoin de cette
- * information aussi", demande explicite de l'auteur du projet). Déplacée
- * dans le bloc, juste avant les boutons Exporter/Importer, et ajoutée à
- * `contratIntentionActuel()`/`appliquerContrat()`.
+ * FLUX EN 3 ÉTAPES POUR LA QUESTION PRÉCISE, MÊME JOUR (demande explicite
+ * de l'auteur du projet avec GPT) : (1) des cases à cocher de
+ * préoccupations éditoriales concrètes (PREOCCUPATIONS_QUESTION_PRECISE, +
+ * "Autre, à préciser"), (2) un appel à la nouvelle Edge Function
+ * `synthetiser-question-cursaudit` (bouton "Proposer ma question
+ * centrale") qui combine ces cases avec le profil auteur et le reste du
+ * contrat d'intention en UNE question cohérente, (3) un champ "Question
+ * centrale validée" — préremplit par la proposition, mais toujours
+ * librement modifiable — qui reste `questionLibre`. SEULE étape de tout ce
+ * questionnaire à appeler l'IA (voir la note "RUPTURE ASSUMÉE" dans
+ * synthetiser-question-cursaudit/index.ts) : le reste (taxonomie, cases à
+ * cocher) reste 100% statique, décision assumée le 28/08/2026 pour éviter
+ * la fragilité observée ce jour-là (NetworkError, sorties mal formées,
+ * latence).
  *
- * FLUX EN 3 ÉTAPES, MÊME JOUR (2e correctif, demande explicite de l'auteur
- * du projet avec GPT) — remplace le champ texte + exemples ci-dessus par :
- * (1) des cases à cocher de préoccupations éditoriales concrètes
- * (PREOCCUPATIONS_QUESTION_PRECISE, + "Autre, à préciser"), (2) un appel à
- * la nouvelle Edge Function `synthetiser-question-cursaudit` (bouton
- * "Proposer ma question centrale") qui combine ces cases avec le profil
- * auteur et le reste du contrat d'intention en UNE question cohérente, (3)
- * un champ "Question centrale validée" — préremplit par la proposition,
- * mais toujours librement modifiable — qui reste `questionLibre`, la même
- * variable qu'avant. SEULE étape de tout ce questionnaire à appeler l'IA
- * (voir la note "RUPTURE ASSUMÉE" dans synthetiser-question-cursaudit/index.ts) :
- * le reste (taxonomie, cases à cocher) reste 100% statique, décision
- * assumée le 28/08/2026 pour éviter la fragilité observée ce jour-là
- * (NetworkError, sorties mal formées, latence) — ici, combiner des
- * préoccupations disparates en une question naturelle est un vrai travail
- * de synthèse en langage, pas une simple sélection dans un arbre.
+ * "AUTRE, À PRÉCISER" SUR LES 5 QUESTIONS À CASES (Pourquoi/pour qui
+ * écrivez-vous, Qu'attendez-vous de l'audit, critère de réussite, ce que
+ * vous espérez découvrir), même jour — jusque-là seule "Nature du projet"
+ * l'avait. Voir `useAutre()`/`GroupeCasesAvecAutre` : chaque "Autre" a son
+ * propre état séparé (jamais fusionné dans le tableau de cases coché, pour
+ * rester fidèlement réimportable) — sauf celui de "Qu'attendez-vous de cet
+ * audit ?", qui EST fusionné dans `finaliteAudit` au moment de valider()
+ * (seul champ de ce groupe lu directement par les 3 fonctions d'analyse au
+ * premier niveau ; les 4 autres "Autre" sont recombinés côté serveur dans
+ * construireContexteQualification à partir de `contrat_intention`).
  *
- * DEUX AJOUTS, MÊME JOUR (3e correctif, demande explicite de l'auteur du
- * projet) :
- *  1. Niveau 3 sur "Nature du projet" — "Roman ne reprend pas encore les
- *     différents types existants". Voir nomSousCategorie()/sousGenresDe()
- *     dans taxonomieContratIntentionCursAudit.js : un élément de
- *     sousCategories peut désormais être soit une chaîne simple, soit
- *     `{ nom, sousGenres }`. Seul "Roman" est détaillé pour l'instant (liste
- *     rédigée directement dans ce fichier, la liste de 47 sous-genres
- *     élaborée le 28/08/2026 avec ChatGPT n'ayant jamais été commitée au
- *     dépôt et n'ayant pas pu être retrouvée) — le mécanisme est générique,
- *     approfondir une autre branche (Religion → Christianisme, par exemple)
- *     est un ajout de données, pas de code.
- *  2. "Autre, à préciser" sur les 5 questions à cases (Pourquoi/pour qui
- *     écrivez-vous, Qu'attendez-vous de l'audit, critère de réussite, ce
- *     que vous espérez découvrir) — jusqu'ici seule "Nature du projet"
- *     l'avait. Voir `useAutre()`/`GroupeCasesAvecAutre` : chaque "Autre" a
- *     son propre état séparé (jamais fusionné dans le tableau de cases
- *     coché, pour rester fidèlement réimportable) — sauf celui de
- *     "Qu'attendez-vous de cet audit ?", qui EST fusionné dans
- *     `finaliteAudit` au moment de valider() (seul champ de ce groupe lu
- *     directement par les 3 fonctions d'analyse au premier niveau ; les 4
- *     autres "Autre" sont recombinés côté serveur dans
- *     construireContexteQualification à partir de `contrat_intention`).
+ * NATURE DU PROJET REMPLACÉE INTÉGRALEMENT, 29/08/2026 — l'auteur du
+ * projet a signalé deux manques réels : (1) le niveau 3 ajouté plus tôt
+ * dans la journée (seul "Roman" détaillé, avec une liste de sous-genres
+ * rédigée à la main faute de retrouver l'originale) ne couvrait ni les
+ * autres familles, ni un vrai niveau 4 ; (2) au niveau 2 (et parfois 3),
+ * choisir "Autre" n'ouvrait aucun champ de précision — bug réel, pas
+ * seulement un manque de contenu. L'auteur du projet a alors fourni
+ * taxonomie_cursus_niveaux_1_a_4.xlsx (élaboré avec ChatGPT) : l'arbre
+ * COMPLET niveaux 1 à 4, 9 familles, 415 chemins. Voir
+ * taxonomieContratIntentionCursAudit.js pour la structure de données et
+ * son docblock (statuts, principe "ne jamais bloquer l'auteur·ice",
+ * réponse à "est-ce Copilot qui crée les niveaux suivants dynamiquement ?"
+ * — non, l'arbre est fixe, "Autre" arrête juste la descente).
+ * `SélecteurNature` remplace tout l'ancien mécanisme famille/sousCategorie/
+ * sousGenre par une navigation générique à N niveaux (`optionsSuivantes()`/
+ * `noeudAtteint()`), avec "Autre" + champ texte à CHAQUE niveau — corrige
+ * structurellement le bug de "Autre" muet, plus possible de l'oublier à un
+ * niveau puisqu'il n'y a plus qu'UN SEUL endroit du code qui rend un
+ * niveau. CHANGEMENT DE COMPORTEMENT réel : l'ancien blocage de "Poésie" à
+ * la validation est retiré — la nouvelle taxonomie classe la plupart des
+ * formes poétiques "prêt" (voir STATUTS_AIDE_GENERIQUE), et le principe
+ * explicite de la source est de ne jamais bloquer. Le message informatif
+ * "format non linéaire" (post réseaux sociaux, livre-jeu...) est retiré de
+ * la même façon, faute d'équivalent direct dans la nouvelle donnée — à
+ * réintroduire via le champ `aide` d'un nœud si un besoin réel se
+ * manifeste.
  *
  * Repère (question → fonction dans l'audit → type de réponse), pour
  * mémoire plutôt que pour l'UI :
@@ -113,20 +110,15 @@
  *   Qu'attendez-vous de l'audit → attentes vis-à-vis de CursAudit       → cases à cocher + "Autre"
  *   Critère de réussite         → ce que "réussi" veut dire pour vous   → cases à cocher + "Autre"
  *   Ce que vous espérez découvrir → angle d'analyse à explorer          → cases à cocher + "Autre"
- *   Question précise à CursAudit → question centrale posée à l'audit   → texte libre (obligatoire)
+ *   Question précise à CursAudit → question centrale posée à l'audit   → cases + synthèse IA + validation
  *
  * PAS ENCORE FAIT (chantier distinct, plus large) — demande explicite de
  * l'auteur du projet : faire remonter un encadré "Cadre de lecture retenu
- * par CursAudit" (profil auteur utilisé, intention principale, lecteur
- * visé, attente principale, critère de réussite, question centrale,
- * conséquence sur l'analyse) DANS la sortie de l'audit lui-même (pré-audit
- * et/ou rapport consolidé), pas seulement dans ce formulaire. Cela suppose
- * que les Edge Functions de génération (au moins
- * preaudit-approfondi-cursaudit, potentiellement orchestrer-audit-cursaudit
- * / analyser-unite-cursaudit) lisent `contrat_intention` (actuellement
- * seul `profils_auteur` est câblé côté prompt) et produisent un champ
- * structuré dédié en sortie — portée nettement plus large qu'un
- * réagencement de formulaire, à traiter comme un chantier à part.
+ * par CursAudit" DANS la sortie de l'audit lui-même (pré-audit et/ou
+ * rapport consolidé, y compris leurs exports Word), pas seulement dans un
+ * encadré de la page de détail (déjà fait, voir CadreLecture dans
+ * CursAuditDetail.jsx). Portée nettement plus large qu'un réagencement de
+ * formulaire, à traiter comme un chantier à part.
  *
  * CE QUE LES RÉPONSES CHANGENT RÉELLEMENT côté moteur d'analyse
  * (analyser-unite-cursaudit / orchestrer-audit-cursaudit) : la question
@@ -145,20 +137,10 @@ import { supabase } from "../lib/supabase.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
 import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
-  NATURE_PROJET, OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
+  OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
   CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
-  nomSousCategorie, sousGenresDe,
+  optionsSuivantes, noeudAtteint, STATUTS_AIDE_GENERIQUE,
 } from "../lib/taxonomieContratIntentionCursAudit.js";
-
-// Sous-catégories de la nouvelle taxonomie faites d'entrées courtes et
-// autonomes plutôt que d'un fil narratif continu — remplace l'ancien
-// "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)",
-// plus précis puisque directement rattaché aux sous-catégories réelles
-// plutôt qu'à une case fourre-tout.
-const SOUS_CATEGORIES_NON_LINEAIRES = new Set([
-  "Post réseaux sociaux", "Série de publications", "Livre-jeu", "Jeu narratif",
-  "Jeu de rôle", "Cartes pédagogiques", "Fiction interactive",
-]);
 
 // Fusionne l'ancienne FINALITES avec ATTENTES_CURSUS du contrat d'intention
 // (réf. 60816-01, suite, 28/08/2026) — signalé par l'auteur du projet :
@@ -291,23 +273,84 @@ function GroupeCasesAvecAutre({ options, valeurs, onBasculer, autre }) {
   );
 }
 
+// Navigation générique à N niveaux dans l'arbre NATURE_PROJET (réf.
+// 60816-01, suite, 29/08/2026) — remplace tout l'ancien mécanisme
+// famille/sousCategorie/sousGenre, qui ne montait qu'à 3 niveaux fixes et
+// avait un vrai bug : "Autre" au niveau 2 n'ouvrait aucun champ de
+// précision. Ici, un seul bloc de rendu par niveau, appliqué en boucle :
+// structurellement impossible d'oublier le champ "Autre" à un niveau
+// donné. `chemin` est un tableau de `{ nom, autre }`, un élément par
+// niveau déjà choisi (niveau 1 en premier) ; `nom === "Autre"` arrête
+// toujours la descente (voir taxonomieContratIntentionCursAudit.js).
+function labelChemin(chemin) {
+  return chemin
+    .map((étape) => (étape.nom === "Autre" ? (étape.autre.trim() || "Autre") : étape.nom))
+    .join(" > ");
+}
+
+function SélecteurNature({ chemin, onChemin }) {
+  const étapes = [];
+  for (let i = 0; ; i++) {
+    const options = optionsSuivantes(chemin.slice(0, i));
+    if (!options) break;
+    étapes.push({ niveau: i, options });
+    if (!chemin[i]) break; // Niveau pas encore choisi : dernier menu à afficher pour l'instant.
+  }
+  const noeudFinal = noeudAtteint(chemin);
+  const statutFinal = noeudFinal?.statut;
+
+  return (
+    <div>
+      {étapes.map(({ niveau, options }) => (
+        <div key={niveau} style={{ marginTop: niveau > 0 ? 8 : 0 }}>
+          <select
+            style={champStyle}
+            value={chemin[niveau]?.nom ?? ""}
+            onChange={(e) => {
+              const nom = e.target.value;
+              const nouveauChemin = chemin.slice(0, niveau);
+              if (nom) nouveauChemin.push({ nom, autre: "" });
+              onChemin(nouveauChemin);
+            }}
+          >
+            <option value="">{niveau === 0 ? "— Choisir —" : "— Préciser (facultatif) —"}</option>
+            {options.map((o) => <option key={o.code} value={o.nom}>{o.nom}</option>)}
+            <option value="Autre">Autre</option>
+          </select>
+          {chemin[niveau]?.nom === "Autre" && (
+            <input
+              style={{ ...champStyle, marginTop: 6 }}
+              value={chemin[niveau].autre}
+              onChange={(e) => {
+                const nouveauChemin = [...chemin];
+                nouveauChemin[niveau] = { nom: "Autre", autre: e.target.value };
+                onChemin(nouveauChemin);
+              }}
+              placeholder="Précisez"
+            />
+          )}
+        </div>
+      ))}
+      {statutFinal && statutFinal !== "prêt" && (
+        <div style={{ background: "#FFF7E6", border: "0.5px solid #C4973A50", borderRadius: 8, padding: "10px 14px", marginTop: 10 }}>
+          <div style={{ fontSize: 11.5, color: "#8A6116", lineHeight: 1.6 }}>
+            {noeudFinal.aide || STATUTS_AIDE_GENERIQUE[statutFinal] || "Cursus peut accompagner ce type de projet avec un cadrage adapté."}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CursAuditQuestionnaire({ onValider }) {
   // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
   // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
-  // Porte désormais SEULE la classification du document (fusion du
-  // 28/08/2026, voir docblock en tête de fichier) — plus de doublon avec
-  // une ancienne liste plate de types de documents.
   const [ouEnEtesVous, setOuEnEtesVous] = useState("");
-  const [famille, setFamille] = useState("");
-  const [sousCategorie, setSousCategorie] = useState("");
-  const [natureAutre, setNatureAutre] = useState("");
-  // Niveau 3 (réf. 60816-01, suite, 29/08/2026, demande explicite de
-  // l'auteur du projet : "Roman ne reprend pas encore les différents types
-  // existants") — uniquement présent quand la sous-catégorie choisie a des
-  // sousGenres (voir taxonomieContratIntentionCursAudit.js). "Autre" a son
-  // propre champ, comme famille/sousCategorie.
-  const [sousGenre, setSousGenre] = useState("");
-  const [sousGenreAutre, setSousGenreAutre] = useState("");
+  // Nature du projet — réf. 60816-01, suite, 29/08/2026, arbre complet
+  // niveaux 1 à 4 (voir SélecteurNature ci-dessus et le docblock en tête de
+  // fichier). `cheminNature` : tableau de { nom, autre }, un élément par
+  // niveau choisi.
+  const [cheminNature, setCheminNature] = useState([]);
   const [objectifs, setObjectifs] = useState([]);
   const [destinataires, setDestinataires] = useState([]);
   const [criteresReussite, setCriteresReussite] = useState([]);
@@ -335,18 +378,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
     profilAuteurAPI.récupérer().then(({ data }) => setProfil(data || null));
   }, []);
 
-  const sousCategoriesDisponibles = NATURE_PROJET.find((f) => f.famille === famille)?.sousCategories ?? [];
-  const sousCategorieSélectionnée = sousCategoriesDisponibles.find((s) => nomSousCategorie(s) === sousCategorie);
-  const sousGenresDisponibles = sousCategorieSélectionnée ? sousGenresDe(sousCategorieSélectionnée) : null;
-
   const appliquerContrat = (c) => {
     if (!c) return;
     setOuEnEtesVous(c.ouEnEtesVous || "");
-    setFamille(c.natureProjet?.famille || "");
-    setSousCategorie(c.natureProjet?.sousCategorie || "");
-    setSousGenre(c.natureProjet?.sousGenre || "");
-    setSousGenreAutre(c.natureProjet?.sousGenreAutre || "");
-    setNatureAutre(c.natureProjet?.autre || "");
+    setCheminNature(Array.isArray(c.natureProjet?.chemin) ? c.natureProjet.chemin : []);
     setObjectifs(c.objectifs || []);
     setDestinataires(c.destinataires || []);
     // attentesCursus fusionné dans finalites le 28/08/2026 — un contrat
@@ -380,15 +415,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
   const contratIntentionActuel = () => ({
     ouEnEtesVous,
-    natureProjet: {
-      famille, sousCategorie,
-      // Niveau 3 (réf. 60816-01, suite, 29/08/2026) — présent seulement si
-      // la sous-catégorie a des sous-genres et que l'auteur·ice en a choisi
-      // un (ou précisé "Autre" à ce niveau).
-      sousGenre: sousGenresDisponibles ? sousGenre : "",
-      sousGenreAutre: sousGenresDisponibles && sousGenre === "Autre" ? sousGenreAutre.trim() : "",
-      autre: famille === "Autre" ? natureAutre : "",
-    },
+    // Chemin complet (niveaux 1 à 4) + libellé prêt à l'emploi — réf.
+    // 60816-01, suite, 29/08/2026. `label` évite à tout code serveur
+    // (synthetiser-question-cursaudit) de devoir connaître la forme de
+    // l'arbre pour reconstruire une description lisible.
+    natureProjet: { chemin: cheminNature, label: labelChemin(cheminNature) },
     objectifs, destinataires,
     // Fusionné avec "Que veux-tu obtenir ?" le 28/08/2026 (doublon signalé
     // par l'auteur du projet) — mêmes valeurs que `finalites`, pas un
@@ -420,7 +451,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
     const url = URL.createObjectURL(blob);
     const lien = document.createElement("a");
     lien.href = url;
-    lien.download = `contrat_intention_${nomDeFichierSûr(famille || "brouillon")}.json`;
+    lien.download = `contrat_intention_${nomDeFichierSûr(labelChemin(cheminNature) || "brouillon")}.json`;
     document.body.appendChild(lien);
     lien.click();
     document.body.removeChild(lien);
@@ -470,11 +501,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const [role, setRole] = useState("lecteur expert");
   const [erreur, setErreur] = useState(null);
 
-  // Poésie et format non linéaire — réexprimés sur la nouvelle taxonomie
-  // (voir docblock en tête de fichier) au lieu de l'ancienne liste plate.
-  const estPoésie = sousCategorie === "Poésie";
-  const estFormatNonLinéaire = SOUS_CATEGORIES_NON_LINEAIRES.has(sousCategorie);
-  const natureRenseignée = famille === "Autre" ? !!natureAutre.trim() : !!(famille && (sousCategorie || sousCategoriesDisponibles.length === 0));
+  // Nature du projet requise dès le niveau 1 — les niveaux suivants
+  // affinent mais ne bloquent jamais (réf. 60816-01, suite, 29/08/2026,
+  // principe explicite de la source : "ne pas bloquer l'auteur").
+  const natureRenseignée = cheminNature.length > 0 &&
+    (cheminNature[cheminNature.length - 1].nom !== "Autre" || cheminNature[cheminNature.length - 1].autre.trim());
 
   const basculerFinalité = (f) => setFinalites((liste) => liste.includes(f) ? liste.filter((x) => x !== f) : [...liste, f]);
   const basculerCondition = (c) => setConditionsIA((liste) => liste.includes(c) ? liste.filter((x) => x !== c) : [...liste, c]);
@@ -521,10 +552,6 @@ export default function CursAuditQuestionnaire({ onValider }) {
   };
 
   const valider = () => {
-    if (estPoésie) {
-      setErreur("La poésie est un type de projet à l'étude chez Cursus, pas encore disponible — voir le message dans \"Nature du projet\".");
-      return;
-    }
     // "Autre" de "Qu'attendez-vous de cet audit ?" fusionné ici (réf.
     // 60816-01, suite, 29/08/2026) : contrairement aux 4 autres questions à
     // cases, celle-ci alimente aussi `finaliteAudit`, un champ obligatoire
@@ -539,17 +566,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       setErreur("Merci de compléter la nature du projet, où vous en êtes, ce que vous voulez obtenir et la question libre avant de continuer.");
       return;
     }
-    // Niveau 3 (réf. 60816-01, suite, 29/08/2026) — inclus dans typeDocument
-    // (chaîne libre injectée au moteur d'analyse, jamais comparée
-    // strictement — voir docblock en tête de fichier) quand renseigné.
-    const sousGenreRetenu = sousGenresDisponibles
-      ? (sousGenre === "Autre" ? sousGenreAutre.trim() : sousGenre)
-      : "";
-    const typeDocument = famille === "Autre"
-      ? natureAutre.trim()
-      : (sousCategorie
-        ? `${sousGenreRetenu ? `${sousGenreRetenu} — ` : ""}${sousCategorie} (${famille})`
-        : famille);
+    const typeDocument = labelChemin(cheminNature);
     onValider({
       typeDocument,
       statutTexte: ouEnEtesVous,
@@ -640,78 +657,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
         <div>
           <label style={labelStyle}>Nature du projet *</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <select style={champStyle} value={famille} onChange={(e) => {
-              setFamille(e.target.value); setSousCategorie(""); setSousGenre(""); setSousGenreAutre("");
-            }}>
-              <option value="">— Famille —</option>
-              {NATURE_PROJET.map((f) => <option key={f.famille} value={f.famille}>{f.famille}</option>)}
-              <option value="Autre">Autre</option>
-            </select>
-            {famille && famille !== "Autre" && (
-              <select style={champStyle} value={sousCategorie} onChange={(e) => {
-                setSousCategorie(e.target.value); setSousGenre(""); setSousGenreAutre("");
-              }}>
-                <option value="">— Sous-catégorie —</option>
-                {sousCategoriesDisponibles.map((s) => {
-                  const nom = nomSousCategorie(s);
-                  return <option key={nom} value={nom}>{nom}</option>;
-                })}
-                <option value="Autre">Autre</option>
-              </select>
-            )}
-            {famille === "Autre" && (
-              <input style={champStyle} value={natureAutre} onChange={(e) => setNatureAutre(e.target.value)} placeholder="Précisez" />
-            )}
-          </div>
-          {/* Niveau 3 — réf. 60816-01, suite, 29/08/2026, demande explicite
-              de l'auteur du projet ("Roman ne reprend pas encore les
-              différents types existants"). Uniquement affiché quand la
-              sous-catégorie choisie a des sous-genres (voir
-              taxonomieContratIntentionCursAudit.js — pour l'instant, seul
-              "Roman" en a). */}
-          {sousGenresDisponibles && (
-            <div style={{ marginTop: 10 }}>
-              <label style={labelStyle}>Quel type de {sousCategorie} ?</label>
-              <select style={champStyle} value={sousGenre} onChange={(e) => setSousGenre(e.target.value)}>
-                <option value="">— Choisir —</option>
-                {sousGenresDisponibles.map((sg) => <option key={sg} value={sg}>{sg}</option>)}
-                <option value="Autre">Autre</option>
-              </select>
-              {sousGenre === "Autre" && (
-                <input
-                  style={{ ...champStyle, marginTop: 8 }}
-                  value={sousGenreAutre}
-                  onChange={(e) => setSousGenreAutre(e.target.value)}
-                  placeholder="Précisez"
-                />
-              )}
-            </div>
-          )}
-          {estPoésie && (
-            <div style={{ background: "#FBE9E9", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 4 }}>
-                Type de projet à l'étude — pas encore disponible
-              </div>
-              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
-                Auditer un poème correctement demande de respecter sa forme — rimé ou non, structuré
-                selon un mètre ou une forme connue (sonnet, haïku, alexandrins…) ou délibérément
-                destructuré. CursAudit ne sait pas encore faire cette distinction : plutôt que de
-                lancer un audit générique de prose sur un poème et risquer de juger une rupture de
-                rythme voulue comme une erreur, ce type de projet reste à l'étude chez nous pour
-                l'instant. Choisissez une autre sous-catégorie ci-dessus, ou revenez plus tard.
-              </div>
-            </div>
-          )}
-          {estFormatNonLinéaire && (
-            <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
-              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
-                Un contenu de ce type est fait d'entrées courtes et autonomes plutôt que d'un fil
-                narratif continu — CursAudit en tient compte et ne signalera pas l'absence d'arc
-                narratif comme un défaut.
-              </div>
-            </div>
-          )}
+          <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "0 0 8px" }}>
+            Précisez autant de niveaux que vous le pouvez — le premier suffit pour continuer, les
+            suivants affinent l'analyse sans être obligatoires.
+          </p>
+          <SélecteurNature chemin={cheminNature} onChemin={setCheminNature} />
         </div>
 
         <div>
@@ -890,9 +840,9 @@ export default function CursAuditQuestionnaire({ onValider }) {
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13 }}>{erreur}</div>
       )}
 
-      <button onClick={valider} disabled={estPoésie} style={{
-        background: estPoésie ? "#ccc" : "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
-        padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: estPoésie ? "default" : "pointer", fontFamily: "inherit",
+      <button onClick={valider} style={{
+        background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
+        padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
       }}>
         Continuer
       </button>
