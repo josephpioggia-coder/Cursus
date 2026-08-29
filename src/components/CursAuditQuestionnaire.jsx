@@ -9,6 +9,31 @@
  * pour qui il est écrit, ni jusqu'où elle a le droit d'intervenir" sans ce
  * cadrage (citation du document d'origine).
  *
+ * FUSION AVEC LE CONTRAT D'INTENTION (réf. 60816-01, suite, 28/08/2026) —
+ * signalé par l'auteur du projet : les questions "quel type de document"
+ * et "ce texte est-il..." faisaient doublon avec "Nature du projet" et "Où
+ * en êtes-vous" du bloc contrat d'intention. Fusionnées : la taxonomie du
+ * contrat d'intention (famille/sous-catégorie) est désormais LA SEULE
+ * classification du document, envoyée telle quelle comme `type_document`
+ * au moteur d'analyse (qui ne fait qu'injecter cette chaîne dans son
+ * prompt, aucune comparaison stricte côté serveur — vérifié). Ce qui
+ * dépendait de valeurs exactes de l'ancienne liste plate a été réexprimé
+ * sur la nouvelle taxonomie :
+ *  - Poésie (bloque la validation, moteur non prêt) → sousCategorie === "Poésie".
+ *  - Format non linéaire (message informatif, pas de blocage) → un
+ *    ensemble de sous-catégories désormais plus précis que l'ancien
+ *    "Format alternatif" fourre-tout (voir SOUS_CATEGORIES_NON_LINEAIRES).
+ *  - Mémoire/TFE académique (bloc "établissement autorise l'IA ?") →
+ *    n'existe dans AUCUNE branche de la nouvelle taxonomie (un TFE peut
+ *    être un essai, un rapport, un témoignage...) : devient une case à
+ *    cocher indépendante, transversale à la nature du projet.
+ *  - "Autre (à préciser)" → déjà géré nativement par la taxonomie à deux
+ *    niveaux (famille ET sous-catégorie peuvent valoir "Autre").
+ * "Ce texte est-il..." (statut_texte) a été vérifié comme jamais lu par
+ * aucune Edge Function (grep sur tout supabase/functions) — supprimé sans
+ * remplacement fonctionnel, sa valeur est désormais directement celle de
+ * "Où en êtes-vous" (ouEnEtesVous), plus riche et déjà présente.
+ *
  * CE QUI N'EST PAS ICI (limites assumées) :
  *  - Section 6 ("préserver ma voix", comparaison à des pages de référence)
  *    — le document d'origine la marque lui-même hors périmètre, nécessite
@@ -21,13 +46,13 @@
  *
  * CE QUE LES RÉPONSES CHANGENT RÉELLEMENT côté moteur d'analyse
  * (analyser-unite-cursaudit / orchestrer-audit-cursaudit) : la question
- * libre (section 4) et le degré d'intervention (section 5) sont injectés
- * dans le prompt système envoyé à l'IA pour CHAQUE unité. Mais le moteur
- * ne produit aujourd'hui qu'un diagnostic (valeur + commentaire) par
- * critère, jamais un texte réécrit séparé — les degrés "reformulation
- * ponctuelle" et "réécriture" influencent donc le CONTENU du commentaire
- * (l'IA peut y glisser une suggestion), pas une sortie dédiée. Écrire
- * réellement à la place de l'auteur⋅ice n'est pas implémenté.
+ * libre et le degré d'intervention sont injectés dans le prompt système
+ * envoyé à l'IA pour CHAQUE unité. Mais le moteur ne produit aujourd'hui
+ * qu'un diagnostic (valeur + commentaire) par critère, jamais un texte
+ * réécrit séparé — les degrés "reformulation ponctuelle" et "réécriture"
+ * influencent donc le CONTENU du commentaire (l'IA peut y glisser une
+ * suggestion), pas une sortie dédiée. Écrire réellement à la place de
+ * l'auteur⋅ice n'est pas implémenté.
  */
 
 import { useState, useEffect } from "react";
@@ -39,49 +64,15 @@ import {
   ATTENTES_CURSUS, CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
 } from "../lib/taxonomieContratIntentionCursAudit.js";
 
-const TYPES_DOCUMENT = [
-  "Mémoire / TFE / travail académique",
-  "Manuscrit de livre",
-  "Biographie / autobiographie",
-  "Article",
-  "Essai",
-  "Rapport professionnel",
-  "Dossier personnel",
-  "Scène / extrait autonome",
-  "Correspondance / message",
-  "Poésie",
-  "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)",
-  "Autre (à préciser)",
-];
-
-// Poésie (référence 60816-01, suite, 24/08/2026) — signalé par l'auteur du
-// projet : l'audit d'un poème (rimes, mètre, forme) demande un travail de
-// conception plus subtil qu'un audit de prose, que le moteur actuel
-// (analyser-unite-cursaudit) ne sait pas faire — pas de dimensions
-// dédiées à la scansion ou au schéma de rimes. Plutôt que de laisser
-// croire à un audit compétent sur ce point, ce type de document est
-// explicitement marqué "à l'étude" et bloque la validation du
-// questionnaire — voir estPoésie ci-dessous.
-//
-// Format alternatif / Autre (référence 60816-01, suite, 24/08/2026) —
-// signalé par l'auteur du projet à propos d'un livret-oracle (préface,
-// mode d'emploi, cartes courtes regroupées par famille) : ni un manuscrit
-// classique, ni un des types déjà listés. Plutôt que de forcer ce genre de
-// contenu (livret de cartes, posts réseaux sociaux…) dans une case
-// inadaptée, "Format alternatif" regroupe les contenus structurés en
-// entrées courtes/non linéaires — le moteur n'a besoin d'aucune dimension
-// dédiée pour ça (il segmente déjà en unités), juste d'un rappel dans le
-// prompt de ne pas juger l'absence d'arc narratif continu comme un défaut.
-// "Autre (à préciser)" couvre le reste : un champ libre, la précision du
-// client remplace alors "Autre" comme valeur envoyée au moteur.
-
-const STATUTS_TEXTE = [
-  "Un brouillon de travail",
-  "Une version presque finale",
-  "Une version déjà envoyée / déposée",
-  "Une version publiée ou annoncée",
-  "Une version destinée à être profondément retravaillée",
-];
+// Sous-catégories de la nouvelle taxonomie faites d'entrées courtes et
+// autonomes plutôt que d'un fil narratif continu — remplace l'ancien
+// "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)",
+// plus précis puisque directement rattaché aux sous-catégories réelles
+// plutôt qu'à une case fourre-tout.
+const SOUS_CATEGORIES_NON_LINEAIRES = new Set([
+  "Post réseaux sociaux", "Série de publications", "Livre-jeu", "Jeu narratif",
+  "Jeu de rôle", "Cartes pédagogiques", "Fiction interactive",
+]);
 
 const FINALITES = [
   "Vérifier la cohérence générale",
@@ -138,15 +129,12 @@ function GroupeCases({ options, valeurs, onBasculer }) {
   );
 }
 
-
 export default function CursAuditQuestionnaire({ onValider }) {
   // Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
   // docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
-  // Bloc distinct du reste du questionnaire ci-dessous (inchangé, garde
-  // ses propres champs typeDocument/statutTexte/... pour ne rien casser
-  // du câblage existant côté moteur d'analyse) — première version testable
-  // du mécanisme, sans les niveaux 3-4 de la taxonomie ni les méta-champs
-  // (importance/certitude/challenge) de l'architecture complète.
+  // Porte désormais SEULE la classification du document (fusion du
+  // 28/08/2026, voir docblock en tête de fichier) — plus de doublon avec
+  // une ancienne liste plate de types de documents.
   const [ouEnEtesVous, setOuEnEtesVous] = useState("");
   const [famille, setFamille] = useState("");
   const [sousCategorie, setSousCategorie] = useState("");
@@ -216,12 +204,15 @@ export default function CursAuditQuestionnaire({ onValider }) {
     lecteur.readAsText(fichier);
   };
 
-  const [typeDocument, setTypeDocument] = useState("");
-  const [autrePrécision, setAutrePrécision] = useState("");
-  const [statutTexte, setStatutTexte] = useState("");
   const [finalites, setFinalites] = useState([]);
   const [questionLibre, setQuestionLibre] = useState("");
   const [degreIntervention, setDegreIntervention] = useState("");
+  // Travail académique — réf. 60816-01, suite, 28/08/2026. Devenu une case
+  // à cocher indépendante lors de la fusion avec le contrat d'intention :
+  // un mémoire/TFE peut relever de n'importe quelle famille de la
+  // taxonomie (essai, témoignage, rapport...), ce n'est pas une nature de
+  // projet en soi mais une contrainte transversale.
+  const [estTravailAcademique, setEstTravailAcademique] = useState(false);
   const [autorisationIA, setAutorisationIA] = useState("");
   const [conditionsIA, setConditionsIA] = useState([]);
   const [adresse, setAdresse] = useState("tu");
@@ -231,10 +222,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const [role, setRole] = useState("lecteur expert");
   const [erreur, setErreur] = useState(null);
 
-  const estAcadémique = typeDocument === "Mémoire / TFE / travail académique";
-  const estPoésie = typeDocument === "Poésie";
-  const estFormatAlternatif = typeDocument === "Format alternatif (oracle, livret de cartes, posts réseaux sociaux…)";
-  const estAutre = typeDocument === "Autre (à préciser)";
+  // Poésie et format non linéaire — réexprimés sur la nouvelle taxonomie
+  // (voir docblock en tête de fichier) au lieu de l'ancienne liste plate.
+  const estPoésie = sousCategorie === "Poésie";
+  const estFormatNonLinéaire = SOUS_CATEGORIES_NON_LINEAIRES.has(sousCategorie);
+  const natureRenseignée = famille === "Autre" ? !!natureAutre.trim() : !!(famille && (sousCategorie || sousCategoriesDisponibles.length === 0));
 
   const basculerFinalité = (f) => setFinalites((liste) => liste.includes(f) ? liste.filter((x) => x !== f) : [...liste, f]);
   const basculerCondition = (c) => setConditionsIA((liste) => liste.includes(c) ? liste.filter((x) => x !== c) : [...liste, c]);
@@ -244,26 +236,23 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
   const valider = () => {
     if (estPoésie) {
-      setErreur("La poésie est un type de projet à l'étude chez Cursus, pas encore disponible — voir le message ci-dessus.");
+      setErreur("La poésie est un type de projet à l'étude chez Cursus, pas encore disponible — voir le message dans \"Nature du projet\".");
       return;
     }
-    if (!typeDocument || !statutTexte || finalites.length === 0 || !questionLibre.trim() || !degreIntervention) {
-      setErreur("Merci de répondre aux questions 1 à 5 (question libre incluse) avant de continuer.");
+    if (!natureRenseignée || !ouEnEtesVous || finalites.length === 0 || !questionLibre.trim() || !degreIntervention) {
+      setErreur("Merci de compléter la nature du projet, où vous en êtes, ce que vous voulez obtenir et la question libre avant de continuer.");
       return;
     }
-    if (estAutre && !autrePrécision.trim()) {
-      setErreur("Merci de préciser le type de document.");
-      return;
-    }
+    const typeDocument = famille === "Autre" ? natureAutre.trim() : (sousCategorie ? `${sousCategorie} (${famille})` : famille);
     onValider({
-      typeDocument: estAutre ? autrePrécision.trim() : typeDocument,
-      statutTexte,
+      typeDocument,
+      statutTexte: ouEnEtesVous,
       finaliteAudit: finalites,
       questionLibre: questionLibre.trim(),
       degreIntervention,
-      contraintesAcademiques: estAcadémique ? { autorisationIA, conditions: conditionsIA } : null,
+      contraintesAcademiques: estTravailAcademique ? { autorisationIA, conditions: conditionsIA } : null,
       relationIA: { adresse, ton, posture, longueur, role },
-      contratIntention: (famille || ouEnEtesVous) ? contratIntentionActuel() : null,
+      contratIntention: contratIntentionActuel(),
     });
   };
 
@@ -281,16 +270,14 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
       <ProfilAuteur />
 
-      {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026. Voir
-          docs/PAQUET-DE-REPRISE-2026-08-27.md, [CHANTIER-CONTRAT-INTENTION].
-          Bloc distinct des questions 1-10 ci-dessous (elles restent
-          inchangées) : "qu'écrivez-vous et pourquoi", pas "que peut faire
-          Cursus". Entièrement optionnel — ne bloque jamais la validation,
-          contrairement aux questions 1 à 5 historiques. */}
+      {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026, fusionné
+          avec l'ancienne classification "type de document" le même jour
+          (voir docblock en tête de fichier). Seul bloc qui classe le
+          document désormais. */}
       <div style={{ background: "#F7F6FD", border: "0.5px solid #7F77DD80", borderRadius: 10, padding: "16px 18px", display: "grid", gap: 16 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#5B52C4", marginBottom: 4 }}>
-            Contrat d'intention — premier essai, tout est facultatif
+            Contrat d'intention
           </div>
           <p style={{ fontSize: 12, color: "var(--texte-tertiaire)", lineHeight: 1.6 }}>
             Pas "quel genre de livre", mais "quelle transformation cherchez-vous". Sert de brief déclaré
@@ -311,7 +298,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
         )}
 
         <div>
-          <label style={labelStyle}>0. Où en êtes-vous dans ce projet ?</label>
+          <label style={labelStyle}>Où en êtes-vous dans ce projet ? *</label>
           <select style={champStyle} value={ouEnEtesVous} onChange={(e) => setOuEnEtesVous(e.target.value)}>
             <option value="">— Choisir —</option>
             {OU_EN_ETES_VOUS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -319,7 +306,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Nature du projet</label>
+          <label style={labelStyle}>Nature du projet *</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <select style={champStyle} value={famille} onChange={(e) => { setFamille(e.target.value); setSousCategorie(""); }}>
               <option value="">— Famille —</option>
@@ -337,6 +324,30 @@ export default function CursAuditQuestionnaire({ onValider }) {
               <input style={champStyle} value={natureAutre} onChange={(e) => setNatureAutre(e.target.value)} placeholder="Précisez" />
             )}
           </div>
+          {estPoésie && (
+            <div style={{ background: "#FBE9E9", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 4 }}>
+                Type de projet à l'étude — pas encore disponible
+              </div>
+              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
+                Auditer un poème correctement demande de respecter sa forme — rimé ou non, structuré
+                selon un mètre ou une forme connue (sonnet, haïku, alexandrins…) ou délibérément
+                destructuré. CursAudit ne sait pas encore faire cette distinction : plutôt que de
+                lancer un audit générique de prose sur un poème et risquer de juger une rupture de
+                rythme voulue comme une erreur, ce type de projet reste à l'étude chez nous pour
+                l'instant. Choisissez une autre sous-catégorie ci-dessus, ou revenez plus tard.
+              </div>
+            </div>
+          )}
+          {estFormatNonLinéaire && (
+            <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
+              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
+                Un contenu de ce type est fait d'entrées courtes et autonomes plutôt que d'un fil
+                narratif continu — CursAudit en tient compte et ne signalera pas l'absence d'arc
+                narratif comme un défaut.
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -382,55 +393,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>1. Quel type de document veux-tu auditer ? *</label>
-        <select style={champStyle} value={typeDocument} onChange={(e) => setTypeDocument(e.target.value)}>
-          <option value="">— Choisir —</option>
-          {TYPES_DOCUMENT.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        {estPoésie && (
-          <div style={{ background: "#FBE9E9", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 4 }}>
-              Type de projet à l'étude — pas encore disponible
-            </div>
-            <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
-              Auditer un poème correctement demande de respecter sa forme — rimé ou non, structuré
-              selon un mètre ou une forme connue (sonnet, haïku, alexandrins…) ou délibérément
-              destructuré. CursAudit ne sait pas encore faire cette distinction : plutôt que de
-              lancer un audit générique de prose sur un poème et risquer de juger une rupture de
-              rythme voulue comme une erreur, ce type de projet reste à l'étude chez nous pour
-              l'instant. Choisissez un autre type de document ci-dessus, ou revenez plus tard.
-            </div>
-          </div>
-        )}
-        {estFormatAlternatif && (
-          <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", marginTop: 8 }}>
-            <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6 }}>
-              Un contenu de ce type (livret de cartes, oracle, posts réseaux sociaux…) est fait
-              d'entrées courtes et autonomes plutôt que d'un fil narratif continu — CursAudit en
-              tient compte et ne signalera pas l'absence d'arc narratif comme un défaut.
-            </div>
-          </div>
-        )}
-        {estAutre && (
-          <input
-            style={{ ...champStyle, marginTop: 8 }}
-            value={autrePrécision}
-            onChange={(e) => setAutrePrécision(e.target.value)}
-            placeholder="Précisez le type de document"
-          />
-        )}
-      </div>
-
-      <div>
-        <label style={labelStyle}>2. Ce texte est-il... *</label>
-        <select style={champStyle} value={statutTexte} onChange={(e) => setStatutTexte(e.target.value)}>
-          <option value="">— Choisir —</option>
-          {STATUTS_TEXTE.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-      </div>
-
-      <div>
-        <label style={labelStyle}>3. Que veux-tu obtenir ? * (plusieurs choix possibles)</label>
+        <label style={labelStyle}>Que veux-tu obtenir ? * (plusieurs choix possibles)</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
           {FINALITES.map((f) => (
             <Checkbox key={f} checked={finalites.includes(f)} onChange={() => basculerFinalité(f)} label={f} />
@@ -439,7 +402,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>4. Quelle est la question précise que tu veux poser à CursAudit ? *</label>
+        <label style={labelStyle}>Quelle est la question précise que tu veux poser à CursAudit ? *</label>
         <textarea
           style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
           value={questionLibre}
@@ -449,22 +412,30 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>5. Que peut faire CursAudit ? *</label>
+        <label style={labelStyle}>Que peut faire CursAudit ? *</label>
         <select style={champStyle} value={degreIntervention} onChange={(e) => setDegreIntervention(e.target.value)}>
           <option value="">— Choisir —</option>
           {DEGRES_INTERVENTION.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
         </select>
-        {estAcadémique && (
+      </div>
+
+      <div>
+        <Checkbox
+          checked={estTravailAcademique}
+          onChange={() => setEstTravailAcademique((v) => !v)}
+          label="Ce texte est un mémoire, un TFE ou un autre travail académique soumis aux règles d'un établissement"
+        />
+        {estTravailAcademique && (
           <p style={{ fontSize: 11.5, color: "#8A6116", marginTop: 6, lineHeight: 1.5 }}>
-            Limite pour un mémoire/TFE : CursAudit peut diagnostiquer, questionner, structurer,
+            Limite pour un travail académique : CursAudit peut diagnostiquer, questionner, structurer,
             signaler — il ne doit pas écrire le travail à la place de l'étudiant⋅e.
           </p>
         )}
       </div>
 
-      {estAcadémique && (
+      {estTravailAcademique && (
         <div style={{ background: "var(--fond, #F7F4EF)", padding: "14px 16px", borderRadius: 8 }}>
-          <label style={labelStyle}>7. Ton établissement autorise-t-il l'usage de l'IA ?</label>
+          <label style={labelStyle}>Ton établissement autorise-t-il l'usage de l'IA ?</label>
           <select style={{ ...champStyle, marginBottom: conditionsIA.length >= 0 && autorisationIA === "Oui" ? 12 : 0 }} value={autorisationIA} onChange={(e) => setAutorisationIA(e.target.value)}>
             <option value="">— Choisir —</option>
             <option value="Oui">Oui</option>
@@ -485,7 +456,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       )}
 
       <div>
-        <label style={labelStyle}>10. Comment veux-tu que l'IA te parle ?</label>
+        <label style={labelStyle}>Comment veux-tu que l'IA te parle ?</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <select style={champStyle} value={adresse} onChange={(e) => setAdresse(e.target.value)}>
             <option value="tu">Tutoiement</option>
