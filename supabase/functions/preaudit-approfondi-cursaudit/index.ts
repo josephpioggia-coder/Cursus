@@ -931,9 +931,16 @@ Deno.serve(async (req) => {
       const dernierÉchecMs = audit.ia_dernier_echec_le ? new Date(audit.ia_dernier_echec_le).getTime() : 0;
       const attenteRestanteMs = dernierÉchecMs + DÉLAI_REFROIDISSEMENT_MS - Date.now();
       if (attenteRestanteMs > 0) {
+        // Réf. 60816-01, suite, 30/08/2026 — reformulé sur retour de
+        // l'auteur du projet : la phrase précédente ("a échoué X fois de
+        // suite") se lisait comme une panne définitive, alors que c'est une
+        // pause temporaire et normale. `attente_ms` (donnée exacte, pas
+        // juste le texte) permet au client de programmer lui-même une
+        // reprise automatique sans que l'auteur·ice n'ait à revenir cliquer.
         return json({
-          error: "trop_d_echecs_consecutifs",
-          message: `Ce pré-audit a échoué ${audit.ia_echecs_consecutifs} fois de suite. Nouvelle tentative possible dans environ ${Math.ceil(attenteRestanteMs / 60000)} minute(s) — délai de sécurité pour éviter une boucle de relances coûteuse pendant qu'un problème se répète.`,
+          error: "operation_en_pause",
+          attente_ms: attenteRestanteMs,
+          message: `Cette opération prend plus de temps que prévu. Le traitement reprendra automatiquement d'ici ${Math.ceil(attenteRestanteMs / 60000)} minute(s) maximum — vous pouvez continuer à utiliser Cursus normalement pendant ce temps.`,
         }, 429);
       }
       // Le délai est écoulé : on retente. Le compteur n'est remis à 0 que
