@@ -416,7 +416,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>Qu'attends-tu de cet audit ? * (plusieurs choix possibles)</label>
+        <label style={labelStyle}>Qu'attendez-vous de cet audit ? * (plusieurs choix possibles)</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
           {FINALITES.map((f) => (
             <Checkbox key={f} checked={finalites.includes(f)} onChange={() => basculerFinalité(f)} label={f} />
@@ -425,7 +425,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>Quelle est la question précise que tu veux poser à CursAudit ? *</label>
+        <label style={labelStyle}>Quelle est la question précise que vous voulez poser à CursAudit ? *</label>
         <textarea
           style={{ ...champStyle, minHeight: 70, resize: "vertical" }}
           value={questionLibre}
@@ -479,7 +479,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       )}
 
       <div>
-        <label style={labelStyle}>Comment veux-tu que l'IA te parle ?</label>
+        <label style={labelStyle}>Comment voulez-vous que l'IA vous parle ?</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <select style={champStyle} value={adresse} onChange={(e) => setAdresse(e.target.value)}>
             <option value="tu">Tutoiement</option>
