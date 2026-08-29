@@ -55,6 +55,21 @@
  * parcours d'un coup), Exporter sur la dernière (pour sauvegarder ce qui
  * vient d'être rempli).
  *
+ * CORRECTIF, MÊME JOUR — arrivé au bout du questionnaire, l'auteur du
+ * projet n'a rien trouvé pour garder une trace de ce qu'il venait de
+ * remplir ("j'aurais bien aimé pouvoir le sauvegarder... le sortir en
+ * Word... qu'il existe quelque part"). Trois manques réels : (1) le
+ * bouton d'export JSON existait mais était trop discret, noyé à côté des
+ * 5 menus de la dernière question — déplacé dans un bloc dédié, bien
+ * visible ; (2) aucun export lisible n'existait, seulement le JSON — voir
+ * `exporterContratEnWord()`/exportContratIntentionWord.js, un document
+ * Word généré côté navigateur (mêmes outils que les autres exports
+ * CursAudit) ; (3) l'export/import JSON (`contratComplet()`, qui englobe
+ * désormais `contratIntentionActuel()` + degré d'intervention +
+ * contraintes académiques + style demandé à l'IA) omettait ces trois
+ * derniers champs, jamais restaurés par `appliquerContrat()` — un contrat
+ * réimporté restait donc incomplet sans qu'on s'en rende compte.
+ *
  * RESTRUCTURATION EN "BLOC DE CADRAGE ÉDITORIAL" (réf. 60816-01, suite,
  * 29/08/2026, ANTÉRIEURE à la refonte en questions séparées ci-dessus,
  * conservée pour l'ordre logique des questions) — demande explicite de
@@ -138,6 +153,7 @@ import { useState, useEffect, useMemo } from "react";
 import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
+import { exporterContratIntentionWord } from "../lib/exportContratIntentionWord.js";
 import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
   OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
@@ -478,6 +494,24 @@ export default function CursAuditQuestionnaire({ onValider }) {
     setPreoccupations(c.preoccupations || []);
     setPreoccupationAutre(c.preoccupationAutre || "");
     setPreoccupationAutreActive(!!c.preoccupationAutre);
+    // Réf. 60816-01, suite, 29/08/2026 — signalé par l'auteur du projet :
+    // le degré d'intervention, les contraintes académiques et le style
+    // demandé à l'IA n'étaient pas restaurés à l'import, alors qu'ils font
+    // partie intégrante du questionnaire — un contrat réimporté restait
+    // incomplet sans qu'on s'en rende compte.
+    if (c.degreIntervention) setDegreIntervention(c.degreIntervention);
+    if (c.contraintesAcademiques) {
+      setEstTravailAcademique(true);
+      setAutorisationIA(c.contraintesAcademiques.autorisationIA || "");
+      setConditionsIA(c.contraintesAcademiques.conditions || []);
+    }
+    if (c.relationIA) {
+      setAdresse(c.relationIA.adresse || "tu");
+      setTon(c.relationIA.ton || "direct");
+      setPosture(c.relationIA.posture || "accompagnant");
+      setLongueur(c.relationIA.longueur || "détaillé");
+      setRole(c.relationIA.role || "lecteur expert");
+    }
   };
 
   const choisirContratPrécédent = (id) => {
@@ -519,8 +553,23 @@ export default function CursAuditQuestionnaire({ onValider }) {
     preoccupationAutre: preoccupationAutreActive ? preoccupationAutre.trim() : "",
   });
 
+  // Réf. 60816-01, suite, 29/08/2026 — signalé par l'auteur du projet :
+  // arrivé au bout du questionnaire, il n'y avait aucune trace lisible
+  // possible de ce qu'il venait de remplir, et l'export JSON existant
+  // (contratIntentionActuel()) omettait le degré d'intervention, les
+  // contraintes académiques et le style demandé à l'IA — pas un
+  // enregistrement complet du questionnaire. `contratComplet()` réunit
+  // tout ce qui a été rempli, réutilisé à la fois par l'export JSON
+  // (réimportable) et l'export Word (lisible).
+  const contratComplet = () => ({
+    ...contratIntentionActuel(),
+    degreIntervention,
+    contraintesAcademiques: estTravailAcademique ? { autorisationIA, conditions: conditionsIA } : null,
+    relationIA: { adresse, ton, posture, longueur, role },
+  });
+
   const exporterContratJSON = () => {
-    const blob = new Blob([JSON.stringify(contratIntentionActuel(), null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(contratComplet(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const lien = document.createElement("a");
     lien.href = url;
@@ -529,6 +578,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
     lien.click();
     document.body.removeChild(lien);
     URL.revokeObjectURL(url);
+  };
+
+  const exporterContratEnWord = () => {
+    exporterContratIntentionWord(contratComplet(), labelChemin(cheminNature));
   };
 
   const importerContratJSON = (fichier) => {
@@ -956,13 +1009,34 @@ export default function CursAuditQuestionnaire({ onValider }) {
                 <option value="lecteur expert">Plutôt lecteur expert</option>
               </select>
             </div>
-            <button type="button" onClick={exporterContratJSON} style={{
-              background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
-              padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              justifySelf: "start",
-            }}>
-              Sauvegarder mes réponses (JSON)
-            </button>
+            {/* Réf. 60816-01, suite, 29/08/2026 — demande explicite de
+                l'auteur du projet, arrivé au bout du questionnaire sans
+                rien trouver pour en garder une trace : bloc dédié, bien
+                visible, plutôt qu'un simple bouton perdu à côté des menus
+                ci-dessus. */}
+            <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--texte-secondaire)" }}>
+                Garder une trace de vos réponses
+              </div>
+              <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: 0 }}>
+                Le Word se lit facilement ; le JSON peut être réimporté ici même pour un futur audit
+                (bouton "Importer un contrat" sur la première question).
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={exporterContratEnWord} style={{
+                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+                  padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Exporter en Word
+                </button>
+                <button type="button" onClick={exporterContratJSON} style={{
+                  background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+                  padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Exporter en JSON (réimportable)
+                </button>
+              </div>
+            </div>
           </>
         );
 
