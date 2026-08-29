@@ -217,7 +217,10 @@ connaître évite de les reproduire ailleurs dans le code :
     sous-cas (constaté seulement pour Roman → 47 sous-genres, et Religion
     → Christianisme → 8 sous-domaines doctrinaux), "Autre (précisez)"
     systématique à chaque niveau. 9 familles de niveau 1 : Se raconter,
-    Imaginer une histoire, Défendre une idée, Transmettre un savoir,
+    Imaginer une histoire, Transmettre / accompagner (renommé le
+    28/08/2026, ex-"Défendre une idée" — posture trop argumentative pour
+    un projet spirituel/méditatif comme "L'Oracle du Sermon sur la
+    montagne"), Transmettre un savoir,
     Transformer le lecteur, Créer une œuvre artistique, Communiquer,
     Produire un document professionnel, Concevoir un support pédagogique
     ou ludique. Contenu complet des niveaux 2+ pour les 9 familles
