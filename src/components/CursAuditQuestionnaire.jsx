@@ -351,6 +351,29 @@ export default function CursAuditQuestionnaire({ onValider }) {
         </p>
       </div>
 
+      {/* Note de continuité profil/projet — réf. 60816-01, suite,
+          29/08/2026, demande explicite de l'auteur du projet : présentée
+          comme une continuité d'accompagnement, jamais comme une
+          obligation. Explique la portée réelle des deux blocs qui suivent
+          (ProfilAuteur = niveau compte, réutilisable dans CursAudit ET
+          CursEdit ; contrat d'intention = niveau projet, associé à CE
+          texte, repris plus tard dans CursEdit pour ce même manuscrit —
+          bridge CursAudit↔CursEdit pas encore construit à ce jour, mais
+          cette note fixe l'intention produit dès maintenant). */}
+      <div style={{ background: "var(--fond, #F7F4EF)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 16px" }}>
+        <p style={{ fontSize: 12, color: "var(--texte-secondaire)", lineHeight: 1.7, margin: 0 }}>
+          Ces informations servent de cadre de travail.
+          <br /><br />
+          Votre profil auteur pourra être réutilisé dans vos futurs projets Cursus.
+          <br /><br />
+          Les informations propres à ce projet resteront associées à ce texte et pourront être reprises
+          plus tard dans CursEdit pour accompagner l'écriture, la réécriture ou la structuration du
+          manuscrit.
+          <br /><br />
+          Vous pourrez les modifier à tout moment.
+        </p>
+      </div>
+
       <ProfilAuteur />
 
       {/* Contrat d'intention — réf. 60816-01, suite, 28/08/2026, fusionné
