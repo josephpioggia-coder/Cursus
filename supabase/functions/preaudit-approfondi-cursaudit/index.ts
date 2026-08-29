@@ -709,12 +709,28 @@ const LABELS_DEGRE_INTERVENTION: Record<string, string> = {
   reecrire_librement: "Même limite, en se montrant plus libre dans la reformulation suggérée.",
 };
 
+// Réf. 60816-01, suite, 29/08/2026 — voir le commentaire jumeau dans
+// analyser-unite-cursaudit/index.ts : "Non" et "Je ne sais pas" traités à
+// l'identique (défaut prudent en cas de doute sur l'autorisation de
+// l'établissement), pas seulement "Non".
+const AUTORISATION_IA_INCERTAINE_OU_REFUSEE = new Set(["Non", "Je ne sais pas"]);
+
+interface ContratIntention {
+  ouEnEtesVous?: string;
+  natureProjet?: { famille?: string; sousCategorie?: string; autre?: string };
+  objectifs?: string[];
+  destinataires?: string[];
+  criteresReussite?: string[];
+  ceQueVousEspérezDécouvrir?: string[];
+}
+
 interface AuditQualification {
   type_document: string | null;
   finalite_audit: string[] | null;
   question_libre: string | null;
   degre_intervention: string | null;
   contraintes_academiques: { autorisationIA?: string; conditions?: string[] } | null;
+  contrat_intention: ContratIntention | null;
 }
 
 // Profil auteur — réf. 60816-01, suite, 28/08/2026 (table profils_auteur,
@@ -743,11 +759,17 @@ function construireContexteQualification(audit: AuditQualification, profil: Prof
   if (audit.degre_intervention && LABELS_DEGRE_INTERVENTION[audit.degre_intervention]) {
     lignes.push(`Degré d'intervention autorisé : ${LABELS_DEGRE_INTERVENTION[audit.degre_intervention]}`);
   }
-  if (audit.contraintes_academiques?.autorisationIA === "Non") {
-    lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail — reste strictement au diagnostic, aucune proposition ni reformulation.");
+  if (AUTORISATION_IA_INCERTAINE_OU_REFUSEE.has(audit.contraintes_academiques?.autorisationIA ?? "")) {
+    lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail (ou l'auteur·ice ne le sait pas encore) — reste strictement au diagnostic, aucune proposition ni reformulation.");
   } else if (audit.contraintes_academiques?.conditions && audit.contraintes_academiques.conditions.length > 0) {
     lignes.push(`Conditions académiques à respecter : ${audit.contraintes_academiques.conditions.join(", ")}.`);
   }
+  const c = audit.contrat_intention;
+  if (c?.ouEnEtesVous) lignes.push(`Où en est l'auteur·ice dans ce projet : ${c.ouEnEtesVous}.`);
+  if (c?.objectifs && c.objectifs.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${c.objectifs.join(", ")}.`);
+  if (c?.destinataires && c.destinataires.length > 0) lignes.push(`Pour qui ce texte est écrit : ${c.destinataires.join(", ")}.`);
+  if (c?.criteresReussite && c.criteresReussite.length > 0) lignes.push(`Ce qui ferait, pour l'auteur·ice, de ce projet une réussite : ${c.criteresReussite.join(", ")}.`);
+  if (c?.ceQueVousEspérezDécouvrir && c.ceQueVousEspérezDécouvrir.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir en écrivant, que ton analyse peut éclairer : ${c.ceQueVousEspérezDécouvrir.join(", ")}.`);
   const profilLignes: string[] = [];
   if (profil?.profession) profilLignes.push(`profession : ${profil.profession}`);
   if (profil?.identite_genre) profilLignes.push(`identité : ${profil.identite_genre}`);
@@ -844,7 +866,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats")
+      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats, contrat_intention")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);

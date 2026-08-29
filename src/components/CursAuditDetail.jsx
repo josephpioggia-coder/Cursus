@@ -25,7 +25,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { auditsAPI } from "../lib/api.js";
+import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
@@ -53,6 +53,79 @@ const CATEGORIES_DIAGNOSTIC = [
 ];
 
 const PAR_PAGE = 20;
+
+// Cadre de lecture retenu par CursAudit (réf. 60816-01, suite, 29/08/2026) —
+// demande explicite de l'auteur du projet : le contrat d'intention et le
+// profil auteur ne doivent pas rester un simple questionnaire préalable,
+// ils doivent devenir la boussole visible de l'audit. "CursAudit ne doit pas
+// seulement dire : voici ce que vaut le texte. Il doit dire : voici ce que
+// vaut le texte par rapport à ce que vous cherchez à faire." Calculé ici en
+// JS pur à partir des données déjà enregistrées (contrat_intention sur
+// l'audit, profils_auteur), PAS régénéré par une IA : un simple reflet fidèle
+// de ce qui a réellement été injecté dans les prompts d'analyse (voir
+// construireContexteQualification dans analyser-unite-cursaudit,
+// orchestrer-audit-cursaudit et preaudit-approfondi-cursaudit), jamais une
+// synthèse qui pourrait diverger de la réalité du traitement.
+const LABELS_DEGRE_INTERVENTION_COURT = {
+  observer: "observer seulement",
+  signaler: "signaler les problèmes",
+  pistes: "proposer des pistes",
+  reformulations_ponctuelles: "proposer des reformulations ponctuelles",
+  reecrire_legerement: "réécrire légèrement",
+  reecrire_librement: "réécrire librement",
+};
+
+function CadreLecture({ audit }) {
+  const [profil, setProfil] = useState(null);
+  useEffect(() => {
+    profilAuteurAPI.récupérer().then(({ data }) => setProfil(data || null));
+  }, []);
+
+  const contrat = audit.contrat_intention;
+  // Audit créé avant ce chantier (28-29/08/2026) : pas de contrat
+  // d'intention enregistré — rien à afficher plutôt qu'inventer un cadre.
+  if (!contrat) return null;
+
+  const nature = contrat.natureProjet || {};
+  const natureLabel = nature.famille === "Autre"
+    ? (nature.autre || "Autre")
+    : [nature.sousCategorie, nature.famille].filter(Boolean).join(" — ");
+  const intentionPrincipale = [natureLabel, contrat.ouEnEtesVous, (contrat.objectifs || []).join(", ")]
+    .filter(Boolean).join(" · ") || "non précisée";
+  const lecteurVisé = (contrat.destinataires || []).join(", ") || "non précisé";
+  const attentePrincipale = (contrat.attentesCursus || []).join(", ") || "non précisé";
+  const critèreRéussite = (contrat.criteresReussite || []).join(", ") || "non précisé";
+  const questionCentrale = audit.question_libre || "non précisée";
+  const degréLabel = LABELS_DEGRE_INTERVENTION_COURT[audit.degre_intervention] || audit.degre_intervention || "non précisé";
+  const profilUtilisé = profil && (profil.profession || profil.niveau_etudes)
+    ? [profil.profession, profil.niveau_etudes].filter(Boolean).join(", ")
+    : null;
+
+  return (
+    <div style={{ background: "#F2F7F5", border: "0.5px solid #1D9E7550", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "grid", gap: 8 }}>
+      <div>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "#146C50", marginBottom: 4 }}>
+          Cadre de lecture retenu par CursAudit
+        </div>
+        <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6 }}>
+          CursAudit ne se contente pas de dire ce que vaut le texte — il le confronte à ce que vous cherchez à faire.
+        </p>
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--texte-secondaire)", display: "grid", gap: 4 }}>
+        <div><strong>Profil auteur utilisé :</strong> {profilUtilisé || "non renseigné"}</div>
+        <div><strong>Intention principale :</strong> {intentionPrincipale}</div>
+        <div><strong>Lecteur visé :</strong> {lecteurVisé}</div>
+        <div><strong>Attente principale :</strong> {attentePrincipale}</div>
+        <div><strong>Critère de réussite :</strong> {critèreRéussite}</div>
+        <div><strong>Question centrale posée à l'audit :</strong> {questionCentrale}</div>
+        <div style={{ marginTop: 2, fontStyle: "italic" }}>
+          <strong>Conséquence sur l'analyse :</strong> CursAudit priorise ces critères dans son analyse — {attentePrincipale} —
+          avec un degré d'intervention limité à « {degréLabel} ».
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Synthèse éditoriale (réf. 60816-01, suite, 22/08/2026) — voir le
 // commentaire dans analyser-unite-cursaudit/index.ts. `effet_lecteur` a son
@@ -1407,6 +1480,8 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           Cet audit est en brouillon — le paiement CursAudit n'existe pas encore dans l'application, l'analyse ne peut pas être lancée depuis cet écran.
         </div>
       )}
+
+      <CadreLecture audit={audit} />
 
       {nombreMots > 0 && (
         <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />

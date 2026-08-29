@@ -325,6 +325,21 @@ const DEGRES_AUTORISANT_PROPOSITION = new Set([
   "pistes", "reformulations_ponctuelles", "reecrire_legerement", "reecrire_librement",
 ]);
 
+// Réf. 60816-01, suite, 29/08/2026 — voir le commentaire jumeau dans
+// analyser-unite-cursaudit/index.ts : "Non" et "Je ne sais pas" traités à
+// l'identique désormais (défaut prudent en cas de doute sur l'autorisation
+// de l'établissement), au lieu de ne bloquer que sur "Non" seul.
+const AUTORISATION_IA_INCERTAINE_OU_REFUSEE = new Set(["Non", "Je ne sais pas"]);
+
+interface ContratIntention {
+  ouEnEtesVous?: string;
+  natureProjet?: { famille?: string; sousCategorie?: string; autre?: string };
+  objectifs?: string[];
+  destinataires?: string[];
+  criteresReussite?: string[];
+  ceQueVousEspérezDécouvrir?: string[];
+}
+
 interface AuditQualification {
   type_document: string | null;
   finalite_audit: string[] | null;
@@ -332,9 +347,20 @@ interface AuditQualification {
   degre_intervention: string | null;
   contraintes_academiques: { autorisationIA?: string; conditions?: string[] } | null;
   relation_ia: { adresse?: string; ton?: string; posture?: string; longueur?: string; role?: string } | null;
+  contrat_intention: ContratIntention | null;
 }
 
-function construireContexteQualification(audit: AuditQualification): string {
+// Profil auteur — réf. 60816-01, suite, 29/08/2026. Voir le commentaire
+// jumeau dans analyser-unite-cursaudit/index.ts.
+interface ProfilAuteur {
+  profession: string | null;
+  identite_genre: string | null;
+  tranche_age: string | null;
+  niveau_etudes: string | null;
+  matieres_etudiees: string | null;
+}
+
+function construireContexteQualification(audit: AuditQualification, profil: ProfilAuteur | null): string {
   const lignes: string[] = [];
   if (audit.type_document) {
     lignes.push(`Type de document audité : ${audit.type_document}.`);
@@ -348,10 +374,26 @@ function construireContexteQualification(audit: AuditQualification): string {
   if (audit.degre_intervention && LABELS_DEGRE_INTERVENTION[audit.degre_intervention]) {
     lignes.push(`Degré d'intervention autorisé : ${LABELS_DEGRE_INTERVENTION[audit.degre_intervention]}`);
   }
-  if (audit.contraintes_academiques?.autorisationIA === "Non") {
-    lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail — reste strictement au diagnostic, aucune proposition ni reformulation, quel que soit le degré d'intervention choisi par ailleurs.");
+  if (AUTORISATION_IA_INCERTAINE_OU_REFUSEE.has(audit.contraintes_academiques?.autorisationIA ?? "")) {
+    lignes.push("L'établissement de l'auteur·ice N'AUTORISE PAS l'usage de l'IA sur ce travail (ou l'auteur·ice ne le sait pas encore) — reste strictement au diagnostic, aucune proposition ni reformulation, quel que soit le degré d'intervention choisi par ailleurs.");
   } else if (audit.contraintes_academiques?.conditions && audit.contraintes_academiques.conditions.length > 0) {
     lignes.push(`Conditions académiques à respecter : ${audit.contraintes_academiques.conditions.join(", ")}.`);
+  }
+  const c = audit.contrat_intention;
+  if (c?.ouEnEtesVous) lignes.push(`Où en est l'auteur·ice dans ce projet : ${c.ouEnEtesVous}.`);
+  if (c?.objectifs && c.objectifs.length > 0) lignes.push(`Pourquoi l'auteur·ice écrit ce texte : ${c.objectifs.join(", ")}.`);
+  if (c?.destinataires && c.destinataires.length > 0) lignes.push(`Pour qui ce texte est écrit : ${c.destinataires.join(", ")}.`);
+  if (c?.criteresReussite && c.criteresReussite.length > 0) lignes.push(`Ce qui ferait, pour l'auteur·ice, de ce projet une réussite : ${c.criteresReussite.join(", ")}.`);
+  if (c?.ceQueVousEspérezDécouvrir && c.ceQueVousEspérezDécouvrir.length > 0) lignes.push(`Ce que l'auteur·ice espère découvrir en écrivant, que ton analyse peut éclairer : ${c.ceQueVousEspérezDécouvrir.join(", ")}.`);
+  const profilLignes: string[] = [];
+  if (profil?.profession) profilLignes.push(`profession : ${profil.profession}`);
+  if (profil?.identite_genre) profilLignes.push(`identité : ${profil.identite_genre}`);
+  if (profil?.tranche_age) profilLignes.push(`tranche d'âge : ${profil.tranche_age}`);
+  if (profil?.niveau_etudes) profilLignes.push(`niveau d'études : ${profil.niveau_etudes}`);
+  if (profil?.matieres_etudiees) profilLignes.push(`domaines étudiés : ${profil.matieres_etudiees}`);
+  if (profilLignes.length > 0) {
+    lignes.push(`Profil de l'auteur·ice (${profilLignes.join(", ")}) — utile pour juger la crédibilité ` +
+      "des affirmations professionnelles ou personnelles du texte, jamais pour préjuger de sa qualité littéraire.");
   }
   if (audit.relation_ia) {
     const r = audit.relation_ia;
@@ -561,10 +603,18 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia, apercu_resultat, preaudit_resultat")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia, apercu_resultat, preaudit_resultat, contrat_intention")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
+
+    // Profil auteur optionnel (réf. 60816-01, suite, 29/08/2026) — table
+    // séparée, une ligne par utilisateur, peut ne pas exister du tout.
+    const { data: profilAuteur } = await admin
+      .from("profils_auteur")
+      .select("profession, identite_genre, tranche_age, niveau_etudes, matieres_etudiees")
+      .eq("user_id", userId)
+      .maybeSingle();
     // Réf. 60816-01, suite, 28/08/2026 — "termine" accepté en plus de
     // "payé"/"en_traitement" : un audit remis à zéro (unités en échec
     // réinitialisées via SQL après incident, ex. schéma non conforme
@@ -593,12 +643,12 @@ Deno.serve(async (req) => {
     if (criteres.length === 0) return json({ error: "Aucun critère actif pour ce palier de dimensions." }, 500);
     const autoriserProposition =
       DEGRES_AUTORISANT_PROPOSITION.has(audit.degre_intervention ?? "") &&
-      audit.contraintes_academiques?.autorisationIA !== "Non";
+      !AUTORISATION_IA_INCERTAINE_OU_REFUSEE.has(audit.contraintes_academiques?.autorisationIA ?? "");
     const schema = fusionnerSchemas(construireSchemaAnalyse(criteres), construireSchemaSyntheseEditoriale(autoriserProposition));
     const consigneCriteres = construireConsigneCriteres(criteres);
     const consigneSyntheseEditoriale = construireConsigneSyntheseEditoriale(autoriserProposition);
     const contexteQualification =
-      construireContexteQualification(audit) +
+      construireContexteQualification(audit, profilAuteur) +
       construireContextePreaudit(audit.preaudit_resultat as Record<string, unknown> | null);
 
     // CORRECTIF 26/08/2026 — même bug que preaudit-approfondi-cursaudit :

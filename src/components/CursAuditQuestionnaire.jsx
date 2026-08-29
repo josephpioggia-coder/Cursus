@@ -509,13 +509,20 @@ export default function CursAuditQuestionnaire({ onValider }) {
 
       {estTravailAcademique && (
         <div style={{ background: "var(--fond, #F7F4EF)", padding: "14px 16px", borderRadius: 8 }}>
-          <label style={labelStyle}>Ton établissement autorise-t-il l'usage de l'IA ?</label>
+          <label style={labelStyle}>Votre établissement autorise-t-il l'usage de l'IA ?</label>
           <select style={{ ...champStyle, marginBottom: conditionsIA.length >= 0 && autorisationIA === "Oui" ? 12 : 0 }} value={autorisationIA} onChange={(e) => setAutorisationIA(e.target.value)}>
             <option value="">— Choisir —</option>
             <option value="Oui">Oui</option>
             <option value="Non">Non</option>
             <option value="Je ne sais pas">Je ne sais pas</option>
           </select>
+          {(autorisationIA === "Non" || autorisationIA === "Je ne sais pas") && (
+            <p style={{ fontSize: 11.5, color: "#8A6116", marginTop: 8, lineHeight: 1.5 }}>
+              CursAudit restera strictement au diagnostic sur ce texte : aucune proposition ni reformulation,
+              quel que soit le degré d'intervention choisi plus haut — cette limite est appliquée
+              automatiquement par le moteur d'analyse, pas seulement affichée ici.
+            </p>
+          )}
           {autorisationIA === "Oui" && (
             <div>
               <label style={{ ...labelStyle, marginTop: 12 }}>À quelles conditions ?</label>
