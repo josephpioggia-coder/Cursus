@@ -1200,10 +1200,24 @@ export const CRITERES_REUSSITE = [
   "il ouvrira un débat", "il changera quelque chose",
 ];
 
+// Remplacée le 29/08/2026 — l'ancienne liste ("pourquoi je souffre
+// encore", "pourquoi cette relation me poursuit"...) ne convenait qu'à un
+// récit personnel/thérapeutique, maladroite pour les autres natures de
+// projet (essai, livre professionnel, fiction...). Nouvelle liste
+// universelle, centrée sur le texte et le lecteur plutôt que sur une
+// expérience intime supposée — fournie telle quelle par l'auteur du
+// projet.
 export const CE_QUE_VOUS_ESPEREZ_DECOUVRIR = [
-  "pourquoi je souffre encore", "pourquoi cette relation me poursuit", "qui je suis devenu",
-  "ce que cette histoire a changé", "ce que je n'ai jamais compris", "ce que je veux transmettre",
-  "ce que je cache", "ce que je ne vois pas encore",
+  "Ce que mon texte cherche vraiment à dire",
+  "Ce que ce projet révèle de mon parcours ou de ma pensée",
+  "Ce que cette histoire, cette idée ou cette expérience a transformé",
+  "Ce que je veux réellement transmettre au lecteur",
+  "Ce que je n'ai pas encore réussi à formuler clairement",
+  "Ce que le lecteur risque de ne pas comprendre",
+  "Ce qui manque encore pour que le texte tienne sa promesse",
+  "Les angles morts de mon texte ou de mon projet",
+  "La meilleure manière de présenter ce projet au lecteur",
+  "La forme éditoriale qui lui conviendrait le mieux",
 ];
 
 // ─── Navigation générique dans l'arbre NATURE_PROJET (réf. 60816-01, suite,
