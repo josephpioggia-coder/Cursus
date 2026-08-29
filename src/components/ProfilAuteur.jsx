@@ -7,11 +7,20 @@
  *
  * Trois façons de le remplir, au choix de l'auteur·ice (demande explicite
  * du 28/08/2026, "on lui laisse l'opportunité") :
- *  - coller un CV ou un profil LinkedIn en texte brut puis "Extraire
- *    automatiquement" (extraire-profil-cursus, une IA lit le texte collé —
- *    aucun accès API LinkedIn, aucun scraping, l'auteur·ice colle lui-même) ;
+ *  - importer un CV et/ou un export LinkedIn (.docx/.pdf/.txt), ou coller
+ *    du texte, puis "Fusionner les sources" (extraire-profil-cursus, une
+ *    IA lit le texte accumulé — aucun accès API LinkedIn, aucun scraping,
+ *    l'auteur·ice fournit lui-même le texte) ;
  *  - remplir les champs à la main ;
  *  - ne rien mettre.
+ *
+ * Plusieurs sources (CV + LinkedIn + ajouts manuels) s'AJOUTENT les unes
+ * aux autres dans le même champ texte plutôt que de s'écraser (bug réel du
+ * 28/08/2026, corrigé le même jour) — "Fusionner les sources" les combine
+ * ensuite en un seul profil dédupliqué.
+ *
+ * Une fois enregistré, le profil s'affiche en résumé (lecture seule) — un
+ * bouton "Modifier" rouvre le formulaire d'édition.
  *
  * POURQUOI CES CHAMPS (pas de la décoration) : la profession de
  * l'auteur·ice a une vraie valeur pour l'audit — un livre sur un métier
@@ -47,6 +56,16 @@ async function extraireProfil(texte) {
   return données.profil;
 }
 
+function ligneRésumé(étiquette, valeur) {
+  if (!valeur) return null;
+  return (
+    <div style={{ fontSize: 12.5, marginBottom: 4 }}>
+      <span style={{ color: "var(--texte-tertiaire)" }}>{étiquette} — </span>
+      <span style={{ color: "var(--texte-primaire)" }}>{valeur}</span>
+    </div>
+  );
+}
+
 export default function ProfilAuteur() {
   const [profession, setProfession] = useState("");
   const [identiteGenre, setIdentiteGenre] = useState("");
@@ -61,6 +80,11 @@ export default function ProfilAuteur() {
   const [message, setMessage] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [déplié, setDéplié] = useState(false);
+  // Bascule résumé (lecture seule) / formulaire (édition) — réf.
+  // 60816-01, suite, 28/08/2026 : une fois enregistré, montrer un résumé
+  // plutôt que de laisser tous les champs éditables en permanence.
+  const [enModification, setEnModification] = useState(false);
+  const [déjàEnregistré, setDéjàEnregistré] = useState(false);
 
   useEffect(() => {
     profilAuteurAPI.récupérer().then(({ data }) => {
@@ -73,13 +97,14 @@ export default function ProfilAuteur() {
         setTexteSourceBrut(data.texte_source_brut || "");
         setRésuméParcours(data.resume_parcours || "");
         setDéplié(true);
+        setDéjàEnregistré(true);
       }
       setChargé(true);
     });
   }, []);
 
   const extraire = async () => {
-    if (!texteSourceBrut.trim()) { setErreur("Colle d'abord un CV ou un profil LinkedIn dans le champ ci-dessous."); return; }
+    if (!texteSourceBrut.trim()) { setErreur("Importe ou colle d'abord un CV/profil LinkedIn dans le champ ci-dessous."); return; }
     setExtractionEnCours(true);
     setErreur(null);
     setMessage(null);
@@ -89,7 +114,7 @@ export default function ProfilAuteur() {
       setNiveauEtudes(profil.niveau_etudes || "");
       setMatieresEtudiees(profil.matieres_etudiees || "");
       setRésuméParcours(profil.resume_parcours || "");
-      setMessage("Champs préremplis à partir du texte collé — vérifie et corrige avant d'enregistrer.");
+      setMessage("Champs préremplis à partir de toutes les sources ajoutées — vérifie et corrige avant d'enregistrer.");
     } catch (e) {
       setErreur(e.message);
     } finally {
@@ -103,9 +128,18 @@ export default function ProfilAuteur() {
   // dynamiquement depuis un CDN (extrairePdf.js), même principe que
   // chargerJSZip() pour le .docx — aucune dépendance npm ajoutée. Le
   // .docx réutilise analyserStructureDocx() (segmenterCursAudit.js), déjà
-  // éprouvée pour l'import du manuscrit — ici on ne garde que le texte
-  // brut de chaque paragraphe, la structure de chapitres ne sert à rien
-  // pour un CV.
+  // éprouvée pour l'import du manuscrit.
+  //
+  // CORRECTIF (même jour, suite) — un second import (ex. profil LinkedIn
+  // après un CV) écrasait le premier au lieu de s'y ajouter. Chaque
+  // import s'AJOUTE désormais à la suite du texte déjà présent, avec un
+  // séparateur nommant la source, pour pouvoir accumuler CV + LinkedIn +
+  // ajouts manuels avant de "Fusionner les sources" en un seul profil.
+  const ajouterAuTexteSource = (texte, nomSource) => {
+    const bloc = `--- ${nomSource} ---\n${texte}`;
+    setTexteSourceBrut((précédent) => précédent.trim() ? `${précédent}\n\n${bloc}` : bloc);
+  };
+
   const importerFichier = async (fichier) => {
     if (!fichier) return;
     setErreur(null);
@@ -115,18 +149,18 @@ export default function ProfilAuteur() {
         const { infos } = await analyserStructureDocx(fichier);
         const texte = infos.map((i) => i.texte).filter(Boolean).join("\n");
         if (!texte) { setErreur("Aucun texte exploitable trouvé dans ce fichier."); return; }
-        setTexteSourceBrut(texte);
+        ajouterAuTexteSource(texte, fichier.name);
       } else if (fichier.name.endsWith(".pdf")) {
         const texte = await extraireTextePdf(fichier);
         if (!texte) { setErreur("Aucun texte exploitable trouvé dans ce PDF (peut-être un PDF scanné/image, sans texte réel)."); return; }
-        setTexteSourceBrut(texte);
+        ajouterAuTexteSource(texte, fichier.name);
       } else if (fichier.name.endsWith(".txt")) {
-        setTexteSourceBrut(await fichier.text());
+        ajouterAuTexteSource(await fichier.text(), fichier.name);
       } else {
         setErreur("Format non pris en charge — utilise un .docx, un .pdf ou un .txt.");
         return;
       }
-      setMessage("Fichier importé — clique \"Extraire automatiquement\" pour préremplir les champs.");
+      setMessage("Fichier ajouté à la suite du texte déjà présent — importe d'autres sources si besoin, puis clique \"Fusionner les sources\".");
     } catch (e) {
       setErreur("Impossible de lire ce fichier : " + e.message);
     }
@@ -143,9 +177,13 @@ export default function ProfilAuteur() {
     setEnregistrementEnCours(false);
     if (error) { setErreur(error.message); return; }
     setMessage("Profil enregistré — réutilisé automatiquement partout dans Cursus.");
+    setDéjàEnregistré(true);
+    setEnModification(false);
   };
 
   if (!chargé) return null;
+
+  const modeLectureSeule = déjàEnregistré && !enModification;
 
   return (
     <div style={{ background: "#F7F4EF", border: "0.5px solid var(--border)", borderRadius: 10, padding: "14px 16px", display: "grid", gap: déplié ? 14 : 4 }}>
@@ -162,7 +200,28 @@ export default function ProfilAuteur() {
         </div>
       </div>
 
-      {déplié && (
+      {déplié && modeLectureSeule && (
+        <>
+          <div>
+            {ligneRésumé("Profession", profession)}
+            {ligneRésumé("Identité de genre", identiteGenre)}
+            {ligneRésumé("Tranche d'âge", trancheAge)}
+            {ligneRésumé("Niveau d'études", niveauEtudes)}
+            {ligneRésumé("Matières étudiées", matieresEtudiees)}
+            {résuméParcours && (
+              <div style={{ fontSize: 12.5, color: "var(--texte-primaire)", marginTop: 8, lineHeight: 1.6 }}>{résuméParcours}</div>
+            )}
+          </div>
+          <button type="button" onClick={() => setEnModification(true)} style={{
+            background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+            padding: "6px 14px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", justifySelf: "start",
+          }}>
+            Modifier mon profil
+          </button>
+        </>
+      )}
+
+      {déplié && !modeLectureSeule && (
         <>
           <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: 0 }}>
             Utile surtout pour une autobiographie ou un livre professionnel : savoir que l'auteur·ice d'un
@@ -170,18 +229,21 @@ export default function ProfilAuteur() {
           </p>
 
           <div>
-            <label style={labelStyle}>Importer un fichier (.docx, .pdf ou .txt)</label>
+            <label style={labelStyle}>Importer un ou plusieurs fichiers (.docx, .pdf ou .txt) — CV, export LinkedIn…</label>
             <label style={{
               display: "inline-block", background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
               padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", marginBottom: 12,
             }}>
-              Choisir un fichier (CV, export LinkedIn…)
-              <input type="file" accept=".docx,.pdf,.txt" style={{ display: "none" }} onChange={(e) => importerFichier(e.target.files[0])} />
+              Choisir un fichier
+              <input type="file" accept=".docx,.pdf,.txt" style={{ display: "none" }} onChange={(e) => { importerFichier(e.target.files[0]); e.target.value = ""; }} />
             </label>
+            <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: -8, marginBottom: 8 }}>
+              Chaque fichier importé s'ajoute à la suite des précédents — importe ton CV puis ton export LinkedIn, par exemple, avant de fusionner.
+            </div>
           </div>
 
           <div>
-            <label style={labelStyle}>...ou coller un CV / un profil LinkedIn (texte)</label>
+            <label style={labelStyle}>...ou coller du texte à la suite</label>
             <textarea
               style={{ ...champStyle, minHeight: 90, resize: "vertical" }}
               value={texteSourceBrut}
@@ -192,7 +254,7 @@ export default function ProfilAuteur() {
               marginTop: 8, background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
               padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: extractionEnCours ? "default" : "pointer", fontFamily: "inherit",
             }}>
-              {extractionEnCours ? "Extraction…" : "Extraire automatiquement"}
+              {extractionEnCours ? "Fusion en cours…" : "Fusionner les sources"}
             </button>
           </div>
 
@@ -241,13 +303,23 @@ export default function ProfilAuteur() {
           {erreur && <div style={{ fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
           {message && <div style={{ fontSize: 12, color: "#1D9E75" }}>{message}</div>}
 
-          <button type="button" onClick={enregistrer} disabled={enregistrementEnCours} style={{
-            background: "#1D9E75", color: "#fff", border: "none", borderRadius: 6,
-            padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enregistrementEnCours ? "default" : "pointer",
-            fontFamily: "inherit", justifySelf: "start",
-          }}>
-            {enregistrementEnCours ? "Enregistrement…" : "Enregistrer mon profil"}
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button type="button" onClick={enregistrer} disabled={enregistrementEnCours} style={{
+              background: "#1D9E75", color: "#fff", border: "none", borderRadius: 6,
+              padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enregistrementEnCours ? "default" : "pointer",
+              fontFamily: "inherit",
+            }}>
+              {enregistrementEnCours ? "Enregistrement…" : déjàEnregistré ? "Enregistrer les modifications" : "Enregistrer mon profil"}
+            </button>
+            {déjàEnregistré && (
+              <button type="button" onClick={() => { setEnModification(false); setErreur(null); setMessage(null); }} style={{
+                background: "none", color: "var(--texte-tertiaire)", border: "none",
+                fontSize: 12.5, cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Annuler
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>
