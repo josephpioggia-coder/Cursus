@@ -862,13 +862,33 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
   );
 }
 
+// ─── Garde-fou contre les boucles de relances coûteuses (réf. 60816-01,
+// suite, 30/08/2026) — incident réel : une nuit entière (~10h) d'appels
+// répétés a coûté plus de 40 $US en une seule journée, sans qu'aucune
+// protection ne l'arrête (la "limite de dépenses" Anthropic Console n'est
+// qu'une notification, pas un plafond dur). Cause probable : le passage 3
+// ci-dessous (le plus coûteux, ~80 000 tokens — il renvoie le manuscrit
+// ENTIER) ne laissait aucune trace en base en cas d'échec ; si le client
+// retente automatiquement après une erreur (onglet resté ouvert, boucle de
+// relance), rien n'empêchait de refaire cet appel indéfiniment. Le
+// compteur ci-dessous est incrémenté à chaque échec et remis à zéro à
+// chaque passage réussi (voir chaque `.update(...)` plus bas) ; au-delà du
+// seuil, la fonction refuse de relancer un appel IA tant que le compteur
+// n'a pas été remis à zéro manuellement (SQL) après vérification humaine.
+const SEUIL_ECHECS_MAX = 3;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+  let admin: ReturnType<typeof createClient> | null = null;
+  // deno-lint-ignore no-explicit-any
+  let audit: any = null;
+  let auditId: string | undefined;
 
   try {
     if (!ANTHROPIC_KEY) return json({ error: "ANTHROPIC_KEY manquante." }, 500);
     if (!OPENAI_API_KEY) return json({ error: "OPENAI_API_KEY manquante." }, 500);
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
     const authHeader = req.headers.get("Authorization") ?? "";
     const token = authHeader.replace("Bearer ", "");
@@ -877,20 +897,27 @@ Deno.serve(async (req) => {
     const userId = userData.user.id;
 
     const body = await req.json();
-    const auditId: string | undefined = body?.audit_id;
+    auditId = body?.audit_id;
     if (!auditId) return json({ error: "audit_id est requis." }, 400);
 
-    const { data: audit } = await admin
+    const { data: auditChargé } = await admin
       .from("audits")
-      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats, contrat_intention")
+      .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats, contrat_intention, ia_echecs_consecutifs, ia_dernier_echec_le")
       .eq("id", auditId)
       .maybeSingle();
+    audit = auditChargé;
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
     if (audit.apercu_statut !== "termine") {
       return json({ error: "apercu_requis", message: "L'aperçu gratuit doit être généré avant le pré-audit approfondi." }, 409);
     }
     if (audit.preaudit_statut !== "paye") {
       return json({ error: "paiement_requis", message: `Le pré-audit a le statut "${audit.preaudit_statut}", pas "paye".` }, 402);
+    }
+    if ((audit.ia_echecs_consecutifs ?? 0) >= SEUIL_ECHECS_MAX) {
+      return json({
+        error: "trop_d_echecs_consecutifs",
+        message: `Ce pré-audit a échoué ${audit.ia_echecs_consecutifs} fois de suite sans succès entre-temps (dernier échec : ${audit.ia_dernier_echec_le}). Traitement bloqué par sécurité pour éviter une boucle de relances coûteuse. Vérifiez la cause avant de remettre "ia_echecs_consecutifs" à 0 pour cet audit.`,
+      }, 429);
     }
 
     // Profil auteur optionnel (réf. 60816-01, suite, 28/08/2026) — table
@@ -1038,7 +1065,7 @@ Deno.serve(async (req) => {
       const brouillon = await appelClaude(systemPromptInitial, texteIntegral);
       const { error: erreurMaj } = await admin
         .from("audits")
-        .update({ preaudit_brouillon: brouillon })
+        .update({ preaudit_brouillon: brouillon, ia_echecs_consecutifs: 0 })
         .eq("id", auditId);
       if (erreurMaj) return json({ error: erreurMaj.message }, 500);
       return json({ audit_id: auditId, etape: "brouillon", restant: true });
@@ -1066,7 +1093,7 @@ Deno.serve(async (req) => {
       const nouvelleValeur = résultatGPT ?? { _statut: déjàTenté ? GPT_STATUT_INDISPONIBLE : GPT_STATUT_TENTATIVE_ÉCHOUÉE };
       const { error: erreurMaj } = await admin
         .from("audits")
-        .update({ preaudit_critique_gpt: nouvelleValeur })
+        .update({ preaudit_critique_gpt: nouvelleValeur, ia_echecs_consecutifs: 0 })
         .eq("id", auditId);
       if (erreurMaj) return json({ error: erreurMaj.message }, 500);
       return json({ audit_id: auditId, etape: "critique", restant: true });
@@ -1101,7 +1128,7 @@ Deno.serve(async (req) => {
           entrée.lecture = await appelClaudeChapitre(chapitre.titre, texteChapitre || chapitre.titre);
           const { error: erreurMaj } = await admin
             .from("audits")
-            .update({ preaudit_chapitres_resultats: résultatsChapitres })
+            .update({ preaudit_chapitres_resultats: résultatsChapitres, ia_echecs_consecutifs: 0 })
             .eq("id", auditId);
           if (erreurMaj) return json({ error: erreurMaj.message }, 500);
           return json({ audit_id: auditId, etape: "chapitre_lecture", chapitre_numero: i + 1, chapitre_total: chapitresConfirmés.length, chapitre_titre: chapitre.titre, restant: true });
@@ -1117,7 +1144,7 @@ Deno.serve(async (req) => {
           entrée.relecture = résultatGPT ?? { _statut: déjàTenté ? GPT_STATUT_INDISPONIBLE : GPT_STATUT_TENTATIVE_ÉCHOUÉE };
           const { error: erreurMaj } = await admin
             .from("audits")
-            .update({ preaudit_chapitres_resultats: résultatsChapitres })
+            .update({ preaudit_chapitres_resultats: résultatsChapitres, ia_echecs_consecutifs: 0 })
             .eq("id", auditId);
           if (erreurMaj) return json({ error: erreurMaj.message }, 500);
           return json({ audit_id: auditId, etape: "chapitre_relecture", chapitre_numero: i + 1, chapitre_total: chapitresConfirmés.length, chapitre_titre: chapitre.titre, restant: true });
@@ -1180,13 +1207,27 @@ Deno.serve(async (req) => {
 
     const { error: erreurMaj } = await admin
       .from("audits")
-      .update({ preaudit_statut: "termine", preaudit_resultat: preauditResultat })
+      .update({ preaudit_statut: "termine", preaudit_resultat: preauditResultat, ia_echecs_consecutifs: 0 })
       .eq("id", auditId);
     if (erreurMaj) return json({ error: erreurMaj.message }, 500);
 
     return json({ audit_id: auditId, etape: "termine", restant: false, preaudit: preauditResultat });
   } catch (err) {
     console.error("Erreur preaudit-approfondi-cursaudit :", err.message);
+    // Réf. 60816-01, suite, 30/08/2026 — voir SEUIL_ECHECS_MAX en tête de
+    // fichier : chaque échec est compté avant de répondre, pour qu'une
+    // boucle de relances (client bloqué, onglet resté ouvert) finisse par
+    // être bloquée au lieu de refaire indéfiniment l'appel le plus coûteux
+    // du pipeline (passage 3, ~80 000 tokens).
+    if (admin && auditId) {
+      await admin
+        .from("audits")
+        .update({
+          ia_echecs_consecutifs: (audit?.ia_echecs_consecutifs ?? 0) + 1,
+          ia_dernier_echec_le: new Date().toISOString(),
+        })
+        .eq("id", auditId);
+    }
     return json({ error: err.message }, 500);
   }
 });
