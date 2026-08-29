@@ -61,7 +61,7 @@ import { nomDeFichierSûr } from "../lib/exportWord.js";
 import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
   NATURE_PROJET, OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
-  ATTENTES_CURSUS, CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
+  CRITERES_REUSSITE, CE_QUE_VOUS_ESPEREZ_DECOUVRIR,
 } from "../lib/taxonomieContratIntentionCursAudit.js";
 
 // Sous-catégories de la nouvelle taxonomie faites d'entrées courtes et
@@ -74,17 +74,38 @@ const SOUS_CATEGORIES_NON_LINEAIRES = new Set([
   "Jeu de rôle", "Cartes pédagogiques", "Fiction interactive",
 ]);
 
+// Fusionne l'ancienne FINALITES avec ATTENTES_CURSUS du contrat d'intention
+// (réf. 60816-01, suite, 28/08/2026) — signalé par l'auteur du projet :
+// "structurer mes idées"/"Améliorer la structure", "rendre mon texte plus
+// fluide"/"Fluidifier sans réécrire à la place", "trouver mes
+// incohérences"/"Vérifier la cohérence générale", "préparer la
+// publication"/"Préparer une nouvelle version" faisaient doublon.
+// Dédupliqué en gardant une seule formulation par idée ; les items sans
+// équivalent des deux côtés sont tous conservés (vérifications techniques
+// d'audit d'un côté, objectifs plus larges/existentiels de l'autre — pas
+// redondants entre eux). Alimente à la fois `finaliteAudit` (obligatoire,
+// injecté dans le prompt du moteur d'analyse) et
+// `contratIntention.attentesCursus` (mêmes valeurs, un seul état — voir
+// `finalites` plus bas).
 const FINALITES = [
+  "Structurer mes idées",
+  "Mieux écrire",
+  "Améliorer le style",
+  "Fluidifier le texte sans réécrire à ma place",
   "Vérifier la cohérence générale",
-  "Améliorer la structure",
+  "Vérifier mes arguments",
   "Repérer les répétitions",
   "Repérer les passages faibles",
   "Vérifier le niveau de preuve",
   "Vérifier les sources",
-  "Préserver la voix de l'auteur",
-  "Fluidifier sans réécrire à la place",
+  "Préserver ma voix d'auteur",
   "Identifier les risques éthiques, académiques ou éditoriaux",
-  "Préparer une nouvelle version",
+  "Approfondir ma réflexion",
+  "Comprendre ce que j'écris",
+  "Comprendre ce que je vis",
+  "Mieux toucher mon lecteur",
+  "Préparer la publication",
+  "Tout analyser",
 ];
 
 const DEGRES_INTERVENTION = [
@@ -141,7 +162,6 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const [natureAutre, setNatureAutre] = useState("");
   const [objectifs, setObjectifs] = useState([]);
   const [destinataires, setDestinataires] = useState([]);
-  const [attentesCursus, setAttentesCursus] = useState([]);
   const [criteresReussite, setCriteresReussite] = useState([]);
   const [ceQueVousEspérezDécouvrir, setCeQueVousEspérezDécouvrir] = useState([]);
   const [contratsPrécédents, setContratsPrécédents] = useState(null);
@@ -161,7 +181,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
     setNatureAutre(c.natureProjet?.autre || "");
     setObjectifs(c.objectifs || []);
     setDestinataires(c.destinataires || []);
-    setAttentesCursus(c.attentesCursus || []);
+    // attentesCursus fusionné dans finalites le 28/08/2026 — un contrat
+    // exporté avant cette date peut encore avoir attentesCursus séparé,
+    // on le récupère quand même plutôt que de perdre l'info.
+    if (c.attentesCursus?.length > 0) setFinalites((f) => [...new Set([...f, ...c.attentesCursus])]);
     setCriteresReussite(c.criteresReussite || []);
     setCeQueVousEspérezDécouvrir(c.ceQueVousEspérezDécouvrir || []);
   };
@@ -175,7 +198,12 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const contratIntentionActuel = () => ({
     ouEnEtesVous,
     natureProjet: { famille, sousCategorie, autre: famille === "Autre" ? natureAutre : "" },
-    objectifs, destinataires, attentesCursus, criteresReussite,
+    objectifs, destinataires,
+    // Fusionné avec "Que veux-tu obtenir ?" le 28/08/2026 (doublon signalé
+    // par l'auteur du projet) — mêmes valeurs que `finalites`, pas un
+    // second état séparé.
+    attentesCursus: finalites,
+    criteresReussite,
     ceQueVousEspérezDécouvrir,
   });
 
@@ -361,11 +389,6 @@ export default function CursAuditQuestionnaire({ onValider }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Qu'attendez-vous de Cursus ?</label>
-          <GroupeCases options={ATTENTES_CURSUS} valeurs={attentesCursus} onBasculer={basculeur(setAttentesCursus)} />
-        </div>
-
-        <div>
           <label style={labelStyle}>À quoi reconnaîtrez-vous que ce projet est réussi ?</label>
           <GroupeCases options={CRITERES_REUSSITE} valeurs={criteresReussite} onBasculer={basculeur(setCriteresReussite)} />
         </div>
@@ -393,7 +416,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       </div>
 
       <div>
-        <label style={labelStyle}>Que veux-tu obtenir ? * (plusieurs choix possibles)</label>
+        <label style={labelStyle}>Qu'attends-tu de cet audit ? * (plusieurs choix possibles)</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
           {FINALITES.map((f) => (
             <Checkbox key={f} checked={finalites.includes(f)} onChange={() => basculerFinalité(f)} label={f} />
