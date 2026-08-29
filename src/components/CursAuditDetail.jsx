@@ -491,7 +491,16 @@ async function appelerPreauditApprofondi(auditId) {
     body: JSON.stringify({ audit_id: auditId }),
   });
   const données = await réponse.json();
-  if (!réponse.ok) throw new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
+  if (!réponse.ok) {
+    // Réf. 60816-01, suite, 30/08/2026 — `code`/`attenteMs` portés par
+    // l'erreur (pas seulement le texte) pour que l'appelant puisse
+    // programmer une reprise automatique sur "operation_en_pause" sans
+    // avoir à parser le message humain.
+    const erreur = new Error(données?.message || données?.error || `HTTP ${réponse.status}`);
+    erreur.code = données?.error;
+    erreur.attenteMs = données?.attente_ms;
+    throw erreur;
+  }
   return données;
 }
 
@@ -746,6 +755,14 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   const [progression, setProgression] = useState(null);
   const [indiceMessage, setIndiceMessage] = useState(0);
   const [erreur, setErreur] = useState(null);
+  // Réf. 60816-01, suite, 30/08/2026 — reprise automatique après une pause
+  // temporaire ("operation_en_pause", voir preaudit-approfondi-cursaudit) :
+  // demande explicite de l'auteur du projet ("le travail reprendra... la
+  // personne peut continuer à utiliser Cursus pour autre chose"), pas
+  // besoin de revenir cliquer soi-même tant que cette page reste ouverte.
+  const [pauseJusquÀ, setPauseJusquÀ] = useState(null);
+  const minuteurReprise = useRef(null);
+  useEffect(() => () => { if (minuteurReprise.current) clearTimeout(minuteurReprise.current); }, []);
   const [ficheActionEnCours, setFicheActionEnCours] = useState(false);
   const [erreurFicheAction, setErreurFicheAction] = useState(null);
   // Chrono visible pendant la génération — réf. 60816-01, suite, 27/08/2026 :
@@ -795,6 +812,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
   const lancer = async () => {
     setEnCours(true);
     setErreur(null);
+    setPauseJusquÀ(null);
     setProgression(null);
     try {
       // Le pipeline se fait en plusieurs appels HTTP séparés (un par
@@ -811,7 +829,17 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
       }
       await onTermine();
     } catch (e) {
-      setErreur(e.message);
+      // Réf. 60816-01, suite, 30/08/2026 — "operation_en_pause" (garde-fou
+      // anti-boucle) n'est pas une vraie erreur pour l'auteur·ice : la page
+      // programme elle-même une reprise automatique dès que le délai
+      // indiqué par le serveur est écoulé, plutôt que d'afficher un échec
+      // et d'attendre un clic manuel.
+      if (e.code === "operation_en_pause" && e.attenteMs) {
+        setPauseJusquÀ(Date.now() + e.attenteMs);
+        minuteurReprise.current = setTimeout(lancer, e.attenteMs + 5000);
+      } else {
+        setErreur(e.message);
+      }
     } finally {
       setEnCours(false);
       setProgression(null);
@@ -929,12 +957,12 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
 
       {audit.preaudit_statut === "paye" && (!audit.chapitres_detectes || audit.chapitres_confirmes) && (
         <>
-          <button onClick={lancer} disabled={enCours} style={{
+          <button onClick={lancer} disabled={enCours || !!pauseJusquÀ} style={{
             marginTop: 10, background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
-            padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: enCours ? "default" : "pointer",
-            opacity: enCours ? 0.6 : 1,
+            padding: "8px 16px", fontSize: 12.5, fontWeight: 600, cursor: (enCours || pauseJusquÀ) ? "default" : "pointer",
+            opacity: (enCours || pauseJusquÀ) ? 0.6 : 1,
           }}>
-            {enCours ? libelléActuel : "Lancer le pré-audit"}
+            {enCours ? libelléActuel : pauseJusquÀ ? "En pause — reprise automatique" : "Lancer le pré-audit"}
           </button>
           {enCours && messageActuel && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
@@ -949,7 +977,18 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
         </>
       )}
 
-      {erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>}
+      {pauseJusquÀ ? (
+        // Réf. 60816-01, suite, 30/08/2026 — ton délibérément neutre, pas
+        // rouge/alarmant : ce n'est pas un échec pour l'auteur·ice, juste
+        // une opération plus longue que prévu qui reprendra toute seule.
+        <div style={{ marginTop: 10, fontSize: 12, color: "var(--texte-tertiaire)" }}>
+          Cette opération prend plus de temps que prévu. Reprise automatique prévue vers{" "}
+          {new Date(pauseJusquÀ).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} au plus tard —
+          vous pouvez continuer à utiliser Cursus normalement pendant ce temps, cette page se chargera de relancer le pré-audit toute seule.
+        </div>
+      ) : (
+        erreur && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreur}</div>
+      )}
       {erreurFicheAction && <div style={{ marginTop: 10, fontSize: 12, color: "#A32D2D" }}>{erreurFicheAction}</div>}
       {ficheActionEnCours && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 11.5, color: "var(--texte-tertiaire)" }}>
