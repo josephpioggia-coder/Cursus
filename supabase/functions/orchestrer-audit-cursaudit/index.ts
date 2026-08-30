@@ -350,6 +350,13 @@ interface ContratIntention {
   destinatairesAutre?: string;
   criteresReussiteAutre?: string;
   ceQueVousEspérezDécouvrirAutre?: string;
+  // Réf. 60816-01, suite, 30/08/2026 — voir le commentaire jumeau dans
+  // analyser-unite-cursaudit/index.ts.
+  auteurEstUtilisateur?: boolean;
+  profilAuteurAudit?: {
+    profession?: string; identiteGenre?: string; trancheAge?: string;
+    niveauEtudes?: string; matieresEtudiees?: string;
+  };
 }
 
 interface AuditQualification {
@@ -370,6 +377,23 @@ interface ProfilAuteur {
   tranche_age: string | null;
   niveau_etudes: string | null;
   matieres_etudiees: string | null;
+}
+
+// Réf. 60816-01, suite, 30/08/2026 — voir le commentaire jumeau dans
+// analyser-unite-cursaudit/index.ts.
+function profilAuteurEffectif(audit: AuditQualification, profilCompte: ProfilAuteur | null): ProfilAuteur | null {
+  const ci = audit.contrat_intention;
+  if (ci?.auteurEstUtilisateur === false && ci.profilAuteurAudit) {
+    const p = ci.profilAuteurAudit;
+    return {
+      profession: p.profession || null,
+      identite_genre: p.identiteGenre || null,
+      tranche_age: p.trancheAge || null,
+      niveau_etudes: p.niveauEtudes || null,
+      matieres_etudiees: p.matieresEtudiees || null,
+    };
+  }
+  return profilCompte;
 }
 
 function construireContexteQualification(audit: AuditQualification, profil: ProfilAuteur | null): string {
@@ -664,7 +688,7 @@ Deno.serve(async (req) => {
     const consigneCriteres = construireConsigneCriteres(criteres);
     const consigneSyntheseEditoriale = construireConsigneSyntheseEditoriale(autoriserProposition);
     const contexteQualification =
-      construireContexteQualification(audit, profilAuteur) +
+      construireContexteQualification(audit, profilAuteurEffectif(audit, profilAuteur)) +
       construireContextePreaudit(audit.preaudit_resultat as Record<string, unknown> | null);
 
     // CORRECTIF 26/08/2026 — même bug que preaudit-approfondi-cursaudit :

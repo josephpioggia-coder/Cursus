@@ -264,6 +264,16 @@ interface ContratIntention {
   destinatairesAutre?: string;
   criteresReussiteAutre?: string;
   ceQueVousEspérezDécouvrirAutre?: string;
+  // Réf. 60816-01, suite, 30/08/2026 — l'auteur·ice du texte peut différer
+  // de la personne qui utilise Cursus (relecture/audit pour le compte d'un
+  // tiers, voir CursAuditQuestionnaire.jsx). Quand auteurEstUtilisateur
+  // est false, profilAuteurAudit (rempli pour CET audit) prime sur le
+  // profil du compte — voir profilAuteurEffectif() plus bas.
+  auteurEstUtilisateur?: boolean;
+  profilAuteurAudit?: {
+    profession?: string; identiteGenre?: string; trancheAge?: string;
+    niveauEtudes?: string; matieresEtudiees?: string;
+  };
 }
 
 interface AuditQualification {
@@ -291,6 +301,26 @@ interface ProfilAuteur {
   tranche_age: string | null;
   niveau_etudes: string | null;
   matieres_etudiees: string | null;
+}
+
+// Réf. 60816-01, suite, 30/08/2026 — voir le commentaire sur
+// ContratIntention.auteurEstUtilisateur ci-dessus. Le profil propre à CET
+// audit (rempli quand l'auteur·ice diffère de la personne qui utilise
+// Cursus) prime sur celui du compte, qui reste celui de la personne qui
+// audite, jamais confondu avec celui de l'auteur·ice du texte.
+function profilAuteurEffectif(audit: AuditQualification, profilCompte: ProfilAuteur | null): ProfilAuteur | null {
+  const ci = audit.contrat_intention;
+  if (ci?.auteurEstUtilisateur === false && ci.profilAuteurAudit) {
+    const p = ci.profilAuteurAudit;
+    return {
+      profession: p.profession || null,
+      identite_genre: p.identiteGenre || null,
+      tranche_age: p.trancheAge || null,
+      niveau_etudes: p.niveauEtudes || null,
+      matieres_etudiees: p.matieresEtudiees || null,
+    };
+  }
+  return profilCompte;
 }
 
 function construireContexteQualification(audit: AuditQualification, profil: ProfilAuteur | null): string {
@@ -516,7 +546,7 @@ Deno.serve(async (req) => {
     const consigneCriteres = construireConsigneCriteres(criteres);
 
     // 5. Analyse Claude (toujours) puis, si mode_ia = "2 IA", contrôle GPT.
-    const contexteQualification = construireContexteQualification(audit, profilAuteur);
+    const contexteQualification = construireContexteQualification(audit, profilAuteurEffectif(audit, profilAuteur));
     const systemClaude =
       contexteQualification +
       "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
