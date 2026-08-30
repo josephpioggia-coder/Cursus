@@ -1236,11 +1236,18 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           const p = JSON.parse(jsonStr);
           setDonnées(d => ({ ...d, références: p.références || [] }));
         } catch {
+          // CORRECTIF 30/08/2026 : cette tentative de réparation pouvait
+          // elle-même échouer (JSON toujours mal formé après extraction),
+          // et son erreur technique brute ("JSON.parse: unexpected...")
+          // remontait alors telle quelle jusqu'à l'écran au lieu du message
+          // d'erreur habituel — plus rien à voir avec ce qu'un·e auteur·ice
+          // peut comprendre ou corriger.
           const match = jsonStr.match(/"références"\s*:\s*\[[\s\S]*\]/);
-          if (match) {
+          try {
+            if (!match) throw new Error();
             const partial = JSON.parse(`{${match[0]}}`);
             setDonnées(d => ({ ...d, références: partial.références || [] }));
-          } else {
+          } catch {
             throw new Error("__ERREUR_GENERIQUE__");
           }
         }
