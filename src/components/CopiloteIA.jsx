@@ -29,7 +29,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
-import { idéesAPI } from "../lib/api.js";
+import { mémoireNarrativeAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
@@ -382,6 +382,19 @@ async function chargerNotesEtCitations(projetId) {
       .select("texte, tags")
       .eq("projet_id", projetId)
       .limit(10);
+    // Réf. 60816-01, suite, 30/08/2026 — mémoire narrative structurée
+    // (remplace le simple Carnet d'idées comme cible de "💾 Mémoriser cette
+    // intention", voir mémoriserIntention plus bas). "rejetee"/"remplacee"
+    // exclues : une décision abandonnée ou remplacée ne doit plus influencer
+    // les prompts. "proposee" incluse mais étiquetée non confirmée — l'IA ne
+    // valide jamais une observation toute seule, voir memoire_narrative.sql.
+    const { data: mémoires } = await supabase
+      .from("memoire_narrative")
+      .select("type, contenu, statut")
+      .eq("projet_id", projetId)
+      .in("statut", ["validee", "proposee"])
+      .order("cree_le", { ascending: false })
+      .limit(15);
 
     const lignes = [];
     (citations || []).forEach((c) => {
@@ -390,6 +403,10 @@ async function chargerNotesEtCitations(projetId) {
     });
     (idées || []).forEach((i) => {
       lignes.push(`- Idée notée : ${i.texte}`);
+    });
+    (mémoires || []).forEach((m) => {
+      const étiquette = m.statut === "proposee" ? " (proposée, non confirmée par l'auteur·ice)" : "";
+      lignes.push(`- [${m.type}] ${m.contenu}${étiquette}`);
     });
 
     return lignes.length ? lignes.join("\n") : null;
@@ -458,13 +475,20 @@ ${instruction}`;
 
 // Réf. 60816-01, suite, 30/08/2026 — voir "💾 Mémoriser cette intention"
 // dans FilDialogue. Distille un diagnostic + son fil de discussion en UNE
-// note courte, réutilisable sans le contexte de l'échange d'origine —
-// enregistrée dans le Carnet d'idées du projet (table `idees`), relue
+// note courte, réutilisable sans le contexte de l'échange d'origine, plus
+// son `type` de mémoire (mémoire_narrative.sql) — enregistrée avec
+// statut "proposee" (jamais "validee" : ce n'est pas à l'IA de décider
+// qu'une intention est actée, voir memoire_narrative.sql), relue
 // automatiquement aux prochaines sessions par chargerNotesEtCitations().
+const TYPES_MÉMOIRE_NARRATIVE = [
+  "fait_canonique", "decision_auteur", "arc", "etat_personnage", "relation",
+  "promesse", "boucle_ouverte", "theme_motif", "vigilance", "fragment",
+  "reference_recherche",
+];
 function promptDistillerIntention(langueProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  return `Tu résumes un échange entre un·e écrivain·e et son co-pilote IA en UNE note courte (1 à 3 phrases), destinée à être relue dans une future session SANS le contexte de cet échange. N'écris pas un résumé de la conversation — extrais la décision ou l'intention narrative concrète qui s'en dégage, formulée de façon autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). ${instruction} Réponds UNIQUEMENT en JSON valide :
-{"note":"..."}`;
+  return `Tu résumes un échange entre un·e écrivain·e et son co-pilote IA en UNE note courte (1 à 3 phrases), destinée à être relue dans une future session SANS le contexte de cet échange. N'écris pas un résumé de la conversation — extrais la décision ou l'intention narrative concrète qui s'en dégage, formulée de façon autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). Classe aussi cette note dans EXACTEMENT une de ces catégories (${TYPES_MÉMOIRE_NARRATIVE.join(", ")}) — par exemple une trajectoire de personnage est "arc", un choix ferme de l'auteur·ice est "decision_auteur", un point de vigilance à surveiller est "vigilance", une idée encore floue est "fragment". ${instruction} Réponds UNIQUEMENT en JSON valide :
+{"note":"...","type":"..."}`;
 }
 
 function BoutonDialogue({ ouvert, onClick, couleur }) {
@@ -1063,11 +1087,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
-  // diagnostic + fil de discussion d'UNE carte en une note courte,
-  // l'enregistre dans le Carnet d'idées du projet (idéesAPI.créer, table
-  // déjà existante), et l'ajoute immédiatement à `notesProjet` en mémoire
-  // (mise à jour optimiste) pour qu'elle serve dès la prochaine analyse de
-  // CETTE session, sans attendre un rechargement complet de la page.
+  // diagnostic + fil de discussion d'UNE carte en une note courte typée,
+  // l'enregistre dans memoire_narrative (statut "proposee" — jamais validée
+  // automatiquement, voir memoire_narrative.sql), et l'ajoute immédiatement
+  // à `notesProjet` en mémoire (mise à jour optimiste) pour qu'elle serve
+  // dès la prochaine analyse de CETTE session, sans attendre un
+  // rechargement complet de la page.
   const [mémorisationEnCoursParCarte, setMémorisationEnCoursParCarte] = useState({});
   const mémoriserIntention = useCallback(async (cléCarte, contexteCarte) => {
     setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: true }));
@@ -1080,8 +1105,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const résultat = await appelClaude(promptDistillerIntention(langueProjet), contenuÀDistiller, null, 300);
       const p = parserJSON(résultat);
       if (p.note) {
-        await idéesAPI.créer({ texte: p.note, tags: ["intention narrative"], projetId });
-        setNotesProjet((n) => (n ? `${n}\n- Idée notée : ${p.note}` : `- Idée notée : ${p.note}`));
+        const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
+        await mémoireNarrativeAPI.créer({ type, contenu: p.note, statut: "proposee", sourceType: "copiloteia", projetId });
+        setNotesProjet((n) => {
+          const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
+          return n ? `${n}\n${ligne}` : ligne;
+        });
       }
     } catch {
       // Non bloquant — l'auteur·ice peut toujours noter lui-même dans le
