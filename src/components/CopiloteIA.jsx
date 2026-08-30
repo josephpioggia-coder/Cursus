@@ -26,9 +26,10 @@
  * l'occasion s'y prêtera, sans urgence.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
+import { idéesAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
@@ -455,6 +456,17 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse
 ${instruction}`;
 }
 
+// Réf. 60816-01, suite, 30/08/2026 — voir "💾 Mémoriser cette intention"
+// dans FilDialogue. Distille un diagnostic + son fil de discussion en UNE
+// note courte, réutilisable sans le contexte de l'échange d'origine —
+// enregistrée dans le Carnet d'idées du projet (table `idees`), relue
+// automatiquement aux prochaines sessions par chargerNotesEtCitations().
+function promptDistillerIntention(langueProjet) {
+  const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
+  return `Tu résumes un échange entre un·e écrivain·e et son co-pilote IA en UNE note courte (1 à 3 phrases), destinée à être relue dans une future session SANS le contexte de cet échange. N'écris pas un résumé de la conversation — extrais la décision ou l'intention narrative concrète qui s'en dégage, formulée de façon autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). ${instruction} Réponds UNIQUEMENT en JSON valide :
+{"note":"..."}`;
+}
+
 function BoutonDialogue({ ouvert, onClick, couleur }) {
   const { t } = useTranslation("copilote");
   return (
@@ -481,9 +493,19 @@ function BoutonDialogue({ ouvert, onClick, couleur }) {
 // le bouton ne s'affiche tout simplement pas si l'API est absente.
 const LANGUE_RECONNAISSANCE = { fr: "fr-FR", en: "en-GB" };
 
-function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet }) {
+function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser, mémorisationEnCours }) {
   const { t } = useTranslation("copilote");
   const [saisie, setSaisie] = useState("");
+  // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
+  // projet après un vrai test : le co-pilote n'a aucune mémoire d'une
+  // session à l'autre, et redonner à la main le contexte narratif à chaque
+  // fois ("réintroduire au fur et à mesure les infos en manuel") n'est pas
+  // acceptable pour un travail qui s'étend sur plusieurs séances. Ce
+  // bouton distille l'échange en une note courte, enregistrée dans le
+  // Carnet d'idées du projet (table `idees`, déjà existante et déjà lue
+  // par chargerNotesEtCitations) — relue automatiquement lors des
+  // prochaines sessions, sans que l'auteur·ice ait à la retaper.
+  const [vientDeMémoriser, setVientDeMémoriser] = useState(false);
   const [enÉcoute, setEnÉcoute] = useState(false);
   const zoneRef = useRef(null);
   const reconnaissanceRef = useRef(null);
@@ -565,6 +587,21 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet }) {
         <div style={{ fontSize: 11, color: "#A32D2D", marginBottom: 6 }}>{dialogue.erreur}</div>
       )}
 
+      {onMémoriser && (dialogue.messages || []).length > 0 && (
+        <button
+          onClick={async () => { await onMémoriser(); setVientDeMémoriser(true); setTimeout(() => setVientDeMémoriser(false), 2500); }}
+          disabled={mémorisationEnCours}
+          style={{
+            fontSize: 10.5, padding: "3px 8px", marginBottom: 6, background: "transparent",
+            color: vientDeMémoriser ? "#1D9E75" : "#888", border: `0.5px solid ${vientDeMémoriser ? "#1D9E75" : "#ccc"}`,
+            borderRadius: 20, cursor: mémorisationEnCours ? "default" : "pointer", fontFamily: "inherit",
+          }}
+          title="Enregistre l'intention narrative de cet échange dans le Carnet d'idées du projet, relue automatiquement lors des prochaines sessions."
+        >
+          {mémorisationEnCours ? "…" : vientDeMémoriser ? "✓ Mémorisé dans le Carnet d'idées" : "💾 Mémoriser cette intention"}
+        </button>
+      )}
+
       {/* Cadre renforcé — fond distinct + bordure colorée, pour que le champ
           de question soit clairement identifiable comme une zone active,
           pas un simple filet gris parmi le reste de la carte. */}
@@ -641,7 +678,7 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet }) {
 
 
 
-function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
+function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet, onMémoriserCarte, mémorisationEnCours }) {
   const icônes = { suite: "→", approfondissement: "↓", reformulation: "↺", structure: "⊞", transition: "⤷", ouverture: "✍️", angle: "🎯", question: "❓" };
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}30`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
@@ -655,12 +692,12 @@ function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, on
       </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, `${s.titre}\n${s.texte}`) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
 
-function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
+function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet, onMémoriserCarte, mémorisationEnCours }) {
   const c = { ok: "#1D9E75", attention: "#BA7517", problème: "#E24B4A" }[p.cohérence] || "#888";
   const texteÀCopier = [
     p.nom,
@@ -682,7 +719,7 @@ function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQu
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
       {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -727,7 +764,7 @@ function CarteRéférence({ r }) {
   );
 }
 
-function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet }) {
+function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQuestion, langueProjet, onMémoriserCarte, mémorisationEnCours }) {
   const s = { info: { c: "#378ADD", bg: "#E6F1FB" }, attention: { c: "#BA7517", bg: "#FAEEDA" }, important: { c: "#E24B4A", bg: "#FCEBEB" } }[p.sévérité] || { c: "#888", bg: "#f0f0f0" };
   const texteÀCopier = [
     `[${p.sévérité}] ${p.type}`,
@@ -749,7 +786,7 @@ function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQue
       </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -837,6 +874,7 @@ function CarteBlocage({
   diagnostic, confirmation, onConfirmer, onRejeter,
   complément, onChangerComplément, onRelancer, chargement,
   suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet,
+  onMémoriser, mémorisationEnCours,
 }) {
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}40`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
@@ -898,7 +936,7 @@ function CarteBlocage({
         </div>
       )}
 
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={onEnvoyerQuestion} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={onEnvoyerQuestion} onMémoriser={onMémoriser} mémorisationEnCours={mémorisationEnCours} />}
     </div>
   );
 }
@@ -907,7 +945,23 @@ function CarteBlocage({
 
 export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null }) {
   const { t } = useTranslation("copilote");
-  const [contexteADN, setContexteADN] = useState(null);
+  const [contexteADNBrut, setContexteADNBrut] = useState(null);
+  // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
+  // projet : le co-pilote n'avait aucune mémoire d'une session à l'autre,
+  // obligeant à retaper les intentions narratives à chaque fois. Le Carnet
+  // d'idées du projet (table `idees`, déjà lu par chargerNotesEtCitations
+  // pour l'aide au démarrage d'une scène) est désormais chargé une fois ici
+  // et injecté dans TOUT prompt qui reçoit `contexteADN` — pas seulement au
+  // démarrage d'une scène — via le useMemo `contexteADN` plus bas. Voir
+  // "💾 Mémoriser cette intention" dans FilDialogue pour l'écriture.
+  const [notesProjet, setNotesProjet] = useState(null);
+  const contexteADN = useMemo(() => {
+    if (!contexteADNBrut && !notesProjet) return null;
+    return [
+      contexteADNBrut,
+      notesProjet ? `NOTES ET IDÉES DÉJÀ ENREGISTRÉES POUR CE PROJET (Carnet d'idées — mémoire des sessions précédentes, à prendre en compte) :\n${notesProjet}` : null,
+    ].filter(Boolean).join("\n\n");
+  }, [contexteADNBrut, notesProjet]);
   // Consommation IA réelle du compte (60803-03) — remontée par
   // CompteurUsageIA, sert à désactiver le bouton d'analyse une fois le
   // quota du palier épuisé (le compteur affiche lui-même l'avertissement
@@ -931,7 +985,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
   useEffect(() => {
     let annulé = false;
-    chargerContexteADN(projetId).then((c) => { if (!annulé) setContexteADN(c); });
+    chargerContexteADN(projetId).then((c) => { if (!annulé) setContexteADNBrut(c); });
+    chargerNotesEtCitations(projetId).then((n) => { if (!annulé) setNotesProjet(n); });
     return () => { annulé = true; };
   }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
@@ -1005,6 +1060,37 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       }));
     }
   }, [dialogues, langueProjet, messageErreur]);
+
+  // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
+  // le commentaire sur notesProjet/contexteADN plus haut. Distille le
+  // diagnostic + fil de discussion d'UNE carte en une note courte,
+  // l'enregistre dans le Carnet d'idées du projet (idéesAPI.créer, table
+  // déjà existante), et l'ajoute immédiatement à `notesProjet` en mémoire
+  // (mise à jour optimiste) pour qu'elle serve dès la prochaine analyse de
+  // CETTE session, sans attendre un rechargement complet de la page.
+  const [mémorisationEnCoursParCarte, setMémorisationEnCoursParCarte] = useState({});
+  const mémoriserIntention = useCallback(async (cléCarte, contexteCarte) => {
+    setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: true }));
+    try {
+      const état = dialogues[cléCarte];
+      const historique = (état?.messages || [])
+        .map((m) => `${m.role === "auteur" ? "Auteur" : "Co-pilote"} : ${m.contenu}`)
+        .join("\n");
+      const contenuÀDistiller = `Analyse ou diagnostic d'origine :\n${contexteCarte}` + (historique ? `\n\nÉchange :\n${historique}` : "");
+      const résultat = await appelClaude(promptDistillerIntention(langueProjet), contenuÀDistiller, null, 300);
+      const p = parserJSON(résultat);
+      if (p.note) {
+        await idéesAPI.créer({ texte: p.note, tags: ["intention narrative"], projetId });
+        setNotesProjet((n) => (n ? `${n}\n- Idée notée : ${p.note}` : `- Idée notée : ${p.note}`));
+      }
+    } catch {
+      // Non bloquant — l'auteur·ice peut toujours noter lui-même dans le
+      // Carnet d'idées si la distillation échoue ; pas la peine d'afficher
+      // une erreur pour une action de confort.
+    } finally {
+      setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: false }));
+    }
+  }, [dialogues, langueProjet, projetId]);
 
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
@@ -1385,6 +1471,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             dialogue={dialogues[cléCarteBlocage]}
             onOuvrirDialogue={(ctx) => ouvrirDialogue(cléCarteBlocage, ctx)}
             onEnvoyerQuestion={(q) => envoyerQuestionDialogue(cléCarteBlocage, q)}
+            onMémoriser={diagnosticBlocage ? () => mémoriserIntention(cléCarteBlocage, `Diagnostic : ${diagnosticBlocage.diagnostic}`) : null}
+            mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteBlocage]}
             couleur={couleurProjet}
             langueProjet={langueProjet}
           />
@@ -1573,7 +1661,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         )}
 
-        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />)}
+        {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} onMémoriserCarte={mémoriserIntention} mémorisationEnCours={mémorisationEnCoursParCarte} />)}
 
         {/* Résultat "Page blanche" — réf. 60816-01, suite, 30/08/2026.
             Bandeau d'avertissement systématique : un brouillon jetable à
@@ -1617,9 +1705,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             ))}
           </div>
         )}
-        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
+        {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} onMémoriserCarte={mémoriserIntention} mémorisationEnCours={mémorisationEnCoursParCarte} />))}
         {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
-        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
+        {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} onMémoriserCarte={mémoriserIntention} mémorisationEnCours={mémorisationEnCoursParCarte} />))}
         {onglet === "vérification" && données_onglet && !Array.isArray(données_onglet) && <PanneauVerification résultat={données_onglet} />}
       </div>
     </div>
