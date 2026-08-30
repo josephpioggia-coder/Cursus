@@ -288,25 +288,32 @@ Réponds UNIQUEMENT en JSON valide :
   definirProjet: () => `Tu es le co-pilote d'un écrivain qui a une idée ou un vécu à raconter, mais pas encore de structure de livre. Il te donne un compte-rendu brut de ce qu'il veut raconter. À partir de ce texte, propose une colonne vertébrale : un titre de livre possible, et une suite de chapitres (5 à 10) qui pourraient porter ce récit du début à la fin, chacun avec un titre et une phrase résumant ce qu'il porterait. Reste fidèle à ce que le compte-rendu raconte réellement, n'invente pas d'éléments qui n'y figurent pas. Réponds UNIQUEMENT en JSON valide :
 {"titre_livre":"...","chapitres":[{"titre":"...","resume":"..."}]}`,
 
-  // "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026, conçu à partir d'une
-  // synthèse de littérature sur le blocage d'écriture fournie par l'auteur
-  // du projet (Ahmed & Güss, Rose, Boice, Elbow, Lamott...) : la page
-  // blanche n'est qu'UNE forme de blocage parmi d'autres (idéation,
-  // direction, choix, structure, personnage, scène inerte, articulation,
-  // voix, perfectionnisme, révision paralysante, perte de sens, saturation,
-  // documentation, reprise après interruption, blocage émotionnel, doute
-  // global) — et un vrai coach ne fait pas poser le diagnostic par la
-  // personne bloquée, il l'infère de ce qui est déjà écrit. Contrairement à
-  // pageBlanche ci-dessus, ce prompt ne doit PAS produire un texte de
-  // remplacement par défaut : le diagnostic vient d'abord, le texte
-  // seulement si l'auteur·ice choisit ensuite "Propose-moi un exemple"
-  // (géré séparément, voir demanderJeSuisBloqué()/boutons de suivi côté
-  // composant, qui réutilisent le fil de dialogue par carte existant).
-  jeSuisBloqué: (typeNœud, titreNœud) => `Tu es un coach d'écriture qui connaît déjà ce livre (contexte fourni ci-dessus) et le texte déjà écrit dans ce ${typeNœud} intitulé "${titreNœud || "(sans titre)"}". L'auteur·ice vient de cliquer sur "Je suis bloqué" sans donner aucun autre détail — c'est à toi de comprendre la nature du blocage à partir d'où le texte s'arrête et de ce qu'il devait accomplir selon le contexte du projet.
+  // "Aide-moi à avancer" — réf. 60816-01, suite, 30/08/2026, conçu à partir
+  // d'une synthèse de littérature sur le blocage d'écriture fournie par
+  // l'auteur du projet (Ahmed & Güss, Rose, Boice, Elbow, Lamott...), puis
+  // affinée une seconde fois le même jour (retour croisé avec GPT) : la page
+  // blanche n'est qu'UNE forme de blocage parmi d'autres, et un vrai coach
+  // ne fait pas poser le diagnostic par la personne bloquée, il l'infère de
+  // ce qui est déjà écrit — MAIS il propose son hypothèse à confirmer,
+  // plutôt que de l'imposer (voir confirmationBlocage côté composant :
+  // "Oui, aide-moi" / "Non, c'est autre chose", cette dernière rouvrant un
+  // nouveau diagnostic avec le complément donné par l'auteur·ice). Deux
+  // raffinements ajoutés à ce second passage : (1) les blocages peuvent se
+  // combiner (continuation + personnage, perfectionnisme + peur du
+  // jugement...) — ne pas forcer une étiquette unique ; (2) "faux blocage"
+  // — catégorie volontairement non nommée à l'auteur·ice — couvre le cas où
+  // le vrai problème n'est pas de trouver comment continuer, mais de
+  // reconnaître qu'il n'y a peut-être rien à continuer ici (ellipse
+  // possible, chapitre déjà terminé plus tôt, geste incohérent avec ce qui
+  // a été construit). Contrairement à pageBlanche ci-dessus, ce prompt ne
+  // doit PAS produire un texte de remplacement par défaut : le diagnostic
+  // vient d'abord, le texte seulement si l'auteur·ice choisit ensuite
+  // "Propose-moi un exemple" (fil de dialogue par carte existant).
+  jeSuisBloqué: (typeNœud, titreNœud, complémentAuteur = null) => `Tu es un coach d'écriture qui connaît déjà ce livre (contexte fourni ci-dessus) et le texte déjà écrit dans ce ${typeNœud} intitulé "${titreNœud || "(sans titre)"}". L'auteur·ice a cliqué sur "Aide-moi à avancer"${complémentAuteur ? " ; un premier diagnostic lui a été proposé, qu'il/elle a jugé inexact, et voici ce qu'il/elle précise sur ce qui se passe réellement : \"" + complémentAuteur + "\" — tiens-en compte impérativement pour ce nouveau diagnostic, ne répète pas la même hypothèse" : " sans donner aucun autre détail — c'est à toi de comprendre la nature du blocage à partir d'où le texte s'arrête et de ce qu'il devait accomplir selon le contexte du projet"}.
 
-Ne commence JAMAIS par demander "comment puis-je t'aider ?" ni par faire choisir une catégorie de blocage à l'auteur·ice — identifie toi-même, en interne, la nature la plus probable parmi (ne montre jamais cette liste, elle sert seulement à orienter ton diagnostic) : idéation (aucune idée), direction (ne sait plus ce qui doit arriver ensuite), choix (plusieurs options, indécision), structure (des éléments mais pas de tenue), personnage (ne sait pas comment il/elle réagirait ici), scène inerte (il se passe quelque chose mais c'est plat), articulation (sait quoi dire, n'arrive pas à l'écrire), voix (ne ressemble plus au reste du livre), perfectionnisme (rejette tout ce qu'il/elle écrit), révision paralysante (ne sait plus quoi garder), perte de sens (n'a plus envie), saturation (tourne en rond depuis un moment), documentation (il manque une information factuelle), reprise après interruption (ne sait plus où il/elle en était), blocage émotionnel (le sujet est difficile à aborder), doute global (pense que son texte ne marche plus — dans ce cas NE PROPOSE PAS de réécrire, aide à situer si le problème est local, dans l'arc, dans un personnage ou dans la promesse du texte).
+Ne commence JAMAIS par demander "comment puis-je t'aider ?" ni par faire choisir une catégorie de blocage à l'auteur·ice — identifie toi-même, en interne, la ou les natures les plus probables parmi (ne montre jamais cette liste, elle sert seulement à orienter ton diagnostic ; un blocage peut combiner plusieurs de ces natures à la fois, ne force pas une étiquette unique si ce n'est pas le cas) : idéation (aucune idée), direction (ne sait plus ce qui doit arriver ensuite), choix (plusieurs options, indécision), structure (des éléments mais pas de tenue — que veut le personnage, qu'est-ce qui l'en empêche, qu'est-ce qui change entre l'entrée et la sortie de la scène, pourquoi cette scène doit-elle exister), personnage (ne sait pas comment il/elle réagirait ici), scène inerte (il se passe quelque chose mais c'est plat), articulation (sait quoi dire, n'arrive pas à l'écrire), voix (ne ressemble plus au reste du livre), perfectionnisme (rejette tout ce qu'il/elle écrit), révision paralysante (ne sait plus quoi garder), perte de sens (n'a plus envie), saturation (tourne en rond depuis un moment), documentation (il manque une information factuelle), reprise après interruption (ne sait plus où il/elle en était), blocage émotionnel (sait exactement ce qu'il faudrait raconter mais n'arrive pas à poser les mots — pas de la lassitude, pas un problème narratif ; n'écris alors surtout pas la scène à sa place, propose plutôt de raconter les faits bruts sans chercher à bien écrire, de noter seulement les faits, d'écrire à la troisième personne, de commencer par juste avant/après, ou de laisser un marqueur et continuer ailleurs), doute global (pense que son texte ne marche plus — dans ce cas NE PROPOSE PAS de réécrire, aide à situer si le problème est local, dans l'arc, dans un personnage ou dans la promesse du texte), faux blocage (le vrai problème n'est peut-être pas de trouver comment continuer, mais que ce passage n'a pas besoin d'exister tel quel — une ellipse suffirait, le chapitre était déjà fini plus tôt, ou l'action demandée est incohérente avec le personnage tel qu'il a été construit ; si tu soupçonnes ce cas, dis-le directement et explique pourquoi, avant de chercher comment continuer).
 
-Réponds directement par un diagnostic court et concret, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et en quoi ton hypothèse sur la nature du blocage en découle. Propose ensuite 2 à 3 directions concrètes et distinctes pour en sortir, SANS en développer aucune complètement — ce sont des pistes qui ouvrent des choix, pas un texte fini. Reste bref : 120 à 200 mots au total, ton direct et concret, jamais générique. Réponds UNIQUEMENT en JSON valide :
+Réponds directement par un diagnostic court et concret, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et en quoi ton hypothèse sur la nature du blocage (une ou plusieurs, si combinées) en découle. Propose ensuite 2 à 3 directions concrètes et distinctes pour en sortir, SANS en développer aucune complètement — ce sont des pistes qui ouvrent des choix, pas un texte fini. Reste bref : 120 à 200 mots au total, ton direct et concret, jamais générique. Réponds UNIQUEMENT en JSON valide :
 {"diagnostic":"...","type_blocage":"..."}`,
 };
 
@@ -819,30 +826,78 @@ function PanneauVerification({ résultat }) {
   );
 }
 
-// "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026 (voir PROMPTS.jeSuisBloqué
-// et SUIVIS_BLOCAGE côté composant). Le diagnostic est présenté seul,
-// d'abord — les 5 suivis n'écrivent rien tant que l'auteur·ice ne choisit
-// pas explicitement lequel il/elle veut, exactement comme "Propose-moi un
-// exemple" plutôt qu'une génération de texte par défaut.
-function CarteBlocage({ diagnostic, suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet }) {
+// "Aide-moi à avancer" — réf. 60816-01, suite, 30/08/2026 (voir
+// PROMPTS.jeSuisBloqué et SUIVIS_BLOCAGE côté composant). Le diagnostic est
+// une HYPOTHÈSE à confirmer, pas une vérité imposée — "Oui, aide-moi" /
+// "Non, c'est autre chose" (voir confirmationBlocage) précèdent les 5
+// suivis, qui restent masqués tant que l'hypothèse n'est pas confirmée. Un
+// rejet ouvre une zone de précision et relance un nouveau diagnostic avec
+// ce complément — jamais d'insistance sur une hypothèse déjà écartée.
+function CarteBlocage({
+  diagnostic, confirmation, onConfirmer, onRejeter,
+  complément, onChangerComplément, onRelancer, chargement,
+  suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet,
+}) {
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}40`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 6 }}>
-        <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase" }}>🛟 {diagnostic.type_blocage || "blocage"}</div>
+        <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase" }}>🛟 {diagnostic.type_blocage || "hypothèse"}</div>
         <BoutonDialogue ouvert={dialogue?.ouvert} couleur={couleur}
           onClick={() => onOuvrirDialogue(`Diagnostic : ${diagnostic.diagnostic}`)} />
       </div>
       <div style={{ fontSize: 12.5, color: "#1a1a1a", lineHeight: 1.6, marginBottom: 10 }}>{diagnostic.diagnostic}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {suivis.map((s) => (
-          <button key={s.id} onClick={() => onSuivi(s.message)} style={{
-            fontSize: 11, padding: "5px 10px", background: `${couleur}12`, color: couleur,
-            border: `0.5px solid ${couleur}30`, borderRadius: 20, cursor: "pointer", fontFamily: "inherit",
+
+      {confirmation === null && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onConfirmer} style={{
+            fontSize: 11.5, padding: "6px 12px", background: couleur, color: "#fff",
+            border: "none", borderRadius: 20, cursor: "pointer", fontFamily: "inherit", fontWeight: 500,
           }}>
-            {s.label}
+            Oui, aide-moi
           </button>
-        ))}
-      </div>
+          <button onClick={onRejeter} style={{
+            fontSize: 11.5, padding: "6px 12px", background: "transparent", color: "#888",
+            border: "0.5px solid #ccc", borderRadius: 20, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            Non, c'est autre chose
+          </button>
+        </div>
+      )}
+
+      {confirmation === false && (
+        <div>
+          <textarea
+            value={complément}
+            onChange={(e) => onChangerComplément(e.target.value)}
+            placeholder="Dis-moi ce qui se passe réellement…"
+            style={{
+              width: "100%", minHeight: 60, padding: "6px 8px", fontSize: 12, fontFamily: "inherit",
+              border: `0.5px solid ${couleur}30`, borderRadius: 7, resize: "vertical", boxSizing: "border-box",
+            }}
+          />
+          <button onClick={onRelancer} disabled={chargement || !complément.trim()} style={{
+            width: "100%", marginTop: 6, padding: "7px", background: `${couleur}15`, color: couleur,
+            border: `0.5px solid ${couleur}30`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+            cursor: (chargement || !complément.trim()) ? "default" : "pointer", fontFamily: "inherit",
+          }}>
+            {chargement ? "…" : "Nouveau diagnostic"}
+          </button>
+        </div>
+      )}
+
+      {confirmation === true && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {suivis.map((s) => (
+            <button key={s.id} onClick={() => onSuivi(s.message)} style={{
+              fontSize: 11, padding: "5px 10px", background: `${couleur}12`, color: couleur,
+              border: `0.5px solid ${couleur}30`, borderRadius: 20, cursor: "pointer", fontFamily: "inherit",
+            }}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={onEnvoyerQuestion} />}
     </div>
   );
@@ -1117,32 +1172,45 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [compteRenduBrut, langueProjet, contexteADN, messageErreur, t]);
 
-  // "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026 (voir PROMPTS.jeSuisBloqué
-  // ci-dessus). Toujours disponible, quel que soit l'onglet actif ou l'état
-  // du texte (contrairement à "Page blanche", qui n'apparaît que sur une
-  // page vide) — le diagnostic est stocké à part, hors des `données` par
-  // onglet, pour rester visible même en changeant d'onglet.
+  // "Aide-moi à avancer" — réf. 60816-01, suite, 30/08/2026 (voir
+  // PROMPTS.jeSuisBloqué ci-dessus). Toujours disponible, quel que soit
+  // l'onglet actif ou l'état du texte (contrairement à "Page blanche", qui
+  // n'apparaît que sur une page vide) — le diagnostic est stocké à part,
+  // hors des `données` par onglet, pour rester visible même en changeant
+  // d'onglet.
+  //
+  // CORRECTIF le jour même (retour croisé avec GPT) : une hypothèse de
+  // diagnostic imposée sans confirmation reste une hypothèse — un vrai
+  // coach vérifie avant d'agir. `confirmationBlocage` (null = pas encore
+  // tranché, true = confirmé, false = rejeté) contrôle l'affichage : tant
+  // qu'elle n'est pas à `true`, les 5 suivis restent masqués. Un rejet
+  // rouvre une zone de précision et relance le diagnostic avec ce complément
+  // (voir `complémentBlocage` et le second paramètre de PROMPTS.jeSuisBloqué).
   const [diagnosticBlocage, setDiagnosticBlocage] = useState(null);
   const [chargementBlocage, setChargementBlocage] = useState(false);
   const [erreurBlocage, setErreurBlocage] = useState(null);
+  const [confirmationBlocage, setConfirmationBlocage] = useState(null);
+  const [complémentBlocage, setComplémentBlocage] = useState("");
   const cléCarteBlocage = "blocage:0";
 
-  const demanderJeSuisBloqué = useCallback(async () => {
+  const demanderJeSuisBloqué = useCallback(async (complémentAuteur = null) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setChargementBlocage(true);
     setErreurBlocage(null);
     setDiagnosticBlocage(null);
+    setConfirmationBlocage(null);
     try {
       const sig = abortRef.current.signal;
       const { texte } = extraireTexte((analyserSélection && texteSélectionné) ? texteSélectionné : texteActif);
       const résultat = await appelClaude(
-        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud), langueProjet, contexteADN),
+        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADN),
         texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`,
         sig, 1024
       );
       const p = parserJSON(résultat);
       setDiagnosticBlocage(p);
+      setComplémentBlocage("");
       // Repart d'un fil de dialogue propre à chaque nouveau diagnostic —
       // un fil ouvert sur un diagnostic précédent n'a plus de sens une fois
       // remplacé par un nouveau.
@@ -1153,6 +1221,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       setChargementBlocage(false);
     }
   }, [analyserSélection, texteSélectionné, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur]);
+
+  const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
+  const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
+  const relancerAvecComplément = useCallback(() => {
+    if (!complémentBlocage.trim()) return;
+    demanderJeSuisBloqué(complémentBlocage.trim());
+  }, [complémentBlocage, demanderJeSuisBloqué]);
 
   // Les 5 suivis proposés après le diagnostic — réf. 60816-01, suite,
   // 30/08/2026, demande explicite : ne jamais répondre par défaut avec un
@@ -1269,17 +1344,24 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           ))}
         </div>
 
-        {/* "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026. Toujours
-            visible, quel que soit l'onglet actif ou l'état du texte —
-            contrairement à "Page blanche", accessible pendant toute
-            l'écriture, pas seulement au démarrage. */}
-        <button onClick={demanderJeSuisBloqué} disabled={chargementBlocage || usageBloqué} style={{
-          width: "100%", marginTop: 8, padding: "7px", background: "#fff", color: couleurProjet,
-          border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
-          cursor: (chargementBlocage || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
-          opacity: usageBloqué ? 0.5 : 1,
-        }}>
-          {chargementBlocage ? t("bouton.enCours") : "🛟 Je suis bloqué"}
+        {/* "Aide-moi à avancer" — réf. 60816-01, suite, 30/08/2026. Renommé
+            depuis "Je suis bloqué" (retour croisé avec GPT) : ce nom oblige
+            presque à reconnaître un échec, alors que le doute, l'hésitation
+            ou la simple recherche d'un recul méritent aussi ce bouton.
+            Toujours visible, quel que soit l'onglet actif ou l'état du
+            texte — contrairement à "Page blanche", accessible pendant
+            toute l'écriture, pas seulement au démarrage. */}
+        <button
+          onClick={() => demanderJeSuisBloqué()}
+          disabled={chargementBlocage || usageBloqué}
+          title="Idée, blocage, doute ou difficulté d'écriture"
+          style={{
+            width: "100%", marginTop: 8, padding: "7px", background: "#fff", color: couleurProjet,
+            border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+            cursor: (chargementBlocage || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
+            opacity: usageBloqué ? 0.5 : 1,
+          }}>
+          {chargementBlocage ? t("bouton.enCours") : "🛟 Aide-moi à avancer"}
         </button>
       </div>
 
@@ -1291,6 +1373,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         {diagnosticBlocage && (
           <CarteBlocage
             diagnostic={diagnosticBlocage}
+            confirmation={confirmationBlocage}
+            onConfirmer={confirmerBlocage}
+            onRejeter={rejeterBlocage}
+            complément={complémentBlocage}
+            onChangerComplément={setComplémentBlocage}
+            onRelancer={relancerAvecComplément}
+            chargement={chargementBlocage}
             suivis={SUIVIS_BLOCAGE}
             onSuivi={lancerSuiviBlocage}
             dialogue={dialogues[cléCarteBlocage]}
