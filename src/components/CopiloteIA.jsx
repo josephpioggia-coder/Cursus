@@ -1152,7 +1152,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const p = parserJSON(résultat);
       if (p.note) {
         const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
-        await mémoireNarrativeAPI.créer({ type, contenu: p.note, statut: "proposee", sourceType: "copiloteia", projetId });
+        // Même lien automatique vers le chapitre/scène actif que
+        // ajouterMémoireManuelle — voir ce commentaire pour le détail.
+        await mémoireNarrativeAPI.créer({
+          type, contenu: p.note, statut: "proposee", sourceType: "copiloteia",
+          portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
+          projetId,
+        });
         setNotesProjet((n) => {
           const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
           return n ? `${n}\n${ligne}` : ligne;
@@ -1165,7 +1171,46 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: false }));
     }
-  }, [dialogues, langueProjet, projetId]);
+  }, [dialogues, langueProjet, projetId, nœudId, titreNœud]);
+
+  // "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE plus haut. Écriture
+  // directe dans memoire_narrative, sans appel IA de distillation : l'auteur
+  // a déjà formulé lui-même le contenu et le type.
+  const [ajoutMémoireOuvert, setAjoutMémoireOuvert] = useState(false);
+  const [nouvelleMémoireType, setNouvelleMémoireType] = useState("vigilance");
+  const [nouvelleMémoireContenu, setNouvelleMémoireContenu] = useState("");
+  const [ajoutMémoireEnCours, setAjoutMémoireEnCours] = useState(false);
+  const ajouterMémoireManuelle = useCallback(async () => {
+    if (!nouvelleMémoireContenu.trim() || !projetId) return;
+    setAjoutMémoireEnCours(true);
+    try {
+      await mémoireNarrativeAPI.créer({
+        type: nouvelleMémoireType,
+        contenu: nouvelleMémoireContenu.trim(),
+        statut: "validee",
+        sourceType: "auteur",
+        // Lie automatiquement l'entrée au chapitre/scène actif — demande de
+        // l'auteur du projet, 30/08/2026 : sans ça, une mémoire ajoutée à
+        // propos d'un passage précis flotte sans lien retrouvable vers ce
+        // passage. `noeud_id`/`noeud_titre` dans `portee` (JSONB flexible,
+        // voir memoire_narrative.sql) permettent de le retrouver plus tard,
+        // sans aucune saisie supplémentaire côté auteur·ice.
+        portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
+        projetId,
+      });
+      setNotesProjet((n) => {
+        const ligne = `- [${nouvelleMémoireType}] ${nouvelleMémoireContenu.trim()}`;
+        return n ? `${n}\n${ligne}` : ligne;
+      });
+      setNouvelleMémoireContenu("");
+      setAjoutMémoireOuvert(false);
+    } catch {
+      // Non bloquant — l'auteur·ice peut réessayer ; pas la peine de
+      // bloquer le panneau pour une action de confort.
+    } finally {
+      setAjoutMémoireEnCours(false);
+    }
+  }, [nouvelleMémoireType, nouvelleMémoireContenu, projetId, nœudId, titreNœud]);
 
   // "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE plus haut. Écriture
   // directe dans memoire_narrative, sans appel IA de distillation : l'auteur
