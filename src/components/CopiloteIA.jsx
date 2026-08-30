@@ -485,6 +485,29 @@ const TYPES_MÉMOIRE_NARRATIVE = [
   "promesse", "boucle_ouverte", "theme_motif", "vigilance", "fragment",
   "reference_recherche",
 ];
+
+// "+ Ajouter à la mémoire" — 30/08/2026, demande explicite de l'auteur du
+// projet : une intention déjà formée AILLEURS (relecture avec un autre
+// outil, réflexion hors session) doit pouvoir entrer dans memoire_narrative
+// sans passer par un faux dialogue avec le co-pilote juste pour déclencher
+// "Mémoriser cette intention". Écrit directement en statut "validee" —
+// contrairement à la distillation automatique (toujours "proposee"), une
+// saisie manuelle EST déjà la décision de l'auteur·ice, il n'y a rien à
+// confirmer après coup.
+const OPTIONS_TYPE_MÉMOIRE = [
+  { valeur: "fait_canonique", label: "Fait canonique (établi dans le texte)" },
+  { valeur: "decision_auteur", label: "Décision de l'auteur·ice" },
+  { valeur: "arc", label: "Arc / trajectoire" },
+  { valeur: "etat_personnage", label: "État d'un personnage" },
+  { valeur: "relation", label: "Relation entre personnages" },
+  { valeur: "promesse", label: "Promesse narrative faite au lecteur" },
+  { valeur: "boucle_ouverte", label: "Boucle ouverte à refermer" },
+  { valeur: "theme_motif", label: "Thème / motif" },
+  { valeur: "vigilance", label: "Point de vigilance" },
+  { valeur: "fragment", label: "Fragment / idée encore floue" },
+  { valeur: "reference_recherche", label: "Référence / recherche" },
+];
+
 function promptDistillerIntention(langueProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
   return `Tu résumes un échange entre un·e écrivain·e et son co-pilote IA en UNE note courte (1 à 3 phrases), destinée à être relue dans une future session SANS le contexte de cet échange. N'écris pas un résumé de la conversation — extrais la décision ou l'intention narrative concrète qui s'en dégage, formulée de façon autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). Classe aussi cette note dans EXACTEMENT une de ces catégories (${TYPES_MÉMOIRE_NARRATIVE.join(", ")}) — par exemple une trajectoire de personnage est "arc", un choix ferme de l'auteur·ice est "decision_auteur", un point de vigilance à surveiller est "vigilance", une idée encore floue est "fragment". ${instruction} Réponds UNIQUEMENT en JSON valide :
@@ -1144,6 +1167,38 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [dialogues, langueProjet, projetId]);
 
+  // "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE plus haut. Écriture
+  // directe dans memoire_narrative, sans appel IA de distillation : l'auteur
+  // a déjà formulé lui-même le contenu et le type.
+  const [ajoutMémoireOuvert, setAjoutMémoireOuvert] = useState(false);
+  const [nouvelleMémoireType, setNouvelleMémoireType] = useState("vigilance");
+  const [nouvelleMémoireContenu, setNouvelleMémoireContenu] = useState("");
+  const [ajoutMémoireEnCours, setAjoutMémoireEnCours] = useState(false);
+  const ajouterMémoireManuelle = useCallback(async () => {
+    if (!nouvelleMémoireContenu.trim() || !projetId) return;
+    setAjoutMémoireEnCours(true);
+    try {
+      await mémoireNarrativeAPI.créer({
+        type: nouvelleMémoireType,
+        contenu: nouvelleMémoireContenu.trim(),
+        statut: "validee",
+        sourceType: "auteur",
+        projetId,
+      });
+      setNotesProjet((n) => {
+        const ligne = `- [${nouvelleMémoireType}] ${nouvelleMémoireContenu.trim()}`;
+        return n ? `${n}\n${ligne}` : ligne;
+      });
+      setNouvelleMémoireContenu("");
+      setAjoutMémoireOuvert(false);
+    } catch {
+      // Non bloquant — l'auteur·ice peut réessayer ; pas la peine de
+      // bloquer le panneau pour une action de confort.
+    } finally {
+      setAjoutMémoireEnCours(false);
+    }
+  }, [nouvelleMémoireType, nouvelleMémoireContenu, projetId]);
+
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
     const { texte } = extraireTexte(sourceTexte);
@@ -1520,6 +1575,59 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           }}>
           {chargementBlocage ? t("bouton.enCours") : "🛟 Aide-moi à avancer"}
         </button>
+
+        {/* "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE et
+            ajouterMémoireManuelle plus haut. Toujours visible, comme "Aide-
+            moi à avancer" : une intention déjà formée ailleurs (une autre
+            IA, une relecture, une conversation hors Cursus) doit pouvoir
+            entrer directement dans la mémoire du projet, sans faux dialogue
+            avec le co-pilote pour déclencher "Mémoriser cette intention". */}
+        <button
+          onClick={() => setAjoutMémoireOuvert((o) => !o)}
+          title="Ajouter directement une information à retenir pour ce projet"
+          style={{
+            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: "#888",
+            border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
+            cursor: "pointer", fontFamily: "inherit",
+          }}>
+          🧠 + Ajouter à la mémoire
+        </button>
+
+        {ajoutMémoireOuvert && (
+          <div style={{ marginTop: 6, padding: "8px 10px", background: "#fafafa", border: "0.5px solid #e5e5e5", borderRadius: 7 }}>
+            <select
+              value={nouvelleMémoireType}
+              onChange={(e) => setNouvelleMémoireType(e.target.value)}
+              style={{ width: "100%", marginBottom: 6, padding: "5px 6px", fontSize: 11.5, fontFamily: "inherit", border: "0.5px solid #ddd", borderRadius: 6, boxSizing: "border-box" }}
+            >
+              {OPTIONS_TYPE_MÉMOIRE.map((o) => <option key={o.valeur} value={o.valeur}>{o.label}</option>)}
+            </select>
+            <textarea
+              value={nouvelleMémoireContenu}
+              onChange={(e) => setNouvelleMémoireContenu(e.target.value)}
+              placeholder="L'information à retenir pour ce projet…"
+              style={{ width: "100%", minHeight: 60, padding: "6px 8px", fontSize: 12, fontFamily: "inherit", border: "0.5px solid #ddd", borderRadius: 6, resize: "vertical", boxSizing: "border-box", marginBottom: 6 }}
+            />
+            <div style={{ display: "flex", gap: 6 }}>
+              <button
+                onClick={ajouterMémoireManuelle}
+                disabled={ajoutMémoireEnCours || !nouvelleMémoireContenu.trim()}
+                style={{
+                  flex: 1, padding: "6px", background: couleurProjet, color: "#fff", border: "none", borderRadius: 6,
+                  fontSize: 12, fontWeight: 500, fontFamily: "inherit",
+                  cursor: (ajoutMémoireEnCours || !nouvelleMémoireContenu.trim()) ? "default" : "pointer",
+                  opacity: (ajoutMémoireEnCours || !nouvelleMémoireContenu.trim()) ? 0.6 : 1,
+                }}>
+                {ajoutMémoireEnCours ? "…" : "Ajouter"}
+              </button>
+              <button
+                onClick={() => { setAjoutMémoireOuvert(false); setNouvelleMémoireContenu(""); }}
+                style={{ padding: "6px 10px", background: "transparent", color: "#888", border: "0.5px solid #ccc", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Corps */}
