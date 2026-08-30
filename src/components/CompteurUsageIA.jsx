@@ -66,11 +66,28 @@ async function démarrerRechargeCheckout() {
   }
 }
 
+// Clé de mémorisation du "×" sur la bannière d'avertissement — 30/08/2026,
+// à la demande de Joseph : rester fermée tant qu'on n'a pas changé de mois,
+// au lieu de réapparaître à chaque remontage du composant (changement de
+// chapitre, ouverture/fermeture du panneau...), ce qui la rendait présente
+// en continu à l'écran malgré le bouton de fermeture.
+function cléAvertissementFermé() {
+  const d = new Date();
+  return `cursus_avertissement_usage_ferme_${d.getFullYear()}-${d.getMonth()}`;
+}
+
 export default function CompteurUsageIA({ onDemanderUpgrade, onÉtatChange, rafraîchirDepuis, compact = false }) {
   const [état, setÉtat] = useState(null);
   const [erreur, setErreur] = useState(null);
-  const [avertissementFermé, setAvertissementFermé] = useState(false);
+  const [avertissementFermé, setAvertissementFermé] = useState(() => {
+    try { return localStorage.getItem(cléAvertissementFermé()) === "1"; } catch { return false; }
+  });
   const [modalFermée, setModalFermée] = useState(false);
+
+  const fermerAvertissement = useCallback(() => {
+    setAvertissementFermé(true);
+    try { localStorage.setItem(cléAvertissementFermé(), "1"); } catch { /* non bloquant */ }
+  }, []);
 
   const rafraîchir = useCallback(async () => {
     const { data, error } = await usageIAAPI.recupererConsommation();
@@ -119,13 +136,12 @@ export default function CompteurUsageIA({ onDemanderUpgrade, onÉtatChange, rafr
       </div>
 
       {dépasséAvertissement && !avertissementFermé && (
-        <div style={{ marginTop: 8, padding: "10px 14px", background: "#FAEEDA", borderRadius: 8, fontSize: 12.5, color: "#854F0B", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div style={{ marginTop: 4, padding: "4px 8px", background: "#FAEEDA", borderRadius: 6, fontSize: 11, color: "#854F0B", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <span>
-            ⚠️ Vous approchez de votre limite mensuelle ({état.pourcentage}% utilisés) —
-            renouvellement le {prochainRenouvellement()}.
+            ⚠️ {état.pourcentage}% utilisés — renouvellement le {prochainRenouvellement()}.
           </span>
-          <button onClick={() => setAvertissementFermé(true)}
-            style={{ background: "none", border: "none", color: "#854F0B", cursor: "pointer", fontSize: 16, flexShrink: 0 }}>×</button>
+          <button onClick={fermerAvertissement} title="Ne plus afficher ce mois-ci"
+            style={{ background: "none", border: "none", color: "#854F0B", cursor: "pointer", fontSize: 14, flexShrink: 0, lineHeight: 1 }}>×</button>
         </div>
       )}
 
