@@ -1154,7 +1154,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
         // Même lien automatique vers le chapitre/scène actif que
         // ajouterMémoireManuelle — voir ce commentaire pour le détail.
-        await mémoireNarrativeAPI.créer({
+        const { data } = await mémoireNarrativeAPI.créer({
           type, contenu: p.note, statut: "proposee", sourceType: "copiloteia",
           portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
           projetId,
@@ -1163,6 +1163,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
           return n ? `${n}\n${ligne}` : ligne;
         });
+        if (data) setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
       }
     } catch {
       // Non bloquant — l'auteur·ice peut toujours noter lui-même dans le
@@ -1184,7 +1185,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     if (!nouvelleMémoireContenu.trim() || !projetId) return;
     setAjoutMémoireEnCours(true);
     try {
-      await mémoireNarrativeAPI.créer({
+      const { data } = await mémoireNarrativeAPI.créer({
         type: nouvelleMémoireType,
         contenu: nouvelleMémoireContenu.trim(),
         statut: "validee",
@@ -1202,6 +1203,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         const ligne = `- [${nouvelleMémoireType}] ${nouvelleMémoireContenu.trim()}`;
         return n ? `${n}\n${ligne}` : ligne;
       });
+      // Garde la liste "🧠 Voir la mémoire" à jour si elle a déjà été
+      // chargée une fois, sans requête supplémentaire.
+      if (data) setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
       setNouvelleMémoireContenu("");
       setAjoutMémoireOuvert(false);
     } catch {
@@ -1211,6 +1215,51 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       setAjoutMémoireEnCours(false);
     }
   }, [nouvelleMémoireType, nouvelleMémoireContenu, projetId, nœudId, titreNœud]);
+
+  // "🧠 Voir la mémoire" — demande de Joseph, 30/08/2026 : la mémoire
+  // n'existait jusqu'ici que côté prompts (injectée silencieusement dans
+  // contexteADN), sans aucun moyen pour l'auteur·ice de relire, valider ou
+  // rejeter ce qui y est enregistré. Chargée à la demande (pas au montage
+  // du panneau, pour ne pas ajouter une requête systématique) ; filtrée par
+  // défaut sur le chapitre/scène ouvert (voir `portee.noeud_id`, ajouté
+  // juste avant), avec bascule vers tout le projet.
+  const [mémoireListeOuverte, setMémoireListeOuverte] = useState(false);
+  const [mémoireListe, setMémoireListe] = useState(null);
+  const [mémoireListeChargement, setMémoireListeChargement] = useState(false);
+  const [mémoireListeErreur, setMémoireListeErreur] = useState(null);
+  const [mémoireToutLeProjet, setMémoireToutLeProjet] = useState(false);
+
+  const chargerMémoireListe = useCallback(async () => {
+    if (!projetId) return;
+    setMémoireListeChargement(true);
+    setMémoireListeErreur(null);
+    try {
+      const { data, error } = await mémoireNarrativeAPI.parProjet(projetId);
+      if (error) throw error;
+      setMémoireListe(data || []);
+    } catch {
+      setMémoireListeErreur(t("erreur.generique"));
+    } finally {
+      setMémoireListeChargement(false);
+    }
+  }, [projetId, t]);
+
+  const basculerListeMémoire = useCallback(() => {
+    setMémoireListeOuverte((o) => {
+      const prochainÉtat = !o;
+      if (prochainÉtat && mémoireListe === null) chargerMémoireListe();
+      return prochainÉtat;
+    });
+  }, [mémoireListe, chargerMémoireListe]);
+
+  const changerStatutMémoire = useCallback(async (id, statut) => {
+    setMémoireListe((liste) => (liste || []).map((m) => (m.id === id ? { ...m, statut } : m)));
+    try {
+      await mémoireNarrativeAPI.màjStatut(id, statut);
+    } catch {
+      chargerMémoireListe(); // resynchronise en cas d'échec de la mise à jour optimiste
+    }
+  }, [chargerMémoireListe]);
 
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
@@ -1646,6 +1695,79 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                 Annuler
               </button>
             </div>
+          </div>
+        )}
+
+        {/* "🧠 Voir la mémoire" — réf. plus haut (chargerMémoireListe,
+            basculerListeMémoire, changerStatutMémoire). Filtrée par défaut
+            sur le chapitre/scène ouvert via portee.noeud_id ; bascule
+            "Tout le projet" pour tout revoir. Les entrées "proposee"
+            (distillées automatiquement par le co-pilote) peuvent être
+            validées ou rejetées directement ici — jamais l'inverse, l'IA
+            ne passe jamais une entrée à "validee" toute seule. */}
+        <button
+          onClick={basculerListeMémoire}
+          style={{
+            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: "#888",
+            border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
+            cursor: "pointer", fontFamily: "inherit",
+          }}>
+          🧠 {mémoireListeOuverte ? "Masquer la mémoire" : "Voir la mémoire"}
+        </button>
+
+        {mémoireListeOuverte && (
+          <div style={{ marginTop: 6, padding: "8px 10px", background: "#fafafa", border: "0.5px solid #e5e5e5", borderRadius: 7, maxHeight: 260, overflowY: "auto" }}>
+            {nœudId && (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#777", marginBottom: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={mémoireToutLeProjet} onChange={(e) => setMémoireToutLeProjet(e.target.checked)} />
+                Tout le projet (au lieu de ce chapitre/scène seulement)
+              </label>
+            )}
+
+            {mémoireListeChargement && <div style={{ fontSize: 11.5, color: "#999" }}>Chargement…</div>}
+            {mémoireListeErreur && <div style={{ fontSize: 11.5, color: "#A32D2D" }}>{mémoireListeErreur}</div>}
+
+            {!mémoireListeChargement && !mémoireListeErreur && (() => {
+              const entrées = (mémoireListe || []).filter((m) =>
+                mémoireToutLeProjet || !nœudId ? true : m.portee?.noeud_id === nœudId
+              );
+              if (entrées.length === 0) {
+                return <div style={{ fontSize: 11.5, color: "#999", fontStyle: "italic" }}>Rien d'enregistré {mémoireToutLeProjet || !nœudId ? "pour ce projet" : "pour ce chapitre/scène"} pour l'instant.</div>;
+              }
+              return entrées.map((m) => {
+                const labelType = OPTIONS_TYPE_MÉMOIRE.find((o) => o.valeur === m.type)?.label || m.type;
+                const styleStatut = {
+                  validee: { c: "#1D9E75", label: "validée" },
+                  proposee: { c: "#BA7517", label: "proposée" },
+                  rejetee: { c: "#999", label: "rejetée" },
+                  remplacee: { c: "#999", label: "remplacée" },
+                }[m.statut] || { c: "#999", label: m.statut };
+                return (
+                  <div key={m.id} style={{ background: "#fff", border: "0.5px solid #eee", borderRadius: 6, padding: "6px 8px", marginBottom: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 600, color: "#888", textTransform: "uppercase" }}>{labelType}</span>
+                      <span style={{ fontSize: 9.5, fontWeight: 600, color: styleStatut.c }}>{styleStatut.label}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#1a1a1a", lineHeight: 1.5, marginBottom: m.statut === "proposee" ? 6 : 0 }}>{m.contenu}</div>
+                    {m.portee?.noeud_titre && mémoireToutLeProjet && (
+                      <div style={{ fontSize: 10, color: "#aaa", marginTop: 2 }}>— {m.portee.noeud_titre}</div>
+                    )}
+                    {m.statut === "proposee" && (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => changerStatutMémoire(m.id, "validee")}
+                          style={{ fontSize: 10.5, padding: "3px 8px", background: "#1D9E7515", color: "#1D9E75", border: "0.5px solid #1D9E7530", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                          Valider
+                        </button>
+                        <button onClick={() => changerStatutMémoire(m.id, "rejetee")}
+                          style={{ fontSize: 10.5, padding: "3px 8px", background: "transparent", color: "#888", border: "0.5px solid #ccc", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                          Rejeter
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
       </div>
