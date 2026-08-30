@@ -76,9 +76,9 @@ const LABELS_DEGRE_INTERVENTION_COURT = {
 };
 
 function CadreLecture({ audit }) {
-  const [profil, setProfil] = useState(null);
+  const [profilCompte, setProfilCompte] = useState(null);
   useEffect(() => {
-    profilAuteurAPI.récupérer().then(({ data }) => setProfil(data || null));
+    profilAuteurAPI.récupérer().then(({ data }) => setProfilCompte(data || null));
   }, []);
 
   const contrat = audit.contrat_intention;
@@ -86,10 +86,25 @@ function CadreLecture({ audit }) {
   // d'intention enregistré — rien à afficher plutôt qu'inventer un cadre.
   if (!contrat) return null;
 
-  const nature = contrat.natureProjet || {};
-  const natureLabel = nature.famille === "Autre"
-    ? (nature.autre || "Autre")
-    : [nature.sousCategorie, nature.famille].filter(Boolean).join(" — ");
+  // Réf. 60816-01, suite, 30/08/2026 — CORRECTIF : cet encart affichait
+  // toujours le profil du compte, même quand l'audit précise que l'auteur·ice
+  // du texte est quelqu'un d'autre (auteurEstUtilisateur === false) — voir
+  // CursAuditQuestionnaire.jsx et profilAuteurEffectif() côté serveur, dont
+  // cet affichage n'était pas synchronisé, laissant croire que le profil du
+  // compte servait encore à l'analyse alors que ce n'était plus le cas.
+  const profil = contrat.auteurEstUtilisateur === false && contrat.profilAuteurAudit
+    ? {
+        profession: contrat.profilAuteurAudit.profession,
+        niveau_etudes: contrat.profilAuteurAudit.niveauEtudes,
+      }
+    : profilCompte;
+
+  // Réf. 60816-01, suite, 30/08/2026 — CORRECTIF : lisait encore l'ancienne
+  // forme de l'arbre (famille/sousCategorie), remplacée par le nouvel arbre
+  // à 415 chemins (natureProjet: { chemin, label }) lors de la refonte de la
+  // taxonomie — cet encart affichait donc une nature de projet vide ou
+  // fausse depuis cette refonte.
+  const natureLabel = contrat.natureProjet?.label || "";
   const intentionPrincipale = [natureLabel, contrat.ouEnEtesVous, (contrat.objectifs || []).join(", ")]
     .filter(Boolean).join(" · ") || "non précisée";
   const lecteurVisé = (contrat.destinataires || []).join(", ") || "non précisé";
