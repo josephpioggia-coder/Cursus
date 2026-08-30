@@ -467,6 +467,29 @@ export default function CursAuditQuestionnaire({ onValider }) {
     profilAuteurAPI.récupérer().then(({ data }) => setProfil(data || null));
   }, []);
 
+  // Profil de l'auteur·ice DU TEXTE, distinct du profil du compte —
+  // réf. 60816-01, suite, 30/08/2026, demande explicite de l'auteur du
+  // projet : "Mon profil" (ci-dessus) est celui de la personne qui utilise
+  // Cursus, pas forcément celui de l'auteur·ice du livre audité (cas d'un
+  // relecteur/éditeur qui audite le texte de quelqu'un d'autre). Stocké
+  // par audit (dans contrat_intention), pas sur le compte — un même compte
+  // peut auditer plusieurs auteur·ices différent·es dans le temps.
+  const [auteurEstUtilisateur, setAuteurEstUtilisateur] = useState(() => brouillonInitial?.auteurEstUtilisateur ?? true);
+  const [profilAuteurAudit, setProfilAuteurAudit] = useState(() => brouillonInitial?.profilAuteurAudit ?? {
+    profession: "", identiteGenre: "", trancheAge: "", niveauEtudes: "", matieresEtudiees: "",
+  });
+  const màjProfilAuteurAudit = (clé, valeur) => setProfilAuteurAudit((p) => ({ ...p, [clé]: valeur }));
+  const copierMonProfilVersAuteur = () => {
+    if (!profil) return;
+    setProfilAuteurAudit({
+      profession: profil.profession || "",
+      identiteGenre: profil.identite_genre || "",
+      trancheAge: profil.tranche_age || "",
+      niveauEtudes: profil.niveau_etudes || "",
+      matieresEtudiees: profil.matieres_etudiees || "",
+    });
+  };
+
   const appliquerContrat = (c) => {
     if (!c) return;
     setOuEnEtesVous(c.ouEnEtesVous || "");
@@ -512,6 +535,10 @@ export default function CursAuditQuestionnaire({ onValider }) {
       setLongueur(c.relationIA.longueur || "détaillé");
       setRole(c.relationIA.role || "lecteur expert");
     }
+    // Réf. 60816-01, suite, 30/08/2026 — profil de l'auteur·ice du texte,
+    // distinct du profil du compte (voir plus haut).
+    if (typeof c.auteurEstUtilisateur === "boolean") setAuteurEstUtilisateur(c.auteurEstUtilisateur);
+    if (c.profilAuteurAudit) setProfilAuteurAudit(c.profilAuteurAudit);
   };
 
   const choisirContratPrécédent = (id) => {
@@ -551,6 +578,14 @@ export default function CursAuditQuestionnaire({ onValider }) {
     questionLibre: questionLibre.trim(),
     preoccupations,
     preoccupationAutre: preoccupationAutreActive ? preoccupationAutre.trim() : "",
+    // Réf. 60816-01, suite, 30/08/2026 — voir le profil du compte
+    // (profils_auteur) vs. celui, propre à CET audit, de l'auteur·ice du
+    // texte quand elle diffère de la personne qui utilise Cursus.
+    // `profilAuteurAudit` reste null quand auteurEstUtilisateur est vrai :
+    // dans ce cas, le profil du compte fait foi côté serveur, pas de
+    // doublon à maintenir.
+    auteurEstUtilisateur,
+    profilAuteurAudit: !auteurEstUtilisateur ? profilAuteurAudit : null,
   });
 
   // Réf. 60816-01, suite, 29/08/2026 — signalé par l'auteur du projet :
@@ -643,6 +678,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
       degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
       adresse, ton, posture, longueur, role,
+      auteurEstUtilisateur, profilAuteurAudit,
     };
     try {
       localStorage.setItem(CLÉ_BROUILLON_QUESTIONNAIRE, JSON.stringify(brouillon));
@@ -659,6 +695,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
     finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
     degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
     adresse, ton, posture, longueur, role,
+    auteurEstUtilisateur, profilAuteurAudit,
   ]);
 
   // Nature du projet requise dès le niveau 1 — les niveaux suivants
@@ -692,10 +729,17 @@ export default function CursAuditQuestionnaire({ onValider }) {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "apikey": SUPABASE_ANON_KEY },
         body: JSON.stringify({
-          profil: profil ? {
-            profession: profil.profession, identiteGenre: profil.identite_genre, trancheAge: profil.tranche_age,
-            niveauEtudes: profil.niveau_etudes, matieresEtudiees: profil.matieres_etudiees,
-          } : null,
+          // Réf. 60816-01, suite, 30/08/2026 — quand l'auteur·ice du texte
+          // diffère de la personne qui utilise Cursus, c'est SON profil (à
+          // elle/lui, propre à cet audit) qui doit orienter la proposition
+          // de question, pas celui du compte. Voir profilAuteurEffectif()
+          // côté serveur pour le même principe dans les 3 autres fonctions.
+          profil: !auteurEstUtilisateur
+            ? profilAuteurAudit
+            : profil ? {
+              profession: profil.profession, identiteGenre: profil.identite_genre, trancheAge: profil.tranche_age,
+              niveauEtudes: profil.niveau_etudes, matieresEtudiees: profil.matieres_etudiees,
+            } : null,
           contratIntention: contratIntentionActuel(),
           preoccupations,
           preoccupationAutre: preoccupationAutreActive ? preoccupationAutre.trim() : "",
@@ -810,6 +854,79 @@ export default function CursAuditQuestionnaire({ onValider }) {
               </p>
             </div>
             <ProfilAuteur />
+
+            {/* Réf. 60816-01, suite, 30/08/2026 — distinction auteur·ice du
+                texte / personne qui utilise Cursus, demande explicite de
+                l'auteur du projet : "Mon profil" ci-dessus est le vôtre,
+                réutilisé partout dans Cursus ; celui-ci concerne
+                spécifiquement l'auteur·ice DE CE TEXTE, quand ce n'est pas
+                vous (relecture/audit pour le compte d'un tiers). */}
+            <div style={{ background: "#F7F4EF", border: "0.5px solid var(--border)", borderRadius: 10, padding: "14px 16px", display: "grid", gap: 10 }}>
+              <label style={labelStyle}>Ce texte est-il de vous, ou faites-vous cet audit pour quelqu'un d'autre ?</label>
+              <div style={{ display: "flex", gap: 18 }}>
+                <label style={{ fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="radio" name="auteurEstUtilisateur" checked={auteurEstUtilisateur} onChange={() => setAuteurEstUtilisateur(true)} />
+                  C'est moi
+                </label>
+                <label style={{ fontSize: 12.5, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="radio" name="auteurEstUtilisateur" checked={!auteurEstUtilisateur} onChange={() => setAuteurEstUtilisateur(false)} />
+                  Un·e autre auteur·ice
+                </label>
+              </div>
+
+              {!auteurEstUtilisateur && (
+                <>
+                  <p style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", lineHeight: 1.6, margin: 0 }}>
+                    Ces informations concernent l'auteur·ice de ce texte, pas vous — "Mon profil" ci-dessus reste le
+                    vôtre et sera réutilisé ailleurs dans Cursus. Entièrement facultatif.
+                  </p>
+                  {profil && (
+                    <button type="button" onClick={copierMonProfilVersAuteur} style={{
+                      background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+                      padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", justifySelf: "start",
+                    }}>
+                      Copier mon profil
+                    </button>
+                  )}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <label style={labelStyle}>Profession</label>
+                      <input style={champStyle} value={profilAuteurAudit.profession} onChange={(e) => màjProfilAuteurAudit("profession", e.target.value)} placeholder="Ex. : psychologue" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Identité de genre</label>
+                      <select style={champStyle} value={profilAuteurAudit.identiteGenre} onChange={(e) => màjProfilAuteurAudit("identiteGenre", e.target.value)}>
+                        <option value="">— Préfère ne pas préciser —</option>
+                        <option value="Femme">Femme</option>
+                        <option value="Homme">Homme</option>
+                        <option value="Autre">Autre</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Tranche d'âge</label>
+                      <select style={champStyle} value={profilAuteurAudit.trancheAge} onChange={(e) => màjProfilAuteurAudit("trancheAge", e.target.value)}>
+                        <option value="">— Préfère ne pas préciser —</option>
+                        <option value="Moins de 25 ans">Moins de 25 ans</option>
+                        <option value="25-34 ans">25-34 ans</option>
+                        <option value="35-44 ans">35-44 ans</option>
+                        <option value="45-54 ans">45-54 ans</option>
+                        <option value="55-64 ans">55-64 ans</option>
+                        <option value="65 ans et plus">65 ans et plus</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Niveau d'études</label>
+                      <input style={champStyle} value={profilAuteurAudit.niveauEtudes} onChange={(e) => màjProfilAuteurAudit("niveauEtudes", e.target.value)} placeholder="Ex. : Master" />
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <label style={labelStyle}>Matières / domaines étudiés</label>
+                      <input style={champStyle} value={profilAuteurAudit.matieresEtudiees} onChange={(e) => màjProfilAuteurAudit("matieresEtudiees", e.target.value)} placeholder="Ex. : psychologie clinique, sciences de l'éducation" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {contratsPrécédents && contratsPrécédents.length > 0 && (
               <div>
                 <label style={labelStyle}>Réutiliser les réponses d'un audit précédent</label>
