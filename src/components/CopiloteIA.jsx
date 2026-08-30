@@ -898,10 +898,20 @@ function CarteBlocage({
   diagnostic, confirmation, onConfirmer, onRejeter,
   complément, onChangerComplément, onRelancer, chargement,
   suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet,
-  onMémoriser, mémorisationEnCours,
+  onMémoriser, mémorisationEnCours, historique,
 }) {
   return (
     <div style={{ background: "#fff", border: `0.5px solid ${couleur}40`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+      {historique?.length > 0 && (
+        <div style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "0.5px solid #eee" }}>
+          {historique.map((h, i) => (
+            <div key={i} style={{ fontSize: 11, color: "#999", lineHeight: 1.5, marginBottom: i < historique.length - 1 ? 8 : 0 }}>
+              <div>🛟 <em>Hypothèse écartée :</em> {h.diagnostic.diagnostic}</div>
+              <div>↳ <em>Ta précision :</em> {h.complément}</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 6 }}>
         <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase" }}>🛟 {diagnostic.type_blocage || "hypothèse"}</div>
         <BoutonDialogue ouvert={dialogue?.ouvert} couleur={couleur}
@@ -1306,6 +1316,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [erreurBlocage, setErreurBlocage] = useState(null);
   const [confirmationBlocage, setConfirmationBlocage] = useState(null);
   const [complémentBlocage, setComplémentBlocage] = useState("");
+  // Trace des hypothèses écartées — 30/08/2026, retour d'usage réel : un
+  // "Non, c'est plutôt..." suivi d'une précision faisait disparaître
+  // l'hypothèse d'origine ET la précision donnée dès que le nouveau
+  // diagnostic arrivait, sans aucun moyen de les revoir ensemble alors
+  // qu'il fallait justement "faire le travail" à partir de cet échange.
+  // Conservée tant qu'on reste sur le même sujet ; repart à zéro sur un
+  // nouveau "Aide-moi à avancer" (complémentAuteur === null).
+  const [historiqueBlocage, setHistoriqueBlocage] = useState([]);
   const cléCarteBlocage = "blocage:0";
 
   const demanderJeSuisBloqué = useCallback(async (complémentAuteur = null) => {
@@ -1313,6 +1331,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     abortRef.current = new AbortController();
     setChargementBlocage(true);
     setErreurBlocage(null);
+    if (complémentAuteur === null) {
+      setHistoriqueBlocage([]);
+    } else if (diagnosticBlocage) {
+      setHistoriqueBlocage((h) => [...h, { diagnostic: diagnosticBlocage, complément: complémentAuteur }]);
+    }
     setDiagnosticBlocage(null);
     setConfirmationBlocage(null);
     try {
@@ -1335,7 +1358,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargementBlocage(false);
     }
-  }, [analyserSélection, texteSélectionné, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur]);
+  }, [analyserSélection, texteSélectionné, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
@@ -1502,6 +1525,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             onEnvoyerQuestion={(q) => envoyerQuestionDialogue(cléCarteBlocage, q)}
             onMémoriser={diagnosticBlocage ? () => mémoriserIntention(cléCarteBlocage, `Diagnostic : ${diagnosticBlocage.diagnostic}`) : null}
             mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteBlocage]}
+            historique={historiqueBlocage}
             couleur={couleurProjet}
             langueProjet={langueProjet}
           />
