@@ -310,14 +310,25 @@ function NœudStructure({ nœud, profondeur = 0, projetCouleur, sélectionné, o
           </span>
         )}
 
-        {/* Actions au survol */}
-        {survol && !enRenommage && (
+        {/* Actions au survol — réf. 60816-01, suite, 30/08/2026 : CORRECTIF,
+            signalé par l'auteur du projet. Avant, ce bloc n'apparaissait que
+            sur `survol` (survol physique de la souris). Après un clic sur
+            ↑/↓, le TITRE se déplace d'une ligne, mais la souris ne bouge
+            pas avec lui — elle se retrouve donc à survoler un AUTRE titre,
+            et un clic suivant, cru porter sur le même titre, agit en
+            réalité sur celui qui a pris sa place. Corrigé en gardant aussi
+            ce bloc visible tant que le nœud reste "sélectionné" (voir
+            onClick des boutons ↑/↓ ci-dessous, qui sélectionnent
+            explicitement le nœud déplacé) — les boutons suivent alors le
+            titre déplacé d'un clic à l'autre, sans dépendre de la position
+            de la souris. */}
+        {(survol || sélectionné === nœud.id) && !enRenommage && (
           <div style={{ display: "flex", gap: 2, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
             {!estPremier && (
-              <button onClick={() => onDéplacer(nœud.id, "haut")} style={btnIconStyle} title={t("actions.monter")}>↑</button>
+              <button onClick={() => { onSélectionner(nœud.id); onDéplacer(nœud.id, "haut"); }} style={btnDéplacerStyle} title={t("actions.monter")}>▲</button>
             )}
             {!estDernier && (
-              <button onClick={() => onDéplacer(nœud.id, "bas")} style={btnIconStyle} title={t("actions.descendre")}>↓</button>
+              <button onClick={() => { onSélectionner(nœud.id); onDéplacer(nœud.id, "bas"); }} style={btnDéplacerStyle} title={t("actions.descendre")}>▼</button>
             )}
             {peutAjouter && (
               <button onClick={() => onAjouter(nœud.id, typeInfo.enfant)} style={btnIconStyle} title={t("actions.ajouter", { label: labelEnfant })}>+</button>
@@ -398,6 +409,17 @@ const btnIconStyle = {
   fontSize: 12, color: "var(--texte-tertiaire)",
   padding: "1px 4px", borderRadius: 4,
   fontFamily: "inherit",
+};
+
+// Réf. 60816-01, suite, 30/08/2026 — CORRECTIF sur retour de l'auteur du
+// projet : les flèches ↑/↓ de btnIconStyle (12px) étaient trop petites et
+// parfois difficiles à distinguer l'une de l'autre en un coup d'œil rapide.
+// Style dédié, plus grand et en gras, réservé aux deux boutons de
+// déplacement — ▲/▼ (triangles pleins) plutôt que ↑/↓ : plus lisibles à
+// cette taille, silhouette clairement différente entre haut et bas.
+const btnDéplacerStyle = {
+  ...btnIconStyle,
+  fontSize: 15, fontWeight: 700, lineHeight: 1,
 };
 
 // ─── Composant : Carte projet (vue liste) ─────────────────────────────────────────
