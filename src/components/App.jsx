@@ -1065,9 +1065,25 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     if (sélectionné === nœudId) setSélectionné(null);
   }, [projet, onMàjStructure, sélectionné, t]);
 
-  // Échange l'ordre d'un nœud avec son frère adjacent (haut ou bas), au même
-  // niveau de la hiérarchie. Utilise nœudsAPI.réordonner(), déjà présente
-  // côté API mais jamais branchée à une interface jusqu'au 17/07/2026.
+  // Échange la position d'un nœud avec son frère adjacent (haut ou bas), au
+  // même niveau de la hiérarchie. Utilise nœudsAPI.réordonner(), déjà
+  // présente côté API mais jamais branchée à une interface jusqu'au
+  // 17/07/2026.
+  //
+  // CORRECTIF 30/08/2026 — bug réel signalé par l'auteur du projet : une
+  // Préface se retrouvait "coincée" entre deux chapitres après un
+  // déplacement, avec des remous dans des chapitres qui n'étaient pourtant
+  // pas concernés par le clic. Cause : l'ancienne version ne touchait qu'à
+  // l'`ordre` des DEUX nœuds échangés, et retombait sur leur position dans
+  // le tableau affiché (`?? index`) quand un nœud n'avait jamais eu
+  // d'`ordre` réellement enregistré en base (import ancien, nœud créé avant
+  // l'existence de ce champ) — mélangeant ainsi deux systèmes de
+  // numérotation différents (le vrai `ordre` en base vs. une position de
+  // tableau en mémoire) au sein d'une même fratrie. Corrigé en réindexant
+  // TOUTE la fratrie avec des valeurs propres et contiguës (0, 1, 2...) à
+  // chaque déplacement, plutôt que de ne réécrire que les deux nœuds
+  // échangés — élimine la possibilité même d'un `ordre` incohérent ou
+  // dupliqué chez un frère non concerné par ce clic précis.
   const déplacerNœud = useCallback(async (nœudId, direction) => {
     // Trouve la liste des frères (même parent) contenant ce nœud, à
     // n'importe quel niveau de l'arbre.
@@ -1087,33 +1103,27 @@ function VueProjet({ projet, onMàjStructure, onRetour, onOuvrirÉditeur, dernie
     const indexCible = direction === "haut" ? index - 1 : index + 1;
     if (indexCible < 0 || indexCible >= fratrie.length) return;
 
-    const nœudA = fratrie[index];
-    const nœudB = fratrie[indexCible];
-    const ordreA = nœudA.ordre ?? index;
-    const ordreB = nœudB.ordre ?? indexCible;
+    const fratrieRéordonnée = [...fratrie];
+    [fratrieRéordonnée[index], fratrieRéordonnée[indexCible]] = [fratrieRéordonnée[indexCible], fratrieRéordonnée[index]];
+    const misesÀJour = fratrieRéordonnée.map((n, i) => ({ id: n.id, ordre: i }));
 
-    const { error } = await nœudsAPI.réordonner([
-      { id: nœudA.id, ordre: ordreB },
-      { id: nœudB.id, ordre: ordreA },
-    ]);
+    const { error } = await nœudsAPI.réordonner(misesÀJour);
     if (error) {
       journaliserErreur("VueProjet:déplacerNœud", error.message, projet.id);
       window.alert(t("erreur.deplacementNoeud") || "Impossible de déplacer cet élément.");
       return;
     }
 
-    // Reconstruit localement la structure avec les deux nœuds échangés et
-    // les ordres mis à jour, sans attendre un rechargement complet.
+    // Reconstruit localement la structure avec l'ensemble de la fratrie
+    // réindexée, sans attendre un rechargement complet.
+    const ordresParId = new Map(misesÀJour.map((m) => [m.id, m.ordre]));
     const échanger = (liste) => {
       const idx = liste.findIndex((n) => n.id === nœudId);
       if (idx !== -1) {
         const idxCible = direction === "haut" ? idx - 1 : idx + 1;
         const copie = [...liste];
-        [copie[idx], copie[idxCible]] = [
-          { ...copie[idxCible], ordre: ordreA },
-          { ...copie[idx], ordre: ordreB },
-        ];
-        return copie;
+        [copie[idx], copie[idxCible]] = [copie[idxCible], copie[idx]];
+        return copie.map((n) => ({ ...n, ordre: ordresParId.get(n.id) ?? n.ordre }));
       }
       return liste.map((n) => ({ ...n, enfants: échanger(n.enfants || []) }));
     };
