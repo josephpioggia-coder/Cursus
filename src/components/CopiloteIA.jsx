@@ -287,6 +287,27 @@ Réponds UNIQUEMENT en JSON valide :
   // développer un par un via "Page blanche" ci-dessus.
   definirProjet: () => `Tu es le co-pilote d'un écrivain qui a une idée ou un vécu à raconter, mais pas encore de structure de livre. Il te donne un compte-rendu brut de ce qu'il veut raconter. À partir de ce texte, propose une colonne vertébrale : un titre de livre possible, et une suite de chapitres (5 à 10) qui pourraient porter ce récit du début à la fin, chacun avec un titre et une phrase résumant ce qu'il porterait. Reste fidèle à ce que le compte-rendu raconte réellement, n'invente pas d'éléments qui n'y figurent pas. Réponds UNIQUEMENT en JSON valide :
 {"titre_livre":"...","chapitres":[{"titre":"...","resume":"..."}]}`,
+
+  // "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026, conçu à partir d'une
+  // synthèse de littérature sur le blocage d'écriture fournie par l'auteur
+  // du projet (Ahmed & Güss, Rose, Boice, Elbow, Lamott...) : la page
+  // blanche n'est qu'UNE forme de blocage parmi d'autres (idéation,
+  // direction, choix, structure, personnage, scène inerte, articulation,
+  // voix, perfectionnisme, révision paralysante, perte de sens, saturation,
+  // documentation, reprise après interruption, blocage émotionnel, doute
+  // global) — et un vrai coach ne fait pas poser le diagnostic par la
+  // personne bloquée, il l'infère de ce qui est déjà écrit. Contrairement à
+  // pageBlanche ci-dessus, ce prompt ne doit PAS produire un texte de
+  // remplacement par défaut : le diagnostic vient d'abord, le texte
+  // seulement si l'auteur·ice choisit ensuite "Propose-moi un exemple"
+  // (géré séparément, voir demanderJeSuisBloqué()/boutons de suivi côté
+  // composant, qui réutilisent le fil de dialogue par carte existant).
+  jeSuisBloqué: (typeNœud, titreNœud) => `Tu es un coach d'écriture qui connaît déjà ce livre (contexte fourni ci-dessus) et le texte déjà écrit dans ce ${typeNœud} intitulé "${titreNœud || "(sans titre)"}". L'auteur·ice vient de cliquer sur "Je suis bloqué" sans donner aucun autre détail — c'est à toi de comprendre la nature du blocage à partir d'où le texte s'arrête et de ce qu'il devait accomplir selon le contexte du projet.
+
+Ne commence JAMAIS par demander "comment puis-je t'aider ?" ni par faire choisir une catégorie de blocage à l'auteur·ice — identifie toi-même, en interne, la nature la plus probable parmi (ne montre jamais cette liste, elle sert seulement à orienter ton diagnostic) : idéation (aucune idée), direction (ne sait plus ce qui doit arriver ensuite), choix (plusieurs options, indécision), structure (des éléments mais pas de tenue), personnage (ne sait pas comment il/elle réagirait ici), scène inerte (il se passe quelque chose mais c'est plat), articulation (sait quoi dire, n'arrive pas à l'écrire), voix (ne ressemble plus au reste du livre), perfectionnisme (rejette tout ce qu'il/elle écrit), révision paralysante (ne sait plus quoi garder), perte de sens (n'a plus envie), saturation (tourne en rond depuis un moment), documentation (il manque une information factuelle), reprise après interruption (ne sait plus où il/elle en était), blocage émotionnel (le sujet est difficile à aborder), doute global (pense que son texte ne marche plus — dans ce cas NE PROPOSE PAS de réécrire, aide à situer si le problème est local, dans l'arc, dans un personnage ou dans la promesse du texte).
+
+Réponds directement par un diagnostic court et concret, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et en quoi ton hypothèse sur la nature du blocage en découle. Propose ensuite 2 à 3 directions concrètes et distinctes pour en sortir, SANS en développer aucune complètement — ce sont des pistes qui ouvrent des choix, pas un texte fini. Reste bref : 120 à 200 mots au total, ton direct et concret, jamais générique. Réponds UNIQUEMENT en JSON valide :
+{"diagnostic":"...","type_blocage":"..."}`,
 };
 
 function systemAvecLangue(promptBase, langueProjet, contexteADN) {
@@ -798,6 +819,35 @@ function PanneauVerification({ résultat }) {
   );
 }
 
+// "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026 (voir PROMPTS.jeSuisBloqué
+// et SUIVIS_BLOCAGE côté composant). Le diagnostic est présenté seul,
+// d'abord — les 5 suivis n'écrivent rien tant que l'auteur·ice ne choisit
+// pas explicitement lequel il/elle veut, exactement comme "Propose-moi un
+// exemple" plutôt qu'une génération de texte par défaut.
+function CarteBlocage({ diagnostic, suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet }) {
+  return (
+    <div style={{ background: "#fff", border: `0.5px solid ${couleur}40`, borderLeft: `3px solid ${couleur}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 6 }}>
+        <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase" }}>🛟 {diagnostic.type_blocage || "blocage"}</div>
+        <BoutonDialogue ouvert={dialogue?.ouvert} couleur={couleur}
+          onClick={() => onOuvrirDialogue(`Diagnostic : ${diagnostic.diagnostic}`)} />
+      </div>
+      <div style={{ fontSize: 12.5, color: "#1a1a1a", lineHeight: 1.6, marginBottom: 10 }}>{diagnostic.diagnostic}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {suivis.map((s) => (
+          <button key={s.id} onClick={() => onSuivi(s.message)} style={{
+            fontSize: 11, padding: "5px 10px", background: `${couleur}12`, color: couleur,
+            border: `0.5px solid ${couleur}30`, borderRadius: 20, cursor: "pointer", fontFamily: "inherit",
+          }}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={onEnvoyerQuestion} />}
+    </div>
+  );
+}
+
 // ─── Composant principal ──────────────────────────────────────────────────────
 
 export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null }) {
@@ -1067,6 +1117,64 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [compteRenduBrut, langueProjet, contexteADN, messageErreur, t]);
 
+  // "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026 (voir PROMPTS.jeSuisBloqué
+  // ci-dessus). Toujours disponible, quel que soit l'onglet actif ou l'état
+  // du texte (contrairement à "Page blanche", qui n'apparaît que sur une
+  // page vide) — le diagnostic est stocké à part, hors des `données` par
+  // onglet, pour rester visible même en changeant d'onglet.
+  const [diagnosticBlocage, setDiagnosticBlocage] = useState(null);
+  const [chargementBlocage, setChargementBlocage] = useState(false);
+  const [erreurBlocage, setErreurBlocage] = useState(null);
+  const cléCarteBlocage = "blocage:0";
+
+  const demanderJeSuisBloqué = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setChargementBlocage(true);
+    setErreurBlocage(null);
+    setDiagnosticBlocage(null);
+    try {
+      const sig = abortRef.current.signal;
+      const { texte } = extraireTexte((analyserSélection && texteSélectionné) ? texteSélectionné : texteActif);
+      const résultat = await appelClaude(
+        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud), langueProjet, contexteADN),
+        texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`,
+        sig, 1024
+      );
+      const p = parserJSON(résultat);
+      setDiagnosticBlocage(p);
+      // Repart d'un fil de dialogue propre à chaque nouveau diagnostic —
+      // un fil ouvert sur un diagnostic précédent n'a plus de sens une fois
+      // remplacé par un nouveau.
+      setDialogues((d) => ({ ...d, [cléCarteBlocage]: undefined }));
+    } catch (err) {
+      if (err.name !== "AbortError") setErreurBlocage(messageErreur(err));
+    } finally {
+      setChargementBlocage(false);
+    }
+  }, [analyserSélection, texteSélectionné, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur]);
+
+  // Les 5 suivis proposés après le diagnostic — réf. 60816-01, suite,
+  // 30/08/2026, demande explicite : ne jamais répondre par défaut avec un
+  // texte généré, laisser l'auteur·ice choisir le type d'aide. Réutilise le
+  // fil de dialogue par carte déjà existant (voir ouvrirDialogue/
+  // envoyerQuestionDialogue plus haut) — chaque bouton envoie un message
+  // "auteur" prérempli dans ce fil, comme si l'auteur·ice l'avait tapé.
+  const SUIVIS_BLOCAGE = [
+    { id: "questionne", label: "Questionne-moi", message: "Pose-moi des questions qui m'aideraient à trouver moi-même la suite, sans me donner de réponse toute faite." },
+    { id: "pistes", label: "Donne-moi des pistes", message: "Donne-moi plusieurs directions possibles, sans en écrire aucune complètement, pour que je choisisse moi-même." },
+    { id: "construire", label: "Construis la scène avec moi", message: "Construisons ce passage ensemble, étape par étape — propose-moi juste le déclencheur ou la première réplique, on avancera ensuite par petites touches." },
+    { id: "exemple", label: "Propose-moi un exemple", message: "Écris un exemple concret et développé de ce que pourrait donner ce passage — un brouillon jetable, à réécrire entièrement dans ma propre voix, pas un texte final." },
+    { id: "surprends", label: "Surprends-moi", message: "Propose-moi quelque chose d'inattendu ou d'audacieux à cet endroit, qui sort du chemin le plus évident." },
+  ];
+
+  const lancerSuiviBlocage = useCallback((message) => {
+    if (!diagnosticBlocage) return;
+    const contexteCarte = `Diagnostic : ${diagnosticBlocage.diagnostic}`;
+    ouvrirDialogue(cléCarteBlocage, contexteCarte);
+    envoyerQuestionDialogue(cléCarteBlocage, message);
+  }, [diagnosticBlocage, ouvrirDialogue, envoyerQuestionDialogue]);
+
   useEffect(() => {
     // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
     // action délibérée sur un passage choisi, jamais un cycle automatique
@@ -1160,10 +1268,38 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             </button>
           ))}
         </div>
+
+        {/* "Je suis bloqué" — réf. 60816-01, suite, 30/08/2026. Toujours
+            visible, quel que soit l'onglet actif ou l'état du texte —
+            contrairement à "Page blanche", accessible pendant toute
+            l'écriture, pas seulement au démarrage. */}
+        <button onClick={demanderJeSuisBloqué} disabled={chargementBlocage || usageBloqué} style={{
+          width: "100%", marginTop: 8, padding: "7px", background: "#fff", color: couleurProjet,
+          border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+          cursor: (chargementBlocage || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
+          opacity: usageBloqué ? 0.5 : 1,
+        }}>
+          {chargementBlocage ? t("bouton.enCours") : "🛟 Je suis bloqué"}
+        </button>
       </div>
 
       {/* Corps */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
+        {erreurBlocage && (
+          <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 8 }}>{erreurBlocage}</div>
+        )}
+        {diagnosticBlocage && (
+          <CarteBlocage
+            diagnostic={diagnosticBlocage}
+            suivis={SUIVIS_BLOCAGE}
+            onSuivi={lancerSuiviBlocage}
+            dialogue={dialogues[cléCarteBlocage]}
+            onOuvrirDialogue={(ctx) => ouvrirDialogue(cléCarteBlocage, ctx)}
+            onEnvoyerQuestion={(q) => envoyerQuestionDialogue(cléCarteBlocage, q)}
+            couleur={couleurProjet}
+            langueProjet={langueProjet}
+          />
+        )}
         {texteSélectionné && texteSélectionné.trim().length > 20 && (
           <>
             {/* CORRECTIF 02/08/2026 — le bouton affichait un nombre de MOTS
