@@ -894,8 +894,21 @@ function PanneauVerification({ résultat }) {
 // suivis, qui restent masqués tant que l'hypothèse n'est pas confirmée. Un
 // rejet ouvre une zone de précision et relance un nouveau diagnostic avec
 // ce complément — jamais d'insistance sur une hypothèse déjà écartée.
+//
+// CORRECTIF 30/08/2026 (retour d'usage réel — "Questionne-moi" répondait
+// "tu ne m'as pas encore soumis de passage à analyser") : contrairement aux
+// autres cartes (CarteSuggestion, CartePersonnage...) où `contexteCarte`
+// EST le contenu à discuter, le `diagnostic` d'un blocage n'est qu'un
+// résumé d'une phrase — le passage réellement analysé n'y était jamais
+// inclus, donc le fil de dialogue n'avait rien de concret à exploiter pour
+// poser des questions ciblées. `construireContexteDialogueBlocage` inclut
+// désormais le passage analysé lui-même, capturé au moment du diagnostic.
+function construireContexteDialogueBlocage(diagnostic, texteAnalysé) {
+  return `Passage analysé :\n"""\n${(texteAnalysé || "").trim() || "(chapitre/scène encore vide au moment du diagnostic)"}\n"""\n\nDiagnostic du co-pilote : ${diagnostic.diagnostic}`;
+}
+
 function CarteBlocage({
-  diagnostic, confirmation, onConfirmer, onRejeter,
+  diagnostic, texteAnalysé, confirmation, onConfirmer, onRejeter,
   complément, onChangerComplément, onRelancer, chargement,
   suivis, onSuivi, dialogue, onOuvrirDialogue, onEnvoyerQuestion, couleur, langueProjet,
   onMémoriser, mémorisationEnCours, historique,
@@ -915,7 +928,7 @@ function CarteBlocage({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 6 }}>
         <div style={{ fontSize: 10, color: couleur, fontWeight: 600, textTransform: "uppercase" }}>🛟 {diagnostic.type_blocage || "hypothèse"}</div>
         <BoutonDialogue ouvert={dialogue?.ouvert} couleur={couleur}
-          onClick={() => onOuvrirDialogue(`Diagnostic : ${diagnostic.diagnostic}`)} />
+          onClick={() => onOuvrirDialogue(construireContexteDialogueBlocage(diagnostic, texteAnalysé))} />
       </div>
       <div style={{ fontSize: 12.5, color: "#1a1a1a", lineHeight: 1.6, marginBottom: 10 }}>{diagnostic.diagnostic}</div>
 
@@ -1324,6 +1337,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // Conservée tant qu'on reste sur le même sujet ; repart à zéro sur un
   // nouveau "Aide-moi à avancer" (complémentAuteur === null).
   const [historiqueBlocage, setHistoriqueBlocage] = useState([]);
+  // Le passage réellement analysé pour produire le diagnostic courant —
+  // 30/08/2026, voir construireContexteDialogueBlocage : sans lui, le fil
+  // de dialogue ("Questionne-moi" etc.) n'avait que le résumé du
+  // diagnostic à se mettre sous la dent, jamais le texte lui-même.
+  const [texteAnalyséBlocage, setTexteAnalyséBlocage] = useState("");
   const cléCarteBlocage = "blocage:0";
 
   const demanderJeSuisBloqué = useCallback(async (complémentAuteur = null) => {
@@ -1348,6 +1366,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       );
       const p = parserJSON(résultat);
       setDiagnosticBlocage(p);
+      setTexteAnalyséBlocage(texte);
       setComplémentBlocage("");
       // Repart d'un fil de dialogue propre à chaque nouveau diagnostic —
       // un fil ouvert sur un diagnostic précédent n'a plus de sens une fois
@@ -1383,10 +1402,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
   const lancerSuiviBlocage = useCallback((message) => {
     if (!diagnosticBlocage) return;
-    const contexteCarte = `Diagnostic : ${diagnosticBlocage.diagnostic}`;
+    const contexteCarte = construireContexteDialogueBlocage(diagnosticBlocage, texteAnalyséBlocage);
     ouvrirDialogue(cléCarteBlocage, contexteCarte);
     envoyerQuestionDialogue(cléCarteBlocage, message);
-  }, [diagnosticBlocage, ouvrirDialogue, envoyerQuestionDialogue]);
+  }, [diagnosticBlocage, texteAnalyséBlocage, ouvrirDialogue, envoyerQuestionDialogue]);
 
   useEffect(() => {
     // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
@@ -1511,6 +1530,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         {diagnosticBlocage && (
           <CarteBlocage
             diagnostic={diagnosticBlocage}
+            texteAnalysé={texteAnalyséBlocage}
             confirmation={confirmationBlocage}
             onConfirmer={confirmerBlocage}
             onRejeter={rejeterBlocage}
