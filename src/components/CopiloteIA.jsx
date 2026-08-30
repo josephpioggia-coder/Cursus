@@ -265,6 +265,28 @@ Réponds UNIQUEMENT en JSON valide :
     return `${contexteChapitreSansTitre}Tu es le co-pilote d'un écrivain qui ouvre un "Chapitre" encore vide. Ton rôle ici n'est pas d'analyser un texte existant (il n'y en a pas), mais d'aider à démarrer, en t'appuyant uniquement sur le contexte du projet fourni ci-dessus et sur le titre du chapitre donné. Propose exactement 4 pistes de nature DIFFÉRENTE les unes des autres pour amorcer précisément CE chapitre — varie les approches, ne répète pas le même type d'angle : un titre alternatif possiblement plus juste, une situation ou un cas concret par lequel entrer dans le sujet, une explication du titre lui-même (ce qu'il signifie, pourquoi ce mot), et une énigme ou question qui intrigue le lecteur dès l'ouverture. Reste ancré dans le ton et les thèmes déjà définis par l'auteur — ne propose rien de générique qui pourrait convenir à n'importe quel livre. Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"reformulation","titre":"...","texte":"..."},{"type":"ouverture","titre":"...","texte":"..."},{"type":"angle","titre":"...","texte":"..."},{"type":"question","titre":"...","texte":"..."}]}`;
   },
+
+  // Page blanche — brouillon complet, réf. 60816-01, suite, 30/08/2026,
+  // demande explicite de l'auteur du projet. ROMPT DÉLIBÉRÉ avec le principe
+  // "jamais de texte de remplacement" qui gouverne le reste de CopiloteIA
+  // (voir RÈGLE NON NÉGOCIABLE dans suggestions/cohérence ci-dessus) — une
+  // action explicite et distincte, jamais déclenchée automatiquement,
+  // toujours présentée avec un avertissement clair côté rendu : un brouillon
+  // jetable à réécrire entièrement dans la voix de l'auteur·ice, jamais un
+  // texte à publier tel quel.
+  pageBlanche: (typeNœud, titreNœud) => `Tu es le co-pilote d'un écrivain confronté à la page blanche sur un ${typeNœud === "partie" ? "grand ensemble" : typeNœud === "scene" ? "passage court" : "chapitre"} intitulé "${titreNœud || "(sans titre)"}". À partir du contexte du projet fourni ci-dessus (thèmes, personnages, intention retenus au questionnaire), rédige un texte développé et concret qui pourrait occuper cet espace — pas trois idées en vrac, un vrai texte suivi, aussi long que nécessaire pour donner un point de départ substantiel à démolir et reconstruire. Ce texte sera présenté à l'auteur·ice comme un brouillon jetable, à réécrire entièrement dans sa propre voix — tu peux donc te permettre d'être concret et développé plutôt que prudent. Réponds UNIQUEMENT en JSON valide :
+{"brouillon":"..."}`,
+
+  // Aide à définir un projet — réf. 60816-01, suite, 30/08/2026. N'a de sens
+  // que pour un livre encore sans aucun chapitre (voir la condition
+  // d'affichage côté composant : typeNœud === "partie" && titresEnfants
+  // vide) : à partir d'un compte-rendu brut fourni par l'auteur·ice (récit
+  // vécu, notes de terrain, idée en vrac), propose une colonne vertébrale —
+  // pas le texte des chapitres eux-mêmes, seulement leurs titres et ce que
+  // chacun porterait, à charge pour l'auteur·ice de les créer puis de les
+  // développer un par un via "Page blanche" ci-dessus.
+  definirProjet: () => `Tu es le co-pilote d'un écrivain qui a une idée ou un vécu à raconter, mais pas encore de structure de livre. Il te donne un compte-rendu brut de ce qu'il veut raconter. À partir de ce texte, propose une colonne vertébrale : un titre de livre possible, et une suite de chapitres (5 à 10) qui pourraient porter ce récit du début à la fin, chacun avec un titre et une phrase résumant ce qu'il porterait. Reste fidèle à ce que le compte-rendu raconte réellement, n'invente pas d'éléments qui n'y figurent pas. Réponds UNIQUEMENT en JSON valide :
+{"titre_livre":"...","chapitres":[{"titre":"...","resume":"..."}]}`,
 };
 
 function systemAvecLangue(promptBase, langueProjet, contexteADN) {
@@ -979,6 +1001,72 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
 
+  // Page blanche — brouillon complet (voir PROMPTS.pageBlanche ci-dessus).
+  // État séparé de `données`/`suggestions` : ce n'est pas une liste de
+  // cartes courtes, c'est un texte long unique, présenté différemment
+  // (bandeau d'avertissement + un seul bloc de texte copiable).
+  const [brouillonPageBlanche, setBrouillonPageBlanche] = useState(null);
+  const [chargementPageBlanche, setChargementPageBlanche] = useState(false);
+  const [erreurPageBlanche, setErreurPageBlanche] = useState(null);
+
+  const demanderPageBlanche = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setChargementPageBlanche(true);
+    setErreurPageBlanche(null);
+    try {
+      const sig = abortRef.current.signal;
+      const résultat = await appelClaude(
+        systemAvecLangue(PROMPTS.pageBlanche(typeNœud, titreNœud), langueProjet, contexteADN),
+        `Titre à développer (${typeNœud}) : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
+        sig, 4096
+      );
+      const p = parserJSON(résultat);
+      setBrouillonPageBlanche(p.brouillon || "");
+    } catch (err) {
+      if (err.name !== "AbortError") setErreurPageBlanche(messageErreur(err));
+    } finally {
+      setChargementPageBlanche(false);
+    }
+  }, [typeNœud, titreNœud, projetTitre, langueProjet, contexteADN, messageErreur]);
+
+  // Aide à définir un projet (voir PROMPTS.definirProjet ci-dessus) —
+  // n'existe que pour un livre encore sans chapitre (condition d'affichage
+  // dans le rendu plus bas). L'auteur·ice colle un compte-rendu brut, reçoit
+  // une proposition de chapitres à créer lui-même (jamais créés
+  // automatiquement — même principe que le reste de CopiloteIA : proposer,
+  // jamais agir à la place de l'auteur·ice sur son manuscrit).
+  const [compteRenduBrut, setCompteRenduBrut] = useState("");
+  const [afficherFormulaireProjet, setAfficherFormulaireProjet] = useState(false);
+  const [propositionProjet, setPropositionProjet] = useState(null);
+  const [chargementProjet, setChargementProjet] = useState(false);
+  const [erreurProjet, setErreurProjet] = useState(null);
+
+  const demanderDefinitionProjet = useCallback(async () => {
+    if (compterMots(compteRenduBrut) < 20) {
+      setErreurProjet(t("erreur.motsInsuffisants"));
+      return;
+    }
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setChargementProjet(true);
+    setErreurProjet(null);
+    try {
+      const sig = abortRef.current.signal;
+      const résultat = await appelClaude(
+        systemAvecLangue(PROMPTS.definirProjet(), langueProjet, contexteADN),
+        `Compte-rendu de l'auteur·ice :\n\n${compteRenduBrut}`,
+        sig, 4096
+      );
+      const p = parserJSON(résultat);
+      setPropositionProjet(p);
+    } catch (err) {
+      if (err.name !== "AbortError") setErreurProjet(messageErreur(err));
+    } finally {
+      setChargementProjet(false);
+    }
+  }, [compteRenduBrut, langueProjet, contexteADN, messageErreur, t]);
+
   useEffect(() => {
     // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
     // action délibérée sur un passage choisi, jamais un cycle automatique
@@ -1185,6 +1273,71 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                       {t("demarrage.sansADN")}
                     </div>
                   )}
+
+                  {/* Page blanche — brouillon complet, réf. 60816-01, suite,
+                      30/08/2026. Distincte de "démarrage" ci-dessus (quelques
+                      pistes courtes) : ici, un texte long et concret, pensé
+                      comme un point de départ jetable, pas des idées à
+                      combiner soi-même. */}
+                  <button
+                    onClick={demanderPageBlanche}
+                    disabled={!contexteADN || chargementPageBlanche}
+                    style={{
+                      width: "100%", padding: "8px", marginTop: 8,
+                      background: contexteADN ? "#fff" : "#f0f0f0",
+                      color: contexteADN ? couleurProjet : "#bbb",
+                      border: `0.5px solid ${contexteADN ? couleurProjet + "50" : "#ddd"}`,
+                      borderRadius: 7, fontSize: 12, fontWeight: 500,
+                      cursor: (contexteADN && !chargementPageBlanche) ? "pointer" : "default", fontFamily: "inherit",
+                    }}
+                  >
+                    {chargementPageBlanche ? t("bouton.enCours") : "Je suis bloqué·e — proposer un brouillon complet"}
+                  </button>
+
+                  {/* Aide à définir un projet — réf. 60816-01, suite,
+                      30/08/2026. Uniquement pour un livre encore sans
+                      chapitre : bootstrap de la colonne vertébrale à partir
+                      d'un compte-rendu brut, pas d'un texte déjà structuré. */}
+                  {typeNœud === "partie" && titresEnfants.length === 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {!afficherFormulaireProjet ? (
+                        <button
+                          onClick={() => setAfficherFormulaireProjet(true)}
+                          style={{
+                            width: "100%", padding: "8px", background: "#fff", color: couleurProjet,
+                            border: `0.5px solid ${couleurProjet}50`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+                            cursor: "pointer", fontFamily: "inherit",
+                          }}
+                        >
+                          Aide-moi à définir un projet
+                        </button>
+                      ) : (
+                        <div style={{ textAlign: "left" }}>
+                          <textarea
+                            value={compteRenduBrut}
+                            onChange={(e) => setCompteRenduBrut(e.target.value)}
+                            placeholder="Racontez ici, même en vrac, ce que vous voulez écrire — un vécu, une idée, des notes…"
+                            style={{
+                              width: "100%", minHeight: 90, padding: "8px 10px", fontSize: 12, fontFamily: "inherit",
+                              border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, resize: "vertical", boxSizing: "border-box",
+                            }}
+                          />
+                          <button
+                            onClick={demanderDefinitionProjet}
+                            disabled={chargementProjet}
+                            style={{
+                              width: "100%", padding: "8px", marginTop: 6, background: `${couleurProjet}15`, color: couleurProjet,
+                              border: `0.5px solid ${couleurProjet}30`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+                              cursor: chargementProjet ? "default" : "pointer", fontFamily: "inherit",
+                            }}
+                          >
+                            {chargementProjet ? t("bouton.enCours") : "Proposer une colonne vertébrale"}
+                          </button>
+                          {erreurProjet && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 6 }}>{erreurProjet}</div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : t("videEtat.suggestions")
             )}
@@ -1196,6 +1349,49 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         )}
 
         {onglet === "suggestions" && Array.isArray(données_onglet) && données_onglet.map((s, i) => <CarteSuggestion key={i} s={s} couleur={couleurProjet} cléCarte={`suggestions:${i}`} dialogue={dialogues[`suggestions:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />)}
+
+        {/* Résultat "Page blanche" — réf. 60816-01, suite, 30/08/2026.
+            Bandeau d'avertissement systématique : un brouillon jetable à
+            réécrire entièrement, jamais un texte à publier tel quel. */}
+        {onglet === "suggestions" && erreurPageBlanche && (
+          <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 8 }}>{erreurPageBlanche}</div>
+        )}
+        {onglet === "suggestions" && brouillonPageBlanche && (
+          <div style={{ background: "#fff", border: `0.5px solid ${couleurProjet}30`, borderRadius: 8, padding: "10px 12px", marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#A36A1D", background: "#FCF3E3", padding: "3px 8px", borderRadius: 5 }}>
+                Brouillon jetable — à réécrire entièrement dans votre voix, jamais à publier tel quel
+              </div>
+              <BoutonCopier texte={brouillonPageBlanche} couleur={couleurProjet} />
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--texte-primaire, #222)", whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+              {brouillonPageBlanche}
+            </div>
+          </div>
+        )}
+
+        {/* Résultat "Aide à définir un projet" — réf. 60816-01, suite,
+            30/08/2026. Propose des titres de chapitres, ne les crée jamais
+            automatiquement dans le manuscrit — à l'auteur·ice de les créer
+            puis de les développer un par un via "Page blanche" ci-dessus. */}
+        {onglet === "suggestions" && propositionProjet && (
+          <div style={{ marginTop: 8 }}>
+            {propositionProjet.titre_livre && (
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: couleurProjet, marginBottom: 6, textAlign: "left" }}>
+                Titre possible : {propositionProjet.titre_livre}
+              </div>
+            )}
+            {(propositionProjet.chapitres || []).map((c, i) => (
+              <div key={i} style={{ background: "#fff", border: `0.5px solid ${couleurProjet}30`, borderRadius: 8, padding: "8px 10px", marginBottom: 6, textAlign: "left" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--texte-primaire, #222)" }}>{i + 1}. {c.titre}</div>
+                  <BoutonCopier texte={c.titre} couleur={couleurProjet} />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--texte-secondaire, #555)", marginTop: 2 }}>{c.resume}</div>
+              </div>
+            ))}
+          </div>
+        )}
         {onglet === "personnages" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("personnages.aucun")}</p> : données_onglet.map((p, i) => <CartePersonnage key={i} p={p} cléCarte={`personnages:${i}`} dialogue={dialogues[`personnages:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
         {onglet === "références" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#999", textAlign: "center" }}>{t("references.aucune")}</p> : données_onglet.map((r, i) => <CarteRéférence key={i} r={r} />))}
         {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} />))}
