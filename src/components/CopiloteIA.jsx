@@ -1063,6 +1063,19 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null });
   const [chargement, setChargement] = useState({});
   const [erreur, setErreur] = useState({});
+  // CORRECTIF 30/08/2026, signalé par Joseph : une erreur restait affichée
+  // indéfiniment en revenant sur un onglet, même après avoir changé la
+  // sélection ou réduit un texte trop long — puisque rien ne l'effaçait
+  // avant qu'une NOUVELLE analyse soit relancée, et que "Analyser
+  // maintenant" est justement désactivé tant que le texte dépasse le seuil
+  // (voir texteTropVolumineux plus bas). Une erreur qui parlait d'un texte
+  // qui n'existe plus n'a plus de raison de rester à l'écran.
+  useEffect(() => {
+    // Ne déclenche un re-rendu que s'il y avait effectivement une erreur à
+    // effacer — texteActif change à chaque frappe, inutile de re-rendre à
+    // chaque caractère tapé quand il n'y a rien à nettoyer.
+    setErreur((e) => (Object.keys(e).length ? {} : e));
+  }, [analyserSélection, texteSélectionné, texteActif]);
   const [modeAuto, setModeAuto] = useState(false);
   const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
   const abortRef = useRef(null);
