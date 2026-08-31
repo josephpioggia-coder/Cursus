@@ -77,8 +77,14 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null)
   }
 
   const corpsRequête = {
-    model: "claude-sonnet-4-6",
+    // claude-sonnet-5 : moins cher ET plus récent que claude-sonnet-4-6
+    // (utilisé ici jusqu'au 30/08/2026 par oubli — verification-deux-ia
+    // utilise déjà claude-sonnet-5 par défaut, voir MODELE_CLAUDE).
+    model: "claude-sonnet-5",
     max_tokens: maxTokens,
+    // `system` peut être une chaîne simple ou un tableau de blocs avec
+    // cache_control (voir systemAvecLangue) — transmis tel quel, l'API
+    // Anthropic accepte les deux formes.
     system,
     messages: [{ role: "user", content: user }],
   };
@@ -318,12 +324,27 @@ Réponds directement par un diagnostic court et concret, dans l'esprit de : "Je 
 {"diagnostic":"...","type_blocage":"..."}`,
 };
 
+// CORRECTIF 30/08/2026 — prompt caching : contexteADN (questionnaire +
+// mémoire narrative + Carnet d'idées) est le bloc le plus gros et le plus
+// stable du prompt système, identique d'un onglet à l'autre (Suggestions,
+// Personnages, Cohérence, Références...) pendant toute une session. Il
+// était pourtant simplement concaténé en tête d'une CHAÎNE unique — jamais
+// mis en cache, donc reconstitué et refacturé au tarif plein à chaque appel.
+// Renvoie désormais un TABLEAU de blocs avec cache_control sur le bloc ADN
+// (breakpoint Anthropic) quand contexteADN est fourni ; reste une simple
+// chaîne sinon (rien à mettre en cache, pas de raison de complexifier).
+// Aucun appelant n'a besoin de changer : `system` accepte les deux formes
+// (voir appelClaude, qui transmet la valeur telle quelle).
 function systemAvecLangue(promptBase, langueProjet, contexteADN) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  const blocADN = contexteADN
-    ? `CONTEXTE DU PROJET — réponses de l'auteur au questionnaire d'intention (à respecter impérativement dans ton comportement, pas seulement à titre informatif) :\n${contexteADN}\n\n`
-    : "";
-  return `${blocADN}${promptBase}\n\n${instruction} (Les clés JSON restent telles quelles ; seules les valeurs textuelles sont dans cette langue.)`;
+  const finDePrompt = `${promptBase}\n\n${instruction} (Les clés JSON restent telles quelles ; seules les valeurs textuelles sont dans cette langue.)`;
+  if (!contexteADN) return finDePrompt;
+
+  const blocADN = `CONTEXTE DU PROJET — réponses de l'auteur au questionnaire d'intention (à respecter impérativement dans ton comportement, pas seulement à titre informatif) :\n${contexteADN}\n\n`;
+  return [
+    { type: "text", text: blocADN, cache_control: { type: "ephemeral" } },
+    { type: "text", text: finDePrompt },
+  ];
 }
 
 // Récupère les réponses au questionnaire ADN (niveau 1) pour un projet, et les
