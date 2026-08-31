@@ -108,12 +108,27 @@ Deno.serve(async (req) => {
     const data = await response.json();
 
     // 6. ENREGISTREMENT des tokens réels
+    // CORRECTIF 30/08/2026 (prompt caching) : quand le prompt système
+    // utilise un breakpoint cache_control (voir systemAvecLangue côté
+    // CopiloteIA), Anthropic renvoie usage.input_tokens réduit aux seuls
+    // tokens APRÈS le dernier breakpoint — cache_creation_input_tokens et
+    // cache_read_input_tokens couvrent le reste. tokens_entree reste
+    // volontairement la somme des trois (comme documenté par Anthropic :
+    // total_input_tokens = cache_read + cache_creation + input_tokens) —
+    // le quota mensuel du compte ne change donc pas rien qu'en activant le
+    // cache. cache_creation_tokens/cache_read_tokens sont stockés à part,
+    // à titre informatif, pour mesurer le taux de cache réel (voir
+    // 2026-08-30-cache-usage-ia.sql) — pas encore utilisés pour facturer.
     if (data?.usage) {
+      const cacheCreation = data.usage.cache_creation_input_tokens ?? 0;
+      const cacheRead = data.usage.cache_read_input_tokens ?? 0;
       const { error: insertError } = await admin.from("usage_ia").insert({
         user_id: userId,
         projet_id: body?.metadata?.projet_id ?? null,
-        tokens_entree: data.usage.input_tokens ?? 0,
+        tokens_entree: (data.usage.input_tokens ?? 0) + cacheCreation + cacheRead,
         tokens_sortie: data.usage.output_tokens ?? 0,
+        cache_creation_tokens: cacheCreation,
+        cache_read_tokens: cacheRead,
         modele: data.model ?? body?.model ?? null,
       });
       if (insertError) console.error("usage_ia insert:", insertError.message);
