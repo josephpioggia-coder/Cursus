@@ -1258,11 +1258,24 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [nouvelleMémoireType, setNouvelleMémoireType] = useState("vigilance");
   const [nouvelleMémoireContenu, setNouvelleMémoireContenu] = useState("");
   const [ajoutMémoireEnCours, setAjoutMémoireEnCours] = useState(false);
+  // CORRECTIF 30/08/2026, signalé par Joseph : un échec d'enregistrement
+  // était totalement silencieux — le formulaire ne se refermait pas, mais
+  // rien n'indiquait qu'une sauvegarde avait échoué. Une action explicite
+  // de saisie manuelle doit toujours confirmer ou expliquer son échec.
+  const [ajoutMémoireErreur, setAjoutMémoireErreur] = useState(null);
   const ajouterMémoireManuelle = useCallback(async () => {
     if (!nouvelleMémoireContenu.trim() || !projetId) return;
     setAjoutMémoireEnCours(true);
+    setAjoutMémoireErreur(null);
     try {
-      const { data } = await mémoireNarrativeAPI.créer({
+      // CORRECTIF 30/08/2026, signalé par Joseph : mémoireNarrativeAPI.créer
+      // renvoie { data, error } (convention Supabase — n'échoue PAS en
+      // levant une exception), mais seul `data` était lu ici. Un refus
+      // silencieux (table absente, permissions...) laissait `data` à null
+      // SANS jamais passer par le `catch` — le formulaire se refermait et
+      // se vidait comme si tout s'était bien passé, alors que rien n'avait
+      // été enregistré. `error` doit être vérifié explicitement.
+      const { data, error } = await mémoireNarrativeAPI.créer({
         type: nouvelleMémoireType,
         contenu: nouvelleMémoireContenu.trim(),
         statut: "validee",
@@ -1276,6 +1289,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
         projetId,
       });
+      if (error) throw error;
       setNotesProjet((n) => {
         const ligne = `- [${nouvelleMémoireType}] ${nouvelleMémoireContenu.trim()}`;
         return n ? `${n}\n${ligne}` : ligne;
@@ -1285,9 +1299,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       if (data) setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
       setNouvelleMémoireContenu("");
       setAjoutMémoireOuvert(false);
-    } catch {
-      // Non bloquant — l'auteur·ice peut réessayer ; pas la peine de
-      // bloquer le panneau pour une action de confort.
+    } catch (err) {
+      setAjoutMémoireErreur(err?.message || "Échec de l'enregistrement — réessaie, ou vérifie que la table memoire_narrative existe.");
     } finally {
       setAjoutMémoireEnCours(false);
     }
@@ -1332,7 +1345,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const changerStatutMémoire = useCallback(async (id, statut) => {
     setMémoireListe((liste) => (liste || []).map((m) => (m.id === id ? { ...m, statut } : m)));
     try {
-      await mémoireNarrativeAPI.màjStatut(id, statut);
+      // Même bug potentiel que ajouterMémoireManuelle : màjStatut renvoie
+      // { data, error } sans lever d'exception — `error` doit être vérifié
+      // explicitement, sinon un refus silencieux laisse la mise à jour
+      // optimiste affichée comme si elle avait réussi.
+      const { error } = await mémoireNarrativeAPI.màjStatut(id, statut);
+      if (error) throw error;
     } catch {
       chargerMémoireListe(); // resynchronise en cas d'échec de la mise à jour optimiste
     }
@@ -1754,6 +1772,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
               placeholder="L'information à retenir pour ce projet…"
               style={{ width: "100%", minHeight: 60, padding: "6px 8px", fontSize: 12, fontFamily: "inherit", border: "0.5px solid #ddd", borderRadius: 6, resize: "vertical", boxSizing: "border-box", marginBottom: 6 }}
             />
+            {ajoutMémoireErreur && (
+              <div style={{ fontSize: 11, color: "#A32D2D", marginBottom: 6 }}>⚠️ {ajoutMémoireErreur}</div>
+            )}
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 onClick={ajouterMémoireManuelle}
@@ -1767,7 +1788,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                 {ajoutMémoireEnCours ? "…" : "Ajouter"}
               </button>
               <button
-                onClick={() => { setAjoutMémoireOuvert(false); setNouvelleMémoireContenu(""); }}
+                onClick={() => { setAjoutMémoireOuvert(false); setNouvelleMémoireContenu(""); setAjoutMémoireErreur(null); }}
                 style={{ padding: "6px 10px", background: "transparent", color: "#888", border: "0.5px solid #ccc", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
                 Annuler
               </button>
