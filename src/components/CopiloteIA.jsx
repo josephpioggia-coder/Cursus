@@ -1917,16 +1917,30 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             IA, une relecture, une conversation hors Cursus) doit pouvoir
             entrer directement dans la mémoire du projet, sans faux dialogue
             avec le co-pilote pour déclencher "Mémoriser cette intention". */}
-        <button
-          onClick={() => setAjoutMémoireOuvert((o) => !o)}
-          title="Ajouter directement une information à retenir pour ce projet"
-          style={{
-            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: "#888",
-            border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
-            cursor: "pointer", fontFamily: "inherit",
-          }}>
-          🧠 + Ajouter à la mémoire
-        </button>
+        {/* Les deux boutons mémoire côte à côte plutôt qu'empilés — demande
+            de Joseph, 30/08/2026, pour gagner une ligne de hauteur dans un
+            panneau déjà chargé. */}
+        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          <button
+            onClick={() => setAjoutMémoireOuvert((o) => !o)}
+            title="Ajouter directement une information à retenir pour ce projet"
+            style={{
+              flex: 1, padding: "7px", background: "#fff", color: "#888",
+              border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+            🧠 + Ajouter
+          </button>
+          <button
+            onClick={basculerListeMémoire}
+            style={{
+              flex: 1, padding: "7px", background: "#fff", color: "#888",
+              border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+            🧠 {mémoireListeOuverte ? "Masquer" : "Voir la mémoire"}
+          </button>
+        </div>
 
         {ajoutMémoireOuvert && (
           <div style={{ marginTop: 6, padding: "8px 10px", background: "#fafafa", border: "0.5px solid #e5e5e5", borderRadius: 7 }}>
@@ -1967,22 +1981,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           </div>
         )}
 
-        {/* "🧠 Voir la mémoire" — réf. plus haut (chargerMémoireListe,
-            basculerListeMémoire, changerStatutMémoire). Filtrée par défaut
-            sur le chapitre/scène ouvert via portee.noeud_id ; bascule
-            "Tout le projet" pour tout revoir. Les entrées "proposee"
-            (distillées automatiquement par le co-pilote) peuvent être
-            validées ou rejetées directement ici — jamais l'inverse, l'IA
-            ne passe jamais une entrée à "validee" toute seule. */}
-        <button
-          onClick={basculerListeMémoire}
-          style={{
-            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: "#888",
-            border: "0.5px solid #ddd", borderRadius: 7, fontSize: 12, fontWeight: 500,
-            cursor: "pointer", fontFamily: "inherit",
-          }}>
-          🧠 {mémoireListeOuverte ? "Masquer la mémoire" : "Voir la mémoire"}
-        </button>
+        {/* Bouton "Voir la mémoire" déplacé plus haut, à côté de "+ Ajouter"
+            (voir le bloc flex juste avant "+ Ajouter à la mémoire") — logique
+            chargerMémoireListe/basculerListeMémoire/changerStatutMémoire
+            inchangée, seul l'emplacement du bouton a changé. */}
 
         {mémoireListeOuverte && (
           <div style={{ marginTop: 6, padding: "8px 10px", background: "#fafafa", border: "0.5px solid #e5e5e5", borderRadius: 7, maxHeight: 260, overflowY: "auto" }}>

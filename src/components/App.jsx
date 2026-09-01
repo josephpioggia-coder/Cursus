@@ -1755,7 +1755,13 @@ function AppConnectée({ user, déconnecter }) {
       if (!redimensionnementActif.current) return;
       const delta = positionDépart.current.x - e.clientX;
       const nouvelleLargeur = positionDépart.current.largeur + delta;
-      setLargeurPanneau(Math.min(560, Math.max(220, nouvelleLargeur)));
+      // CORRECTIF 30/08/2026, signalé par Joseph : la limite haute de 560px
+      // était fixe, donc trop basse sur un grand écran pour que le panneau
+      // atteigne jamais une largeur égale à celle de l'éditeur. Plafond
+      // relevé à 50% de la largeur de la fenêtre — le panneau peut
+      // maintenant réellement égaler l'éditeur, sans dépasser au-delà.
+      const maximumDynamique = Math.max(560, window.innerWidth * 0.5);
+      setLargeurPanneau(Math.min(maximumDynamique, Math.max(220, nouvelleLargeur)));
     };
     const surRelâchement = () => {
       if (redimensionnementActif.current) {
