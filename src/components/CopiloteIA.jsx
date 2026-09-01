@@ -1891,25 +1891,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 6 }}>{recompositionErreur}</div>
         )}
 
-        {recompositionPoints && (
-          <div style={{ marginTop: 6 }}>
-            {recompositionPoints.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center", margin: "8px 0" }}>Rien à signaler sur ce chapitre.</p>
-            ) : (
-              recompositionPoints.map((p, i) => (
-                <CarteCoherence
-                  key={i} p={p} cléCarte={`recomposition:${i}`}
-                  dialogue={dialogues[`recomposition:${i}`]}
-                  onOuvrirDialogue={ouvrirDialogue}
-                  onEnvoyerQuestion={envoyerQuestionDialogue}
-                  langueProjet={langueProjet}
-                  onMémoriserCarte={mémoriserIntention}
-                  mémorisationEnCours={mémorisationEnCoursParCarte}
-                />
-              ))
-            )}
-          </div>
-        )}
+        {/* Les résultats (recompositionPoints) sont affichés plus bas, DANS
+            la section "Corps" défilante — voir plus bas dans le rendu.
+            CORRECTIF 30/08/2026, signalé par Joseph : ils étaient d'abord
+            affichés ici, dans l'en-tête fixe (flexShrink: 0, jamais de
+            défilement) — avec un chapitre entier produisant 15-20 points,
+            la liste débordait sans aucun moyen de la parcourir ni
+            d'atteindre quoi que ce soit en dessous. */}
 
         {/* "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE et
             ajouterMémoireManuelle plus haut. Toujours visible, comme "Aide-
@@ -2045,6 +2033,28 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
       {/* Corps */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "10px 12px" }}>
+        {/* Résultats de "🧩 Conseils de recomposition" — déplacés ici
+            depuis l'en-tête fixe (voir le commentaire à l'ancien
+            emplacement) pour pouvoir défiler avec le reste du corps. */}
+        {recompositionPoints && (
+          <div style={{ marginBottom: 8 }}>
+            {recompositionPoints.length === 0 ? (
+              <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center", margin: "8px 0" }}>Rien à signaler sur ce chapitre.</p>
+            ) : (
+              recompositionPoints.map((p, i) => (
+                <CarteCoherence
+                  key={i} p={p} cléCarte={`recomposition:${i}`}
+                  dialogue={dialogues[`recomposition:${i}`]}
+                  onOuvrirDialogue={ouvrirDialogue}
+                  onEnvoyerQuestion={envoyerQuestionDialogue}
+                  langueProjet={langueProjet}
+                  onMémoriserCarte={mémoriserIntention}
+                  mémorisationEnCours={mémorisationEnCoursParCarte}
+                />
+              ))
+            )}
+          </div>
+        )}
         {erreurBlocage && (
           <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginBottom: 8 }}>{erreurBlocage}</div>
         )}
