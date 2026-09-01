@@ -68,7 +68,15 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // l'outil, c'est ce header, dans claude-prox, qu'il faudra mettre à jour.
 const OUTIL_RECHERCHE_WEB = [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
 
-async function appelClaude(system, user, signal, maxTokens = 1000, tools = null) {
+// CORRECTIF 30/08/2026, retour d'usage réel : une réponse coupée en plein
+// milieu d'une phrase (max_tokens atteint) était invisible pour l'appelant —
+// `avecDétails` (utilisé par le fil de dialogue, voir DIALOGUE_MAX_TOKENS)
+// renvoie { texte, tronqué } au lieu d'une simple chaîne, pour permettre un
+// vrai bouton "Continuer" plutôt que de laisser l'auteur·ice retaper
+// "continue !" à la main pour s'en sortir. Tous les autres appelants
+// n'ont rien à changer : par défaut, le comportement (chaîne simple) est
+// inchangé.
+async function appelClaude(system, user, signal, maxTokens = 1000, tools = null, avecDétails = false) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
@@ -107,7 +115,9 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null)
   // blocs (server_tool_use, web_search_tool_result, text) avant le texte
   // final — content[0] n'est donc plus fiable pour l'extraire. On concatène
   // tous les blocs de type "text", dans l'ordre.
-  return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+  const texte = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+  if (!avecDétails) return texte;
+  return { texte, tronqué: data.stop_reason === "max_tokens" };
 }
 
 // ─── Vérification approfondie à deux IA (protocole 60805-06) ──────────────────
@@ -481,9 +491,15 @@ function BoutonCopier({ texte, couleur = "#888" }) {
 // de suivi (coûteux en tokens, et le résultat pourrait différer de la carte
 // affichée). Le co-pilote reçoit systématiquement l'analyse d'origine de
 // CETTE carte précise + l'historique de l'échange, formatés en texte, et
-// répond dans le fil — un appel Claude léger (1024 tokens), pas une
-// nouvelle analyse.
-const DIALOGUE_MAX_TOKENS = 1024;
+// répond dans le fil — un appel Claude léger, pas une nouvelle analyse.
+//
+// CORRECTIF 30/08/2026, retour d'usage réel : 1024 coupait régulièrement
+// des réponses en pleine phrase sur des questions nuancées (nuances de
+// traduction, de registre...), forçant l'auteur à retaper "continue !" à
+// la main pour obtenir la suite. Relevé à 2048 pour réduire la fréquence
+// du problème ; voir aussi le bouton "Continuer" dans FilDialogue pour le
+// cas où la limite est quand même atteinte.
+const DIALOGUE_MAX_TOKENS = 2048;
 
 function promptDialogue(langueProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
@@ -645,6 +661,23 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
             {m.role === "auteur" ? t("dialogue.vous", "Vous") : t("dialogue.copilote", "Co-pilote")}
           </span>
           {" — "}{m.contenu}
+          {/* CORRECTIF 30/08/2026, retour d'usage réel : une réponse coupée
+              en plein milieu d'une phrase (max_tokens atteint) obligeait à
+              retaper "continue !" à la main. Bouton dédié sur le DERNIER
+              message seulement — voir tronqué côté appelClaude/
+              envoyerQuestionDialogue. */}
+          {m.role === "copilote" && m.tronqué && i === dialogue.messages.length - 1 && !dialogue.enCours && (
+            <button
+              onClick={() => onEnvoyer(null, true)}
+              style={{
+                display: "block", marginTop: 4, fontSize: 10.5, padding: "3px 9px",
+                background: "transparent", color: couleur, border: `0.5px solid ${couleur}50`,
+                borderRadius: 14, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              ↳ Continuer (réponse coupée)
+            </button>
+          )}
         </div>
       ))}
 
@@ -760,7 +793,7 @@ function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, on
       </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, `${s.titre}\n${s.texte}`) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, `${s.titre}\n${s.texte}`) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -787,7 +820,7 @@ function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQu
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
       {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -854,7 +887,7 @@ function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQue
       </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q) => onEnvoyerQuestion(cléCarte, q)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -1124,29 +1157,39 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     });
   }, []);
 
-  const envoyerQuestionDialogue = useCallback(async (cléCarte, question) => {
+  const envoyerQuestionDialogue = useCallback(async (cléCarte, question, estContinuation = false) => {
     setDialogues((d) => ({
       ...d,
       [cléCarte]: {
         ...d[cléCarte],
         enCours: true,
         erreur: null,
-        messages: [...(d[cléCarte]?.messages || []), { role: "auteur", contenu: question }],
+        // En continuation, aucune nouvelle intervention "auteur" à afficher —
+        // seule la réponse coupée doit se poursuivre.
+        messages: estContinuation
+          ? (d[cléCarte]?.messages || [])
+          : [...(d[cléCarte]?.messages || []), { role: "auteur", contenu: question }],
       },
     }));
 
     try {
       const état = dialogues[cléCarte];
-      const historique = [...(état?.messages || []), { role: "auteur", contenu: question }]
+      const messagesActuels = état?.messages || [];
+      const historique = (estContinuation ? messagesActuels : [...messagesActuels, { role: "auteur", contenu: question }])
         .map((m) => `${m.role === "auteur" ? "Auteur" : "Co-pilote"} : ${m.contenu}`)
         .join("\n");
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}`;
+      const consigneContinuation = estContinuation
+        ? "\n\n(Ta réponse précédente a été coupée par la limite de longueur, en plein milieu d'une phrase. Continue exactement là où tu t'es arrêté, sans rien répéter de ce qui précède.)"
+        : "";
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
-      const réponse = await appelClaude(
+      const { texte, tronqué } = await appelClaude(
         promptDialogue(langueProjet),
         userContent,
         null,
-        DIALOGUE_MAX_TOKENS
+        DIALOGUE_MAX_TOKENS,
+        null,
+        true
       );
 
       setDialogues((d) => ({
@@ -1154,7 +1197,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: {
           ...d[cléCarte],
           enCours: false,
-          messages: [...(d[cléCarte]?.messages || []), { role: "copilote", contenu: réponse.trim() }],
+          messages: [...(d[cléCarte]?.messages || []), { role: "copilote", contenu: texte.trim(), tronqué }],
         },
       }));
     } catch (err) {
@@ -1826,7 +1869,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             onSuivi={lancerSuiviBlocage}
             dialogue={dialogues[cléCarteBlocage]}
             onOuvrirDialogue={(ctx) => ouvrirDialogue(cléCarteBlocage, ctx)}
-            onEnvoyerQuestion={(q) => envoyerQuestionDialogue(cléCarteBlocage, q)}
+            onEnvoyerQuestion={(q, continuer) => envoyerQuestionDialogue(cléCarteBlocage, q, continuer)}
             onMémoriser={diagnosticBlocage ? () => mémoriserIntention(cléCarteBlocage, `Diagnostic : ${diagnosticBlocage.diagnostic}`) : null}
             mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteBlocage]}
             historique={historiqueBlocage}
