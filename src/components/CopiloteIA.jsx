@@ -47,6 +47,38 @@ const extraireTexte = (html = "") => {
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
 
+// Découpe un texte en tranches chevauchantes — réf. 60816-01, suite,
+// 30/08/2026, "Conseils de recomposition". Permet d'analyser un chapitre
+// entier au-delà du seuil de 8000 caractères sans jamais résumer le texte
+// source, en plusieurs appels dont les résultats sont ensuite fusionnés
+// (voir lancerConseilsRecomposition). Coupe à la ponctuation de fin de
+// phrase la plus proche du seuil plutôt qu'au caractère près, pour ne
+// jamais trancher en plein milieu d'une phrase — le texte est déjà nettoyé
+// par extraireTexte à ce stade, donc plus de sauts de paragraphe à
+// détecter (les espaces ont été collapsés). Le chevauchement assure
+// qu'une incohérence ou une transition à cheval sur une coupure n'est pas
+// ratée par les deux tranches voisines.
+function découperEnTranches(texte, tailleMax = 8000, chevauchement = 2000) {
+  if (texte.length <= tailleMax) return [texte];
+  const tranches = [];
+  let début = 0;
+  while (début < texte.length) {
+    let fin = Math.min(début + tailleMax, texte.length);
+    if (fin < texte.length) {
+      const bornInf = Math.max(début, fin - 400);
+      const zoneRecherche = texte.slice(bornInf, fin);
+      const dernièrePonctuation = Math.max(
+        zoneRecherche.lastIndexOf(". "), zoneRecherche.lastIndexOf("! "), zoneRecherche.lastIndexOf("? ")
+      );
+      if (dernièrePonctuation !== -1) fin = bornInf + dernièrePonctuation + 2;
+    }
+    tranches.push(texte.slice(début, fin).trim());
+    if (fin >= texte.length) break;
+    début = Math.max(0, fin - chevauchement);
+  }
+  return tranches;
+}
+
 // ─── Appel API Claude ─────────────────────────────────────────────────────────
 
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
@@ -238,6 +270,40 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne 
 
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
+
+  // "Conseils de recomposition" — réf. 60816-01, suite, 30/08/2026. Analyse
+  // structurelle d'un chapitre entier, tranche par tranche (voir
+  // découperEnTranches). Même forme JSON que `cohérence` — réutilise
+  // CarteCoherence pour l'affichage, pas de nouveau composant nécessaire.
+  // Ajout demandé explicitement après un test réel : repérer la "glose
+  // redondante" (une phrase qui explique ce qu'une scène montre déjà).
+  recomposition: (type) => `Tu es éditeur professionnel relisant un extrait d'un ${type === "fiction" ? "roman" : "essai"} — ce texte est UNE TRANCHE d'un chapitre plus long, analysée séparément pour des raisons techniques : ne t'étonne pas d'un début ou d'une fin qui semblent couper une phrase ou une scène en cours, et ne le signale pas comme un problème.
+
+Repère spécifiquement :
+- les endroits où le texte EXPLIQUE ce qu'une scène montre déjà ("glose redondante") — une phrase qui commente ou interprète ce qu'une image ou une action vient de rendre évident, alors que la scène se suffisait à elle-même ;
+- les répétitions de mots ou d'idées à quelques lignes d'intervalle ;
+- les transitions manquantes ou abruptes entre deux idées ou deux scènes ;
+- les ruptures de registre ou de voix ;
+- les échos ou rappels internes (un motif, une réplique, un objet) qui mériteraient d'être renforcés, ou à l'inverse qui créent une redite.
+
+RÈGLE NON NÉGOCIABLE sur les personnes nommées : si un point mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
+
+Réponds UNIQUEMENT en JSON valide :
+{"points":[{"type":"glose redondante","sévérité":"attention","description":"...","suggestion":"..."}]}
+Le champ "type" nomme librement la nature du point (ex. "glose redondante", "répétition", "transition manquante", "rupture de registre", "écho interne"). Le champ "sévérité" vaut "info", "attention" ou "important".`,
+
+  // Fusionne les résultats de plusieurs tranches chevauchantes en une seule
+  // liste — sans ce passage, le même point apparaîtrait deux fois (une
+  // fois par tranche qui couvre la zone de chevauchement).
+  synthèseRecomposition: (type) => `Tu reçois plusieurs listes de points de relecture, produites séparément sur des tranches qui se chevauchent d'un même chapitre de ${type === "fiction" ? "roman" : "essai"}. À cause du chevauchement, le même point peut apparaître deux fois, formulé différemment.
+
+Fusionne ces listes en UNE seule liste finale :
+- si deux points décrivent clairement le même problème (même passage, même nature), n'en garde qu'un, avec la description la plus claire des deux ;
+- conserve tous les points distincts, même s'ils viennent de tranches différentes ;
+- classe les points par ordre d'apparition approximatif dans le chapitre, du début vers la fin, si tu peux l'estimer.
+
+Réponds UNIQUEMENT en JSON valide, même format que les listes reçues :
+{"points":[{"type":"...","sévérité":"...","description":"...","suggestion":"..."}]}`,
 
   // Aide au démarrage — ajouté le 18/07/2026, différencié par niveau le
   // 19/07/2026. Trois comportements distincts selon que la page blanche est
@@ -1356,6 +1422,69 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [chargerMémoireListe]);
 
+  // "Conseils de recomposition" — réf. 60816-01, suite, 30/08/2026. Analyse
+  // un chapitre ENTIER (pas seulement les 8000 premiers caractères) en le
+  // découpant en tranches chevauchantes (voir découperEnTranches), puis
+  // fusionne les résultats — sans jamais résumer le texte source, et sans
+  // avoir à le faire à la main tranche par tranche. V1 volontairement
+  // resserrée : la double vérification GPT et le contrôle du texte
+  // recomposé APRÈS application restent différés à une itération suivante
+  // (voir le registre) — même principe que memoire_narrative V1, tester la
+  // version simple avant d'ajouter la couche suivante.
+  //
+  // Pas de garde-fou anti-boucle façon préaudit ici : contrairement à un
+  // appel qui peut être relancé automatiquement en cas d'échec, ceci est
+  // une séquence FINIE d'appels déclenchée une seule fois par clic, sans
+  // retry automatique — le risque de dérive de coût qui justifiait ce
+  // garde-fou ne s'applique pas à ce mécanisme.
+  const [recompositionPoints, setRecompositionPoints] = useState(null);
+  const [recompositionChargement, setRecompositionChargement] = useState(false);
+  const [recompositionProgression, setRecompositionProgression] = useState(null);
+  const [recompositionErreur, setRecompositionErreur] = useState(null);
+
+  const lancerConseilsRecomposition = useCallback(async () => {
+    setRecompositionChargement(true);
+    setRecompositionErreur(null);
+    setRecompositionPoints(null);
+    try {
+      const { texte } = extraireTexte(texteActif);
+      if (compterMots(texteActif) < 20) {
+        throw new Error(t("erreur.motsInsuffisants"));
+      }
+      const tranches = découperEnTranches(texte);
+      const résultatsParTranche = [];
+      for (let i = 0; i < tranches.length; i++) {
+        setRecompositionProgression(tranches.length > 1 ? `Tranche ${i + 1}/${tranches.length}…` : "Analyse en cours…");
+        const résultat = await appelClaude(
+          systemAvecLangue(PROMPTS.recomposition(typeProjet), langueProjet, contexteADN),
+          `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}`,
+          null, 4096
+        );
+        const p = parserJSON(résultat);
+        résultatsParTranche.push(...(p.points || []));
+      }
+
+      let pointsFinaux = résultatsParTranche;
+      if (tranches.length > 1) {
+        setRecompositionProgression("Fusion des résultats…");
+        const résultatSynthèse = await appelClaude(
+          systemAvecLangue(PROMPTS.synthèseRecomposition(typeProjet), langueProjet, contexteADN),
+          `Listes à fusionner :\n\n${JSON.stringify({ points: résultatsParTranche })}`,
+          null, 4096
+        );
+        const synthèse = parserJSON(résultatSynthèse);
+        pointsFinaux = synthèse.points || résultatsParTranche;
+      }
+
+      setRecompositionPoints(pointsFinaux);
+    } catch (err) {
+      setRecompositionErreur(messageErreur(err));
+    } finally {
+      setRecompositionChargement(false);
+      setRecompositionProgression(null);
+    }
+  }, [texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
+
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
     const { texte } = extraireTexte(sourceTexte);
@@ -1739,6 +1868,48 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           }}>
           {chargementBlocage ? t("bouton.enCours") : "🛟 Aide-moi à avancer"}
         </button>
+
+        {/* "🧩 Conseils de recomposition" — voir lancerConseilsRecomposition
+            plus haut. Toujours visible, contrairement à "Analyser
+            maintenant" (onglets Suggestions/Cohérence/...) : c'est
+            précisément l'opération conçue pour dépasser le seuil de 8000
+            caractères, donc jamais désactivée par texteTropVolumineux. */}
+        <button
+          onClick={lancerConseilsRecomposition}
+          disabled={recompositionChargement || usageBloqué}
+          title="Analyse le chapitre entier par tranches si besoin (au-delà de 8000 caractères), sans rien résumer — structure, répétitions, transitions, glose redondante."
+          style={{
+            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: couleurProjet,
+            border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+            cursor: (recompositionChargement || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
+            opacity: usageBloqué ? 0.5 : 1,
+          }}>
+          {recompositionChargement ? (recompositionProgression || t("bouton.enCours")) : "🧩 Conseils de recomposition (chapitre entier)"}
+        </button>
+
+        {recompositionErreur && (
+          <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 6 }}>{recompositionErreur}</div>
+        )}
+
+        {recompositionPoints && (
+          <div style={{ marginTop: 6 }}>
+            {recompositionPoints.length === 0 ? (
+              <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center", margin: "8px 0" }}>Rien à signaler sur ce chapitre.</p>
+            ) : (
+              recompositionPoints.map((p, i) => (
+                <CarteCoherence
+                  key={i} p={p} cléCarte={`recomposition:${i}`}
+                  dialogue={dialogues[`recomposition:${i}`]}
+                  onOuvrirDialogue={ouvrirDialogue}
+                  onEnvoyerQuestion={envoyerQuestionDialogue}
+                  langueProjet={langueProjet}
+                  onMémoriserCarte={mémoriserIntention}
+                  mémorisationEnCours={mémorisationEnCoursParCarte}
+                />
+              ))
+            )}
+          </div>
+        )}
 
         {/* "+ Ajouter à la mémoire" — voir OPTIONS_TYPE_MÉMOIRE et
             ajouterMémoireManuelle plus haut. Toujours visible, comme "Aide-
