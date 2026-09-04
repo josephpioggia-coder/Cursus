@@ -25,6 +25,7 @@
  */
 
 import { useState } from "react";
+import CursDecisionPage from "./CursDecisionPage.jsx";
 
 const ESPACES = [
   {
@@ -120,6 +121,20 @@ const ESPACES = [
         "Son rôle est d'aider à voir plus clair avant de corriger.",
       ],
     },
+  },
+  {
+    // 04/09/2026 — troisième espace, conçu et rédigé par l'auteur du projet.
+    // Contrairement à CursEdit/CursAudit, pas de fenêtre "Voir les
+    // fonctionnalités" (pas de champ `info`) : le détail va dans une page
+    // dédiée (CursDecisionPage.jsx), pas une modale — demande explicite.
+    // Logo attendu en public/logo-cursdecision.png (pas encore fourni).
+    id: "cursdecision",
+    nom: "CursDecision",
+    accroche: "Transformer une situation complexe ou floue en décision claire, argumentée et suivable.",
+    description: "Clarifier les faits, explorer les options, mesurer les risques et préparer une décision.",
+    couleur: "#0E7256",
+    logo: "/logo-cursdecision.png",
+    libelléLien: "Découvrir CursDecision",
   },
 ];
 
@@ -220,6 +235,14 @@ function FenêtreInfo({ espace, onFermer }) {
 
 export default function EcranChoixEspace({ onChoisir }) {
   const [infoOuverte, setInfoOuverte] = useState(null);
+  // CursDecision n'a pas encore d'espace de travail réel (voir note dans
+  // CursDecisionPage.jsx) : "Ouvrir" et "Découvrir" mènent tous les deux
+  // ici pour l'instant, au lieu d'un vrai `onChoisir("cursdecision")`.
+  const [pageDécisionOuverte, setPageDécisionOuverte] = useState(false);
+
+  if (pageDécisionOuverte) {
+    return <CursDecisionPage onRetour={() => setPageDécisionOuverte(false)} />;
+  }
 
   return (
     <div style={{
@@ -264,9 +287,12 @@ export default function EcranChoixEspace({ onChoisir }) {
             }}
           >
             <img src={e.logo} alt={e.nom} style={{ width: 110, height: "auto", display: "block", margin: "0 auto 14px" }} />
-            <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.accroche}</div>
+            <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6, marginBottom: e.description ? 6 : 18, flex: e.description ? "none" : 1 }}>{e.accroche}</div>
+            {e.description && (
+              <div style={{ fontSize: 12, color: "#999", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.description}</div>
+            )}
             <button
-              onClick={() => onChoisir(e.id)}
+              onClick={() => (e.info ? onChoisir(e.id) : setPageDécisionOuverte(true))}
               style={{
                 width: "100%", padding: "10px 0", borderRadius: 8, border: "none", cursor: "pointer",
                 background: e.couleur, color: "#fff", fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", marginBottom: 10,
@@ -275,13 +301,13 @@ export default function EcranChoixEspace({ onChoisir }) {
               Ouvrir {e.nom}
             </button>
             <button
-              onClick={() => setInfoOuverte(e)}
+              onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
               style={{
                 width: "100%", padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
                 background: "transparent", color: e.couleur, fontSize: 12.5, fontWeight: 500, fontFamily: "inherit",
               }}
             >
-              Voir les fonctionnalités
+              {e.libelléLien || "Voir les fonctionnalités"}
             </button>
           </div>
         ))}
