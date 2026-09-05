@@ -233,7 +233,7 @@ function FenêtreInfo({ espace, onFermer }) {
   );
 }
 
-export default function EcranChoixEspace({ onChoisir }) {
+export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
   const [infoOuverte, setInfoOuverte] = useState(null);
   // CursDecision n'a pas encore d'espace de travail réel (voir note dans
   // CursDecisionPage.jsx) : "Ouvrir" et "Découvrir" mènent tous les deux
@@ -281,20 +281,20 @@ export default function EcranChoixEspace({ onChoisir }) {
             Cursus Essentiel — 60€ pour la première année
           </span>
         </div>
-        {/* 04/09/2026 — pas encore de checkout Stripe pour ce palier (voir
-            EcranChoixEspace.jsx notes) : inscription manuelle en attendant
-            la migration Stripe, cohérente avec la phase actuelle de
-            démarchage direct des prospects. */}
-        <a
-          href="mailto:joseph.pioggia@gmail.com?subject=Offre de lancement Cursus Essentiel"
+        {/* 05/09/2026 — mène à la page Tarification existante (paliers
+            CursEdit) plutôt qu'à un mailto : pas encore de palier "Cursus
+            Essentiel" séparé côté Stripe, donc on montre la tarification
+            actuelle en attendant la migration. */}
+        <button
+          onClick={onVoirTarification}
           style={{
             padding: "9px 22px", borderRadius: 8, border: "none", cursor: "pointer",
             background: "#8B2635", color: "#fff", fontSize: 13.5, fontWeight: 600,
-            fontFamily: "inherit", textDecoration: "none",
+            fontFamily: "inherit",
           }}
         >
           Rejoindre l'offre de lancement
-        </a>
+        </button>
       </div>
 
       <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Trois espaces inclus dans Cursus Essentiel</div>
