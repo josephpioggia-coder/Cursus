@@ -127,13 +127,15 @@ const ESPACES = [
     // Contrairement à CursEdit/CursAudit, pas de fenêtre "Voir les
     // fonctionnalités" (pas de champ `info`) : le détail va dans une page
     // dédiée (CursDecisionPage.jsx), pas une modale — demande explicite.
-    // Logo attendu en public/logo-cursdecision.png (pas encore fourni).
+    // Logo en public/logo-cursdecision-v2.png — renommé le 05/09/2026 pour
+    // casser le cache CDN/navigateur sur l'ancienne version (le dossier
+    // public/ n'est pas hashé automatiquement comme les bundles JS).
     id: "cursdecision",
     nom: "CursDecision",
     accroche: "Transformer une situation complexe ou floue en décision claire, argumentée et suivable.",
     description: "Clarifier les faits, explorer les options, mesurer les risques et préparer une décision.",
     couleur: "#0E7256",
-    logo: "/logo-cursdecision.png",
+    logo: "/logo-cursdecision-v2.png",
     libelléLien: "Découvrir CursDecision",
   },
 ];
