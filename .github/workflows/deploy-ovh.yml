@@ -1,0 +1,50 @@
+name: Déployer sur cursus.pro (OVH)
+
+# CURSUS — Déploiement automatique (référence 60816-01, suite, 05/09/2026)
+# ============================================================================
+# Jusqu'ici, la mise en ligne sur cursus.pro (hébergement OVH) se faisait à
+# la main : npm run build, puis dépôt du dossier dist/ par FTP. Ce workflow
+# automatise cette étape unique — construction + dépôt FTP — à chaque push
+# sur main, pour que cursus.pro reflète toujours le code de main sans geste
+# manuel répété. Les identifiants FTP OVH ne sont JAMAIS dans ce fichier ni
+# dans le dépôt : ils vivent uniquement dans les secrets GitHub du dépôt
+# (Settings → Secrets and variables → Actions), même principe que les
+# secrets Supabase/OpenAI déjà en place côté serveur.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-et-deployer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Construire (npm run build)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Déposer dist/ sur OVH par FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.OVH_FTP_SERVER }}
+          username: ${{ secrets.OVH_FTP_USERNAME }}
+          password: ${{ secrets.OVH_FTP_PASSWORD }}
+          # Dossier de destination sur le FTP OVH — à ajuster si besoin
+          # (voir instructions : vérifier où se trouve l'index.html du site
+          # actuellement en ligne avant le premier lancement).
+          server-dir: ${{ secrets.OVH_FTP_DIR }}
+          local-dir: ./dist/
