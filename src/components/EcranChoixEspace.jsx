@@ -302,7 +302,10 @@ export default function EcranChoixEspace({ onChoisir }) {
         Découvrez ce que chaque espace permet — l'ouverture est réservée aux membres de Cursus Essentiel.
       </div>
 
-      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 680 }}>
+      {/* 05/09/2026 — maxWidth élargi de 680 (dimensionné pour 2 cartes) à
+          960 : 3 cartes de 300px + 2 gaps de 20px = 940px, sinon la
+          troisième (CursDecision) passe à la ligne. */}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 960 }}>
         {ESPACES.map((e) => (
           <div
             key={e.id}
