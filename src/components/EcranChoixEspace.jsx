@@ -249,31 +249,57 @@ export default function EcranChoixEspace({ onChoisir }) {
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
     }}>
-      {/* 22/08/2026, v3 — spécification exacte donnée par l'auteur du projet :
-          largeur = exactement celle des deux cartes CursEdit/CursAudit
-          réunies (300 + 20 de gap + 300 = 620px, pas 680 qui était le
-          maxWidth de leur conteneur mais pas leur largeur réelle), hauteur
-          selon le ratio 732:280 (≈2.61:1), liseré doré (couleur "or" déjà
-          utilisée ailleurs dans l'app, #C4973A), logo centré au-dessus du
-          titre plutôt qu'à côté. */}
-      <div style={{
-        width: 620, aspectRatio: "732 / 280", boxSizing: "border-box",
+      {/* 22/08/2026, v3 — largeur = exactement celle des deux cartes
+          CursEdit/CursAudit réunies (300 + 20 de gap + 300 = 620px), ratio
+          732:280, liseré doré #C4973A, logo centré au-dessus du titre.
+          04/09/2026 — repositionné autour de "Cursus Essentiel" : l'offre
+          d'accès global remplace la simple accroche produit. */}
+      <div id="offre-cursus-essentiel" style={{
+        width: 620, boxSizing: "border-box",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        padding: "16px 24px", borderRadius: 14,
+        padding: "22px 24px", borderRadius: 14,
         border: "0.5px solid #C4973A80", background: "#fff",
         boxShadow: "0 1px 4px rgba(0,0,0,0.04)", marginBottom: 36,
       }}>
         {/* Logo agrandi ×1,75 (56→98px), demandé après premier retour */}
         <img src="/logo-cursus.png" alt="Cursus" style={{ height: 98, width: 98, borderRadius: 16, marginBottom: 6 }} />
         <div style={{ fontSize: 24, fontWeight: 600, color: "#8B2635", marginBottom: 6, letterSpacing: "0.01em" }}>Cursus</div>
-        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.4, textAlign: "center" }}>
-          Une suite d'écriture et d'audit assistée par IA.
+        <div style={{ fontSize: 13.5, color: "#555", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 4 }}>
+          Une suite assistée par l'intelligence artificielle pour écrire, auditer et décider avec méthode.
         </div>
+        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 16 }}>
+          Activez Cursus Essentiel et accédez aux trois espaces de travail : CursEdit, CursAudit et CursDecision.
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center",
+          padding: "10px 18px", borderRadius: 10, background: "#8B263508", marginBottom: 10,
+        }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "#8B2635", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Offre de lancement
+          </span>
+          <span style={{ fontSize: 13.5, color: "#333" }}>
+            Cursus Essentiel — 60€ pour la première année
+          </span>
+        </div>
+        {/* 04/09/2026 — pas encore de checkout Stripe pour ce palier (voir
+            EcranChoixEspace.jsx notes) : inscription manuelle en attendant
+            la migration Stripe, cohérente avec la phase actuelle de
+            démarchage direct des prospects. */}
+        <a
+          href="mailto:joseph.pioggia@gmail.com?subject=Offre de lancement Cursus Essentiel"
+          style={{
+            padding: "9px 22px", borderRadius: 8, border: "none", cursor: "pointer",
+            background: "#8B2635", color: "#fff", fontSize: 13.5, fontWeight: 600,
+            fontFamily: "inherit", textDecoration: "none",
+          }}
+        >
+          Rejoindre l'offre de lancement
+        </a>
       </div>
 
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Choisissez votre espace de travail</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Trois espaces inclus dans Cursus Essentiel</div>
       <div style={{ fontSize: 13, color: "#999", marginBottom: 36, textAlign: "center", maxWidth: 420 }}>
-        Écrivez, structurez, relisez ou auditez vos textes selon votre besoin du moment.
+        Découvrez ce que chaque espace permet — l'ouverture est réservée aux membres de Cursus Essentiel.
       </div>
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 680 }}>
@@ -291,15 +317,23 @@ export default function EcranChoixEspace({ onChoisir }) {
             {e.description && (
               <div style={{ fontSize: 12, color: "#999", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.description}</div>
             )}
-            <button
-              onClick={() => (e.info ? onChoisir(e.id) : setPageDécisionOuverte(true))}
+            {/* 04/09/2026 — "Ouvrir X" n'est plus un accès libre : seul
+                "Voir les fonctionnalités" / "Découvrir CursDecision" reste
+                gratuit à l'ouverture (décision explicite). L'ouverture réelle
+                est réservée aux membres Cursus Essentiel — pas encore de
+                vérification d'abonnement câblée (couche suivante), donc pas
+                de bouton qui prétend ouvrir l'espace : renvoi vers l'offre. */}
+            <a
+              href="#offre-cursus-essentiel"
               style={{
-                width: "100%", padding: "10px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                background: e.couleur, color: "#fff", fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", marginBottom: 10,
+                width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
+                background: "#f3f3f3", color: "#999", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                marginBottom: 10, textAlign: "center", textDecoration: "none", boxSizing: "border-box",
+                border: "0.5px dashed #ccc",
               }}
             >
-              Ouvrir {e.nom}
-            </button>
+              Nécessite Cursus Essentiel
+            </a>
             <button
               onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
               style={{
