@@ -34,6 +34,11 @@ const ESPACES = [
     accroche: "Écrire, structurer, être accompagné·e par l'IA pendant la rédaction.",
     couleur: "#7F77DD",
     logo: "/logo-cursedit.png",
+    // 06/09/2026 — CursEdit a son propre palier d'entrée le moins cher
+    // (Découverte, 9,99€/mois — voir Tarification.jsx), distinct du
+    // bundle Cursus Essentiel qui couvre les trois espaces. Le minimum
+    // réel pour ouvrir CursEdit seul est Découverte, pas Essentiel.
+    requisLabel: "Cursus Découverte",
     info: {
       sousTitre: "Votre espace d'écriture accompagné par IA",
       intro: [
@@ -356,7 +361,7 @@ export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
                 border: "0.5px dashed #ccc",
               }}
             >
-              Nécessite Cursus Essentiel
+              Nécessite {e.requisLabel || "Cursus Essentiel"}
             </a>
           </div>
         ))}
