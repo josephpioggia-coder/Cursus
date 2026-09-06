@@ -79,6 +79,7 @@ const ESPACES = [
     nom: "CursAudit",
     accroche: "Auditer un texte déjà écrit : preuve, cohérence, risques, sur une grille de critères.",
     couleur: "#1D9E75",
+    requisLabel: "Cursus Essentiel",
     logo: "/logo-cursaudit.png",
     info: {
       sousTitre: "Votre espace d'audit critique des textes",
@@ -142,6 +143,7 @@ const ESPACES = [
     couleur: "#0E7256",
     logo: "/logo-cursdecision-v2.png",
     libelléLien: "Découvrir CursDecision",
+    requisLabel: "Cursus Initié",
   },
 ];
 
