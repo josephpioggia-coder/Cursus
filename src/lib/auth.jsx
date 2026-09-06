@@ -98,9 +98,13 @@ export function PageConnexion() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <img src="/logo-cursus.png" alt="Cursus" style={{ height: 48, width: 48, borderRadius: 10, marginBottom: 8 }} />
+          {/* 06/09/2026 — logo agrandi de 48 à 98px : trop petit comparé aux
+              logos de l'écran d'accueil (98px dans le bandeau, 110px sur les
+              cartes) — même taille que le bandeau Cursus Essentiel pour
+              rester cohérent d'une page à l'autre. */}
+          <img src="/logo-cursus.png" alt="Cursus" style={{ height: 98, width: 98, borderRadius: 16, marginBottom: 8 }} />
           <div style={{ fontSize: 28, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>Cursus</div>
-          <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>CursEdit pour écrire, CursAudit pour auditer — l'écriture assistée par IA</div>
+          <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>CursEdit pour écrire, CursAudit pour auditer, CursDecision pour décider — l'écriture assistée par IA</div>
         </div>
 
         {/* Onglets */}

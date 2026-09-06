@@ -300,8 +300,27 @@ export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
       </div>
 
       <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Trois espaces inclus dans Cursus Essentiel</div>
-      <div style={{ fontSize: 13, color: "#999", marginBottom: 36, textAlign: "center", maxWidth: 420 }}>
+      <div style={{ fontSize: 13, color: "#999", marginBottom: 20, textAlign: "center", maxWidth: 420 }}>
         Découvrez ce que chaque espace permet — l'ouverture est réservée aux membres de Cursus Essentiel.
+      </div>
+
+      {/* 06/09/2026 — "Voir les fonctionnalités" déplacé hors des cartes,
+          en cartouches colorées au-dessus (maquette fournie), plutôt qu'un
+          simple lien texte discret sous chaque carte. */}
+      <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 960, marginBottom: 16 }}>
+        {ESPACES.map((e) => (
+          <button
+            key={`cartouche-${e.id}`}
+            onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
+            style={{
+              width: 300, padding: "10px 0", borderRadius: 24, cursor: "pointer",
+              background: "#fff", color: e.couleur, fontSize: 13.5, fontWeight: 600,
+              fontFamily: "inherit", border: `1.5px solid ${e.couleur}`,
+            }}
+          >
+            {e.libelléLien || "Voir les fonctionnalités"}
+          </button>
+        ))}
       </div>
 
       {/* 05/09/2026 — maxWidth élargi de 680 (dimensionné pour 2 cartes) à
@@ -339,15 +358,6 @@ export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
             >
               Nécessite Cursus Essentiel
             </a>
-            <button
-              onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
-              style={{
-                width: "100%", padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                background: "transparent", color: e.couleur, fontSize: 12.5, fontWeight: 500, fontFamily: "inherit",
-              }}
-            >
-              {e.libelléLien || "Voir les fonctionnalités"}
-            </button>
           </div>
         ))}
       </div>
