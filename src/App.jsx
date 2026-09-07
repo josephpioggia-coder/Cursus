@@ -1705,7 +1705,28 @@ export default function App() {
   // localStorage — le choix survit désormais à une déconnexion/reconnexion
   // et à un nouvel onglet, jusqu'à ce qu'on clique explicitement sur
   // "changer d'espace" (changerEspace ci-dessous, toujours disponible).
-  const [espace, setEspace] = useState(() => localStorage.getItem("cursus_espace") || null);
+  const [espace, setEspace] = useState(() => {
+    // CORRECTIF 07/09/2026 — retour de paiement Stripe (success_url de
+    // creer-session-checkout : "?abonnement=succes&palier=..." pour
+    // CursEdit, "?audit=succes&audit_id=..." pour CursAudit) n'était jamais
+    // lu ici : un client qui venait de payer retombait systématiquement sur
+    // l'écran de choix d'espace au lieu d'entrer directement dans son
+    // espace — signalé par l'auteur du projet ("le client qui vient de
+    // payer se retrouve coincé à la même page"). Détecté et traité dès
+    // l'initialisation de l'état, avant le tout premier rendu : l'écran de
+    // choix n'apparaît même pas le temps d'un clignement.
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("abonnement") || params.has("audit")) {
+      const espaceRetour = params.has("audit") ? "cursaudit" : "cursedit";
+      localStorage.setItem("cursus_espace", espaceRetour);
+      // Nettoie l'URL pour qu'un rechargement ultérieur (favori, F5) ne
+      // re-déclenche pas ce comportement indéfiniment sur une URL de succès
+      // devenue obsolète.
+      window.history.replaceState({}, "", window.location.pathname);
+      return espaceRetour;
+    }
+    return localStorage.getItem("cursus_espace") || null;
+  });
 
   const choisirEspace = (id) => {
     localStorage.setItem("cursus_espace", id);
