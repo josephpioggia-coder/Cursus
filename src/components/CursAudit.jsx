@@ -349,16 +349,29 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
       {résultat ? (
         <div style={{ background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 10, padding: "18px 20px" }}>
-          <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé — en attente de paiement</div>
+          <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>
+            {résultat.audit.statut === "paye" ? "Audit créé et débloqué" : "Audit créé — en attente de paiement"}
+          </div>
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
             « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}.
             <br />
             Un aperçu gratuit du manuscrit est disponible dès maintenant depuis l'écran de détail de cet audit.
-            <br />
-            L'audit détaillé nécessite le paiement ci-dessous pour être lancé.
+            {résultat.audit.statut === "paye" ? (
+              <>
+                <br />
+                Compte propriétaire — audit détaillé débloqué sans paiement.
+              </>
+            ) : (
+              <>
+                <br />
+                L'audit détaillé nécessite le paiement ci-dessous pour être lancé.
+              </>
+            )}
           </div>
 
-          {/* 07/09/2026 — étape de paiement réelle (référence 60816-01, suite) */}
+          {/* 07/09/2026 — étape de paiement réelle (référence 60816-01, suite) —
+              masquée si déjà payé (compte propriétaire, voir auditsAPI.créer). */}
+          {résultat.audit.statut !== "paye" && (
           <div style={{ marginTop: 14, padding: "14px 16px", background: "#fff", border: "0.5px solid #1D9E7540", borderRadius: 8 }}>
             <div style={{ fontSize: 20, fontWeight: 600, color: "var(--texte-primaire)", marginBottom: 10 }}>
               {résultat.audit.prix_ttc.toFixed(2).replace(".", ",")} € TTC
@@ -391,6 +404,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
               <div style={{ marginTop: 8, fontSize: 12, color: "#A32D2D" }}>{erreurCheckout}</div>
             )}
           </div>
+          )}
 
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button

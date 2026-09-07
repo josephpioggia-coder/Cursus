@@ -28,6 +28,13 @@ const userId = async () => {
   return user?.id || null;
 };
 
+// 07/09/2026 — même email déjà utilisé pour gater l'accès à Administration
+// (App.jsx, nav) : le propriétaire du projet n'a jamais à payer ses propres
+// audits de test. Un seul endroit pour cette adresse serait plus propre,
+// mais dupliquer une constante simple prend moins de risque, dans l'urgence,
+// que d'introduire un nouvel import partagé entre api.js et App.jsx.
+const EMAIL_PROPRIETAIRE = "joseph.pioggia@gmail.com";
+
 // ─── PROJETS ──────────────────────────────────────────────────────────────────
 
 export const projetsAPI = {
@@ -612,7 +619,10 @@ export const auditsAPI = {
   }) {
     if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
 
-    const uid = await userId();
+    const { data: { user: utilisateurCourant } } = await supabase.auth.getUser();
+    const uid = utilisateurCourant?.id || null;
+    const estProprietaire = utilisateurCourant?.email === EMAIL_PROPRIETAIRE;
+
     const { data: audit, error: erreurAudit } = await supabase
       .from("audits")
       .insert([{
@@ -634,7 +644,10 @@ export const auditsAPI = {
         // checkout.session.completed. Le pré-audit (preaudit_statut) reste
         // un produit séparé, non traité par ce chantier — "non_demande" par
         // défaut, comme avant ce contournement.
-        statut:            "brouillon",
+        // Exception : le propriétaire du projet (même adresse que le
+        // gardien "Administration" dans App.jsx) n'a jamais à payer ses
+        // propres audits de test.
+        statut:            estProprietaire ? "paye" : "brouillon",
         preaudit_statut:   "non_demande",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
