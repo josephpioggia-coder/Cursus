@@ -1697,18 +1697,22 @@ const btnSecondaryStyle = {
 export default function App() {
   const { t } = useTranslation("common");
   const { user, chargement: authChargement, déconnecter } = useAuth();
-  // Choix d'espace (CursEdit / CursAudit, chantier 2) — mémorisé pour la
-  // session du navigateur (sessionStorage, pas localStorage) : on redemande
-  // à chaque nouvelle connexion/onglet, pas à chaque simple rechargement de
-  // page pendant qu'on travaille.
-  const [espace, setEspace] = useState(() => sessionStorage.getItem("cursus_espace") || null);
+  // Choix d'espace (CursEdit / CursAudit, chantier 2) — CORRECTIF 07/09/2026 :
+  // était en sessionStorage ("on redemande à chaque nouvelle connexion"),
+  // mais signalé par l'auteur du projet comme une vraie gêne : se
+  // déconnecter puis se reconnecter renvoyait systématiquement à l'écran de
+  // choix au lieu de rouvrir directement le dernier espace utilisé. Passé en
+  // localStorage — le choix survit désormais à une déconnexion/reconnexion
+  // et à un nouvel onglet, jusqu'à ce qu'on clique explicitement sur
+  // "changer d'espace" (changerEspace ci-dessous, toujours disponible).
+  const [espace, setEspace] = useState(() => localStorage.getItem("cursus_espace") || null);
 
   const choisirEspace = (id) => {
-    sessionStorage.setItem("cursus_espace", id);
+    localStorage.setItem("cursus_espace", id);
     setEspace(id);
   };
   const changerEspace = () => {
-    sessionStorage.removeItem("cursus_espace");
+    localStorage.removeItem("cursus_espace");
     setEspace(null);
   };
 
