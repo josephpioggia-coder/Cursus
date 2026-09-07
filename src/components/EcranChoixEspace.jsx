@@ -400,23 +400,31 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
               <button
                 onClick={() => setPageDécisionOuverte(true)}
                 style={{
-                  width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
-                  background: e.couleur, color: "#fff", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                  width: "100%", padding: "14px 0", borderRadius: 10, cursor: "pointer",
+                  background: e.couleur, color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit",
                   marginBottom: 10, textAlign: "center", border: "none", boxSizing: "border-box",
+                  boxShadow: `0 3px 10px ${e.couleur}55`,
                 }}
               >
-                Découvrir CursDecision
+                Découvrir CursDecision →
               </button>
             ) : (
+              // 07/09/2026 — agrandi (padding/taille/ombre) après retour de
+              // l'auteur du projet : le bouton passait inaperçu, trop
+              // discret face au gros bouton rouge "Rejoindre l'offre de
+              // lancement" en haut de la page — donnait l'impression de
+              // rester bloqué sur le même écran alors qu'un vrai bouton
+              // d'entrée existait déjà juste en dessous.
               <button
                 onClick={() => onChoisir(e.id)}
                 style={{
-                  width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
-                  background: e.couleur, color: "#fff", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                  width: "100%", padding: "14px 0", borderRadius: 10, cursor: "pointer",
+                  background: e.couleur, color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit",
                   marginBottom: 10, textAlign: "center", border: "none", boxSizing: "border-box",
+                  boxShadow: `0 3px 10px ${e.couleur}55`,
                 }}
               >
-                Ouvrir {e.nom}
+                Ouvrir {e.nom} →
               </button>
             )}
           </div>
