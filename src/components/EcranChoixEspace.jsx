@@ -307,34 +307,26 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
         <div style={{ fontSize: 13.5, color: "#555", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 4 }}>
           Une suite assistée par l'intelligence artificielle pour écrire, auditer et décider avec méthode.
         </div>
-        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 14 }}>
           Un seul abonnement CursEdit débloque progressivement les trois espaces :
           CursEdit, puis CursAudit (dès Essentiel), puis CursDecision (dès Initié).
         </div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center",
-          padding: "10px 18px", borderRadius: 10, background: "#8B263508", marginBottom: 10,
-        }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#8B2635", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            Offre de lancement
-          </span>
-          <span style={{ fontSize: 13.5, color: "#333" }}>
-            Cinq formules, à partir de 9,99€/mois
-          </span>
-        </div>
-        {/* 07/09/2026 — ouvre PageLancement (autonome, hors shell
-            applicatif) plutôt que d'entrer dans le shell via
-            choisirEspace() juste pour afficher un tarif — voir la note de
-            PageLancement.jsx. */}
+        {/* CORRECTIF 07/09/2026 — cet écran s'affiche à CHAQUE connexion,
+            y compris pour un compte déjà abonné qui veut juste rouvrir son
+            espace (ex. via "changer d'espace") : le gros bandeau rouge
+            "Offre de lancement / Rejoindre l'offre de lancement", au même
+            niveau visuel que les vrais boutons d'entrée juste en dessous,
+            n'a plus de raison d'être ici — signalé par l'auteur du projet
+            ("cette page est différente de l'accueil"). Réduit à un simple
+            lien texte : toujours atteignable, plus jamais dominant. */}
         <button
           onClick={() => setPageLancementOuverte(true)}
           style={{
-            padding: "9px 22px", borderRadius: 8, border: "none", cursor: "pointer",
-            background: "#8B2635", color: "#fff", fontSize: 13.5, fontWeight: 600,
-            fontFamily: "inherit",
+            background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
+            fontSize: 12.5, color: "#8B2635", textDecoration: "underline", padding: 0,
           }}
         >
-          Rejoindre l'offre de lancement
+          Voir les tarifs et l'offre de lancement
         </button>
       </div>
 
@@ -345,16 +337,26 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
 
       {/* 06/09/2026 — "Voir les fonctionnalités" déplacé hors des cartes,
           en cartouches colorées au-dessus (maquette fournie), plutôt qu'un
-          simple lien texte discret sous chaque carte. */}
+          simple lien texte discret sous chaque carte.
+          CORRECTIF 07/09/2026 — taille explicitement alignée sur les
+          boutons "Ouvrir X" des cartes ci-dessous (STYLE_BOUTON_CARTE,
+          UNE seule constante pour les deux rangées) : signalé à plusieurs
+          reprises par l'auteur du projet que le bouton CursDecision
+          paraissait plus petit que les autres. Aucun des deux boutons de
+          CursDecision (celui-ci et celui de la carte) n'avait en réalité
+          un style différent des deux autres espaces — donc soit un souci
+          de cache/déploiement, soit la confusion venait de ces DEUX
+          rangées de boutons de tailles différentes l'une de l'autre.
+          Plus qu'une seule taille possible sur tout l'écran désormais. */}
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center", maxWidth: 960, marginBottom: 16 }}>
         {ESPACES.map((e) => (
           <button
             key={`cartouche-${e.id}`}
             onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
             style={{
-              width: 300, padding: "10px 0", borderRadius: 24, cursor: "pointer",
-              background: "#fff", color: e.couleur, fontSize: 13.5, fontWeight: 600,
-              fontFamily: "inherit", border: `1.5px solid ${e.couleur}`,
+              width: 300, padding: "14px 0", borderRadius: 24, cursor: "pointer",
+              background: "#fff", color: e.couleur, fontSize: 15, fontWeight: 700,
+              fontFamily: "inherit", border: `2px solid ${e.couleur}`, boxSizing: "border-box",
             }}
           >
             {e.libelléLien || "Voir les fonctionnalités"}
