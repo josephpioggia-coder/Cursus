@@ -67,6 +67,11 @@ export default function Administration() {
   // input désactivé plus bas).
   const [idEnÉdition, setIdEnÉdition] = useState(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  // Recherche (07/09/2026) — la table "Codes existants" n'avait ni
+  // pagination ni filtre : question posée par l'auteur du projet en
+  // anticipant le jour où elle contiendrait des dizaines de lignes.
+  // Filtre client (pas de nouvel appel serveur) sur code/email/description.
+  const [recherche, setRecherche] = useState("");
   const [journal, setJournal] = useState([]);
   const compteurLigne = useRef(0);
 
@@ -228,6 +233,15 @@ export default function Administration() {
     }
   };
 
+  const rechercheNormalisée = recherche.trim().toLowerCase();
+  const codesFiltrés = rechercheNormalisée
+    ? codes.filter((c) =>
+        c.code?.toLowerCase().includes(rechercheNormalisée) ||
+        c.client_email?.toLowerCase().includes(rechercheNormalisée) ||
+        c.description?.toLowerCase().includes(rechercheNormalisée)
+      )
+    : codes;
+
   const champStyle = {
     padding: "8px 10px",
     border: `0.5px solid ${COULEURS.texteClair}55`,
@@ -356,11 +370,26 @@ export default function Administration() {
       </div>
       </form>
 
-      <h2 style={{ fontSize: 15, color: COULEURS.texte, marginBottom: 12 }}>Codes existants</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <h2 style={{ fontSize: 15, color: COULEURS.texte, margin: 0 }}>
+          Codes existants {codes.length > 0 && <span style={{ fontWeight: 400, color: COULEURS.texteClair }}>({codesFiltrés.length}{codesFiltrés.length !== codes.length ? ` / ${codes.length}` : ""})</span>}
+        </h2>
+        {codes.length > 5 && (
+          <input
+            type="text"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+            placeholder="Rechercher un code ou un email…"
+            style={{ ...champStyle, width: 240 }}
+          />
+        )}
+      </div>
       {chargement ? (
         <p style={{ fontSize: 13, color: COULEURS.texteClair }}>Chargement…</p>
       ) : codes.length === 0 ? (
         <p style={{ fontSize: 13, color: COULEURS.texteClair }}>Aucun code créé pour l'instant.</p>
+      ) : codesFiltrés.length === 0 ? (
+        <p style={{ fontSize: 13, color: COULEURS.texteClair }}>Aucun code ne correspond à « {recherche} ».</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
@@ -379,7 +408,7 @@ export default function Administration() {
               </tr>
             </thead>
             <tbody>
-              {codes.map((c) => (
+              {codesFiltrés.map((c) => (
                 <tr key={c.id} style={{ borderBottom: `0.5px solid ${COULEURS.texteClair}22` }}>
                   <td style={{ padding: "6px 8px", fontFamily: "monospace" }}>{c.code}</td>
                   <td style={{ padding: "6px 8px" }}>{c.client_email || "—"}</td>
