@@ -1701,19 +1701,10 @@ export default function App() {
   // à chaque nouvelle connexion/onglet, pas à chaque simple rechargement de
   // page pendant qu'on travaille.
   const [espace, setEspace] = useState(() => sessionStorage.getItem("cursus_espace") || null);
-  // 05/09/2026 — "Rejoindre l'offre de lancement" (EcranChoixEspace) doit
-  // amener directement sur la page Tarification plutôt qu'à un mailto :
-  // vueInitiale force la vue de démarrage d'AppConnectée une seule fois,
-  // sans dépendre d'un vrai routage entre les deux écrans.
-  const [vueInitiale, setVueInitiale] = useState(null);
 
   const choisirEspace = (id) => {
     sessionStorage.setItem("cursus_espace", id);
     setEspace(id);
-  };
-  const voirTarification = () => {
-    setVueInitiale("tarification");
-    choisirEspace("cursedit");
   };
   const changerEspace = () => {
     sessionStorage.removeItem("cursus_espace");
@@ -1726,18 +1717,23 @@ export default function App() {
     </div>
   );
   if (!user) return <PageConnexion />;
-  if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} onVoirTarification={voirTarification} />;
+  // 07/09/2026 — "Rejoindre l'offre de lancement" ouvre désormais
+  // PageLancement depuis EcranChoixEspace elle-même (autonome, comme
+  // CursDecisionPage) — plus besoin de vueInitiale ici pour y accéder via
+  // choisirEspace("cursedit"), qui montait tout le shell applicatif juste
+  // pour afficher un tarif.
+  if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} />;
 
-  return <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} vueInitiale={vueInitiale} />;
+  return <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} />;
 }
 
 // ─── Composant : App connectée (après auth) ───────────────────────────────────
 
-function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace, vueInitiale }) {
+function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const { t, i18n } = useTranslation("common");
   const [projets, setProjets]   = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [vue, setVue]           = useState(vueInitiale || (espaceActif === "cursaudit" ? "cursaudit" : "tableau"));
+  const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
   const [auditActifId, setAuditActifId] = useState(null);
   // ── Mise en page mobile (23/08/2026) ── La grille "220px 1fr" était figée

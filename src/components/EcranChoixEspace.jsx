@@ -26,6 +26,7 @@
 
 import { useState } from "react";
 import CursDecisionPage from "./CursDecisionPage.jsx";
+import PageLancement from "./PageLancement.jsx";
 
 const ESPACES = [
   {
@@ -242,15 +243,23 @@ function FenêtreInfo({ espace, onFermer }) {
   );
 }
 
-export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
+export default function EcranChoixEspace({ onChoisir }) {
   const [infoOuverte, setInfoOuverte] = useState(null);
   // CursDecision n'a pas encore d'espace de travail réel (voir note dans
   // CursDecisionPage.jsx) : "Ouvrir" et "Découvrir" mènent tous les deux
   // ici pour l'instant, au lieu d'un vrai `onChoisir("cursdecision")`.
   const [pageDécisionOuverte, setPageDécisionOuverte] = useState(false);
+  // 07/09/2026 — "Rejoindre l'offre de lancement" affiche cette page
+  // autonome (comme CursDecisionPage), plutôt que de passer par
+  // choisirEspace("cursedit") qui montait tout le shell applicatif pour
+  // simplement afficher un tarif (voir note dans PageLancement.jsx).
+  const [pageLancementOuverte, setPageLancementOuverte] = useState(false);
 
   if (pageDécisionOuverte) {
     return <CursDecisionPage onRetour={() => setPageDécisionOuverte(false)} />;
+  }
+  if (pageLancementOuverte) {
+    return <PageLancement onRetour={() => setPageLancementOuverte(false)} />;
   }
 
   return (
@@ -277,7 +286,8 @@ export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
           Une suite assistée par l'intelligence artificielle pour écrire, auditer et décider avec méthode.
         </div>
         <div style={{ fontSize: 13, color: "#999", lineHeight: 1.5, textAlign: "center", maxWidth: 460, marginBottom: 16 }}>
-          Activez Cursus Essentiel et accédez aux trois espaces de travail : CursEdit, CursAudit et CursDecision.
+          Un seul abonnement CursEdit débloque progressivement les trois espaces :
+          CursEdit, puis CursAudit (dès Essentiel), puis CursDecision (dès Initié).
         </div>
         <div style={{
           display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "center",
@@ -287,15 +297,15 @@ export default function EcranChoixEspace({ onChoisir, onVoirTarification }) {
             Offre de lancement
           </span>
           <span style={{ fontSize: 13.5, color: "#333" }}>
-            Cursus Essentiel — 60€ pour la première année
+            Cinq formules, à partir de 9,99€/mois
           </span>
         </div>
-        {/* 05/09/2026 — mène à la page Tarification existante (paliers
-            CursEdit) plutôt qu'à un mailto : pas encore de palier "Cursus
-            Essentiel" séparé côté Stripe, donc on montre la tarification
-            actuelle en attendant la migration. */}
+        {/* 07/09/2026 — ouvre PageLancement (autonome, hors shell
+            applicatif) plutôt que d'entrer dans le shell via
+            choisirEspace() juste pour afficher un tarif — voir la note de
+            PageLancement.jsx. */}
         <button
-          onClick={onVoirTarification}
+          onClick={() => setPageLancementOuverte(true)}
           style={{
             padding: "9px 22px", borderRadius: 8, border: "none", cursor: "pointer",
             background: "#8B2635", color: "#fff", fontSize: 13.5, fontWeight: 600,
