@@ -654,7 +654,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
               style={{ marginTop: 2, flexShrink: 0 }}
             />
             <span style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--texte-secondaire)" }}>
-              J'accepte que le texte et les réponses transmis dans cet audit puissent être supervisés et relus par l'équipe Cursus,
+              <strong style={{ color: "var(--texte-primaire)" }}>Supervision demandée</strong> — J'accepte que le texte et les réponses transmis dans cet audit puissent être supervisés et relus par l'équipe Cursus,
               dans le cadre d'une clause de confidentialité et de déontologie professionnelle. Un retour de l'équipe Cursus suit un
               premier examen des données transmises ; si cet examen révèle qu'un travail de relecture humaine non compris dans
               l'offre de base est nécessaire, il peut donner lieu à un devis avant toute poursuite.
