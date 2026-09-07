@@ -19,16 +19,27 @@
  * d'intervention sont transmis au moteur d'analyse ; le reste qualifie la
  * demande sans influencer encore le résultat.
  *
+ * PAIEMENT RÉEL (référence 60816-01, suite, 07/09/2026) — l'audit créé
+ * reste au statut "brouillon" jusqu'au paiement Stripe réel (checkout à
+ * montant dynamique, voir demarrerCheckoutAudit()/creer-session-checkout/
+ * stripe-webhook), confirmé exclusivement sur checkout.session.completed —
+ * jamais à la création. Décision actée avec l'auteur du projet le
+ * 16/08/2026 : le paiement vient APRÈS le texte/palier choisis, une fois
+ * le prix exact connu — jamais avant, puisque le prix dépend du nombre
+ * réel d'unités. Exception : le propriétaire du projet (EMAIL_PROPRIETAIRE
+ * dans api.js) n'a jamais à payer ses propres audits de test.
+ *
+ * CONSENTEMENT À LA SUPERVISION (référence 60816-01, suite, 07/09/2026) —
+ * voir 2026-09-07-consentement-supervision-cursaudit.sql. Case à cocher
+ * obligatoire avant "Créer l'audit", recueillie à chaque audit (pas une
+ * fois pour tout le compte) : l'auteur·ice accepte que les données
+ * transmises soient supervisées/relues par l'équipe Cursus, dans un cadre
+ * confidentiel, et qu'un premier examen puisse déboucher sur un devis si
+ * un travail de relecture humaine non compris dans l'offre de base s'avère
+ * nécessaire.
+ *
  * CE QUE CETTE PAGE NE FAIT PAS ENCORE (limites assumées) :
  *  - Pas d'import .pdf — .docx et texte collé seulement.
- *  - Pas de paiement : l'audit créé reste au statut "brouillon". Aucun
- *    flux Stripe pour CursAudit n'existe encore (voir
- *    docs/cursaudit-tarification.md) — lancer l'analyse réelle nécessite
- *    encore de repasser le statut à "paye" manuellement (SQL), comme pour
- *    les tests de analyser-unite-cursaudit / orchestrer-audit-cursaudit.
- *    Décision actée avec l'auteur du projet le 16/08/2026 : le paiement
- *    doit venir APRÈS le texte/palier choisis, une fois le prix exact
- *    connu — jamais avant, puisque le prix dépend du nombre réel d'unités.
  *  - Pas de remise abonné CursEdit dans le prix affiché (nécessite de
  *    connaître l'abonnement actif de l'auteur·e — hors périmètre ici).
  *  - Modes IA limités à "1 IA" et "2 IA", les deux seuls implémentés côté
@@ -135,6 +146,12 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [erreurCheckout, setErreurCheckout] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [résultat, setRésultat] = useState(null);
+  // Consentement à la supervision (07/09/2026) — voir docblock en tête de
+  // fichier et 2026-09-07-consentement-supervision-cursaudit.sql. Recueilli
+  // à chaque audit, jamais restauré depuis le brouillon localStorage : une
+  // case cochée avant un rechargement de page ne doit pas se recocher
+  // silencieusement toute seule.
+  const [consentementSupervision, setConsentementSupervision] = useState(false);
 
   // Mise en page (réf. 60816-01, suite, 24/08/2026) — voir
   // diagnostiquerQualitéImport() ci-dessous. null = pas encore demandée
@@ -275,7 +292,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
   };
 
   const créer = async () => {
-    if (!titre.trim() || unités.length === 0 || !prix) return;
+    if (!titre.trim() || unités.length === 0 || !prix || !consentementSupervision) return;
     setEnCours(true);
     setErreur(null);
     setRésultat(null);
@@ -301,6 +318,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
       relationIA: questionnaire?.relationIA,
       contratIntention: questionnaire?.contratIntention,
       chapitresDétectés,
+      consentementSupervision,
     });
 
     setEnCours(false);
@@ -329,6 +347,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setInfosDocx(null); setNiveauxDisponibles([]); setNiveauxRetenus([]);
     setDemandeMiseEnPage(null);
     setQuestionnaire(null);
+    setConsentementSupervision(false);
   };
 
   return (
@@ -614,16 +633,37 @@ export default function CursAudit({ onVoirAudits } = {}) {
             </div>
           )}
 
+          <label style={{ display: "flex", gap: 9, alignItems: "flex-start", background: "var(--surface, #fff)", border: "0.5px solid var(--border)", borderRadius: 8, padding: "12px 14px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={consentementSupervision}
+              onChange={(e) => setConsentementSupervision(e.target.checked)}
+              style={{ marginTop: 2, flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--texte-secondaire)" }}>
+              J'accepte que le texte et les réponses transmis dans cet audit puissent être supervisés et relus par l'équipe Cursus,
+              dans le cadre d'une clause de confidentialité et de déontologie professionnelle. Un retour de l'équipe Cursus suit un
+              premier examen des données transmises ; si cet examen révèle qu'un travail de relecture humaine non compris dans
+              l'offre de base est nécessaire, il peut donner lieu à un devis avant toute poursuite.
+            </span>
+          </label>
+
           <button
             onClick={créer}
-            disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage}
+            disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision}
             style={{
               padding: "10px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-              background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage) ? "#ccc" : "#7F77DD",
-              color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage) ? "default" : "pointer",
+              background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "#ccc" : "#7F77DD",
+              color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "default" : "pointer",
             }}
           >
-            {enCours ? "Création…" : problèmeMiseEnPage ? "Mise en page à résoudre avant création" : "Créer l'audit (brouillon)"}
+            {enCours
+              ? "Création…"
+              : problèmeMiseEnPage
+                ? "Mise en page à résoudre avant création"
+                : !consentementSupervision
+                  ? "Acceptez la supervision ci-dessus pour continuer"
+                  : "Créer l'audit (brouillon)"}
           </button>
         </div>
       )}

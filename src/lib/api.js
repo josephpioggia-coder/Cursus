@@ -616,8 +616,18 @@ export const auditsAPI = {
     // détectée : le pré-audit enrichi chapitre par chapitre n'est alors
     // simplement pas proposé pour cet audit (voir CursAuditDetail.jsx).
     chapitresDétectés = null,
+    // Consentement à la supervision (réf. 60816-01, suite, 07/09/2026) —
+    // voir 2026-09-07-consentement-supervision-cursaudit.sql et le bloc
+    // dédié dans CursAudit.jsx, juste avant le bouton "Créer l'audit".
+    // Recueilli à CHAQUE audit (pas une case cochée une fois pour tout le
+    // compte) : chaque projet transmis a sa propre trace. Le contrôle
+    // réel vit ici, pas seulement côté UI — un appel qui l'omettrait
+    // (script, appel direct) échoue au lieu de créer un audit sans trace
+    // de consentement.
+    consentementSupervision = false,
   }) {
     if (!unités || unités.length === 0) return { data: null, error: { message: "Aucune unité détectée." } };
+    if (!consentementSupervision) return { data: null, error: { message: "Le consentement à la supervision est requis avant de créer un audit." } };
 
     const { data: { user: utilisateurCourant } } = await supabase.auth.getUser();
     const uid = utilisateurCourant?.id || null;
@@ -658,6 +668,8 @@ export const auditsAPI = {
         relation_ia:             relationIA,
         contrat_intention:       contratIntention,
         chapitres_detectes:      chapitresDétectés,
+        consentement_supervision:    true,
+        consentement_supervision_le: new Date().toISOString(),
       }])
       .select()
       .single();
