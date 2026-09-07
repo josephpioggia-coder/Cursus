@@ -23,6 +23,19 @@ export const COULEURS = {
 
 // Contenu marketing par palier — séparé de la config technique (prix-stripe-config.mjs)
 // pour ne jamais mélanger les données Stripe (immuables) et le texte (modifiable librement).
+// Logos des espaces débloqués par palier (07/09/2026, correctif) — la
+// grille affichait jusqu'ici une ligne de texte ("Accès à CursAudit")
+// ajoutée pendant l'extraction de ce fichier, alors que le design réel
+// (voir capture d'écran de la page en ligne) montre les LOGOS des espaces
+// sous la liste de fonctionnalités, pas une ligne de texte en plus.
+// Modèle cumulatif inchangé : Essentiel débloque CursAudit, Initié
+// débloque CursDecision, Auteur/Studio héritent des deux.
+export const LOGOS_ESPACES = {
+  cursedit: "/logo-cursedit.png",
+  cursaudit: "/logo-cursaudit.png",
+  cursdecision: "/logo-cursdecision-v2.png",
+};
+
 export const CONTENU_PALIERS = {
   decouverte: {
     description: "Pour démarrer sérieusement, sans engagement lourd.",
@@ -34,6 +47,7 @@ export const CONTENU_PALIERS = {
       "1 projet",
       "5 analyses IA / jour",
     ],
+    espaces: ["cursedit"],
     miseEnAvant: false,
   },
   essentiel: {
@@ -46,8 +60,8 @@ export const CONTENU_PALIERS = {
       "Cohérence narrative & personnages",
       "Mode auto-analyse (10 min)",
       "Bibliothèque + citations APA",
-      "Accès à CursAudit",
     ],
+    espaces: ["cursedit", "cursaudit"],
     miseEnAvant: false,
   },
   initie: {
@@ -58,8 +72,8 @@ export const CONTENU_PALIERS = {
       "250 analyses IA / mois",
       "Références académiques par IA",
       "Export Word / PDF soigné",
-      "Accès à CursDecision",
     ],
+    espaces: ["cursedit", "cursaudit", "cursdecision"],
     miseEnAvant: true,
   },
   auteur: {
@@ -72,6 +86,7 @@ export const CONTENU_PALIERS = {
       "Support prioritaire",
       "Sessions de supervision sur devis",
     ],
+    espaces: ["cursedit", "cursaudit", "cursdecision"],
     miseEnAvant: false,
   },
   studio: {
@@ -84,6 +99,7 @@ export const CONTENU_PALIERS = {
       "Tableau de bord partagé",
       "Onboarding personnalisé",
     ],
+    espaces: ["cursedit", "cursaudit", "cursdecision"],
     miseEnAvant: false,
   },
 };

@@ -15,7 +15,7 @@
 
 import { useState } from "react";
 import { PRIX_STRIPE, ORDRE_PALIERS } from "../lib/prix-stripe-config.mjs";
-import { COULEURS, CONTENU_PALIERS, demarrerCheckout } from "../lib/contenuPaliers.js";
+import { COULEURS, CONTENU_PALIERS, LOGOS_ESPACES, demarrerCheckout } from "../lib/contenuPaliers.js";
 
 export default function GrillePaliers() {
   const [periode, setPeriode] = useState("mensuel");
@@ -123,6 +123,14 @@ export default function GrillePaliers() {
                   </li>
                 ))}
               </ul>
+
+              {contenu.espaces && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                  {contenu.espaces.map((espace) => (
+                    <img key={espace} src={LOGOS_ESPACES[espace]} alt="" style={{ width: 26, height: 26, borderRadius: 6 }} />
+                  ))}
+                </div>
+              )}
 
               <button
                 onClick={() => demarrerCheckout(priceIdActuel, cle, codePromo)}
