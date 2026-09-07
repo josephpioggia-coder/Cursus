@@ -1723,7 +1723,7 @@ export default function App() {
   // CursDecisionPage) — plus besoin de vueInitiale ici pour y accéder via
   // choisirEspace("cursedit"), qui montait tout le shell applicatif juste
   // pour afficher un tarif.
-  if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} />;
+  if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} onDéconnecter={déconnecter} />;
 
   return <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} />;
 }

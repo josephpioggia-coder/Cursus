@@ -243,7 +243,7 @@ function FenêtreInfo({ espace, onFermer }) {
   );
 }
 
-export default function EcranChoixEspace({ onChoisir }) {
+export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
   const [infoOuverte, setInfoOuverte] = useState(null);
   // CursDecision n'a pas encore d'espace de travail réel (voir note dans
   // CursDecisionPage.jsx) : "Ouvrir" et "Découvrir" mènent tous les deux
@@ -266,7 +266,29 @@ export default function EcranChoixEspace({ onChoisir }) {
     <div style={{
       minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", padding: 24,
+      position: "relative",
     }}>
+      {/* 07/09/2026 — cet écran s'affichait déjà après connexion, mais sans
+          AUCUN moyen d'en sortir : `déconnecter` (lib/auth.jsx) n'était
+          câblé que dans AppConnectée, jamais transmis jusqu'ici. Un compte
+          arrivant sur cet écran (ex. session déjà active en visitant
+          cursus.pro dans un nouvel onglet) restait bloqué, sans moyen de se
+          reconnecter avec un autre compte — signalé par l'auteur du projet.
+          Bouton discret plutôt qu'imposant, ce n'est pas l'action attendue
+          ici la plupart du temps. */}
+      {onDéconnecter && (
+        <button
+          onClick={onDéconnecter}
+          style={{
+            position: "absolute", top: 16, right: 16,
+            background: "none", border: "0.5px solid #00000022", borderRadius: 6,
+            padding: "5px 10px", fontSize: 11.5, color: "#666", cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          Se déconnecter
+        </button>
+      )}
       {/* 22/08/2026, v3 — largeur = exactement celle des deux cartes
           CursEdit/CursAudit réunies (300 + 20 de gap + 300 = 620px), ratio
           732:280, liseré doré #C4973A, logo centré au-dessus du titre.
