@@ -377,7 +377,18 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column",
             }}
           >
-            <img src={e.logo} alt={e.nom} style={{ width: 110, height: "auto", display: "block", margin: "0 auto 14px" }} />
+            {/* CORRECTIF 07/09/2026 — les trois logos ont été recadrés sur
+                l'icône seule (voir public/logo-*.png) : ils contenaient
+                jusqu'ici le nom du produit intégré à l'image, illisible à
+                cette taille d'affichage (110px) et surtout responsable du
+                vrai bug signalé par l'auteur du projet — le mot "CursDecision"
+                (plus long que "CursEdit"/"CursAudit") forçait un canevas
+                plus large SANS agrandir le cadre coloré en proportion,
+                donc un cadre visuellement plus petit. Nom du produit
+                réintroduit ici en vrai texte HTML, jamais dépendant de la
+                longueur du mot. */}
+            <img src={e.logo} alt={e.nom} style={{ width: 110, height: 110, objectFit: "contain", display: "block", margin: "0 auto 10px" }} />
+            <div style={{ fontSize: 16, fontWeight: 700, color: e.couleur, textAlign: "center", marginBottom: 10 }}>{e.nom}</div>
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6, marginBottom: e.description ? 6 : 18, flex: e.description ? "none" : 1 }}>{e.accroche}</div>
             {e.description && (
               <div style={{ fontSize: 12, color: "#999", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.description}</div>

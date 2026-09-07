@@ -127,7 +127,7 @@ export default function GrillePaliers() {
               {contenu.espaces && (
                 <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
                   {contenu.espaces.map((espace) => (
-                    <img key={espace} src={LOGOS_ESPACES[espace]} alt="" style={{ width: 26, height: 26, borderRadius: 6 }} />
+                    <img key={espace} src={LOGOS_ESPACES[espace]} alt="" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: 6 }} />
                   ))}
                 </div>
               )}
