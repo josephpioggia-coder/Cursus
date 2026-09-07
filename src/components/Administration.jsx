@@ -66,12 +66,6 @@ export default function Administration() {
   // formulaire redevient alors purement informatif (non modifiable, voir
   // input désactivé plus bas).
   const [idEnÉdition, setIdEnÉdition] = useState(null);
-  // Code secret admin (16/08/2026) — volontairement hors de `formulaire` :
-  // il ne doit PAS être réinitialisé après chaque création (sinon
-  // l'administrateur devrait le retaper à chaque code), mais il ne doit
-  // jamais être envoyé ailleurs qu'à admin-codes-promo, ni stocké.
-  const [secretAdmin, setSecretAdmin] = useState("");
-  const [voirSecret, setVoirSecret] = useState(false);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [journal, setJournal] = useState([]);
   const compteurLigne = useRef(0);
@@ -178,7 +172,6 @@ export default function Administration() {
     noter(enÉdition ? `— Clic sur « Enregistrer les modifications » (code #${idEnÉdition}) —` : "— Clic sur « Créer le code » —");
     try {
       const champsCommuns = {
-        secretAdmin,
         clientEmail: formulaire.clientEmail || null,
         palierCible: formulaire.palierCible || null,
         produitCible: formulaire.produitCible || null,
@@ -228,7 +221,7 @@ export default function Administration() {
 
   const basculerActif = async (ligne) => {
     try {
-      await appellerAdmin("definirActif", { secretAdmin, id: ligne.id, actif: !ligne.actif });
+      await appellerAdmin("definirActif", { id: ligne.id, actif: !ligne.actif });
       await rafraîchir();
     } catch (e) {
       setErreur(e.message);
@@ -275,27 +268,6 @@ export default function Administration() {
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); créerCode(); }}>
-      <div style={{
-        background: "#FBE9E9", padding: "14px 16px", borderRadius: 8, marginBottom: 16,
-      }}>
-        <label style={{ ...labelStyle, color: "#A32D2D" }}>
-          Code secret administrateur * (requis pour créer ou activer/désactiver un code — pas pour la simple consultation)
-        </label>
-        <div style={{ position: "relative", maxWidth: 320 }}>
-          <input style={{ ...champStyle, paddingRight: 38 }} type={voirSecret ? "text" : "password"} value={secretAdmin}
-                 onChange={(e) => setSecretAdmin(e.target.value)}
-                 placeholder="connu uniquement de l'administrateur" required autoComplete="off" />
-          <button type="button" onClick={() => setVoirSecret((v) => !v)}
-                  title={voirSecret ? "Masquer" : "Afficher"}
-                  style={{
-                    position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", fontSize: 15,
-                    padding: 4, color: COULEURS.texteClair, lineHeight: 1,
-                  }}>
-            {voirSecret ? "🙈" : "👁"}
-          </button>
-        </div>
-      </div>
 
       <div style={{
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12,

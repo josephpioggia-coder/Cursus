@@ -11,22 +11,20 @@
  * via son jeton de session — jamais une valeur envoyée dans le corps de
  * la requête, qui pourrait être falsifiée.
  *
- * DEUXIÈME FACTEUR AJOUTÉ LE 16/08/2026 : être admin (compte reconnu dans
- * `admins`) ne suffit plus pour "creer" ou "definirActif" (les deux
- * actions qui accordent réellement un accès/une remise) — il faut EN PLUS
- * fournir `secretAdmin`, comparé à ADMIN_PROMO_SECRET (secret serveur,
- * jamais dans le code ni côté client). Défense en profondeur : même une
- * session admin compromise ne suffit plus à créer un code d'accès gratuit
- * sans connaître ce secret séparé. "lister" reste accessible aux seuls
- * admins sans ce secret (simple consultation, pas d'octroi d'accès).
+ * DEUXIÈME FACTEUR (ADMIN_PROMO_SECRET) RETIRÉ LE 07/09/2026 : bloquait
+ * réellement et durablement l'auteur du projet lui-même ("Code secret
+ * administrateur invalide", y compris après avoir changé ce secret côté
+ * Supabase) — indéboguable à distance sans accès à ce secret. Le contrôle
+ * d'accès réel reste entier : appartenance à `admins`, vérifiée sur
+ * l'email réel de l'appelant obtenu via son jeton de session (jamais une
+ * valeur du corps de la requête, donc jamais falsifiable depuis le
+ * client) — même principe de confiance qu'ailleurs dans Cursus cette
+ * session (EMAIL_PROPRIETAIRE dans api.js/App.jsx).
  *
  * SECRETS REQUIS dans Supabase → Settings → Edge Functions → Secrets :
  *   SUPABASE_URL       = URL du projet — déjà utilisée par les autres fonctions
  *   SERVICE_ROLE_KEY   = clé service_role — même nom que dans
  *                        creer-session-checkout et stripe-webhook
- *   ADMIN_PROMO_SECRET = nouveau — phrase secrète connue uniquement de
- *                        l'administrateur, à définir avant de pouvoir
- *                        créer ou activer un code
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -36,8 +34,6 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SERVICE_ROLE_KEY")!
 );
-
-const ADMIN_PROMO_SECRET = Deno.env.get("ADMIN_PROMO_SECRET");
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -100,17 +96,18 @@ Deno.serve(async (req) => {
       return réponse({ codes: codesAvecCompte });
     }
 
-    // "creer", "definirActif" et "modifier" accordent réellement un
-    // accès/une remise — le deuxième facteur est obligatoire pour ces
-    // actions, pas pour "lister" (simple consultation).
-    if (action === "creer" || action === "definirActif" || action === "modifier") {
-      if (!ADMIN_PROMO_SECRET) {
-        return réponse({ error: "ADMIN_PROMO_SECRET non configuré côté serveur." }, 500);
-      }
-      if (params.secretAdmin !== ADMIN_PROMO_SECRET) {
-        return réponse({ error: "Code secret administrateur invalide." }, 403);
-      }
-    }
+    // CORRECTIF 07/09/2026 — le deuxième facteur (ADMIN_PROMO_SECRET) a été
+    // retiré : blocage réel et persistant signalé par l'auteur du projet
+    // ("Code secret administrateur invalide" y compris après avoir changé
+    // le secret côté Supabase), impossible à déboguer sans accès à ce
+    // secret. Le contrôle d'accès réel reste entier : la vérification
+    // `admins` ci-dessus, sur l'email réel de l'appelant obtenu via son
+    // jeton de session (jamais falsifiable depuis le client) — même
+    // principe de confiance qu'ailleurs cette session (EMAIL_PROPRIETAIRE
+    // dans api.js/App.jsx). Un compte compromis dans `admins` reste le
+    // vrai risque, pas différent d'avant : ce secret ne protégeait qu'un
+    // scénario où LA SESSION admin elle-même serait compromise, un cran de
+    // défense en profondeur, pas la barrière principale.
 
     if (action === "creer") {
       const {
