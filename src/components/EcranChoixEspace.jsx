@@ -33,7 +33,12 @@ const ESPACES = [
     id: "cursedit",
     nom: "CursEdit",
     accroche: "Écrire, structurer, être accompagné·e par l'IA pendant la rédaction.",
-    couleur: "#7F77DD",
+    // CORRECTIF 07/09/2026 — harmonisé sur la couleur réelle du logo (le
+    // trait du C, échantillonné directement dans le fichier : #771125),
+    // repris ici en #8B2635 pour rester cohérent avec COULEURS.bordeaux
+    // déjà utilisé partout ailleurs dans Cursus (Administration, boutons
+    // de paiement CursEdit...) plutôt qu'une troisième nuance de marron.
+    couleur: "#8B2635",
     logo: "/logo-cursedit.png",
     // 06/09/2026 — CursEdit a son propre palier d'entrée le moins cher
     // (Découverte, 9,99€/mois — voir Tarification.jsx), distinct du
@@ -79,7 +84,11 @@ const ESPACES = [
     id: "cursaudit",
     nom: "CursAudit",
     accroche: "Auditer un texte déjà écrit : preuve, cohérence, risques, sur une grille de critères.",
-    couleur: "#1D9E75",
+    // CORRECTIF 07/09/2026 — harmonisé sur la couleur réelle du logo
+    // (le trait du C, échantillonné directement dans le fichier : #0E3374,
+    // bleu marine), à la place d'un vert qui n'avait aucun rapport avec le
+    // logo bleu de CursAudit — signalé par l'auteur du projet.
+    couleur: "#0E3374",
     requisLabel: "Cursus Essentiel",
     logo: "/logo-cursaudit.png",
     info: {
