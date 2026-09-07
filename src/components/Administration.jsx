@@ -61,6 +61,11 @@ export default function Administration() {
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
   const [formulaire, setFormulaire] = useState(FORMULAIRE_VIDE);
+  // Édition d'un code existant (07/09/2026) — null = mode création normal.
+  // Contient l'id du code en cours de modification ; le champ "code" du
+  // formulaire redevient alors purement informatif (non modifiable, voir
+  // input désactivé plus bas).
+  const [idEnÉdition, setIdEnÉdition] = useState(null);
   // Code secret admin (16/08/2026) — volontairement hors de `formulaire` :
   // il ne doit PAS être réinitialisé après chaque création (sinon
   // l'administrateur devrait le retaper à chaque code), mais il ne doit
@@ -169,11 +174,11 @@ export default function Administration() {
   const créerCode = async () => {
     setEnvoiEnCours(true);
     setErreur("");
-    noter("— Clic sur « Créer le code » —");
+    const enÉdition = !!idEnÉdition;
+    noter(enÉdition ? `— Clic sur « Enregistrer les modifications » (code #${idEnÉdition}) —` : "— Clic sur « Créer le code » —");
     try {
-      await appellerAdmin("creer", {
+      const champsCommuns = {
         secretAdmin,
-        code: formulaire.code,
         clientEmail: formulaire.clientEmail || null,
         palierCible: formulaire.palierCible || null,
         produitCible: formulaire.produitCible || null,
@@ -182,9 +187,15 @@ export default function Administration() {
         dateDebut: formulaire.dateDebut || null,
         dateFin: formulaire.dateFin || null,
         utilisationsMax: formulaire.utilisationsMax ? Number(formulaire.utilisationsMax) : null,
-      });
-      noter("Création confirmée par le serveur, rafraîchissement de la liste…");
+      };
+      if (enÉdition) {
+        await appellerAdmin("modifier", { id: idEnÉdition, ...champsCommuns });
+      } else {
+        await appellerAdmin("creer", { code: formulaire.code, ...champsCommuns });
+      }
+      noter("Confirmé par le serveur, rafraîchissement de la liste…");
       setFormulaire(FORMULAIRE_VIDE);
+      setIdEnÉdition(null);
       await rafraîchir();
     } catch (e) {
       noter(`⚠ Échec final : ${e.message}`);
@@ -192,6 +203,27 @@ export default function Administration() {
     } finally {
       setEnvoiEnCours(false);
     }
+  };
+
+  const commencerÉdition = (ligne) => {
+    setIdEnÉdition(ligne.id);
+    setFormulaire({
+      code: ligne.code,
+      clientEmail: ligne.client_email || "",
+      palierCible: ligne.palier_cible || "",
+      produitCible: ligne.produit_cible || "",
+      remisePourcent: ligne.remise_pourcent,
+      dureeMois: ligne.duree_mois,
+      dateDebut: ligne.date_debut ? ligne.date_debut.slice(0, 10) : "",
+      dateFin: ligne.date_fin ? ligne.date_fin.slice(0, 10) : "",
+      utilisationsMax: ligne.utilisations_max ?? "",
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const annulerÉdition = () => {
+    setIdEnÉdition(null);
+    setFormulaire(FORMULAIRE_VIDE);
   };
 
   const basculerActif = async (ligne) => {
@@ -270,11 +302,11 @@ export default function Administration() {
         background: COULEURS.fond, padding: 20, borderRadius: 8, marginBottom: 28,
       }}>
         <div>
-          <label style={labelStyle}>Code *</label>
+          <label style={labelStyle}>Code * {idEnÉdition && <span style={{ fontWeight: 400 }}>(non modifiable une fois créé)</span>}</label>
           <div style={{ display: "flex", gap: 6 }}>
             <input style={champStyle} value={formulaire.code} onChange={(e) => majChamp("code", e.target.value)}
-                   placeholder="JOSEPH-100-99-Q7X4" required />
-            <button type="button" onClick={ajouterSuffixeAléatoire} title="Ajouter un suffixe aléatoire — empêche de deviner ou reconstruire un autre code à partir de celui-ci" style={{
+                   placeholder="JOSEPH-100-99-Q7X4" required disabled={!!idEnÉdition} />
+            <button type="button" onClick={ajouterSuffixeAléatoire} disabled={!!idEnÉdition} title="Ajouter un suffixe aléatoire — empêche de deviner ou reconstruire un autre code à partir de celui-ci" style={{
               flexShrink: 0, background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 6,
               padding: "0 10px", fontSize: 13, cursor: "pointer", color: COULEURS.texte,
             }}>🎲</button>
@@ -332,14 +364,22 @@ export default function Administration() {
           <input style={champStyle} type="number" min={1} value={formulaire.utilisationsMax}
                  onChange={(e) => majChamp("utilisationsMax", e.target.value)} placeholder="illimité si vide" />
         </div>
-        <div style={{ gridColumn: "1 / -1" }}>
+        <div style={{ gridColumn: "1 / -1", display: "flex", gap: 10, alignItems: "center" }}>
           <button type="submit" disabled={envoiEnCours} style={{
             background: COULEURS.bordeaux, color: "#fff", border: "none", borderRadius: 6,
             padding: "10px 20px", fontSize: 13, cursor: envoiEnCours ? "default" : "pointer",
             opacity: envoiEnCours ? 0.6 : 1,
           }}>
-            {envoiEnCours ? "Création…" : "Créer le code"}
+            {envoiEnCours ? (idEnÉdition ? "Enregistrement…" : "Création…") : (idEnÉdition ? "Enregistrer les modifications" : "Créer le code")}
           </button>
+          {idEnÉdition && (
+            <button type="button" onClick={annulerÉdition} style={{
+              background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 6,
+              padding: "10px 16px", fontSize: 13, cursor: "pointer", color: COULEURS.texte,
+            }}>
+              Annuler la modification
+            </button>
+          )}
         </div>
       </div>
       </form>
@@ -384,7 +424,13 @@ export default function Administration() {
                   <td style={{ padding: "6px 8px" }}>
                     <span style={{ color: c.actif ? "#1D9E75" : "#A32D2D" }}>{c.actif ? "Actif" : "Désactivé"}</span>
                   </td>
-                  <td style={{ padding: "6px 8px" }}>
+                  <td style={{ padding: "6px 8px", display: "flex", gap: 6 }}>
+                    <button onClick={() => commencerÉdition(c)} style={{
+                      background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 4,
+                      padding: "3px 8px", fontSize: 11.5, cursor: "pointer", color: COULEURS.texte,
+                    }}>
+                      Modifier
+                    </button>
                     <button onClick={() => basculerActif(c)} style={{
                       background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 4,
                       padding: "3px 8px", fontSize: 11.5, cursor: "pointer", color: COULEURS.texte,

@@ -100,10 +100,10 @@ Deno.serve(async (req) => {
       return réponse({ codes: codesAvecCompte });
     }
 
-    // "creer" et "definirActif" accordent réellement un accès/une remise —
-    // le deuxième facteur est obligatoire pour ces deux actions, pas pour
-    // "lister" (simple consultation).
-    if (action === "creer" || action === "definirActif") {
+    // "creer", "definirActif" et "modifier" accordent réellement un
+    // accès/une remise — le deuxième facteur est obligatoire pour ces
+    // actions, pas pour "lister" (simple consultation).
+    if (action === "creer" || action === "definirActif" || action === "modifier") {
       if (!ADMIN_PROMO_SECRET) {
         return réponse({ error: "ADMIN_PROMO_SECRET non configuré côté serveur." }, 500);
       }
@@ -143,6 +143,37 @@ Deno.serve(async (req) => {
         const message = error.code === "23505" ? "Ce code existe déjà." : error.message;
         return réponse({ error: message }, 400);
       }
+      return réponse({ code: data });
+    }
+
+    // "modifier" (07/09/2026) — corriger un code déjà créé (ex. l'ouvrir à
+    // CursEdit en plus de CursAudit) sans devoir en créer un second que
+    // le·la bénéficiaire devrait retenir en plus du premier. Mêmes champs
+    // que "creer", sauf le code lui-même (immuable une fois transmis — le
+    // changer casserait tout lien déjà donné à quelqu'un).
+    if (action === "modifier") {
+      const {
+        id, clientEmail, palierCible, produitCible, remisePourcent,
+        dureeMois, dateDebut, dateFin, utilisationsMax,
+      } = params;
+      if (!id) return réponse({ error: "id requis." }, 400);
+
+      const { data, error } = await supabase
+        .from("codes_promo")
+        .update({
+          client_email: clientEmail || null,
+          palier_cible: palierCible || null,
+          produit_cible: produitCible || null,
+          remise_pourcent: remisePourcent,
+          duree_mois: dureeMois ?? 0,
+          date_debut: dateDebut || null,
+          date_fin: dateFin || null,
+          utilisations_max: utilisationsMax || null,
+        })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) return réponse({ error: error.message }, 400);
       return réponse({ code: data });
     }
 
