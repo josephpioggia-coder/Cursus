@@ -448,6 +448,25 @@ export const sessionsAPI = {
 // achetés (credits_ia). `usage_ia` est alimentée par l'Edge Function
 // claude-prox à chaque appel — jamais écrite depuis le client.
 
+// 07/09/2026 — poids par modèle (référence 60816-01, suite) : préparation
+// du choix de niveau Rapide/Standard/Approfondi/Maximal (CopiloteIA), pas
+// encore câblé côté interface. `usage_ia.modele` existe déjà (claude-prox,
+// ligne ~132) — jusqu'ici jamais lu par recupererConsommation(), qui
+// sommait les tokens à plat quel que soit le modèle réellement appelé.
+// Poids = coût $ moyen (entrée+sortie)/2 du modèle, rapporté à Sonnet 5
+// (référence, poids 1) — tarifs vérifiés le 06-07/09/2026. Un modèle
+// absent de la table (ou null) vaut 1 par défaut : ne change RIEN pour
+// tout appel déjà en base avant ce correctif, tous passés par Sonnet 5.
+const POIDS_PAR_MODELE = {
+  "claude-haiku-4-5": 0.5,
+  "claude-sonnet-5": 1,
+  "gpt-4o": 1,
+  "gpt-5.6-sol": 2,
+  "claude-opus-5": 2.5,
+  "claude-fable-5-1": 5,
+  "gpt-6-astra": 5,
+};
+
 export const usageIAAPI = {
 
   // Retourne { palier, quotaMensuel, credits, consomme, disponible, pourcentage }
@@ -478,14 +497,18 @@ export const usageIAAPI = {
 
     const { data: lignesUsage, error: erreurUsage } = await supabase
       .from("usage_ia")
-      .select("tokens_entree, tokens_sortie")
+      .select("tokens_entree, tokens_sortie, modele")
       .eq("user_id", uid)
       .gte("created_at", débutMois.toISOString());
     if (erreurUsage) return { data: null, error: erreurUsage };
 
-    const consomme = (lignesUsage || []).reduce(
-      (total, ligne) => total + (ligne.tokens_entree || 0) + (ligne.tokens_sortie || 0), 0
-    );
+    // Arrondi au final seulement (pas ligne par ligne) : des poids comme
+    // 0,5 ou 2,5 produiraient sinon un total "tokens" à virgule, sans sens
+    // pour l'affichage (CompteurUsageIA formate en tokens entiers).
+    const consomme = Math.round((lignesUsage || []).reduce((total, ligne) => {
+      const poids = POIDS_PAR_MODELE[ligne.modele] ?? 1;
+      return total + ((ligne.tokens_entree || 0) + (ligne.tokens_sortie || 0)) * poids;
+    }, 0));
 
     const { data: lignesCredits, error: erreurCredits } = await supabase
       .from("credits_ia")
