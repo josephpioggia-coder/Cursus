@@ -338,9 +338,9 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
         </button>
       </div>
 
-      <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Trois espaces inclus dans Cursus Essentiel</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Trois espaces, un seul compte</div>
       <div style={{ fontSize: 13, color: "#999", marginBottom: 20, textAlign: "center", maxWidth: 420 }}>
-        Découvrez ce que chaque espace permet — l'ouverture est réservée aux membres de Cursus Essentiel.
+        Découvrez ce que chaque espace permet, ou ouvrez-le directement — les conditions d'accès (abonnement, paiement à l'acte) s'appliquent une fois à l'intérieur.
       </div>
 
       {/* 06/09/2026 — "Voir les fonctionnalités" déplacé hors des cartes,
@@ -380,23 +380,45 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
             {e.description && (
               <div style={{ fontSize: 12, color: "#999", lineHeight: 1.6, marginBottom: 18, flex: 1 }}>{e.description}</div>
             )}
-            {/* 04/09/2026 — "Ouvrir X" n'est plus un accès libre : seul
-                "Voir les fonctionnalités" / "Découvrir CursDecision" reste
-                gratuit à l'ouverture (décision explicite). L'ouverture réelle
-                est réservée aux membres Cursus Essentiel — pas encore de
-                vérification d'abonnement câblée (couche suivante), donc pas
-                de bouton qui prétend ouvrir l'espace : renvoi vers l'offre. */}
-            <a
-              href="#offre-cursus-essentiel"
-              style={{
-                width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
-                background: "#f3f3f3", color: "#999", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
-                marginBottom: 10, textAlign: "center", textDecoration: "none", boxSizing: "border-box",
-                border: "0.5px dashed #ccc",
-              }}
-            >
-              Nécessite {e.requisLabel || "Cursus Essentiel"}
-            </a>
+            {/* CORRECTIF 07/09/2026 — le "renvoi vers l'offre" du 04/09
+                (ci-dessous en commentaire) était un vrai cul-de-sac : ce
+                lien était le SEUL bouton de la carte, et `onChoisir` n'était
+                jamais appelé nulle part dans ce fichier — personne, pas même
+                un abonné payant, ne pouvait plus entrer dans CursEdit ou
+                CursAudit depuis cet écran. Signalé par l'auteur du projet
+                ("je n'ai pas encore pu rejoindre CursEdit"). La raison
+                d'être de ce cul-de-sac (pas de vérification d'abonnement
+                câblée) n'existe plus : CursEdit (projetsAPI.créer()) et
+                CursAudit (paiement par audit) ont chacun leur vrai contrôle
+                au moment de l'action réelle — inutile de bloquer l'entrée
+                dans l'espace lui-même, cohérent avec CursAudit qui a
+                toujours laissé consulter/créer un brouillon avant paiement.
+                CursDecision reste à part : aucun espace de travail réel
+                n'existe encore pour lui (voir CursDecisionPage.jsx), donc
+                pas de bouton "Ouvrir" qui mentirait sur ce qu'il y a derrière. */}
+            {e.id === "cursdecision" ? (
+              <button
+                onClick={() => setPageDécisionOuverte(true)}
+                style={{
+                  width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
+                  background: e.couleur, color: "#fff", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                  marginBottom: 10, textAlign: "center", border: "none", boxSizing: "border-box",
+                }}
+              >
+                Découvrir CursDecision
+              </button>
+            ) : (
+              <button
+                onClick={() => onChoisir(e.id)}
+                style={{
+                  width: "100%", padding: "10px 0", borderRadius: 8, cursor: "pointer",
+                  background: e.couleur, color: "#fff", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit",
+                  marginBottom: 10, textAlign: "center", border: "none", boxSizing: "border-box",
+                }}
+              >
+                Ouvrir {e.nom}
+              </button>
+            )}
           </div>
         ))}
       </div>
