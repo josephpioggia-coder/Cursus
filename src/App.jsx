@@ -1764,6 +1764,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [importOuvert, setImportOuvert]   = useState(false);
   const [incorporerOuvert, setIncorporerOuvert] = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
+  const [erreurCréationProjet, setErreurCréationProjet] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
   const [exportEnCours, setExportEnCours]                 = useState(false);
@@ -2027,6 +2028,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   // ── Actions projets ──
 
   const créerProjet = async (données) => {
+    setErreurCréationProjet(null);
     const { data, error } = await projetsAPI.créer(données);
     if (!error && data) {
       const nouveau = { ...normaliserProjet(data), structure: [] };
@@ -2034,6 +2036,12 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
       setProjetActifId(nouveau.id);
       setProjetVenantDêtreCréé(nouveau);
       setVue("projet");
+    } else if (error) {
+      // 07/09/2026 — jusqu'ici cette erreur était totalement silencieuse :
+      // clic sur "Créer" sans rien qui se passe, aucune explication. Devenu
+      // un vrai cas d'usage depuis l'ajout du contrôle d'abonnement dans
+      // projetsAPI.créer() (même faille que celle fermée pour CursAudit).
+      setErreurCréationProjet(error.message || "Impossible de créer ce projet.");
     }
   };
 
@@ -2475,6 +2483,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 24 }}>
               {t("formulaireProjet.titre")}
             </h1>
+            {erreurCréationProjet && (
+              <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "10px 14px", fontSize: 13, color: "#A32D2D", marginBottom: 16 }}>
+                {erreurCréationProjet}
+              </div>
+            )}
             <FormulaireProjet
               onCréer={créerProjet}
               onAnnuler={() => setVue(projets.length > 0 ? "tableau" : "liste")}

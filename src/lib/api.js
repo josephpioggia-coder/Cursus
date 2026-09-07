@@ -50,7 +50,29 @@ export const projetsAPI = {
 
   /** Crée un nouveau projet */
   async créer(projet) {
-    const uid = await userId();
+    const { data: { user: utilisateurCourant } } = await supabase.auth.getUser();
+    const uid = utilisateurCourant?.id || null;
+
+    // 07/09/2026 — CursEdit n'avait AUCUN contrôle de paiement à la création
+    // d'un projet (constaté en répondant à une question de l'auteur du
+    // projet sur CursAudit/CursEdit : quelqu'un avec accès à CursAudit
+    // n'a pas nécessairement accès à CursEdit, et réciproquement — les deux
+    // produits sont indépendants, jamais reliés automatiquement malgré le
+    // texte marketing "Cursus Essentiel débloque CursAudit"). Même faille
+    // que celle fermée pour CursAudit cette session (25/08 → 07/09) : un
+    // utilisateur sans abonnement actif pouvait créer des projets
+    // gratuitement, indéfiniment. Même exception propriétaire.
+    if (utilisateurCourant?.email !== EMAIL_PROPRIETAIRE) {
+      const { data: abonnement, error: erreurAbonnement } = await supabase
+        .from("abonnements")
+        .select("statut")
+        .eq("user_id", uid)
+        .eq("statut", "actif")
+        .maybeSingle();
+      if (erreurAbonnement) return { data: null, error: erreurAbonnement };
+      if (!abonnement) return { data: null, error: { message: "Un abonnement CursEdit actif est nécessaire pour créer un projet." } };
+    }
+
     const { data, error } = await supabase
       .from("projets")
       .insert([{
