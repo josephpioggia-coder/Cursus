@@ -131,3 +131,46 @@ export async function demarrerCheckout(priceId, nomPalier, codePromo) {
     console.error("Erreur lors de la création de la session Checkout :", erreur);
   }
 }
+
+// 07/09/2026 — CursAudit (référence 60816-01, suite) : montant dynamique
+// (pas de Price Stripe préexistant, le prix dépend du nombre réel
+// d'unités/palier/mode IA). Fonction séparée plutôt qu'une modification de
+// demarrerCheckout() ci-dessus : celle-ci est déjà en production sur de
+// l'argent réel (CursEdit), pas de raison de la faire dépendre d'un
+// chantier fait dans l'urgence pour CursAudit.
+export async function demarrerCheckoutAudit(auditId, montantTTC, titre, codePromo) {
+  const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/creer-session-checkout";
+  const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const jetonAppelant = session?.access_token || SUPABASE_ANON_KEY;
+
+  try {
+    const réponse = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${jetonAppelant}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        auditId,
+        montantCentimes: Math.round(montantTTC * 100),
+        nomProduit: `Audit CursAudit — ${titre}`,
+        ...(codePromo ? { codePromo } : {}),
+      }),
+    });
+    const data = await réponse.json();
+    if (!réponse.ok) {
+      return { error: data.error || "Ce code promo n'a pas pu être appliqué." };
+    }
+    if (data.url) {
+      window.location.href = data.url;
+      return { error: null };
+    }
+    return { error: "Pas d'URL de redirection reçue de la session Checkout." };
+  } catch (erreur) {
+    console.error("Erreur lors de la création de la session Checkout (audit) :", erreur);
+    return { error: erreur.message };
+  }
+}

@@ -65,16 +65,33 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { priceId, nomPalier, mode, codePromo } = await req.json();
+    // 07/09/2026 — CursAudit (référence 60816-01, suite) : prix dynamique,
+    // pas de Price Stripe préexistant (le prix dépend du nombre réel
+    // d'unités/palier/mode IA, calculé côté client par
+    // calculerPrixCursAudit). montantCentimes + nomProduit remplacent
+    // priceId dans ce cas ; auditId identifie l'audit à marquer "payé" par
+    // stripe-webhook via metadata. CursEdit continue d'utiliser priceId
+    // (Price Stripe fixe), comportement inchangé.
+    const { priceId, nomPalier, mode, codePromo, montantCentimes, nomProduit, auditId } = await req.json();
 
-    if (!priceId) {
-      return new Response(JSON.stringify({ error: "priceId manquant" }), {
+    if (!priceId && !montantCentimes) {
+      return new Response(JSON.stringify({ error: "priceId ou montantCentimes requis" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS },
+      });
+    }
+    if (montantCentimes && !auditId) {
+      return new Response(JSON.stringify({ error: "auditId requis avec montantCentimes" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...CORS },
       });
     }
 
-    const modeCheckout = mode === "payment" ? "payment" : "subscription";
+    // Un paiement à montant dynamique (CursAudit) est toujours ponctuel,
+    // jamais un abonnement récurrent — pas de negotiation possible sur
+    // `mode` dans ce cas.
+    const modeCheckout = montantCentimes ? "payment" : (mode === "payment" ? "payment" : "subscription");
+    const produitActuel = auditId ? "cursaudit" : "cursedit";
 
     // Identité réelle de l'appelant (60804-02), via le jeton Authorization
     // — jamais via une valeur du corps de la requête. Si le jeton n'est
@@ -132,6 +149,17 @@ Deno.serve(async (req) => {
           headers: { "Content-Type": "application/json", ...CORS },
         });
       }
+      // 07/09/2026 — produit_cible existait en base depuis le 16/08/2026
+      // (2026-08-16-codes-promo-cursaudit.sql) mais n'était encore jamais
+      // lu ici, comme annoncé dans le commentaire de cette migration.
+      // null = valable pour les deux produits, comportement des codes
+      // existants inchangé.
+      if (ligne.produit_cible && ligne.produit_cible !== produitActuel) {
+        return new Response(JSON.stringify({ error: `Ce code n'est valable que pour ${ligne.produit_cible === "cursaudit" ? "CursAudit" : "CursEdit"}.` }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
+      }
       if (ligne.client_email && ligne.client_email.toLowerCase() !== (emailAppelant || "").toLowerCase()) {
         return new Response(JSON.stringify({ error: "Ce code promo n'est pas valable pour ce compte." }), {
           status: 400,
@@ -171,15 +199,26 @@ Deno.serve(async (req) => {
       mode: modeCheckout,
       payment_method_types: ["card"],
       line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
+        montantCentimes
+          ? {
+              price_data: {
+                currency: "eur",
+                unit_amount: montantCentimes,
+                product_data: { name: nomProduit || "Audit CursAudit" },
+              },
+              quantity: 1,
+            }
+          : { price: priceId, quantity: 1 },
       ],
       ...(discounts ? { discounts } : {}),
-      ...(codePromoId ? { metadata: { code_promo_id: codePromoId } } : {}),
-      success_url: `${URL_BASE}/?abonnement=succes&palier=${encodeURIComponent(nomPalier || "")}`,
-      cancel_url: `${URL_BASE}/?abonnement=annule`,
+      metadata: {
+        ...(codePromoId ? { code_promo_id: codePromoId } : {}),
+        ...(auditId ? { type: "cursaudit", audit_id: auditId } : {}),
+      },
+      success_url: auditId
+        ? `${URL_BASE}/?audit=succes&audit_id=${encodeURIComponent(auditId)}`
+        : `${URL_BASE}/?abonnement=succes&palier=${encodeURIComponent(nomPalier || "")}`,
+      cancel_url: auditId ? `${URL_BASE}/?audit=annule` : `${URL_BASE}/?abonnement=annule`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {

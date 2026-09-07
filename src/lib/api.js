@@ -625,19 +625,17 @@ export const auditsAPI = {
         type_rapport:      typeRapport,
         nombre_pages:      nombrePages,
         prix_ttc:          prixTTC,
-        // TEMPORAIRE (réf. 60816-01, suite, 25/08/2026) — statut = "paye" et
-        // preaudit_statut = "paye" dès la création, au lieu de "brouillon" /
-        // "non_demande". CursAudit n'a aucun Stripe branché : la vérification
-        // audit.statut === "paye" (orchestrer-audit-cursaudit,
-        // analyser-unite-cursaudit) et preaudit_statut === "paye"
-        // (preaudit-approfondi-cursaudit) ne protège aujourd'hui aucun
-        // paiement réel, juste une case à cocher manuellement en SQL à
-        // chaque test — pur temps perdu tant que personne ne peut payer de
-        // toute façon. À RETIRER (remettre "brouillon" / "non_demande") dès
-        // qu'un vrai flux Stripe existe pour CursAudit, sans quoi tout
-        // nouvel audit deviendrait immédiatement lancable sans paiement.
-        statut:            "paye",
-        preaudit_statut:   "paye",
+        // 07/09/2026 — retiré le contournement temporaire du 25/08/2026
+        // (statut/preaudit_statut forcés à "paye" dès la création) : un
+        // vrai flux Stripe existe désormais pour l'audit détaillé (voir
+        // creer-session-checkout + stripe-webhook, référence 60816-01,
+        // suite). Retour au comportement normal : brouillon jusqu'au
+        // paiement réel, confirmé par stripe-webhook sur
+        // checkout.session.completed. Le pré-audit (preaudit_statut) reste
+        // un produit séparé, non traité par ce chantier — "non_demande" par
+        // défaut, comme avant ce contournement.
+        statut:            "brouillon",
+        preaudit_statut:   "non_demande",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
         finalite_audit:          finaliteAudit,

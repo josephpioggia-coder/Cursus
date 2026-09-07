@@ -40,6 +40,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI, misEnPageAPI } from "../lib/api.js";
+import { demarrerCheckoutAudit } from "../lib/contenuPaliers.js";
 import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire, { CLÉ_BROUILLON_QUESTIONNAIRE } from "./CursAuditQuestionnaire.jsx";
@@ -128,6 +129,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [typeRapport, setTypeRapport] = useState(() => brouillonInitial?.typeRapport ?? "Aucun");
   const [reglesPrix, setReglesPrix] = useState(null);
   const [enCours, setEnCours] = useState(false);
+  // 07/09/2026 — étape de paiement (référence 60816-01, suite)
+  const [codePromoAudit, setCodePromoAudit] = useState("");
+  const [checkoutEnCours, setCheckoutEnCours] = useState(false);
+  const [erreurCheckout, setErreurCheckout] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [résultat, setRésultat] = useState(null);
 
@@ -304,6 +309,20 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setRésultat(data);
   };
 
+  const payerAudit = async () => {
+    if (!résultat) return;
+    setCheckoutEnCours(true);
+    setErreurCheckout(null);
+    const { error } = await demarrerCheckoutAudit(résultat.audit.id, résultat.audit.prix_ttc, titre, codePromoAudit);
+    if (error) {
+      setCheckoutEnCours(false);
+      setErreurCheckout(error);
+    }
+    // Pas de setCheckoutEnCours(false) sur succès : la page redirige vers
+    // Stripe (window.location.href), inutile de réactiver le bouton avant
+    // de quitter la page.
+  };
+
   const toutRéinitialiser = () => {
     viderBrouillon();
     setRésultat(null); setTitre(""); setTexte(""); setNomFichier(null); setSource("coller");
@@ -330,15 +349,49 @@ export default function CursAudit({ onVoirAudits } = {}) {
 
       {résultat ? (
         <div style={{ background: "#EAF3DE", border: "0.5px solid #1D9E75", borderRadius: 10, padding: "18px 20px" }}>
-          <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé</div>
+          <div style={{ fontWeight: 600, color: "#1D9E75", marginBottom: 6 }}>Audit créé — en attente de paiement</div>
           <div style={{ fontSize: 13, color: "var(--texte-secondaire)", lineHeight: 1.7 }}>
             « {titre} » — {résultat.nombreUnités} unité{résultat.nombreUnités > 1 ? "s" : ""} créée{résultat.nombreUnités > 1 ? "s" : ""}.
             <br />
             Un aperçu gratuit du manuscrit est disponible dès maintenant depuis l'écran de détail de cet audit.
             <br />
-            Le paiement CursAudit n'est pas encore disponible dans l'application — en attendant, cet audit est
-            directement utilisable (aucun paiement réel n'est effectué), pré-audit et analyse détaillée compris.
+            L'audit détaillé nécessite le paiement ci-dessous pour être lancé.
           </div>
+
+          {/* 07/09/2026 — étape de paiement réelle (référence 60816-01, suite) */}
+          <div style={{ marginTop: 14, padding: "14px 16px", background: "#fff", border: "0.5px solid #1D9E7540", borderRadius: 8 }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: "var(--texte-primaire)", marginBottom: 10 }}>
+              {résultat.audit.prix_ttc.toFixed(2).replace(".", ",")} € TTC
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                value={codePromoAudit}
+                onChange={(e) => setCodePromoAudit(e.target.value)}
+                placeholder="Code promotionnel (optionnel)"
+                style={{
+                  padding: "8px 12px", borderRadius: 7, border: "0.5px solid var(--border)",
+                  fontFamily: "inherit", fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.5,
+                  flex: "1 1 200px",
+                }}
+              />
+              <button
+                onClick={payerAudit}
+                disabled={checkoutEnCours}
+                style={{
+                  padding: "8px 18px", borderRadius: 7, border: "none", background: "#1D9E75", color: "#fff",
+                  fontSize: 13, fontWeight: 600, cursor: checkoutEnCours ? "default" : "pointer",
+                  fontFamily: "inherit", opacity: checkoutEnCours ? 0.6 : 1,
+                }}
+              >
+                {checkoutEnCours ? "Redirection…" : "Payer et lancer l'audit"}
+              </button>
+            </div>
+            {erreurCheckout && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#A32D2D" }}>{erreurCheckout}</div>
+            )}
+          </div>
+
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button
               onClick={toutRéinitialiser}

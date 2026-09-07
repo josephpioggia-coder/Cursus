@@ -90,6 +90,56 @@ Deno.serve(async (req) => {
 
       if (!email) break;
 
+      // 07/09/2026 — CursAudit (référence 60816-01, suite) : paiement
+      // ponctuel (mode "payment"), jamais d'abonnement Stripe associé —
+      // stripe.subscriptions.retrieve(undefined) échouerait si on tombait
+      // dans la branche CursEdit ci-dessous. Identifié via
+      // metadata.type="cursaudit" (posé par creer-session-checkout).
+      const métaSession = session.metadata as Record<string, string> | null;
+      if (métaSession?.type === "cursaudit") {
+        const auditId = métaSession.audit_id;
+        if (!auditId) {
+          console.error("checkout.session.completed cursaudit sans audit_id en metadata — session", session.id);
+          break;
+        }
+
+        const { error: erreurMajAudit } = await supabase
+          .from("audits")
+          .update({ statut: "paye" })
+          .eq("id", auditId);
+        if (erreurMajAudit) {
+          console.error("Erreur passage audit à 'paye' :", erreurMajAudit.message, "audit", auditId);
+        } else {
+          console.log(`Audit ${auditId} marqué payé pour ${email}`);
+        }
+
+        // Même logique de consommation de code promo que côté CursEdit
+        // ci-dessous — dupliquée ici plutôt que factorisée, pour ne pas
+        // risquer de casser le chemin CursEdit déjà en production en le
+        // réorganisant sous pression de temps.
+        const codePromoIdAudit = métaSession?.code_promo_id;
+        if (codePromoIdAudit) {
+          const { data: users } = await supabase.auth.admin.listUsers();
+          const userAudit = users?.users?.find((u) => u.email === email);
+          const { data: consomme, error: erreurConsommation } = await supabase.rpc(
+            "consommer_code_promo",
+            {
+              p_code_promo_id: codePromoIdAudit,
+              p_user_id: userAudit?.id ?? null,
+              p_email: email,
+              p_stripe_session_id: session.id,
+            }
+          );
+          if (erreurConsommation) {
+            console.error("Erreur consommation code promo (audit) :", erreurConsommation.message);
+          } else if (consomme === false) {
+            console.error(`Code promo ${codePromoIdAudit} refusé à la consommation pour la session ${session.id} (audit ${auditId}) — paiement déjà effectué.`);
+          }
+        }
+
+        break;
+      }
+
       // Récupère le price_id depuis l'abonnement Stripe
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const priceId = subscription.items.data[0]?.price.id;
