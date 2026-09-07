@@ -44,6 +44,7 @@ import CursAudit from "./components/CursAudit.jsx";
 import CursAuditListe from "./components/CursAuditListe.jsx";
 import CursAuditDetail from "./components/CursAuditDetail.jsx";
 import Administration from "./components/Administration.jsx";
+import Supervision from "./components/Supervision.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -2257,7 +2258,10 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             // commodité d'affichage, la vraie vérification est refaite côté
             // serveur (admin-codes-promo) à chaque action.
             ...(user.email === "joseph.pioggia@gmail.com"
-              ? [{ id: "administration", label: "Administration", icone: "⚙️" }]
+              ? [
+                  { id: "administration", label: "Administration", icone: "⚙️" },
+                  { id: "supervision", label: "Supervision", icone: "🛡️" },
+                ]
               : []),
           ].map((item) => (
             <div
@@ -2440,6 +2444,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {vue === "administration" && user.email === "joseph.pioggia@gmail.com" && (
           <div style={{ flex: 1, overflowY: "auto" }}>
             <Administration />
+          </div>
+        )}
+
+        {/* Vue : Supervision (audits CursAudit consentis) — réf. 60816-01, suite, 07/09/2026 */}
+        {vue === "supervision" && user.email === "joseph.pioggia@gmail.com" && (
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <Supervision />
           </div>
         )}
 
