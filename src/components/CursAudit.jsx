@@ -152,6 +152,19 @@ export default function CursAudit({ onVoirAudits } = {}) {
   // case cochée avant un rechargement de page ne doit pas se recocher
   // silencieusement toute seule.
   const [consentementSupervision, setConsentementSupervision] = useState(false);
+  // CORRECTIF 07/09/2026 — demande explicite de l'auteur du projet : le
+  // consentement est "au coup par coup", jamais reporté implicitement sur
+  // un projet différent. Sans ce garde-fou, cocher la case puis modifier
+  // ensuite le texte/titre/fichier importé AVANT de cliquer "Créer
+  // l'audit" aurait laissé la case cochée pour un contenu jamais montré
+  // au moment de l'accord — contre-productif pour la confidentialité et
+  // plus contraignant, pas moins, pour le propriétaire censé superviser
+  // ce à quoi l'auteur·ice a réellement consenti.
+  const premierRenduRef = useRef(true);
+  useEffect(() => {
+    if (premierRenduRef.current) { premierRenduRef.current = false; return; }
+    setConsentementSupervision(false);
+  }, [texte, titre, source, nomFichier]);
 
   // Mise en page (réf. 60816-01, suite, 24/08/2026) — voir
   // diagnostiquerQualitéImport() ci-dessous. null = pas encore demandée
