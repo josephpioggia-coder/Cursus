@@ -449,6 +449,15 @@ export default function CursAuditQuestionnaire({ onValider }) {
   const espérezDécouvrirAutre = useAutre(brouillonInitial?.espérezDécouvrirAutre);
   const [contratsPrécédents, setContratsPrécédents] = useState(null);
   const [contratChoisi, setContratChoisi] = useState("");
+  // Titre du livre/texte (07/09/2026) — signalé par l'auteur du projet :
+  // le questionnaire posait des questions sur le projet (pourquoi vous
+  // écrivez, pour qui...) sans jamais demander DE QUEL texte il s'agissait
+  // avant la toute fin (le champ "Titre" de CursAudit.jsx, après tout le
+  // parcours). Demandé ici, juste à côté du choix "réutiliser un audit
+  // précédent" — logique : si on ne réutilise rien, la première chose à
+  // savoir est le titre de ce nouveau texte. Repris tel quel par
+  // CursAudit.jsx (voir son onValider) pour ne jamais le demander deux fois.
+  const [titreLivre, setTitreLivre] = useState(() => brouillonInitial?.titreLivre ?? "");
 
   // Parcours "une question à la fois" — réf. 60816-01, suite, 29/08/2026
   // (voir docblock en tête de fichier).
@@ -678,7 +687,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
       finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
       degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
       adresse, ton, posture, longueur, role,
-      auteurEstUtilisateur, profilAuteurAudit,
+      auteurEstUtilisateur, profilAuteurAudit, titreLivre,
     };
     try {
       localStorage.setItem(CLÉ_BROUILLON_QUESTIONNAIRE, JSON.stringify(brouillon));
@@ -695,7 +704,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
     finalites, questionLibre, preoccupations, preoccupationAutreActive, preoccupationAutre,
     degreIntervention, estTravailAcademique, autorisationIA, conditionsIA,
     adresse, ton, posture, longueur, role,
-    auteurEstUtilisateur, profilAuteurAudit,
+    auteurEstUtilisateur, profilAuteurAudit, titreLivre,
   ]);
 
   // Nature du projet requise dès le niveau 1 — les niveaux suivants
@@ -772,6 +781,7 @@ export default function CursAuditQuestionnaire({ onValider }) {
     }
     const typeDocument = labelChemin(cheminNature);
     onValider({
+      titre: titreLivre.trim(),
       typeDocument,
       statutTexte: ouEnEtesVous,
       finaliteAudit: finalitesAvecAutre,
@@ -936,6 +946,19 @@ export default function CursAuditQuestionnaire({ onValider }) {
                     <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
                   ))}
                 </select>
+              </div>
+            )}
+            {/* 07/09/2026 — demandé ici plutôt qu'à la toute fin du parcours
+                (l'ancien emplacement, dans CursAudit.jsx) : juste à côté du
+                choix de réutilisation, seulement quand on NE réutilise pas
+                — logique, s'il n'y a rien à reprendre, la première chose à
+                savoir est de quel texte il s'agit. Volontairement sans lien
+                avec le type d'ouvrage (abordé plus loin, à "Quelle est la
+                nature de votre projet ?") — un titre seul, rien d'autre. */}
+            {contratChoisi === "" && (
+              <div>
+                <label style={labelStyle}>Quel titre désirez-vous donner à ce texte ?</label>
+                <input style={champStyle} value={titreLivre} onChange={(e) => setTitreLivre(e.target.value)} placeholder="Ex. : Le silence des cimes" />
               </div>
             )}
             <div>

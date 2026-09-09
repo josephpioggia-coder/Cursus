@@ -456,7 +456,16 @@ export default function CursAudit({ onVoirAudits } = {}) {
           </div>
         </div>
       ) : !questionnaire ? (
-        <CursAuditQuestionnaire onValider={setQuestionnaire} />
+        <CursAuditQuestionnaire onValider={(q) => {
+          // 07/09/2026 — le titre est désormais demandé DANS le
+          // questionnaire (juste à côté du choix de réutilisation), plus
+          // ici en second temps : repris tel quel pour ne jamais le
+          // redemander deux fois. N'écrase pas un titre déjà tapé ici si
+          // le questionnaire n'en a fourni aucun (ex. contrat réimporté
+          // sans titre renseigné).
+          if (q.titre) setTitre(q.titre);
+          setQuestionnaire(q);
+        }} />
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--fond, #F7F4EF)", padding: "8px 14px", borderRadius: 8 }}>
