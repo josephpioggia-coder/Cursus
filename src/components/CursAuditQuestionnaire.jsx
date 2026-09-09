@@ -957,8 +957,8 @@ export default function CursAuditQuestionnaire({ onValider }) {
                 nature de votre projet ?") — un titre seul, rien d'autre. */}
             {contratChoisi === "" && (
               <div>
-                <label style={labelStyle}>Quel titre désirez-vous donner à ce texte ?</label>
-                <input style={champStyle} value={titreLivre} onChange={(e) => setTitreLivre(e.target.value)} placeholder="Ex. : Le silence des cimes" />
+                <label style={{ ...labelStyle, fontWeight: 700 }}>Nouvel audit ?</label>
+                <input style={champStyle} value={titreLivre} onChange={(e) => setTitreLivre(e.target.value)} placeholder="Quel titre désirez-vous donner à ce texte ?" />
               </div>
             )}
             <div>
