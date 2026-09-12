@@ -154,6 +154,7 @@ import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { nomDeFichierSûr } from "../lib/exportWord.js";
 import { exporterContratIntentionWord } from "../lib/exportContratIntentionWord.js";
+import { importerQuestionnaireDocx } from "../lib/importerQuestionnaireCursAudit.js";
 import ProfilAuteur from "./ProfilAuteur.jsx";
 import {
   OU_EN_ETES_VOUS, OBJECTIFS, DESTINATAIRES,
@@ -198,7 +199,11 @@ function lireBrouillonQuestionnaire() {
 // injecté dans le prompt du moteur d'analyse) et
 // `contratIntention.attentesCursus` (mêmes valeurs, un seul état — voir
 // `finalites` plus bas).
-const FINALITES = [
+// Exportées (07/09/2026) pour être réutilisées telles quelles par
+// importerQuestionnaireDocx.js (import du questionnaire rempli au format
+// Word) — une seule source de vérité, jamais de liste dupliquée qui
+// pourrait diverger de celle-ci avec le temps.
+export const FINALITES = [
   "Structurer mes idées",
   "Mieux écrire",
   "Améliorer le style",
@@ -219,7 +224,7 @@ const FINALITES = [
   "Tout analyser",
 ];
 
-const DEGRES_INTERVENTION = [
+export const DEGRES_INTERVENTION = [
   { id: "observer",                 label: "Observer seulement" },
   { id: "signaler",                 label: "Signaler les problèmes" },
   { id: "pistes",                   label: "Proposer des pistes" },
@@ -228,7 +233,7 @@ const DEGRES_INTERVENTION = [
   { id: "reecrire_librement",       label: "Réécrire librement" },
 ];
 
-const CONDITIONS_IA_ACADEMIQUE = [
+export const CONDITIONS_IA_ACADEMIQUE = [
   "Correction linguistique",
   "Aide à la structure",
   "Aide bibliographique",
@@ -243,7 +248,7 @@ const CONDITIONS_IA_ACADEMIQUE = [
 // de question finale : combinées par synthetiser-question-cursaudit (voir
 // ce fichier) en une seule question centrale que l'auteur·ice valide ou
 // modifie ensuite — voir "Question centrale validée" plus bas.
-const PREOCCUPATIONS_QUESTION_PRECISE = [
+export const PREOCCUPATIONS_QUESTION_PRECISE = [
   "Mon texte tient-il sa promesse ?",
   "Le lecteur comprend-il ce que je veux transmettre ?",
   "Le genre réel de mon texte correspond-il au genre que j'annonce ?",
@@ -458,6 +463,11 @@ export default function CursAuditQuestionnaire({ onValider }) {
   // savoir est le titre de ce nouveau texte. Repris tel quel par
   // CursAudit.jsx (voir son onValider) pour ne jamais le demander deux fois.
   const [titreLivre, setTitreLivre] = useState(() => brouillonInitial?.titreLivre ?? "");
+  // Import Word (07/09/2026) — voir importerQuestionnaireWord plus bas.
+  // Jamais persistés dans le brouillon : propres à un import ponctuel, pas
+  // à reproposer tels quels si l'auteur·ice revient sur cet écran plus tard.
+  const [importWordEnCours, setImportWordEnCours] = useState(false);
+  const [avertissementsImportWord, setAvertissementsImportWord] = useState([]);
 
   // Parcours "une question à la fois" — réf. 60816-01, suite, 29/08/2026
   // (voir docblock en tête de fichier).
@@ -639,6 +649,25 @@ export default function CursAuditQuestionnaire({ onValider }) {
       }
     };
     lecteur.readAsText(fichier);
+  };
+
+  // Import du questionnaire rempli au format Word (07/09/2026) — voir
+  // importerQuestionnaireCursAudit.js. Réutilise appliquerContrat(), le
+  // même chemin de restauration d'état que la réutilisation d'un audit
+  // précédent et l'import JSON, jamais une logique dupliquée. `titre`
+  // n'est pas géré par appliquerContrat() (il vit hors du contrat
+  // d'intention, voir titreLivre plus haut) — mis à jour séparément ici.
+  const importerQuestionnaireWord = async (fichier) => {
+    if (!fichier) return;
+    setImportWordEnCours(true);
+    setAvertissementsImportWord([]);
+    setErreur(null);
+    const { data, error, avertissements } = await importerQuestionnaireDocx(fichier);
+    setImportWordEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    appliquerContrat(data);
+    if (data.titre) setTitreLivre(data.titre);
+    setAvertissementsImportWord(avertissements || []);
   };
 
   const [finalites, setFinalites] = useState(() => brouillonInitial?.finalites ?? []);
@@ -970,6 +999,35 @@ export default function CursAuditQuestionnaire({ onValider }) {
                 Importer un contrat (JSON)
                 <input type="file" accept=".json" style={{ display: "none" }} onChange={(e) => { importerContratJSON(e.target.files[0]); e.target.value = ""; }} />
               </label>
+            </div>
+            {/* Import Word (07/09/2026) — voir importerQuestionnaireCursAudit.js
+                et importerQuestionnaireWord plus haut. Distinct du contrat
+                JSON : celui-ci lit un questionnaire rempli hors ligne à
+                partir du modèle Word fourni, jamais généré par l'app
+                elle-même — d'où les avertissements affichés après import
+                (la nature du projet, notamment, ne peut jamais être
+                déduite automatiquement d'un texte libre). */}
+            <div>
+              <label style={labelStyle}>Ou importer un questionnaire rempli hors ligne (Word)</label>
+              <label style={{
+                display: "inline-block", background: "#fff", color: "#5B52C4", border: "1px solid #7F77DD80", borderRadius: 6,
+                padding: "6px 12px", fontSize: 12, fontWeight: 500, cursor: importWordEnCours ? "default" : "pointer",
+                fontFamily: "inherit", opacity: importWordEnCours ? 0.6 : 1,
+              }}>
+                {importWordEnCours ? "Lecture du fichier…" : "Importer un questionnaire (Word)"}
+                <input type="file" accept=".docx" disabled={importWordEnCours} style={{ display: "none" }}
+                       onChange={(e) => { importerQuestionnaireWord(e.target.files[0]); e.target.value = ""; }} />
+              </label>
+              {avertissementsImportWord.length > 0 && (
+                <div style={{ marginTop: 8, background: "#FCF3E3", border: "0.5px solid #C4973A60", borderRadius: 7, padding: "8px 12px" }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 600, color: "#7A5A10", marginBottom: 4 }}>
+                    Import terminé — quelques points à vérifier :
+                  </div>
+                  {avertissementsImportWord.map((a, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#7A5A10", marginBottom: 2 }}>• {a}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         );
