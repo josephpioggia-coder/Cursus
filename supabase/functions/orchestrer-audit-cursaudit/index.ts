@@ -560,7 +560,7 @@ function fusionnerSchemas(a: Record<string, unknown>, b: Record<string, unknown>
 // ─── Analyse d'une unité (logique identique à analyser-unite-cursaudit) ────
 
 async function analyserUneSection(
-  section: { id: string; texte_source: string },
+  texteAvecContexte: string,
   modeIA: string,
   criteres: CritereActif[],
   schema: Record<string, unknown>,
@@ -568,10 +568,23 @@ async function analyserUneSection(
   contexteQualification: string,
   consigneSyntheseEditoriale: string,
 ): Promise<Record<string, unknown>> {
+  // CORRECTIF 12/09/2026 — cette fonction, PAS analyser-unite-cursaudit,
+  // est le vrai chemin exécuté par "Lancer/Continuer l'analyse" (voir le
+  // commentaire "FICHIER AUTONOME" en tête de fichier) : le contexte de
+  // voisinage et la continuité par chapitre avec le pré-audit, ajoutés le
+  // même jour dans analyser-unite-cursaudit, n'avaient donc aucun effet
+  // réel tant qu'ils n'étaient pas dupliqués ici aussi — erreur repérée
+  // après un test resté sans changement malgré le correctif déployé.
   const systemClaude =
     contexteQualification +
-    "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
-    "CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
+    "Tu es le moteur d'analyse de CursAudit. Le texte fourni peut inclure, avant et/ou après l'unité à " +
+    "analyser, un court extrait voisin explicitement marqué « NE PAS l'évaluer » — il sert uniquement à " +
+    "situer l'unité dans son contexte immédiat (reconnaître par exemple qu'un fragment court est un titre " +
+    "ou une accroche plutôt qu'une affirmation isolée à juger sur le fond). Il peut aussi inclure un repère " +
+    "marqué « lecture de ce chapitre par le pré-audit » — un passage antérieur du pré-audit sur ce même " +
+    "chapitre, à prendre en compte pour assurer une continuité éditoriale, jamais à recopier ni à noter " +
+    "comme si c'était le texte de l'unité. Pour l'unité marquée « à analyser », et elle seule, évalue-la " +
+    "selon CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
     "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
     consigneCriteres + "\n\n" + consigneSyntheseEditoriale;
 
@@ -585,7 +598,7 @@ async function analyserUneSection(
   // le correctif de ce matin.
   const { data: analyse, usage: usageClaude } = await appellerMoteurIAStructure({
     moteur: "claude", modele: MODELE_CLAUDE, role: "analyseur_cursaudit",
-    schema_sortie: schema, system: systemClaude, contexte: section.texte_source, max_tokens: 8192,
+    schema_sortie: schema, system: systemClaude, contexte: texteAvecContexte, max_tokens: 8192,
   });
 
   const nbCritèresVides = compterCritèresVides(analyse as Record<string, unknown>, criteres);
@@ -598,13 +611,15 @@ async function analyserUneSection(
   if (modeIA === "2 IA") {
     const systemGPT =
       "Tu es le second lecteur du moteur d'analyse CursAudit. Relis l'analyse ci-dessous, produite par un " +
-      "premier moteur pour cette unité de texte, selon les mêmes dimensions :\n" + consigneCriteres +
+      "premier moteur pour l'unité de texte marquée « à analyser » (les extraits voisins marqués « NE PAS " +
+      "l'évaluer » et le repère « lecture de ce chapitre par le pré-audit », s'il est présent, ne servent " +
+      "qu'à situer le contexte, comme pour le premier moteur), selon les mêmes dimensions :\n" + consigneCriteres +
       "\nSignale UNIQUEMENT les désaccords réels (une dimension classée de façon manifestement erronée au " +
       "regard du texte) — jamais une reformulation ou une préférence de nuance.";
     const résultatGPT = await appellerMoteurIAStructure({
       moteur: "gpt", modele: MODELE_GPT, role: "second_lecteur_cursaudit",
       schema_sortie: SCHEMA_CONTROLE_GPT, system: systemGPT,
-      contexte: JSON.stringify({ texte_source: section.texte_source, analyse_premier_moteur: analyse }),
+      contexte: JSON.stringify({ texte_source: texteAvecContexte, analyse_premier_moteur: analyse }),
     });
     controleGPT = résultatGPT.data;
     usageGPT = résultatGPT.usage;
@@ -699,11 +714,11 @@ Deno.serve(async (req) => {
     // — un livre à plus de 1000 unités non traitées ne doit pas dépendre de
     // cette compensation accidentelle. Lecture par lots de 1000 via .range().
     const TAILLE_PAGE = 1000;
-    const aTraiter: { id: string; texte_source: string }[] = [];
+    const aTraiter: { id: string; texte_source: string; ordre: number; chapitre_index: number | null }[] = [];
     for (let page = 0; ; page++) {
       let requeteSections = admin
         .from("audit_sections")
-        .select("id, texte_source")
+        .select("id, texte_source, ordre, chapitre_index")
         .eq("audit_id", auditId)
         .is("resultat_analyse", null);
       if (chapitreMaxIndex !== undefined) requeteSections = requeteSections.lte("chapitre_index", chapitreMaxIndex);
@@ -715,14 +730,54 @@ Deno.serve(async (req) => {
       if (lot.length < TAILLE_PAGE) break;
     }
 
+    // Contexte de voisinage (12/09/2026, dupliqué depuis analyser-unite-
+    // cursaudit — voir le commentaire "FICHIER AUTONOME" en tête de
+    // fichier) : table ordre → texte_source de TOUT l'audit (pas seulement
+    // `aTraiter`, qui exclut les unités déjà analysées — un voisin déjà
+    // traité doit quand même pouvoir servir de repère). Un seul aller-
+    // retour par appel d'orchestrateur, pas par unité.
+    const texteParOrdre = new Map<number, string>();
+    for (let page = 0; ; page++) {
+      const { data: lot } = await admin
+        .from("audit_sections")
+        .select("ordre, texte_source")
+        .eq("audit_id", auditId)
+        .order("ordre", { ascending: true })
+        .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
+      if (!lot || lot.length === 0) break;
+      for (const s of lot) texteParOrdre.set(s.ordre, s.texte_source);
+      if (lot.length < TAILLE_PAGE) break;
+    }
+
+    // Continuité avec le pré-audit, chapitre par chapitre (12/09/2026,
+    // même duplication) — distinct de construireContextePreaudit ci-dessus
+    // (global, injecté une fois dans contexteQualification pour toutes les
+    // unités) : ceci cible la lecture du SEUL chapitre de chaque unité.
+    const lectureChapitres = (audit.preaudit_resultat as { lecture_chapitres?: Array<{ lecture?: { point_faible?: string; a_verifier?: string; a_approfondir_audit_final?: string } }> } | null)?.lecture_chapitres;
+
     let traiteesCetteFois = 0;
     let echoueesCetteFois = 0;
 
     for (const section of aTraiter) {
       if (Date.now() - départ > BUDGET_MS) break; // lot suivant au prochain appel
 
+      const texteAvant = texteParOrdre.get(section.ordre - 1);
+      const texteAprès = texteParOrdre.get(section.ordre + 1);
+      const lectureChapitre = typeof section.chapitre_index === "number" ? lectureChapitres?.[section.chapitre_index]?.lecture : undefined;
+      const contextePréaudit = lectureChapitre
+        ? `\n\n[Repère : lecture de ce chapitre par le pré-audit — informe ta lecture, NE PAS le recopier ni le noter directement]\n` +
+          (lectureChapitre.point_faible ? `Point faible relevé : ${lectureChapitre.point_faible}\n` : "") +
+          (lectureChapitre.a_verifier ? `À vérifier : ${lectureChapitre.a_verifier}\n` : "") +
+          (lectureChapitre.a_approfondir_audit_final ? `À approfondir ici : ${lectureChapitre.a_approfondir_audit_final}` : "")
+        : "";
+      const texteAvecContexte =
+        (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
+        `[Unité à analyser]\n${section.texte_source}` +
+        (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "") +
+        contextePréaudit;
+
       try {
-        const résultat = await analyserUneSection(section, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+        const résultat = await analyserUneSection(texteAvecContexte, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
         await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
         traiteesCetteFois++;
       } catch (err) {
