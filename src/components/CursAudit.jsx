@@ -408,6 +408,113 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setConsentementSupervision(false);
   };
 
+  // Section "Texte à auditer" (12/09/2026, réf. 60816-01, suite) — demandé
+  // plusieurs fois par l'auteur du projet : l'import du texte doit se faire
+  // DÈS LE DÉBUT du parcours, juste avant "Réutiliser les réponses d'un
+  // audit précédent" (CursAuditQuestionnaire.jsx, étape "intro"), pas après
+  // les 12 questions comme avant. L'état (source, texte, infosDocx…) reste
+  // entièrement possédé ici — seule la JSX est extraite pour être passée en
+  // prop à CursAuditQuestionnaire, qui l'affiche à sa juste place. Rendue
+  // indépendamment de `questionnaire` : disponible dès l'écran "intro",
+  // conservée ensuite (état non réinitialisé) si l'auteur·ice revient en
+  // arrière via "Modifier mes réponses".
+  const sectionTexte = (
+    <div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Texte à auditer</label>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 8, background: "#f5f5f5", borderRadius: 7, padding: 3 }}>
+        <button type="button" onClick={() => setSource("coller")}
+          style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
+            background: source === "coller" ? "#fff" : "transparent", color: source === "coller" ? "#7F77DD" : "#999", fontWeight: source === "coller" ? 600 : 400,
+            boxShadow: source === "coller" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
+          Coller le texte
+        </button>
+        <button type="button" onClick={() => setSource("docx")}
+          style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
+            background: source === "docx" ? "#fff" : "transparent", color: source === "docx" ? "#7F77DD" : "#999", fontWeight: source === "docx" ? 600 : 400,
+            boxShadow: source === "docx" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
+          Importer un fichier Word
+        </button>
+      </div>
+
+      {source === "coller" ? (
+        <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} placeholder="Collez le texte ici…"
+          style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
+      ) : (
+        <div style={{ border: "1px dashed var(--border)", borderRadius: 8, padding: "24px 16px", textAlign: "center" }}>
+          <input ref={inputFichierRef} type="file" accept=".docx" style={{ display: "none" }}
+            onChange={(e) => importerFichier(e.target.files[0])} />
+          <button type="button" onClick={() => inputFichierRef.current?.click()} disabled={importEnCours}
+            style={{ padding: "8px 16px", borderRadius: 7, border: "none", background: "#378ADD", color: "#fff", fontSize: 12.5, fontWeight: 500, cursor: importEnCours ? "default" : "pointer", fontFamily: "inherit" }}>
+            {importEnCours ? "Lecture…" : "Choisir un fichier .docx"}
+          </button>
+          {nomFichier && !importEnCours && (
+            <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>
+              « {nomFichier} » — {unitésDocx?.length || 0} unités extraites
+              {chapitresDétectés && ` · ${chapitresDétectés.length} titres détectés (à confirmer après création, dans l'aperçu gratuit)`}
+            </div>
+          )}
+          {nomFichier && !importEnCours && niveauxDisponibles.length === 0 && (
+            <div style={{ marginTop: 10, textAlign: "left", background: "#FFF9EC", border: "1px solid #C4973A66", borderRadius: 6, padding: "8px 10px", fontSize: 11.5, color: "#8A6116" }}>
+              Aucun niveau de titre Word détecté dans ce fichier — ce texte sera transmis comme un seul bloc continu, sans découpage par chapitre. Si votre livre a des chapitres, vérifiez qu'ils utilisent bien un style de titre Word (Titre 1, Titre 2…) avant d'importer ; sinon, la structure ne pourra pas être reconnue automatiquement.
+            </div>
+          )}
+          {niveauxDisponibles.length > 0 && !importEnCours && (
+            <div style={{ marginTop: 10, textAlign: "left" }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 6 }}>
+                Quel niveau de titre correspond à vos chapitres ? Vérifiez avec les exemples ci-dessous et cochez celui (ou ceux) qui séparent vraiment votre texte :
+              </div>
+              {niveauxDisponibles.map(({ niveau, nombre }) => (
+                <label key={niveau} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "5px 0", cursor: "pointer" }}>
+                  <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRetenu(niveau)} style={{ marginTop: 2, flexShrink: 0 }} />
+                  <span>
+                    <strong>Niveau {niveau}</strong> ({nombre} occurrence{nombre > 1 ? "s" : ""})
+                    {exemplesParNiveau[niveau]?.length > 0 && (
+                      <span style={{ display: "block", fontStyle: "italic", color: "var(--texte-tertiaire)", marginTop: 2 }}>
+                        Ex. : {exemplesParNiveau[niveau].map((t) => `« ${t} »`).join(", ")}{nombre > exemplesParNiveau[niveau].length ? "…" : ""}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )}
+          {erreurImport && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 10 }}>{erreurImport}</div>}
+        </div>
+      )}
+
+      <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
+
+      {problèmeMiseEnPage && (
+        <div style={{ marginTop: 12, background: "#FCEBEB", border: "0.5px solid #A32D2D50", borderRadius: 8, padding: "14px 16px" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "#A32D2D", marginBottom: 6 }}>
+            Mise en page à résoudre avant de créer cet audit
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.6, marginBottom: 8 }}>
+            {diagnosticImport.segmentationIrrégulière && (
+              <>Ce fichier semble présenter une segmentation irrégulière ({diagnosticImport.moyenneMotsParUnité.toFixed(1).replace(".", ",")} mots par unité en moyenne, probablement une ligne = un paragraphe à l'export). Cela gonfle artificiellement le nombre d'unités, donc le prix et le temps de l'audit détaillé. </>
+            )}
+            {diagnosticImport.titresQuasiInexistants && (
+              <>Ce texte ({nombreMots.toLocaleString("fr-FR")} mots) ne présente presque aucun titre de chapitre détecté ({chapitresDétectés?.length ?? 0}) — la structure du pré-audit enrichi chapitre par chapitre ne pourra pas être proposée correctement. </>
+            )}
+            Deux options : corrigez la mise en forme vous-même dans votre traitement de texte et réimportez le fichier, ou confiez-nous cette mise en page.
+          </div>
+          {demandeMiseEnPage ? (
+            <div style={{ fontSize: 11.5, color: "#1D9E75", fontWeight: 500 }}>
+              Demande enregistrée ({PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC). Le paiement CursAudit n'est pas encore disponible dans l'application —
+              nous vous recontacterons pour la suite. Vous pourrez réimporter le fichier corrigé dès réception.
+            </div>
+          ) : (
+            <button type="button" onClick={demanderMiseEnPage} disabled={miseEnPageEnCours}
+              style={{ padding: "8px 14px", borderRadius: 7, border: "none", background: "#A32D2D", color: "#fff", fontSize: 12, fontWeight: 500, cursor: miseEnPageEnCours ? "default" : "pointer", fontFamily: "inherit" }}>
+              {miseEnPageEnCours ? "Envoi…" : `Commander la mise en page — ${PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 720 }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>CursAudit</h1>
@@ -501,7 +608,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
           </div>
         </div>
       ) : !questionnaire ? (
-        <CursAuditQuestionnaire onValider={(q) => {
+        <CursAuditQuestionnaire sectionTexte={sectionTexte} onValider={(q) => {
           // 07/09/2026 — le titre est désormais demandé DANS le
           // questionnaire (juste à côté du choix de réutilisation), plus
           // ici en second temps : repris tel quel pour ne jamais le
@@ -528,71 +635,15 @@ export default function CursAudit({ onVoirAudits } = {}) {
               style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }} />
           </div>
 
-          <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Texte à auditer</label>
-
-            <div style={{ display: "flex", gap: 6, marginBottom: 8, background: "#f5f5f5", borderRadius: 7, padding: 3 }}>
-              <button onClick={() => setSource("coller")}
-                style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
-                  background: source === "coller" ? "#fff" : "transparent", color: source === "coller" ? "#7F77DD" : "#999", fontWeight: source === "coller" ? 600 : 400,
-                  boxShadow: source === "coller" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
-                Coller le texte
-              </button>
-              <button onClick={() => setSource("docx")}
-                style={{ flex: 1, padding: "6px 8px", borderRadius: 5, border: "none", fontFamily: "inherit", fontSize: 11.5, cursor: "pointer",
-                  background: source === "docx" ? "#fff" : "transparent", color: source === "docx" ? "#7F77DD" : "#999", fontWeight: source === "docx" ? 600 : 400,
-                  boxShadow: source === "docx" ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>
-                Importer un fichier Word
-              </button>
-            </div>
-
-            {source === "coller" ? (
-              <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} placeholder="Collez le texte ici…"
-                style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
-            ) : (
-              <div style={{ border: "1px dashed var(--border)", borderRadius: 8, padding: "24px 16px", textAlign: "center" }}>
-                <input ref={inputFichierRef} type="file" accept=".docx" style={{ display: "none" }}
-                  onChange={(e) => importerFichier(e.target.files[0])} />
-                <button onClick={() => inputFichierRef.current?.click()} disabled={importEnCours}
-                  style={{ padding: "8px 16px", borderRadius: 7, border: "none", background: "#378ADD", color: "#fff", fontSize: 12.5, fontWeight: 500, cursor: importEnCours ? "default" : "pointer", fontFamily: "inherit" }}>
-                  {importEnCours ? "Lecture…" : "Choisir un fichier .docx"}
-                </button>
-                {nomFichier && !importEnCours && (
-                  <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)", marginTop: 10 }}>
-                    « {nomFichier} » — {unitésDocx?.length || 0} unités extraites
-                    {chapitresDétectés && ` · ${chapitresDétectés.length} titres détectés (à confirmer après création, dans l'aperçu gratuit)`}
-                  </div>
-                )}
-                {nomFichier && !importEnCours && niveauxDisponibles.length === 0 && (
-                  <div style={{ marginTop: 10, textAlign: "left", background: "#FFF9EC", border: "1px solid #C4973A66", borderRadius: 6, padding: "8px 10px", fontSize: 11.5, color: "#8A6116" }}>
-                    Aucun niveau de titre Word détecté dans ce fichier — ce texte sera transmis comme un seul bloc continu, sans découpage par chapitre. Si votre livre a des chapitres, vérifiez qu'ils utilisent bien un style de titre Word (Titre 1, Titre 2…) avant d'importer ; sinon, la structure ne pourra pas être reconnue automatiquement.
-                  </div>
-                )}
-                {niveauxDisponibles.length > 0 && !importEnCours && (
-                  <div style={{ marginTop: 10, textAlign: "left" }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 6 }}>
-                      Quel niveau de titre correspond à vos chapitres ? Vérifiez avec les exemples ci-dessous et cochez celui (ou ceux) qui séparent vraiment votre texte :
-                    </div>
-                    {niveauxDisponibles.map(({ niveau, nombre }) => (
-                      <label key={niveau} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "5px 0", cursor: "pointer" }}>
-                        <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRetenu(niveau)} style={{ marginTop: 2, flexShrink: 0 }} />
-                        <span>
-                          <strong>Niveau {niveau}</strong> ({nombre} occurrence{nombre > 1 ? "s" : ""})
-                          {exemplesParNiveau[niveau]?.length > 0 && (
-                            <span style={{ display: "block", fontStyle: "italic", color: "var(--texte-tertiaire)", marginTop: 2 }}>
-                              Ex. : {exemplesParNiveau[niveau].map((t) => `« ${t} »`).join(", ")}{nombre > exemplesParNiveau[niveau].length ? "…" : ""}
-                            </span>
-                          )}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {erreurImport && <div style={{ fontSize: 11.5, color: "#A32D2D", marginTop: 10 }}>{erreurImport}</div>}
-              </div>
-            )}
-
-            <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", marginTop: 4 }}>{unités.length} unité{unités.length > 1 ? "s" : ""} détectée{unités.length > 1 ? "s" : ""}</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--fond, #F7F4EF)", padding: "8px 14px", borderRadius: 8 }}>
+            <span style={{ fontSize: 12, color: "var(--texte-secondaire)" }}>
+              {/* 12/09/2026 — le texte est désormais importé DANS le questionnaire
+                  (étape "intro", voir sectionTexte plus haut) : ici, juste un
+                  résumé de ce qui a déjà été fourni, pas le formulaire d'import
+                  en double. "Modifier mes réponses" ci-dessus permet d'y revenir. */}
+              Texte à auditer — {nomFichier ? `« ${nomFichier} »` : texte ? "texte collé" : "aucun texte fourni"}, {unités.length} unité{unités.length > 1 ? "s" : ""}
+              {chapitresDétectés && ` · ${chapitresDétectés.length} chapitre${chapitresDétectés.length > 1 ? "s" : ""} détecté${chapitresDétectés.length > 1 ? "s" : ""}`}
+            </span>
           </div>
 
           {problèmeMiseEnPage && (
@@ -607,7 +658,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
                 {diagnosticImport.titresQuasiInexistants && (
                   <>Ce texte ({nombreMots.toLocaleString("fr-FR")} mots) ne présente presque aucun titre de chapitre détecté ({chapitresDétectés?.length ?? 0}) — la structure du pré-audit enrichi chapitre par chapitre ne pourra pas être proposée correctement. </>
                 )}
-                Deux options : corrigez la mise en forme vous-même dans votre traitement de texte et réimportez le fichier, ou confiez-nous cette mise en page.
+                Deux options : corrigez la mise en forme vous-même dans votre traitement de texte et réimportez le fichier (bouton "Modifier mes réponses" ci-dessus), ou confiez-nous cette mise en page.
               </div>
               {demandeMiseEnPage ? (
                 <div style={{ fontSize: 11.5, color: "#1D9E75", fontWeight: 500 }}>

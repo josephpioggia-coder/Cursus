@@ -425,7 +425,7 @@ function calculerÉtapesClés(estTravailAcademique) {
   return étapes;
 }
 
-export default function CursAuditQuestionnaire({ onValider }) {
+export default function CursAuditQuestionnaire({ onValider, sectionTexte }) {
   // Brouillon du questionnaire lui-même (voir CLÉ_BROUILLON_QUESTIONNAIRE
   // en tête de fichier) — lu UNE SEULE FOIS à l'initialisation, jamais
   // recalculé ensuite (useMemo avec dépendances vides), pour ne pas
@@ -985,6 +985,15 @@ export default function CursAuditQuestionnaire({ onValider }) {
                 </>
               )}
             </div>
+
+            {/* 12/09/2026 — demandé explicitement par l'auteur du projet,
+                à plusieurs reprises : l'import du texte à auditer doit se
+                faire DÈS LE DÉBUT du parcours, juste avant "Réutiliser les
+                réponses d'un audit précédent" — pas après les 12 questions
+                comme avant (CursAudit.jsx). L'état et la logique restent
+                dans CursAudit.jsx (voir sectionTexte) ; ce composant ne fait
+                qu'afficher la JSX reçue à la bonne place. */}
+            {sectionTexte && <div>{sectionTexte}</div>}
 
             {contratsPrécédents && contratsPrécédents.length > 0 && (
               <div>
