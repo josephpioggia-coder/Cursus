@@ -811,10 +811,16 @@ export const auditsAPI = {
    *  index.ts) : les unités déjà analysées avant ce correctif restent
    *  fausses tant qu'elles n'ont pas été relancées. Réservé au propriétaire
    *  du projet côté écran (voir estProprietaire dans CursAuditDetail.jsx).
-   *  Ne touche pas à `statut`/`preaudit_statut` (déjà "paye" pour le
-   *  propriétaire) : effacer seulement les résultats suffit à rendre
-   *  "Lancer l'analyse"/"Lancer le pré-audit" à nouveau disponibles, sans
-   *  étape supplémentaire. */
+   *
+   *  CORRECTIF 12/09/2026 (même jour) — bug réel signalé : `statut` et
+   *  `preaudit_statut` n'étaient PAS remis à "paye" ici, sur l'hypothèse
+   *  fausse qu'ils l'étaient "déjà" pour le propriétaire. Vrai seulement à
+   *  LA CRÉATION de l'audit — un audit dont le pré-audit avait déjà tourné
+   *  une fois se retrouvait avec preaudit_statut toujours sur "termine"
+   *  alors que preaudit_resultat venait d'être vidé : ni rapport affiché
+   *  (résultat null), ni bouton "Lancer le pré-audit" (qui n'apparaît que
+   *  sur "paye", pas "termine") — un audit bloqué dans un état mort. Les
+   *  deux statuts sont maintenant explicitement remis à "paye" ici. */
   async réinitialiserTest(auditId) {
     const { error: erreurSections } = await supabase
       .from("audit_sections")
@@ -825,8 +831,10 @@ export const auditsAPI = {
     const { error } = await supabase
       .from("audits")
       .update({
+        statut:                   "paye",
         apercu_statut:            "non_demande",
         apercu_resultat:          null,
+        preaudit_statut:          "paye",
         preaudit_resultat:        null,
         preaudit_brouillon:       null,
         preaudit_critique_gpt:    null,
