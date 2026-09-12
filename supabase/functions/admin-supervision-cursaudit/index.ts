@@ -128,6 +128,34 @@ Deno.serve(async (req) => {
       return réponse({ audit: { ...audit, email: emails[audit.user_id] || "(compte introuvable)" }, sections });
     }
 
+    // "supprimer" — 12/09/2026, demandé par l'auteur du projet : la liste de
+    // supervision s'accumule aussi avec des audits de test (parfois les
+    // siens propres), sans aucun moyen de la nettoyer depuis cet écran.
+    // Filtré sur consentement_supervision = true comme "detail" ci-dessus :
+    // ne permet de supprimer que ce que cet écran montre réellement, jamais
+    // un id arbitraire d'un autre audit non consenti. auditId revérifié
+    // avant toute suppression — pas de suppression en masse possible ici.
+    if (action === "supprimer") {
+      const { auditId } = params;
+      if (!auditId) return réponse({ error: "auditId requis." }, 400);
+
+      const { data: audit, error: erreurLecture } = await supabase
+        .from("audits")
+        .select("id")
+        .eq("id", auditId)
+        .eq("consentement_supervision", true)
+        .maybeSingle();
+      if (erreurLecture) return réponse({ error: erreurLecture.message }, 500);
+      if (!audit) return réponse({ error: "Audit introuvable ou supervision non consentie." }, 404);
+
+      const { error: erreurSections } = await supabase.from("audit_sections").delete().eq("audit_id", auditId);
+      if (erreurSections) return réponse({ error: erreurSections.message }, 500);
+      const { error: erreurAudit } = await supabase.from("audits").delete().eq("id", auditId);
+      if (erreurAudit) return réponse({ error: erreurAudit.message }, 500);
+
+      return réponse({ ok: true });
+    }
+
     return réponse({ error: "Action inconnue." }, 400);
   } catch (err) {
     console.error("Erreur admin-supervision-cursaudit :", err.message);

@@ -566,6 +566,26 @@ export default function CursAuditQuestionnaire({ onValider }) {
     if (trouvé) appliquerContrat(trouvé.contrat_intention);
   };
 
+  // Suppression depuis "Réutiliser les réponses d'un audit précédent"
+  // (12/09/2026) — demandé par l'auteur du projet : cette liste s'accumule
+  // vite avec des audits de test, sans aucun moyen de la nettoyer sans
+  // aller sur l'écran "Mes audits". Supprime l'AUDIT entier (mêmes
+  // conséquences que là-bas, voir auditsAPI.supprimer), pas seulement son
+  // entrée dans cette liste — window.confirm comme seule sécurité,
+  // cohérent avec CursAuditListe.jsx, pas un facteur bloquant en plus.
+  const [suppressionContratEnCours, setSuppressionContratEnCours] = useState(false);
+  const supprimerContratPrécédent = async () => {
+    const trouvé = contratsPrécédents?.find((a) => a.id === contratChoisi);
+    if (!trouvé) return;
+    if (!window.confirm(`Supprimer définitivement l'audit "${trouvé.titre}" et ses réponses ? Cette action est irréversible.`)) return;
+    setSuppressionContratEnCours(true);
+    const { error } = await auditsAPI.supprimer(trouvé.id);
+    setSuppressionContratEnCours(false);
+    if (error) { alert(error.message || "Échec de la suppression."); return; }
+    setContratChoisi("");
+    setContratsPrécédents((prev) => (prev || []).filter((a) => a.id !== trouvé.id));
+  };
+
   const contratIntentionActuel = () => ({
     ouEnEtesVous,
     // Chemin complet (niveaux 1 à 4) + libellé prêt à l'emploi — réf.
@@ -969,12 +989,21 @@ export default function CursAuditQuestionnaire({ onValider }) {
             {contratsPrécédents && contratsPrécédents.length > 0 && (
               <div>
                 <label style={labelStyle}>Réutiliser les réponses d'un audit précédent</label>
-                <select style={champStyle} value={contratChoisi} onChange={(e) => choisirContratPrécédent(e.target.value)}>
-                  <option value="">— Ne pas réutiliser —</option>
-                  {contratsPrécédents.map((c) => (
-                    <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
-                  ))}
-                </select>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <select style={{ ...champStyle, flex: 1 }} value={contratChoisi} onChange={(e) => choisirContratPrécédent(e.target.value)}>
+                    <option value="">— Ne pas réutiliser —</option>
+                    {contratsPrécédents.map((c) => (
+                      <option key={c.id} value={c.id}>{c.titre} ({new Date(c.cree_le).toLocaleDateString("fr-FR")})</option>
+                    ))}
+                  </select>
+                  {contratChoisi !== "" && (
+                    <button type="button" onClick={supprimerContratPrécédent} disabled={suppressionContratEnCours}
+                      title="Supprimer définitivement cet audit et ses réponses"
+                      style={{ background: "none", border: "1px solid #A32D2D66", borderRadius: 6, color: "#A32D2D", fontSize: 12, padding: "8px 10px", cursor: suppressionContratEnCours ? "default" : "pointer", flexShrink: 0 }}>
+                      {suppressionContratEnCours ? "…" : "🗑 Supprimer"}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             {/* 07/09/2026 — demandé ici plutôt qu'à la toute fin du parcours

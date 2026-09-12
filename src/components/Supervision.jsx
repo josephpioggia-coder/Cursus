@@ -85,6 +85,29 @@ export default function Supervision() {
 
   useEffect(() => { rafraîchir(); }, [rafraîchir]);
 
+  // Suppression (12/09/2026) — demandé par l'auteur du projet : cette liste
+  // s'accumule aussi avec des audits de test, sans moyen de la nettoyer
+  // depuis cet écran. Supprime l'audit ET ses sections côté serveur (action
+  // "supprimer" de admin-supervision-cursaudit, qui revérifie lui-même le
+  // consentement avant d'agir). window.confirm avec le titre ET l'email de
+  // l'auteur·ice en toutes lettres — sécurité avant d'effacer, demandée
+  // explicitement, sans en faire un facteur bloquant séparé.
+  const [suppressionEnCoursId, setSuppressionEnCoursId] = useState(null);
+  const supprimer = async (e, audit) => {
+    e.stopPropagation();
+    if (!window.confirm(`Supprimer définitivement l'audit "${audit.titre}" de ${audit.email} et tout son contenu ? Cette action est irréversible.`)) return;
+    setSuppressionEnCoursId(audit.id);
+    try {
+      await appellerSupervision("supprimer", { auditId: audit.id });
+      if (auditOuvertId === audit.id) { setAuditOuvertId(null); setDétail(null); }
+      setAudits((prev) => prev.filter((a) => a.id !== audit.id));
+    } catch (err) {
+      setErreur(err.message);
+    } finally {
+      setSuppressionEnCoursId(null);
+    }
+  };
+
   const ouvrir = async (audit) => {
     if (auditOuvertId === audit.id) { setAuditOuvertId(null); setDétail(null); return; }
     setAuditOuvertId(audit.id);
@@ -154,12 +177,20 @@ export default function Supervision() {
                     <td style={{ padding: "6px 8px" }}>
                       {a.consentement_supervision_le ? new Date(a.consentement_supervision_le).toLocaleString("fr-FR") : "—"}
                     </td>
-                    <td style={{ padding: "6px 8px" }}>
+                    <td style={{ padding: "6px 8px", display: "flex", gap: 6 }}>
                       <button onClick={() => ouvrir(a)} style={{
                         background: "none", border: `0.5px solid ${COULEURS.texteClair}55`, borderRadius: 4,
                         padding: "3px 8px", fontSize: 11.5, cursor: "pointer", color: COULEURS.texte,
                       }}>
                         {auditOuvertId === a.id ? "Fermer" : "Regarder"}
+                      </button>
+                      <button onClick={(e) => supprimer(e, a)} disabled={suppressionEnCoursId === a.id}
+                        title="Supprimer définitivement cet audit"
+                        style={{
+                          background: "none", border: "0.5px solid #A32D2D66", borderRadius: 4,
+                          padding: "3px 8px", fontSize: 11.5, cursor: suppressionEnCoursId === a.id ? "default" : "pointer", color: "#A32D2D",
+                        }}>
+                        {suppressionEnCoursId === a.id ? "…" : "🗑"}
                       </button>
                     </td>
                   </tr>
