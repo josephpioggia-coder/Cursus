@@ -1997,7 +1997,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   );
 
   return (
-    <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 920 }}>
+    <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 1400 }}>
       <button onClick={onRetour} style={{ fontSize: 12.5, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 12 }}>
         ← Mes audits
       </button>
