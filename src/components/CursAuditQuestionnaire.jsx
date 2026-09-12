@@ -704,7 +704,15 @@ export default function CursAuditQuestionnaire({ onValider, sectionTexte }) {
   const [preoccupationAutre, setPreoccupationAutre] = useState(() => brouillonInitial?.preoccupationAutre ?? "");
   const [syntheseQuestionEnCours, setSyntheseQuestionEnCours] = useState(false);
   const [erreurSyntheseQuestion, setErreurSyntheseQuestion] = useState(null);
-  const [degreIntervention, setDegreIntervention] = useState(() => brouillonInitial?.degreIntervention ?? "");
+  // 12/09/2026 — "Proposer des pistes" pré-sélectionné par défaut (demande
+  // explicite de l'auteur du projet) : le point d'équilibre le plus sûr en
+  // l'absence d'autre information (signale les problèmes ET oriente, sans
+  // empiéter sur le rôle de CursEdit qui, lui, réécrit) — jamais un choix
+  // universellement valable (contraintes académiques, stade du texte,
+  // préférence de l'auteur·ice en décident souvent autrement), d'où un
+  // pré-remplissage visuellement discret (grisé, voir plus bas) plutôt
+  // qu'un choix imposé ou mis en avant comme définitif.
+  const [degreIntervention, setDegreIntervention] = useState(() => brouillonInitial?.degreIntervention ?? "pistes");
   // Travail académique — réf. 60816-01, suite, 28/08/2026. Devenu une case
   // à cocher indépendante lors de la fusion avec le contrat d'intention :
   // un mémoire/TFE peut relever de n'importe quelle famille de la
@@ -1180,10 +1188,21 @@ export default function CursAuditQuestionnaire({ onValider, sectionTexte }) {
 
       case "degre_intervention":
         return (
-          <select style={champStyle} value={degreIntervention} onChange={(e) => setDegreIntervention(e.target.value)}>
-            <option value="">— Choisir —</option>
-            {DEGRES_INTERVENTION.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-          </select>
+          <>
+            <select
+              style={{ ...champStyle, color: degreIntervention === "pistes" ? "var(--texte-tertiaire)" : "var(--texte-primaire)" }}
+              value={degreIntervention}
+              onChange={(e) => setDegreIntervention(e.target.value)}
+            >
+              <option value="">— Choisir —</option>
+              {DEGRES_INTERVENTION.map((d) => (
+                <option key={d.id} value={d.id}>{d.label}{d.id === "pistes" ? " (privilégié par défaut)" : ""}</option>
+              ))}
+            </select>
+            <p style={{ fontSize: 11, color: "var(--texte-tertiaire)", margin: "4px 0 0" }}>
+              "Proposer des pistes" est présélectionné comme un point de départ raisonnable si vous hésitez — changez-le si votre situation s'y prête mieux (contraintes académiques, texte déjà avancé…).
+            </p>
+          </>
         );
 
       case "academique_choix":
