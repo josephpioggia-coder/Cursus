@@ -146,6 +146,18 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [erreurCheckout, setErreurCheckout] = useState(null);
   const [erreur, setErreur] = useState(null);
   const [résultat, setRésultat] = useState(null);
+  // Confirmation avant création (12/09/2026, réf. 60816-01, suite) — signalé
+  // par l'auteur du projet après un test réel : un mauvais fichier (un
+  // rapport déjà exporté, collé par erreur à la place du manuscrit) peut
+  // être soumis sans qu'aucun contrôle n'en avertisse — CursEdit contrôle
+  // toujours la mise en page avant d'agir, CursAudit ne le faisait pas
+  // avant ce correctif. "Créer l'audit" n'appelle plus créer() directement :
+  // il ouvre d'abord un aperçu exact (texte + structure de chapitres telle
+  // que détectée, ou l'absence explicite de structure) que le client doit
+  // confirmer. S'applique à tout audit, pas seulement à ceux avec
+  // supervision demandée — le risque de soumettre le mauvais texte existe
+  // pour tous.
+  const [étapeConfirmation, setÉtapeConfirmation] = useState(false);
   // Consentement à la supervision (07/09/2026) — voir docblock en tête de
   // fichier et 2026-09-07-consentement-supervision-cursaudit.sql. Recueilli
   // à chaque audit, jamais restauré depuis le brouillon localStorage : une
@@ -164,6 +176,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
   useEffect(() => {
     if (premierRenduRef.current) { premierRenduRef.current = false; return; }
     setConsentementSupervision(false);
+    setÉtapeConfirmation(false);
   }, [texte, titre, source, nomFichier]);
 
   // Mise en page (réf. 60816-01, suite, 24/08/2026) — voir
@@ -217,6 +230,21 @@ export default function CursAudit({ onVoirAudits } = {}) {
     if (source === "docx") return unitésDocx || [];
     return segmenterTexte(texte);
   }, [source, texte, unitésDocx]);
+
+  // Aperçu de confirmation (12/09/2026) — début et fin du texte RÉELLEMENT
+  // soumis (unités jointes, pas `texte` brut : pour un import .docx, `texte`
+  // ne contient rien, c'est `unités` qui part vers l'audit). Tronqué à
+  // l'affichage seulement, jamais dans ce qui est envoyé.
+  const LONGUEUR_EXTRAIT = 600;
+  const aperçuTexte = useMemo(() => {
+    const texteComplet = unités.join("\n\n");
+    if (texteComplet.length <= LONGUEUR_EXTRAIT * 2) return { court: true, texte: texteComplet };
+    return {
+      court: false,
+      début: texteComplet.slice(0, LONGUEUR_EXTRAIT),
+      fin: texteComplet.slice(-LONGUEUR_EXTRAIT),
+    };
+  }, [unités]);
 
   const prix = useMemo(() => {
     if (!reglesPrix || unités.length === 0) return null;
@@ -670,23 +698,65 @@ export default function CursAudit({ onVoirAudits } = {}) {
             </span>
           </label>
 
-          <button
-            onClick={créer}
-            disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision}
-            style={{
-              padding: "10px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-              background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "#ccc" : "#7F77DD",
-              color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "default" : "pointer",
-            }}
-          >
-            {enCours
-              ? "Création…"
-              : problèmeMiseEnPage
-                ? "Mise en page à résoudre avant création"
-                : !consentementSupervision
-                  ? "Acceptez la supervision ci-dessus pour continuer"
-                  : "Créer l'audit (brouillon)"}
-          </button>
+          {étapeConfirmation && (
+            <div style={{ background: "#FFF9EC", border: "1px solid #C4973A80", borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: "#8A6116", marginBottom: 10 }}>
+                Vérifie avant d'envoyer — c'est le texte ci-dessous, tel quel, qui sera soumis à l'audit{consentementSupervision ? " et lu par la supervision si demandé" : ""}.
+              </div>
+
+              <div style={{ fontSize: 12, color: "var(--texte-secondaire)", marginBottom: 8 }}>
+                <strong>Titre :</strong> « {titre.trim()} » — {unités.length} unité{unités.length > 1 ? "s" : ""}, {nombreMots.toLocaleString("fr-FR")} mots.
+              </div>
+
+              <div style={{ fontSize: 12, color: "var(--texte-secondaire)", marginBottom: 10 }}>
+                <strong>Structure de chapitres :</strong>{" "}
+                {chapitresDétectés
+                  ? `${chapitresDétectés.length} chapitre${chapitresDétectés.length > 1 ? "s" : ""} détecté${chapitresDétectés.length > 1 ? "s" : ""} (${chapitresDétectés.slice(0, 5).map((c) => `« ${c.titre} »`).join(", ")}${chapitresDétectés.length > 5 ? ", …" : ""}).`
+                  : "aucune structure détectée — ce texte sera transmis comme un seul bloc continu, sans découpage par chapitre."}
+              </div>
+
+              <div style={{ background: "#fff", borderRadius: 6, padding: "10px 12px", fontSize: 12, lineHeight: 1.5, color: "var(--texte-primaire)", whiteSpace: "pre-wrap", maxHeight: 220, overflowY: "auto" }}>
+                {aperçuTexte.court ? aperçuTexte.texte : (
+                  <>
+                    {aperçuTexte.début}
+                    <div style={{ textAlign: "center", color: "var(--texte-tertiaire)", margin: "8px 0" }}>[… texte intermédiaire non affiché ici, {unités.length} unités au total …]</div>
+                    {aperçuTexte.fin}
+                  </>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <button onClick={() => setÉtapeConfirmation(false)} disabled={enCours}
+                  style={{ flex: 1, padding: "9px", borderRadius: 8, border: "0.5px solid var(--border)", background: "transparent", color: "var(--texte-secondaire)", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: enCours ? "default" : "pointer" }}>
+                  Ce n'est pas le bon texte — modifier
+                </button>
+                <button onClick={créer} disabled={enCours}
+                  style={{ flex: 1, padding: "9px", borderRadius: 8, border: "none", background: enCours ? "#ccc" : "#7F77DD", color: "#fff", fontSize: 12.5, fontWeight: 600, fontFamily: "inherit", cursor: enCours ? "default" : "pointer" }}>
+                  {enCours ? "Création…" : "Oui, c'est le bon texte — créer l'audit"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!étapeConfirmation && (
+            <button
+              onClick={() => setÉtapeConfirmation(true)}
+              disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision}
+              style={{
+                padding: "10px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+                background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "#ccc" : "#7F77DD",
+                color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "default" : "pointer",
+              }}
+            >
+              {enCours
+                ? "Création…"
+                : problèmeMiseEnPage
+                  ? "Mise en page à résoudre avant création"
+                  : !consentementSupervision
+                    ? "Acceptez la supervision ci-dessus pour continuer"
+                    : "Créer l'audit (brouillon)"}
+            </button>
+          )}
         </div>
       )}
     </div>
