@@ -1483,6 +1483,69 @@ function apercuVersHtml(résultat) {
   return html;
 }
 
+// Le pré-audit COMPLET (audit.preaudit_resultat, schéma v7) — même contenu
+// que exportPreauditWord.js, en HTML plutôt qu'en .docx. CORRECTIF
+// 12/09/2026 : "Envoyer vers CursEdit" n'envoyait jusqu'ici que
+// fiche_action_resultat (un résumé court, généré séparément par un second
+// bouton) — jamais le pré-audit lui-même, qui existe dès que
+// preaudit_statut === "termine" et contient le vrai travail chapitre par
+// chapitre (lecture_chapitres) que la fiche d'action ne fait que résumer.
+function preauditVersHtml(résultat) {
+  const listeHtml = (arr) => (arr?.length ? `<ul>${arr.map((x) => `<li>${échapperHtml(x)}</li>`).join("")}</ul>` : "");
+  let html = "";
+  if (résultat.resume_executif) html += `<h3>Résumé exécutif</h3><p>${échapperHtml(résultat.resume_executif)}</p>`;
+  if (résultat.fiche_synthese) {
+    const f = résultat.fiche_synthese;
+    html += `<h3>Fiche de synthèse</h3>` +
+      `<p><strong>Contrat annoncé :</strong> ${échapperHtml(f.contrat_annonce)}</p>` +
+      `<p><strong>Contrat réel :</strong> ${échapperHtml(f.contrat_reel)}</p>` +
+      `<p><strong>Écart principal :</strong> ${échapperHtml(f.ecart_principal)}</p>` +
+      `<p><strong>Risque lecteur :</strong> ${échapperHtml(f.risque_lecteur)}</p>` +
+      `<p><strong>Recommandation :</strong> ${échapperHtml(f.recommandation)}</p>` +
+      `<p><strong>Priorité :</strong> ${échapperHtml(f.priorite)}</p>`;
+  }
+  if (résultat.nature_reelle) html += `<h3>Nature réelle du texte</h3><p>${échapperHtml(résultat.nature_reelle)}</p>`;
+  if (résultat.promesse_affichee) html += `<h3>Promesse affichée et écart</h3><p>${échapperHtml(résultat.promesse_affichee)}</p>`;
+  if (résultat.ecart_promesse_execution) html += `<p><strong>Écart constaté :</strong> ${échapperHtml(résultat.ecart_promesse_execution)}</p>`;
+  if (résultat.voies_editoriales?.length) {
+    html += `<h3>Voies éditoriales possibles</h3>`;
+    for (const v of résultat.voies_editoriales) {
+      html += `<p><strong>${échapperHtml(v.nom)}</strong> <em>(réécriture ${échapperHtml(v.ampleur_reecriture)}${v.duree_estimee_travail ? `, ${échapperHtml(v.duree_estimee_travail)}` : ""})</em><br/>${échapperHtml(v.description)}</p>`;
+    }
+  }
+  if (résultat.recommandation_principale) html += `<p><strong>Recommandation principale :</strong> ${échapperHtml(résultat.recommandation_principale)}</p>`;
+  if (résultat.plan_intervention?.length) {
+    html += `<h3>Plan d'intervention</h3><ol>`;
+    for (const c of résultat.plan_intervention) html += `<li><strong>${échapperHtml(c.chantier)}</strong> — ${échapperHtml(c.geste_editorial)}</li>`;
+    html += `</ol>`;
+  }
+  if (résultat.exemples_concrets?.length) {
+    html += `<h3>Exemples concrets</h3>`;
+    résultat.exemples_concrets.forEach((ex, i) => {
+      html += `<p><strong>Exemple ${i + 1}</strong><br/>` +
+        `<strong>Problème :</strong> ${échapperHtml(ex.probleme)}<br/>` +
+        `<strong>Effet :</strong> ${échapperHtml(ex.effet)}<br/>` +
+        `<strong>Geste éditorial :</strong> ${échapperHtml(ex.geste_editorial)}<br/>` +
+        `<strong>Proposition :</strong> ${échapperHtml(ex.proposition)}</p>`;
+    });
+  }
+  if (résultat.a_preserver?.length) html += `<h3>À préserver</h3>${listeHtml(résultat.a_preserver)}`;
+  if (résultat.a_couper_ou_alleger?.length) html += `<h3>À couper ou alléger</h3>${listeHtml(résultat.a_couper_ou_alleger)}`;
+  if (résultat.prochaine_etape) html += `<h3>Prochaine étape recommandée</h3><p>${échapperHtml(résultat.prochaine_etape)}</p>`;
+  if (résultat.lecture_chapitres?.length) {
+    html += `<h3>Lecture chapitre par chapitre</h3>`;
+    résultat.lecture_chapitres.forEach((c, i) => {
+      html += `<p><strong>${i + 1}. ${échapperHtml(c.titre)}</strong><br/>` +
+        `<strong>Fonction :</strong> ${échapperHtml(c.lecture?.fonction)}<br/>` +
+        `<strong>Point fort :</strong> ${échapperHtml(c.lecture?.point_fort)}<br/>` +
+        `<strong>Point faible :</strong> ${échapperHtml(c.lecture?.point_faible)}<br/>` +
+        `<strong>À vérifier :</strong> ${échapperHtml(c.lecture?.a_verifier)}<br/>` +
+        `<strong>À approfondir dans l'audit final :</strong> ${échapperHtml(c.lecture?.a_approfondir_audit_final)}</p>`;
+    });
+  }
+  return html;
+}
+
 // Même forme pour la fiche d'action du pré-audit ET le rapport consolidé de
 // l'audit détaillé — voir FicheActionAffichage plus haut, dont ce formateur
 // reprend exactement les mêmes champs.
@@ -1718,8 +1781,16 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
       if (audit.apercu_statut === "termine" && audit.apercu_resultat) {
         await créerChapitre("Aperçu gratuit du manuscrit", apercuVersHtml(audit.apercu_resultat));
       }
-      if (audit.fiche_action_statut === "termine" && audit.fiche_action_resultat) {
-        await créerChapitre("Rapport de décision éditoriale (pré-audit)", ficheVersHtml(audit.fiche_action_resultat));
+      if (audit.preaudit_statut === "termine" && audit.preaudit_resultat) {
+        let html = preauditVersHtml(audit.preaudit_resultat);
+        // Fiche d'action (résumé court, générée séparément si demandée) —
+        // ajoutée à la suite du pré-audit complet quand les deux existent,
+        // jamais à sa place : la fiche résume le pré-audit, elle ne le
+        // remplace pas.
+        if (audit.fiche_action_statut === "termine" && audit.fiche_action_resultat) {
+          html += `<hr/><h3>Fiche d'action éditoriale (résumé court)</h3>` + ficheVersHtml(audit.fiche_action_resultat);
+        }
+        await créerChapitre("Rapport de décision éditoriale (pré-audit)", html);
       }
       if (analysées > 0) {
         const introAuditDétaillé = audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat
@@ -1910,7 +1981,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
         </div>
       )}
 
-      {(audit.contrat_intention || audit.apercu_resultat || audit.fiche_action_resultat || analysées > 0) && (
+      {(audit.contrat_intention || audit.apercu_resultat || audit.preaudit_resultat || audit.fiche_action_resultat || analysées > 0) && (
         <div style={{ background: "#EEF6FC", border: "0.5px solid #378ADD50", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, color: "var(--texte-secondaire)" }}>

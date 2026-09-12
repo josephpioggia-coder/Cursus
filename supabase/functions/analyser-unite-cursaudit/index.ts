@@ -502,7 +502,7 @@ Deno.serve(async (req) => {
     // 3. Charger l'unité et son audit parent, vérifier propriété + paiement
     const { data: section } = await admin
       .from("audit_sections")
-      .select("id, audit_id, texte_source, ordre")
+      .select("id, audit_id, texte_source, ordre, chapitre_index")
       .eq("id", auditSectionId)
       .maybeSingle();
     if (!section) return json({ error: "Unité introuvable." }, 404);
@@ -530,13 +530,31 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia, contrat_intention")
+      .select("id, user_id, statut, nombre_dimensions, mode_ia, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, relation_ia, contrat_intention, preaudit_resultat")
       .eq("id", section.audit_id)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
     if (audit.statut !== "paye") {
       return json({ error: "paiement_requis", message: "Cet audit n'est pas encore payé." }, 402);
     }
+
+    // Continuité avec le pré-audit (12/09/2026) — demandé par l'auteur du
+    // projet : le pré-audit lit déjà chaque chapitre confirmé
+    // (lecture_chapitres, voir preaudit-approfondi-cursaudit) avant l'audit
+    // détaillé, sans que ce dernier n'en tienne jamais compte — deux
+    // passages sur le même texte sans continuité. Si l'unité appartient à
+    // un chapitre lu par le pré-audit, sa lecture (point faible, à
+    // vérifier...) est fournie comme repère supplémentaire — jamais notée
+    // elle-même, même principe que le contexte de voisinage ci-dessus.
+    const lectureChapitre = typeof section.chapitre_index === "number"
+      ? audit.preaudit_resultat?.lecture_chapitres?.[section.chapitre_index]?.lecture
+      : undefined;
+    const contextePréaudit = lectureChapitre
+      ? `\n\n[Repère : lecture de ce chapitre par le pré-audit — informe ta lecture, NE PAS le recopier ni le noter directement]\n` +
+        (lectureChapitre.point_faible ? `Point faible relevé : ${lectureChapitre.point_faible}\n` : "") +
+        (lectureChapitre.a_verifier ? `À vérifier : ${lectureChapitre.a_verifier}\n` : "") +
+        (lectureChapitre.a_approfondir_audit_final ? `À approfondir ici : ${lectureChapitre.a_approfondir_audit_final}` : "")
+      : "";
 
     // Profil auteur optionnel (réf. 60816-01, suite, 29/08/2026) — table
     // séparée, une ligne par utilisateur, peut ne pas exister du tout.
@@ -567,13 +585,17 @@ Deno.serve(async (req) => {
     const consigneCriteres = construireConsigneCriteres(criteres);
 
     // 5. Analyse Claude (toujours) puis, si mode_ia = "2 IA", contrôle GPT.
+    const texteAvecContexte = texteAvecVoisinage + contextePréaudit;
     const contexteQualification = construireContexteQualification(audit, profilAuteurEffectif(audit, profilAuteur));
     const systemClaude =
       contexteQualification +
       "Tu es le moteur d'analyse de CursAudit. Le texte fourni peut inclure, avant et/ou après l'unité à " +
       "analyser, un court extrait voisin explicitement marqué « NE PAS l'évaluer » — il sert uniquement à " +
       "situer l'unité dans son contexte immédiat (reconnaître par exemple qu'un fragment court est un titre " +
-      "ou une accroche plutôt qu'une affirmation isolée à juger sur le fond). Pour l'unité marquée « à " +
+      "ou une accroche plutôt qu'une affirmation isolée à juger sur le fond). Il peut aussi inclure un repère " +
+      "marqué « lecture de ce chapitre par le pré-audit » — un passage antérieur du pré-audit sur ce même " +
+      "chapitre, à prendre en compte pour assurer une continuité éditoriale, jamais à recopier ni à noter " +
+      "comme si c'était le texte de l'unité. Pour l'unité marquée « à " +
       "analyser », et elle seule, évalue-la selon CHACUNE des dimensions suivantes, en indiquant pour " +
       "chacune une valeur (catégorie observée) et un bref commentaire justificatif ancré dans le texte " +
       "fourni, jamais une supposition externe :\n" +
@@ -586,7 +608,7 @@ Deno.serve(async (req) => {
       role: "analyseur_cursaudit",
       schema_sortie: schema,
       system: systemClaude,
-      contexte: texteAvecVoisinage,
+      contexte: texteAvecContexte,
     });
 
     let controleGPT: unknown = null;
@@ -595,7 +617,8 @@ Deno.serve(async (req) => {
       const systemGPT =
         "Tu es le second lecteur du moteur d'analyse CursAudit. Relis l'analyse ci-dessous, produite par un " +
         "premier moteur pour l'unité de texte marquée « à analyser » (les extraits voisins marqués « NE PAS " +
-        "l'évaluer » ne servent qu'à situer le contexte, comme pour le premier moteur), selon les mêmes " +
+        "l'évaluer » et le repère « lecture de ce chapitre par le pré-audit », s'il est présent, ne servent " +
+        "qu'à situer le contexte, comme pour le premier moteur), selon les mêmes " +
         "dimensions :\n" + consigneCriteres +
         "\nSignale UNIQUEMENT les désaccords réels (une dimension classée de façon manifestement erronée au " +
         "regard du texte) — jamais une reformulation ou une préférence de nuance.";
@@ -605,7 +628,7 @@ Deno.serve(async (req) => {
         role: "second_lecteur_cursaudit",
         schema_sortie: SCHEMA_CONTROLE_GPT,
         system: systemGPT,
-        contexte: JSON.stringify({ texte_source: texteAvecVoisinage, analyse_premier_moteur: analyse }),
+        contexte: JSON.stringify({ texte_source: texteAvecContexte, analyse_premier_moteur: analyse }),
       });
       controleGPT = résultatGPT.data;
       usageGPT = résultatGPT.usage;
