@@ -928,11 +928,20 @@ Deno.serve(async (req) => {
     auditId = body?.audit_id;
     if (!auditId) return json({ error: "audit_id est requis." }, 400);
 
-    const { data: auditChargé } = await admin
+    // CORRECTIF 12/09/2026 — "Audit introuvable" s'affichait pour un audit
+    // qui existait bel et bien (confirmé par l'auteur du projet : les autres
+    // écrans le chargent sans problème) : l'`error` de ce select était
+    // ignorée (seul `data` était déstructuré), donc toute vraie erreur DB
+    // (ex. colonne manquante en production, cas déjà rencontré plusieurs
+    // fois sur ce projet) tombait silencieusement dans le même message
+    // trompeur "introuvable" qu'un id réellement inexistant. Distingue
+    // maintenant les deux : une vraie erreur DB remonte son propre message.
+    const { data: auditChargé, error: erreurChargement } = await admin
       .from("audits")
       .select("id, user_id, preaudit_statut, preaudit_brouillon, preaudit_critique_gpt, apercu_statut, apercu_resultat, type_document, finalite_audit, question_libre, degre_intervention, contraintes_academiques, chapitres_detectes, chapitres_confirmes, preaudit_chapitres_resultats, contrat_intention, ia_echecs_consecutifs, ia_dernier_echec_le")
       .eq("id", auditId)
       .maybeSingle();
+    if (erreurChargement) return json({ error: erreurChargement.message }, 500);
     audit = auditChargé;
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
     if (audit.apercu_statut !== "termine") {
