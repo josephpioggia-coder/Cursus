@@ -326,6 +326,23 @@ export default function CursAudit({ onVoirAudits } = {}) {
     setImportEnCours(false);
   };
 
+  // Exemples de titres par niveau (12/09/2026) — demandé par l'auteur du
+  // projet : "Niveau 2 (45 occurrences)" seul ne permet pas à l'auteur·ice
+  // de vérifier concrètement ce que ce niveau désigne dans SON texte. Un
+  // niveau technique (issu du style Word) doit être traduit en question
+  // vérifiable : "est-ce bien ça, vos chapitres ?", avec de vrais titres du
+  // document à l'appui, pas juste un chiffre.
+  const exemplesParNiveau = useMemo(() => {
+    if (!infosDocx) return {};
+    const table = {};
+    for (const { texte, niveau } of infosDocx) {
+      if (niveau === undefined || !texte) continue;
+      if (!table[niveau]) table[niveau] = [];
+      if (table[niveau].length < 3) table[niveau].push(texte);
+    }
+    return table;
+  }, [infosDocx]);
+
   const basculerNiveauRetenu = (niveau) => {
     setNiveauxRetenus((prev) =>
       prev.includes(niveau) ? prev.filter((n) => n !== niveau) : [...prev, niveau].sort((a, b) => a - b)
@@ -546,15 +563,27 @@ export default function CursAudit({ onVoirAudits } = {}) {
                     {chapitresDétectés && ` · ${chapitresDétectés.length} titres détectés (à confirmer après création, dans l'aperçu gratuit)`}
                   </div>
                 )}
+                {nomFichier && !importEnCours && niveauxDisponibles.length === 0 && (
+                  <div style={{ marginTop: 10, textAlign: "left", background: "#FFF9EC", border: "1px solid #C4973A66", borderRadius: 6, padding: "8px 10px", fontSize: 11.5, color: "#8A6116" }}>
+                    Aucun niveau de titre Word détecté dans ce fichier — ce texte sera transmis comme un seul bloc continu, sans découpage par chapitre. Si votre livre a des chapitres, vérifiez qu'ils utilisent bien un style de titre Word (Titre 1, Titre 2…) avant d'importer ; sinon, la structure ne pourra pas être reconnue automatiquement.
+                  </div>
+                )}
                 {niveauxDisponibles.length > 0 && !importEnCours && (
                   <div style={{ marginTop: 10, textAlign: "left" }}>
-                    <div style={{ fontSize: 11.5, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 4 }}>
-                      Niveaux de titre à retenir comme divisions (chapitres/parties) :
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 6 }}>
+                      Quel niveau de titre correspond à vos chapitres ? Vérifiez avec les exemples ci-dessous et cochez celui (ou ceux) qui séparent vraiment votre texte :
                     </div>
                     {niveauxDisponibles.map(({ niveau, nombre }) => (
-                      <label key={niveau} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "3px 0", cursor: "pointer" }}>
-                        <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRetenu(niveau)} />
-                        Niveau {niveau} ({nombre} occurrence{nombre > 1 ? "s" : ""})
+                      <label key={niveau} style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: "var(--texte-secondaire)", padding: "5px 0", cursor: "pointer" }}>
+                        <input type="checkbox" checked={niveauxRetenus.includes(niveau)} onChange={() => basculerNiveauRetenu(niveau)} style={{ marginTop: 2, flexShrink: 0 }} />
+                        <span>
+                          <strong>Niveau {niveau}</strong> ({nombre} occurrence{nombre > 1 ? "s" : ""})
+                          {exemplesParNiveau[niveau]?.length > 0 && (
+                            <span style={{ display: "block", fontStyle: "italic", color: "var(--texte-tertiaire)", marginTop: 2 }}>
+                              Ex. : {exemplesParNiveau[niveau].map((t) => `« ${t} »`).join(", ")}{nombre > exemplesParNiveau[niveau].length ? "…" : ""}
+                            </span>
+                          )}
+                        </span>
                       </label>
                     ))}
                   </div>
