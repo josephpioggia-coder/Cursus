@@ -674,13 +674,18 @@ export const auditsAPI = {
         // suite). Retour au comportement normal : brouillon jusqu'au
         // paiement réel, confirmé par stripe-webhook sur
         // checkout.session.completed. Le pré-audit (preaudit_statut) reste
-        // un produit séparé, non traité par ce chantier — "non_demande" par
-        // défaut, comme avant ce contournement.
+        // un produit séparé, non traité par ce chantier ni payable via
+        // Stripe pour l'instant — "non_demande" par défaut.
         // Exception : le propriétaire du projet (même adresse que le
         // gardien "Administration" dans App.jsx) n'a jamais à payer ses
-        // propres audits de test.
+        // propres audits de test — CORRECTIF 12/09/2026 : cette exception
+        // s'appliquait déjà à `statut` (l'audit détaillé) mais avait été
+        // perdue pour `preaudit_statut` en retirant le contournement du
+        // 25/08 ci-dessus, obligeant même le propriétaire à un flip SQL
+        // manuel pour débloquer son propre pré-audit de test — signalé par
+        // l'auteur du projet ("il y a peu les préaudits existaient").
         statut:            estProprietaire ? "paye" : "brouillon",
-        preaudit_statut:   "non_demande",
+        preaudit_statut:   estProprietaire ? "paye" : "non_demande",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
         finalite_audit:          finaliteAudit,
