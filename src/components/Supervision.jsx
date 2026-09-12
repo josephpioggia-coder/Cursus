@@ -175,11 +175,16 @@ export default function Supervision() {
                             <div>
                               <h3 style={{ fontSize: 13, color: COULEURS.bordeaux, marginBottom: 10 }}>Cadrage</h3>
                               {champDétail("Type de document", détail.audit.type_document)}
-                              {champDétail("Finalité de l'audit", détail.audit.finalite_audit)}
+                              {champDétail("Finalité de l'audit", Array.isArray(détail.audit.finalite_audit) ? détail.audit.finalite_audit.join(", ") : détail.audit.finalite_audit)}
                               {champDétail("Question posée à CursAudit", détail.audit.question_libre)}
                               {champDétail("Degré d'intervention souhaité", détail.audit.degre_intervention)}
-                              {champDétail("Contraintes académiques", détail.audit.contraintes_academiques)}
-                              {champDétail("Relation à l'IA", détail.audit.relation_ia)}
+                              {champDétail("Contraintes académiques", détail.audit.contraintes_academiques && (
+                                `Autorisation IA : ${détail.audit.contraintes_academiques.autorisationIA || "—"}` +
+                                (détail.audit.contraintes_academiques.conditions?.length ? ` · Conditions : ${détail.audit.contraintes_academiques.conditions.join(", ")}` : "")
+                              ))}
+                              {champDétail("Relation à l'IA", détail.audit.relation_ia && (
+                                `Adresse : ${détail.audit.relation_ia.adresse} · Ton : ${détail.audit.relation_ia.ton} · Posture : ${détail.audit.relation_ia.posture} · Longueur : ${détail.audit.relation_ia.longueur} · Rôle : ${détail.audit.relation_ia.role}`
+                              ))}
                               {détail.audit.contrat_intention && (
                                 <details style={{ marginTop: 8 }}>
                                   <summary style={{ fontSize: 11.5, color: COULEURS.texteClair, cursor: "pointer" }}>Contrat d'intention complet (JSON)</summary>
