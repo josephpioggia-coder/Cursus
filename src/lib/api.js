@@ -878,6 +878,30 @@ export const auditsAPI = {
     return { error };
   },
 
+  /** Relance UNIQUEMENT les unités en échec de l'audit détaillé (réf.
+   *  60816-01, suite, 12/09/2026) — besoin réel constaté en usage : une
+   *  coupure de solde Anthropic en cours d'audit a fait échouer une série
+   *  d'unités d'un coup (le solde était passé négatif, rechargement
+   *  automatique désactivé). orchestrer-audit-cursaudit ne retente JAMAIS
+   *  automatiquement une unité déjà marquée en échec (voir son commentaire
+   *  "GESTION D'ÉCHEC PAR UNITÉ" — comportement volontaire pour ne pas
+   *  boucler indéfiniment sur un vrai problème de fond), donc sans ceci,
+   *  ces unités resteraient bloquées en échec pour toujours. Ne touche
+   *  QUE les sections dont resultat_analyse contient une clé "erreur" —
+   *  toutes les unités déjà correctement analysées restent intactes,
+   *  aucune repasse ni recoût sur elles. Une fois appelé, "Continuer
+   *  l'analyse" reprend normalement (l'orchestrateur sélectionne toute
+   *  section à resultat_analyse = null, échecs tout juste réinitialisés
+   *  inclus, mélangés aux unités jamais encore traitées). */
+  async relancerÉchecsAuditDetaille(auditId) {
+    const { error } = await supabase
+      .from("audit_sections")
+      .update({ resultat_analyse: null })
+      .eq("audit_id", auditId)
+      .not("resultat_analyse->>erreur", "is", null);
+    return { error };
+  },
+
   /** Débloque le pré-audit d'un audit SANS passer par du SQL manuel (réf.
    *  60816-01, suite, 12/09/2026) — réservé au propriétaire du projet côté
    *  écran (voir estProprietaire dans CursAuditDetail.jsx) : l'exception

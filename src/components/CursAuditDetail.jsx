@@ -1715,6 +1715,25 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
     await charger();
   };
 
+  // Relancer uniquement les échecs (12/09/2026, même jour) — besoin réel
+  // constaté en usage : une coupure de solde Anthropic en cours d'audit a
+  // fait échouer une série d'unités d'un coup. orchestrer-audit-cursaudit
+  // ne retente jamais automatiquement une unité déjà marquée en échec
+  // (comportement volontaire, voir auditsAPI.relancerÉchecsAuditDetaille) —
+  // sans ce bouton, ces unités resteraient bloquées pour toujours. Ne wipe
+  // QUE les échecs, jamais les unités déjà correctement analysées (pas de
+  // "Repartir de zéro" déguisé) — disponible à tout le monde, pas réservé
+  // au propriétaire, puisque ce n'est pas un raccourci de test.
+  const [relanceÉchecsEnCours, setRelanceÉchecsEnCours] = useState(false);
+  const relancerÉchecs = async () => {
+    setRelanceÉchecsEnCours(true);
+    setErreur(null);
+    const { error } = await auditsAPI.relancerÉchecsAuditDetaille(audit.id);
+    setRelanceÉchecsEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    await charger();
+  };
+
   const lancerAnalyse = async () => {
     setEnCours(true);
     setErreur(null);
@@ -2155,6 +2174,21 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
               <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
                 {analysées} / {total} analysée{total > 1 ? "s" : ""}{échouées > 0 ? ` · ${échouées} échec(s)` : ""}
               </div>
+              {/* Relancer les échecs (12/09/2026) — apparu en usage réel
+                  après une coupure de solde Anthropic en cours d'audit :
+                  une série d'unités marquées en échec d'un coup, jamais
+                  retentées automatiquement (voir le commentaire dans
+                  auditsAPI.relancerÉchecsAuditDetaille). Disponible à
+                  tout le monde (pas réservé au propriétaire) : ne wipe
+                  que les échecs, jamais les unités déjà analysées. */}
+              {échouées > 0 && (
+                <button onClick={relancerÉchecs} disabled={relanceÉchecsEnCours} style={{
+                  background: "none", border: "0.5px solid #C9820066", borderRadius: 6,
+                  padding: "3px 8px", fontSize: 11, color: "#C98200", cursor: relanceÉchecsEnCours ? "default" : "pointer",
+                }}>
+                  {relanceÉchecsEnCours ? "…" : `↻ Relancer les ${échouées} échec(s)`}
+                </button>
+              )}
               {/* 12/09/2026 — dupliqué ici (déjà en haut de page) : signalé
                   par l'auteur du projet que le bouton en haut est invisible
                   depuis l'endroit où les résultats se lisent réellement,
