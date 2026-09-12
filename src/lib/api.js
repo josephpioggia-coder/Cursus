@@ -804,6 +804,25 @@ export const auditsAPI = {
     return { data: { audit, sections }, error: null };
   },
 
+  /** Débloque le pré-audit d'un audit SANS passer par du SQL manuel (réf.
+   *  60816-01, suite, 12/09/2026) — réservé au propriétaire du projet côté
+   *  écran (voir estProprietaire dans CursAuditDetail.jsx) : l'exception
+   *  "le propriétaire ne paie jamais ses propres audits de test" existait
+   *  déjà pour `statut` (audit détaillé) et pour `preaudit_statut` à la
+   *  création (créer() ci-dessus, corrigé le même jour) — celle-ci couvre
+   *  les audits créés AVANT ce correctif, restés bloqués sur "non_demande"
+   *  malgré l'exception. Pas de vérification d'email ici : RLS limite déjà
+   *  la mise à jour à la ligne du propriétaire de CET audit (même modèle de
+   *  confiance que confirmerChapitres() juste en dessous) — le vrai garde-
+   *  fou est l'écran, qui n'affiche ce bouton qu'au propriétaire du projet. */
+  async débloquerPreauditTest(auditId) {
+    const { error } = await supabase
+      .from("audits")
+      .update({ preaudit_statut: "paye" })
+      .eq("id", auditId);
+    return { error };
+  },
+
   /** Relie un audit à un projet CursEdit (réf. 60816-01, suite, 12/09/2026)
    *  — pont bidirectionnel prévu dès le schéma d'origine (audits.projet_id,
    *  voir 2026-08-15-cursaudit-schema.sql) mais jamais câblé jusqu'ici.

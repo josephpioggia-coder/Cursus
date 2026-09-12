@@ -44,6 +44,12 @@ const FICHE_ACTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/
 const SYNTHESE_AUDIT_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/synthese-audit-detaille-cursaudit";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Même adresse et même principe que dans src/lib/api.js et CursAudit.jsx
+// (copie délibérée, pas un import partagé — décision du 07/09/2026 dans
+// api.js) : le propriétaire du projet n'a jamais à payer ses propres audits
+// de test, y compris le pré-audit — voir débloquerPreaudit ci-dessous.
+const EMAIL_PROPRIETAIRE = "joseph.pioggia@gmail.com";
+
 const CATEGORIES_DIAGNOSTIC = [
   { id: "recevable",    label: "Recevable",     couleur: "#1D9E75" },
   { id: "a_nuancer",    label: "À nuancer",     couleur: "#C4973A" },
@@ -765,7 +771,17 @@ function FicheExecutive({ fiche }) {
   );
 }
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, onEnvoyerCursEdit }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, onEnvoyerCursEdit, estProprietaire }) {
+  const [déblocageEnCours, setDéblocageEnCours] = useState(false);
+  const [erreurDéblocage, setErreurDéblocage] = useState(null);
+  const débloquerPreaudit = async () => {
+    setDéblocageEnCours(true);
+    setErreurDéblocage(null);
+    const { error } = await auditsAPI.débloquerPreauditTest(audit.id);
+    setDéblocageEnCours(false);
+    if (error) { setErreurDéblocage(error.message); return; }
+    await onTermine();
+  };
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
   // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
@@ -961,10 +977,27 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
 
       {ouvert && <>
       {audit.preaudit_statut === "non_demande" && (
-        <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
-          Paiement CursAudit pas encore disponible dans l'application — statut à positionner manuellement (SQL) en attendant.
-          {prix && ` Si l'audit détaillé est commandé ensuite, ${prix.reductionSurAuditFinal.toFixed(2).replace(".", ",")} € seront déductibles de son prix.`}
-        </div>
+        estProprietaire ? (
+          // Corrige un vrai blocage vécu par le propriétaire : les audits créés
+          // avant le 12/09/2026 restent sur "non_demande" malgré l'exception
+          // (voir auditsAPI.créer) — ce bouton évite un flip SQL manuel, ici
+          // et pour tout futur cas similaire, plutôt qu'une simple promesse
+          // que "la prochaine fois ça marchera".
+          <div style={{ marginTop: 8 }}>
+            <button onClick={débloquerPreaudit} disabled={déblocageEnCours} style={{
+              background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
+              padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: déblocageEnCours ? "default" : "pointer",
+            }}>
+              {déblocageEnCours ? "…" : "Débloquer ce pré-audit (compte propriétaire, test)"}
+            </button>
+            {erreurDéblocage && <div style={{ marginTop: 6, fontSize: 11.5, color: "#A32D2D" }}>{erreurDéblocage}</div>}
+          </div>
+        ) : (
+          <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", marginTop: 8 }}>
+            Paiement du pré-audit pas encore disponible dans l'application.
+            {prix && ` Si l'audit détaillé est commandé ensuite, ${prix.reductionSurAuditFinal.toFixed(2).replace(".", ",")} € seront déductibles de son prix.`}
+          </div>
+        )
       )}
 
       {audit.preaudit_statut === "paye" && audit.chapitres_detectes && !audit.chapitres_confirmes && (
@@ -1454,6 +1487,15 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
   const [reglesPrix, setReglesPrix] = useState(null);
+  // Débloquer le pré-audit sans SQL (12/09/2026) — voir débloquerPreaudit
+  // plus bas et auditsAPI.débloquerPreauditTest(). Récupéré une fois au
+  // montage, comme les autres useEffect de ce fichier qui ont besoin de la
+  // session (appelerOrchestrateur, etc.), mais celui-ci n'a besoin que de
+  // l'email, pas d'un jeton d'accès.
+  const [estProprietaire, setEstProprietaire] = useState(false);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEstProprietaire(data?.user?.email === EMAIL_PROPRIETAIRE));
+  }, []);
   const [erreur, setErreur] = useState(null);
   const [filtresActifs, setFiltresActifs] = useState([]);
   const [page, setPage] = useState(1);
@@ -1707,6 +1749,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
           onChapitreLimiteChange={setChapitreLimite}
           totalUnites={total}
           onEnvoyerCursEdit={envoyerVersCursEdit}
+          estProprietaire={estProprietaire}
         />
       )}
 
