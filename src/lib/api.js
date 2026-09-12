@@ -804,6 +804,44 @@ export const auditsAPI = {
     return { data: { audit, sections }, error: null };
   },
 
+  /** Réinitialise les RÉSULTATS d'un audit pour repartir de zéro (réf.
+   *  60816-01, suite, 12/09/2026) — jamais le texte importé ni le
+   *  questionnaire, qui restent inchangés. Demandé après l'ajout du
+   *  contexte de voisinage dans analyser-unite-cursaudit (voir son
+   *  index.ts) : les unités déjà analysées avant ce correctif restent
+   *  fausses tant qu'elles n'ont pas été relancées. Réservé au propriétaire
+   *  du projet côté écran (voir estProprietaire dans CursAuditDetail.jsx).
+   *  Ne touche pas à `statut`/`preaudit_statut` (déjà "paye" pour le
+   *  propriétaire) : effacer seulement les résultats suffit à rendre
+   *  "Lancer l'analyse"/"Lancer le pré-audit" à nouveau disponibles, sans
+   *  étape supplémentaire. */
+  async réinitialiserTest(auditId) {
+    const { error: erreurSections } = await supabase
+      .from("audit_sections")
+      .update({ resultat_analyse: null })
+      .eq("audit_id", auditId);
+    if (erreurSections) return { error: erreurSections };
+
+    const { error } = await supabase
+      .from("audits")
+      .update({
+        apercu_statut:            "non_demande",
+        apercu_resultat:          null,
+        preaudit_resultat:        null,
+        preaudit_brouillon:       null,
+        preaudit_critique_gpt:    null,
+        preaudit_chapitres_resultats: null,
+        fiche_action_statut:      "non_demande",
+        fiche_action_resultat:    null,
+        synthese_audit_statut:    "non_demande",
+        synthese_audit_resultat:  null,
+        ia_echecs_consecutifs:    0,
+        ia_dernier_echec_le:      null,
+      })
+      .eq("id", auditId);
+    return { error };
+  },
+
   /** Débloque le pré-audit d'un audit SANS passer par du SQL manuel (réf.
    *  60816-01, suite, 12/09/2026) — réservé au propriétaire du projet côté
    *  écran (voir estProprietaire dans CursAuditDetail.jsx) : l'exception

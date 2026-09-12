@@ -1574,6 +1574,22 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
   const totalPages = Math.max(1, Math.ceil(sectionsFiltrées.length / PAR_PAGE));
   const sectionsPage = sectionsFiltrées.slice((page - 1) * PAR_PAGE, page * PAR_PAGE);
 
+  // Repartir de zéro (12/09/2026) — demandé après l'ajout du contexte de
+  // voisinage dans analyser-unite-cursaudit : les unités déjà analysées
+  // avant ce correctif restent fausses tant qu'elles n'ont pas été
+  // relancées. Efface les RÉSULTATS seulement (auditsAPI.réinitialiserTest),
+  // jamais le texte importé ni le questionnaire.
+  const [réinitialisationEnCours, setRéinitialisationEnCours] = useState(false);
+  const réinitialiser = async () => {
+    if (!window.confirm(`Réinitialiser tous les résultats de "${audit.titre}" (aperçu, pré-audit, audit détaillé) pour relancer l'analyse à zéro ? Le texte et le questionnaire ne sont pas touchés. Cette action est irréversible.`)) return;
+    setRéinitialisationEnCours(true);
+    setErreur(null);
+    const { error } = await auditsAPI.réinitialiserTest(audit.id);
+    setRéinitialisationEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    await charger();
+  };
+
   const lancerAnalyse = async () => {
     setEnCours(true);
     setErreur(null);
@@ -1721,6 +1737,14 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
           <p style={{ fontSize: 12.5, color: "var(--texte-tertiaire)" }}>
             {total} unité{total > 1 ? "s" : ""} · palier {audit.palier_dimensions} · mode {audit.mode_ia} · statut {audit.statut}
           </p>
+          {estProprietaire && (
+            <button onClick={réinitialiser} disabled={réinitialisationEnCours} style={{
+              marginTop: 6, background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
+              padding: "4px 10px", fontSize: 11.5, color: "#A32D2D", cursor: réinitialisationEnCours ? "default" : "pointer",
+            }}>
+              {réinitialisationEnCours ? "…" : "↺ Repartir de zéro (compte propriétaire, test)"}
+            </button>
+          )}
         </div>
         {peutLancer && boutonAnalyse}
       </div>
