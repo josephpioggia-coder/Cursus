@@ -152,6 +152,17 @@ function combler(schema: Record<string, unknown>, data: unknown): unknown {
   return base;
 }
 
+// Mise en cache du prompt système (12/09/2026) — signalé par l'auteur du
+// projet en lisant la page "Mise en cache" de la console Anthropic,
+// entièrement vide malgré un usage réel : aucun appel Claude de CursAudit
+// n'a jamais marqué son system prompt en cache. Coûteux précisément ici —
+// analyserUneSection() envoie le MÊME long system prompt (critères actifs,
+// contexte de qualification) pour CHAQUE unité d'un même audit, en boucle
+// (472 unités = 472 fois le même prompt système en entrée fraîche, non
+// mise en cache). `system` doit être un tableau de blocs (pas une simple
+// chaîne) pour pouvoir porter `cache_control` — voir la doc Anthropic liée
+// depuis cette même page. Claude uniquement : l'API OpenAI (appellerGPTMoteur
+// plus bas) a son propre mécanisme de cache automatique, rien à faire ici.
 async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
   const nomOutil = "sortie_structuree";
@@ -161,7 +172,7 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     body: JSON.stringify({
       model: params.modele,
       max_tokens: params.max_tokens ?? 4096,
-      system: params.system,
+      system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
       // CORRECTIF 26/08/2026 — vraie cure plutôt qu'un simple garde-fou après
       // coup (voir compterCritèresVides ci-dessous, qui ne fait que détecter

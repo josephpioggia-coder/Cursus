@@ -91,6 +91,12 @@ function normaliserTableauxNuls(schema: Record<string, unknown>, data: unknown):
   return résultat;
 }
 
+// Mise en cache du prompt système (12/09/2026, même correctif que
+// orchestrer-audit-cursaudit — voir son commentaire jumeau) — aucun appel
+// Claude de CursAudit ne marquait son system prompt en cache jusqu'ici,
+// alors que CopiloteIA le fait depuis le 30/08/2026 (voir
+// 2026-08-30-cache-usage-ia.sql) : un chantier fait pour une fonctionnalité,
+// jamais porté sur celle-ci, un "fichier autonome" séparé.
 async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
   const nomOutil = "sortie_structuree";
@@ -100,7 +106,7 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     body: JSON.stringify({
       model: params.modele,
       max_tokens: params.max_tokens ?? 4096,
-      system: params.system,
+      system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
       // CORRECTIF 26/08/2026 — même correctif que orchestrer-audit-cursaudit :
       // `strict: true` fait garantir par l'API Claude elle-même la conformité

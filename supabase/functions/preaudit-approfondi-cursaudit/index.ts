@@ -1074,6 +1074,11 @@ Deno.serve(async (req) => {
     // Lecture d'UN chapitre (réf. 60816-01, suite, 24/08/2026) — même
     // principe qu'appelClaude() mais avec le schéma allégé
     // SCHEMA_LECTURE_CHAPITRE, pas le schéma complet du pré-audit.
+    // Mise en cache (12/09/2026) — ce system prompt est FIXE, appelé une
+    // fois PAR CHAPITRE confirmé (jusqu'à plusieurs dizaines par livre,
+    // ex. 66 ici) sans jamais changer — voir le commentaire jumeau dans
+    // orchestrer-audit-cursaudit/analyser-unite-cursaudit pour le contexte
+    // complet (page "Mise en cache" de la console Anthropic restée vide).
     const appelClaudeChapitre = async (titreChapitre: string, texteChapitre: string) => {
       if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
       const system =
@@ -1089,7 +1094,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: MODELE_CLAUDE,
           max_tokens: 2000,
-          system,
+          system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: `Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
           // CORRECTIF 26/08/2026 — voir la note jumelle sur appelClaude() ci-dessus.
           tools: [{ name: "lecture_chapitre", description: "Lecture brève d'un chapitre : fonction, point fort, point faible, à vérifier, à approfondir dans l'audit final.", input_schema: SCHEMA_LECTURE_CHAPITRE, strict: true }],
