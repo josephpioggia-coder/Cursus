@@ -25,7 +25,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { auditsAPI, profilAuteurAPI } from "../lib/api.js";
+import { auditsAPI, profilAuteurAPI, projetsAPI, nœudsAPI } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
@@ -372,7 +372,7 @@ function ConfirmationChapitres({ audit, onTermine }) {
   );
 }
 
-function ApercuGlobal({ audit, nombreMots, onTermine }) {
+function ApercuGlobal({ audit, nombreMots, onTermine, onEnvoyerCursEdit }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — une fois le
@@ -477,6 +477,9 @@ function ApercuGlobal({ audit, nombreMots, onTermine }) {
                   palier {résultat.audit_recommande.palier}
                   {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
                 </div>
+              )}
+              {onEnvoyerCursEdit && (
+                <BoutonEnvoyerCursEdit onEnvoyer={() => onEnvoyerCursEdit(`Aperçu — ${audit.titre}`, apercuVersHtml(résultat))} />
               )}
             </div>
           )}
@@ -762,7 +765,7 @@ function FicheExecutive({ fiche }) {
   );
 }
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, onEnvoyerCursEdit }) {
   const [enCours, setEnCours] = useState(false);
   // `progression` = la dernière réponse complète de l'API (pas juste
   // `.etape`) — réf. 60816-01, suite, 24/08/2026, nécessaire pour
@@ -1014,7 +1017,12 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
       )}
 
       {audit.fiche_action_statut === "termine" && audit.fiche_action_resultat && (
-        <FicheActionAffichage titre="Fiche d'action éditoriale (pré-audit) — court et actionnable" fiche={audit.fiche_action_resultat} />
+        <>
+          <FicheActionAffichage titre="Fiche d'action éditoriale (pré-audit) — court et actionnable" fiche={audit.fiche_action_resultat} />
+          {onEnvoyerCursEdit && (
+            <BoutonEnvoyerCursEdit onEnvoyer={() => onEnvoyerCursEdit(`Pré-audit — ${audit.titre}`, ficheVersHtml(audit.fiche_action_resultat))} />
+          )}
+        </>
       )}
 
       {audit.preaudit_statut === "termine" && résultat && (
@@ -1359,7 +1367,90 @@ function LigneSection({ section }) {
   );
 }
 
-export default function CursAuditDetail({ auditId, onRetour }) {
+// ─── Envoyer un rapport vers CursEdit (12/09/2026) ────────────────────────
+// Demandé par l'auteur du projet : un rapport d'audit ne doit jamais rester
+// un résultat figé qu'on ne peut que lire ou exporter — "tout ce qui est
+// dans cet outil doit servir à l'écriture". Plutôt que construire un
+// éditeur/système de commentaires propre à CursAudit, on réutilise
+// l'éditeur CursEdit qui existe déjà : le rapport devient un chapitre
+// normal d'un projet CursEdit, modifiable comme n'importe quel autre texte.
+// `audits.projet_id` (voir 2026-08-15-cursaudit-schema.sql) porte ce pont,
+// jusqu'ici jamais câblé à l'écran — voir 2026-09-12-audits-projet-id.sql.
+
+function échapperHtml(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function apercuVersHtml(résultat) {
+  const listeHtml = (arr) => (arr?.length ? `<ul>${arr.map((x) => `<li>${échapperHtml(x)}</li>`).join("")}</ul>` : "");
+  let html = "";
+  if (résultat.genre_apparent) {
+    html += `<p><strong>Genre apparent :</strong> ${échapperHtml(résultat.genre_apparent)}` +
+      (résultat.genre_reel_probable && résultat.genre_reel_probable !== résultat.genre_apparent
+        ? ` (forme réelle probable : ${échapperHtml(résultat.genre_reel_probable)})` : "") + `</p>`;
+  }
+  if (résultat.colonne_vertebrale) html += `<p><strong>Colonne vertébrale :</strong> ${échapperHtml(résultat.colonne_vertebrale)}</p>`;
+  if (résultat.tension_principale) html += `<p><strong>Tension principale :</strong> ${échapperHtml(résultat.tension_principale)}</p>`;
+  if (résultat.forces_globales?.length) html += `<h3>Forces globales</h3>${listeHtml(résultat.forces_globales)}`;
+  if (résultat.risques_globaux?.length) html += `<h3>Risques globaux</h3>${listeHtml(résultat.risques_globaux)}`;
+  if (résultat.audit_recommande) {
+    html += `<p><strong>Recommandation pour l'audit détaillé :</strong> palier ${échapperHtml(résultat.audit_recommande.palier)}` +
+      (résultat.audit_recommande.priorites?.length ? ` — priorités : ${échapperHtml(résultat.audit_recommande.priorites.join(", "))}` : "") + `</p>`;
+  }
+  return html;
+}
+
+// Même forme pour la fiche d'action du pré-audit ET le rapport consolidé de
+// l'audit détaillé — voir FicheActionAffichage plus haut, dont ce formateur
+// reprend exactement les mêmes champs.
+function ficheVersHtml(fiche) {
+  const listeHtml = (arr) => (arr?.length ? `<ul>${arr.map((x) => `<li>${échapperHtml(x)}</li>`).join("")}</ul>` : "");
+  let html = "";
+  if (fiche.diagnostic) html += `<p>${échapperHtml(fiche.diagnostic)}</p>`;
+  if (fiche.forces?.length) html += `<h3>Ce qui tient déjà</h3>${listeHtml(fiche.forces)}`;
+  if (fiche.points_a_traiter?.length) {
+    html += `<h3>Points à traiter</h3>`;
+    for (const p of fiche.points_a_traiter) {
+      html += `<p><strong>${échapperHtml(p.constat)}</strong> — ${échapperHtml(p.impact_lecteur)}<br/>→ ${échapperHtml(p.geste_concret)}</p>`;
+    }
+  }
+  if (fiche.priorites?.length) {
+    html += `<h3>Priorités de réécriture</h3><ol>${[...fiche.priorites].sort((a, b) => a.rang.localeCompare(b.rang)).map((p) => `<li>${échapperHtml(p.action)}</li>`).join("")}</ol>`;
+  }
+  if (fiche.risque_principal) html += `<p><strong>Risque si rien ne change —</strong> ${échapperHtml(fiche.risque_principal)}</p>`;
+  if (fiche.action_immediate) html += `<p><strong>Première action —</strong> ${échapperHtml(fiche.action_immediate)}</p>`;
+  if (fiche.a_eviter?.length) html += `<h3>À éviter</h3>${listeHtml(fiche.a_eviter)}`;
+  return html;
+}
+
+function BoutonEnvoyerCursEdit({ onEnvoyer }) {
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+  const cliquer = async () => {
+    setEnCours(true);
+    setErreur(null);
+    try {
+      await onEnvoyer();
+    } catch (e) {
+      setErreur(e.message);
+    } finally {
+      setEnCours(false);
+    }
+  };
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button onClick={cliquer} disabled={enCours} style={{
+        background: "#fff", color: "#378ADD", border: "1px solid #378ADD80", borderRadius: 8,
+        padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
+      }}>
+        {enCours ? "Envoi…" : "Envoyer vers CursEdit (modifiable)"}
+      </button>
+      {erreur && <div style={{ marginTop: 4, fontSize: 11, color: "#A32D2D" }}>{erreur}</div>}
+    </div>
+  );
+}
+
+export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
   const [reglesPrix, setReglesPrix] = useState(null);
@@ -1475,6 +1566,35 @@ export default function CursAuditDetail({ auditId, onRetour }) {
 
   const arrêterAnalyse = () => { arrêtRef.current?.abort(); };
 
+  // Envoie un rapport vers CursEdit comme nouveau chapitre du projet lié à
+  // cet audit (créé au premier envoi si aucun n'existe encore) — voir le
+  // docblock au-dessus de ce composant. Propage toute erreur à l'appelant
+  // (BoutonEnvoyerCursEdit l'affiche) plutôt que de l'avaler ici.
+  const envoyerVersCursEdit = async (titreChapitre, html) => {
+    let projetId = audit.projet_id;
+    if (!projetId) {
+      const { data: projet, error: erreurProjet } = await projetsAPI.créer({
+        titre: audit.titre || "Audit CursAudit",
+        genre: "Autre",
+        statut: "En cours",
+        couleur: "#8A8A8A",
+        objectifMots: 80000,
+        description: `Créé automatiquement depuis l'audit CursAudit « ${audit.titre} », pour retravailler ses rapports comme un manuscrit normal.`,
+      });
+      if (erreurProjet) throw new Error(erreurProjet.message || "Impossible de créer le projet CursEdit — un abonnement CursEdit actif est peut-être nécessaire.");
+      projetId = projet.id;
+      const { error: erreurLien } = await auditsAPI.lierProjet(audit.id, projetId);
+      if (erreurLien) throw new Error(erreurLien.message);
+    }
+    const { data: nœudsExistants, error: erreurListe } = await nœudsAPI.listerParProjet(projetId);
+    if (erreurListe) throw new Error(erreurListe.message);
+    const ordre = (nœudsExistants || []).filter((n) => !n.parent_id).length;
+    const { data: nœud, error: erreurNœud } = await nœudsAPI.créer({ type: "chapitre", titre: titreChapitre, texte: html, ordre }, projetId);
+    if (erreurNœud) throw new Error(erreurNœud.message);
+    await charger();
+    onOuvrirÉditeur?.(projetId, nœud.id);
+  };
+
   const lancerSynthese = async () => {
     setSyntheseEnCours(true);
     setErreurSynthese(null);
@@ -1572,7 +1692,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
       <CadreLecture audit={audit} />
 
       {nombreMots > 0 && (
-        <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />
+        <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} onEnvoyerCursEdit={envoyerVersCursEdit} />
       )}
 
       {audit.apercu_statut === "termine" && (
@@ -1586,6 +1706,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
           chapitreLimite={chapitreLimite}
           onChapitreLimiteChange={setChapitreLimite}
           totalUnites={total}
+          onEnvoyerCursEdit={envoyerVersCursEdit}
         />
       )}
 
@@ -1681,6 +1802,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
             <>
               <FicheExecutive fiche={audit.synthese_audit_resultat} />
               <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} masquerResumeCourt />
+              <BoutonEnvoyerCursEdit onEnvoyer={() => envoyerVersCursEdit(`Rapport consolidé — ${audit.titre}`, ficheVersHtml(audit.synthese_audit_resultat))} />
             </>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, marginTop: 12 }}>

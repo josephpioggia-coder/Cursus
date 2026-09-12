@@ -799,6 +799,20 @@ export const auditsAPI = {
     return { data: { audit, sections }, error: null };
   },
 
+  /** Relie un audit à un projet CursEdit (réf. 60816-01, suite, 12/09/2026)
+   *  — pont bidirectionnel prévu dès le schéma d'origine (audits.projet_id,
+   *  voir 2026-08-15-cursaudit-schema.sql) mais jamais câblé jusqu'ici.
+   *  Demandé par l'auteur du projet : les rapports d'audit doivent pouvoir
+   *  être repris et modifiés comme un chapitre normal dans CursEdit, pas
+   *  rester un résultat figé — voir CursAuditDetail.jsx, envoyerVersCursEdit. */
+  async lierProjet(auditId, projetId) {
+    const { error } = await supabase
+      .from("audits")
+      .update({ projet_id: projetId })
+      .eq("id", auditId);
+    return { error };
+  },
+
   /** Confirmation du découpage en chapitres détecté à l'import (réf.
    *  60816-01, suite, 24/08/2026) — déverrouille le pré-audit enrichi. Voir
    *  audits.chapitres_detectes / chapitres_confirmes et ApercuGlobal dans
