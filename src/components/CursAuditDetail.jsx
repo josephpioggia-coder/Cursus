@@ -1592,7 +1592,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
     const { data: nœud, error: erreurNœud } = await nœudsAPI.créer({ type: "chapitre", titre: titreChapitre, texte: html, ordre }, projetId);
     if (erreurNœud) throw new Error(erreurNœud.message);
     await charger();
-    onOuvrirÉditeur?.(projetId, nœud.id);
+    onOuvrirÉditeur?.(projetId, nœud.id, audit.id);
   };
 
   const lancerSynthese = async () => {

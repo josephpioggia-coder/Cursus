@@ -1762,6 +1762,19 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
   const [auditActifId, setAuditActifId] = useState(null);
+  // Retour vers CursAudit depuis l'éditeur (12/09/2026) — demandé par
+  // l'auteur du projet : quand un chapitre a été créé depuis un rapport
+  // d'audit ("Envoyer vers CursEdit", voir CursAuditDetail.jsx), il faut
+  // pouvoir y retourner directement, pas seulement naviguer via la barre
+  // latérale. Passé en 3e argument optionnel à ouvrirÉditeur ; absent
+  // (undefined) pour toute navigation normale dans CursEdit, qui n'affiche
+  // donc jamais ce bandeau.
+  const [auditOrigineId, setAuditOrigineId] = useState(null);
+  const rejoindreCursAudit = () => {
+    setAuditActifId(auditOrigineId);
+    setAuditOrigineId(null);
+    setVue("auditdetail");
+  };
   // ── Mise en page mobile (23/08/2026) ── La grille "220px 1fr" était figée
   // quelle que soit la largeur d'écran : sur téléphone, ces 220px de barre
   // latérale ne laissaient presque plus de place au contenu, d'où des
@@ -2073,10 +2086,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
   const ouvrirProjet = (id) => { setProjetActifId(id); setVue("projet"); };
 
-  const ouvrirÉditeur = (projetId, nœudId) => {
+  const ouvrirÉditeur = (projetId, nœudId, depuisAuditId) => {
     setProjetActifId(projetId);
     setNœudActifId(nœudId);
     setVue("editeur");
+    setAuditOrigineId(depuisAuditId || null);
   };
 
   // Suppression de projet — ajouté 28/07/2026, remplacé le même jour par une
@@ -2700,7 +2714,24 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
         {vue === "editeur" && projetActif && nœudActif && (
-          <div style={{ display: "grid", gridTemplateColumns: `minmax(0, 1fr) ${largeurPanneau}px`, height: "100%", overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+            {auditOrigineId && (
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "#EEF0FB", borderBottom: "0.5px solid var(--border)",
+                padding: "8px 20px", fontSize: 12.5, color: "var(--texte-secondaire)", flexShrink: 0,
+              }}>
+                <span>Ce chapitre a été créé à partir d'un rapport CursAudit.</span>
+                <button onClick={rejoindreCursAudit} style={{
+                  flexShrink: 0, fontSize: 12, color: "#1D9E75", background: "none",
+                  border: "0.5px solid #1D9E75", borderRadius: 6, padding: "4px 10px",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  ← Rejoindre CursAudit
+                </button>
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: `minmax(0, 1fr) ${largeurPanneau}px`, flex: 1, overflow: "hidden" }}>
             {/* Éditeur central */}
             <Editeur
               nœud={nœudActif}
@@ -2743,6 +2774,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}
               />
+            </div>
             </div>
           </div>
         )}
