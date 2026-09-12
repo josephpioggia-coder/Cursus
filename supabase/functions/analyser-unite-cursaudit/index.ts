@@ -502,10 +502,31 @@ Deno.serve(async (req) => {
     // 3. Charger l'unité et son audit parent, vérifier propriété + paiement
     const { data: section } = await admin
       .from("audit_sections")
-      .select("id, audit_id, texte_source")
+      .select("id, audit_id, texte_source, ordre")
       .eq("id", auditSectionId)
       .maybeSingle();
     if (!section) return json({ error: "Unité introuvable." }, 404);
+
+    // Contexte de voisinage (12/09/2026) — demandé par l'auteur du projet
+    // après un cas réel absurde : un titre nu ("Oracle du Sermon sur la
+    // montagne", sa propre unité — aucun style Word détecté dessus, voir
+    // segmenterCursAudit.js) analysé isolément comme une affirmation
+    // argumentative complète, avec "cohérence argumentative", "risque
+    // d'appropriation d'un texte sacré"... alors que ce n'est qu'un titre.
+    // Les unités immédiatement voisines (même audit, ordre ±1) sont
+    // fournies au moteur comme simple repère — jamais notées elles-mêmes,
+    // voir le marquage explicite dans systemClaude/systemGPT plus bas.
+    const { data: voisines } = await admin
+      .from("audit_sections")
+      .select("ordre, texte_source")
+      .eq("audit_id", section.audit_id)
+      .in("ordre", [section.ordre - 1, section.ordre + 1]);
+    const texteAvant = voisines?.find((v) => v.ordre === section.ordre - 1)?.texte_source;
+    const texteAprès = voisines?.find((v) => v.ordre === section.ordre + 1)?.texte_source;
+    const texteAvecVoisinage =
+      (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
+      `[Unité à analyser]\n${section.texte_source}` +
+      (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "");
 
     const { data: audit } = await admin
       .from("audits")
@@ -549,9 +570,13 @@ Deno.serve(async (req) => {
     const contexteQualification = construireContexteQualification(audit, profilAuteurEffectif(audit, profilAuteur));
     const systemClaude =
       contexteQualification +
-      "Tu es le moteur d'analyse de CursAudit. Pour l'unité de texte fournie, évalue-la selon " +
-      "CHACUNE des dimensions suivantes, en indiquant pour chacune une valeur (catégorie observée) " +
-      "et un bref commentaire justificatif ancré dans le texte fourni, jamais une supposition externe :\n" +
+      "Tu es le moteur d'analyse de CursAudit. Le texte fourni peut inclure, avant et/ou après l'unité à " +
+      "analyser, un court extrait voisin explicitement marqué « NE PAS l'évaluer » — il sert uniquement à " +
+      "situer l'unité dans son contexte immédiat (reconnaître par exemple qu'un fragment court est un titre " +
+      "ou une accroche plutôt qu'une affirmation isolée à juger sur le fond). Pour l'unité marquée « à " +
+      "analyser », et elle seule, évalue-la selon CHACUNE des dimensions suivantes, en indiquant pour " +
+      "chacune une valeur (catégorie observée) et un bref commentaire justificatif ancré dans le texte " +
+      "fourni, jamais une supposition externe :\n" +
       consigneCriteres + "\n\n" +
       construireConsigneSyntheseEditoriale(autoriserProposition);
 
@@ -561,7 +586,7 @@ Deno.serve(async (req) => {
       role: "analyseur_cursaudit",
       schema_sortie: schema,
       system: systemClaude,
-      contexte: section.texte_source,
+      contexte: texteAvecVoisinage,
     });
 
     let controleGPT: unknown = null;
@@ -569,7 +594,9 @@ Deno.serve(async (req) => {
     if (audit.mode_ia === "2 IA") {
       const systemGPT =
         "Tu es le second lecteur du moteur d'analyse CursAudit. Relis l'analyse ci-dessous, produite par un " +
-        "premier moteur pour cette unité de texte, selon les mêmes dimensions :\n" + consigneCriteres +
+        "premier moteur pour l'unité de texte marquée « à analyser » (les extraits voisins marqués « NE PAS " +
+        "l'évaluer » ne servent qu'à situer le contexte, comme pour le premier moteur), selon les mêmes " +
+        "dimensions :\n" + consigneCriteres +
         "\nSignale UNIQUEMENT les désaccords réels (une dimension classée de façon manifestement erronée au " +
         "regard du texte) — jamais une reformulation ou une préférence de nuance.";
       const résultatGPT = await appellerMoteurIAStructure({
@@ -578,7 +605,7 @@ Deno.serve(async (req) => {
         role: "second_lecteur_cursaudit",
         schema_sortie: SCHEMA_CONTROLE_GPT,
         system: systemGPT,
-        contexte: JSON.stringify({ texte_source: section.texte_source, analyse_premier_moteur: analyse }),
+        contexte: JSON.stringify({ texte_source: texteAvecVoisinage, analyse_premier_moteur: analyse }),
       });
       controleGPT = résultatGPT.data;
       usageGPT = résultatGPT.usage;
