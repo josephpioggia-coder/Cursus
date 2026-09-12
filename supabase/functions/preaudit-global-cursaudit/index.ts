@@ -152,7 +152,12 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 8192,
-        system: SYSTEM_PREAUDIT,
+        // Mise en cache (12/09/2026) — SYSTEM_PREAUDIT est une constante
+        // fixe ; voir le commentaire complet dans orchestrer-audit-cursaudit
+        // /analyser-unite-cursaudit. Un seul appel par aperçu (pas de boucle
+        // ici), mais le bloc reste réutilisable entre audits différents
+        // survenant dans la fenêtre de cache (par défaut 5 min).
+        system: [{ type: "text", text: SYSTEM_PREAUDIT, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: texteIntegral }],
         // CORRECTIF 26/08/2026 — même correctif que les autres fonctions
         // CursAudit : strict: true fait garantir par l'API Claude

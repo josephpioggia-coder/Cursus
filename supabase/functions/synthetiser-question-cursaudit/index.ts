@@ -181,7 +181,10 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 400,
-        system: SYSTEM_PROMPT,
+        // Mise en cache (12/09/2026) — SYSTEM_PROMPT est une constante fixe,
+        // identique à chaque appel ; voir le commentaire complet dans
+        // orchestrer-audit-cursaudit/analyser-unite-cursaudit.
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: contexte }],
         tools: [{
           name: "question_centrale",

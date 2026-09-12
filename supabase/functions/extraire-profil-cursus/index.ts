@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
+        // Mise en cache (12/09/2026) — voir le commentaire complet dans
+        // orchestrer-audit-cursaudit/analyser-unite-cursaudit.
+        system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: texte.slice(0, 20000) }],
         tools: [{
           name: "profil_auteur",
