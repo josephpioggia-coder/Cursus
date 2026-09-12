@@ -1676,6 +1676,21 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
     await charger();
   };
 
+  // Réinitialiser SEULEMENT l'audit détaillé (12/09/2026, même jour) —
+  // signalé à raison : forcer à réeffacer un pré-audit de 37 pages
+  // péniblement restauré juste pour retester l'audit détaillé n'a aucun
+  // sens. Ne touche pas apercu_*/preaudit_*/fiche_action_*.
+  const [réinitialisationDétailléeEnCours, setRéinitialisationDétailléeEnCours] = useState(false);
+  const réinitialiserDétailléSeul = async () => {
+    if (!window.confirm(`Réinitialiser SEULEMENT l'audit détaillé de "${audit.titre}" ? L'aperçu et le pré-audit restent intacts. Cette action est irréversible.`)) return;
+    setRéinitialisationDétailléeEnCours(true);
+    setErreur(null);
+    const { error } = await auditsAPI.réinitialiserAuditDetailleSeul(audit.id);
+    setRéinitialisationDétailléeEnCours(false);
+    if (error) { setErreur(error.message); return; }
+    await charger();
+  };
+
   const lancerAnalyse = async () => {
     setEnCours(true);
     setErreur(null);
@@ -1960,12 +1975,20 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
             {total} unité{total > 1 ? "s" : ""} · palier {audit.palier_dimensions} · mode {audit.mode_ia} · statut {audit.statut}
           </p>
           {estProprietaire && (
-            <button onClick={réinitialiser} disabled={réinitialisationEnCours} style={{
-              marginTop: 6, background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
-              padding: "4px 10px", fontSize: 11.5, color: "#A32D2D", cursor: réinitialisationEnCours ? "default" : "pointer",
-            }}>
-              {réinitialisationEnCours ? "…" : "↺ Repartir de zéro (compte propriétaire, test)"}
-            </button>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={réinitialiserDétailléSeul} disabled={réinitialisationDétailléeEnCours} style={{
+                background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
+                padding: "4px 10px", fontSize: 11.5, color: "#A32D2D", cursor: réinitialisationDétailléeEnCours ? "default" : "pointer",
+              }}>
+                {réinitialisationDétailléeEnCours ? "…" : "↺ Réinitialiser l'audit détaillé seul (test)"}
+              </button>
+              <button onClick={réinitialiser} disabled={réinitialisationEnCours} style={{
+                background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
+                padding: "4px 10px", fontSize: 11.5, color: "#A32D2D", cursor: réinitialisationEnCours ? "default" : "pointer",
+              }}>
+                {réinitialisationEnCours ? "…" : "↺ Repartir de zéro — tout (test)"}
+              </button>
+            </div>
           )}
         </div>
         {peutLancer && (parcoursPréalableFait ? boutonAnalyse : (
@@ -2080,11 +2103,11 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
                   depuis l'endroit où les résultats se lisent réellement,
                   même défaut déjà corrigé pour "Continuer l'analyse". */}
               {estProprietaire && (
-                <button onClick={réinitialiser} disabled={réinitialisationEnCours} style={{
+                <button onClick={réinitialiserDétailléSeul} disabled={réinitialisationDétailléeEnCours} style={{
                   background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
-                  padding: "3px 8px", fontSize: 11, color: "#A32D2D", cursor: réinitialisationEnCours ? "default" : "pointer",
+                  padding: "3px 8px", fontSize: 11, color: "#A32D2D", cursor: réinitialisationDétailléeEnCours ? "default" : "pointer",
                 }}>
-                  {réinitialisationEnCours ? "…" : "↺ Repartir de zéro (test)"}
+                  {réinitialisationDétailléeEnCours ? "…" : "↺ Réinitialiser l'audit détaillé seul (test)"}
                 </button>
               )}
             </div>

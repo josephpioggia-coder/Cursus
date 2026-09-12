@@ -850,6 +850,34 @@ export const auditsAPI = {
     return { error };
   },
 
+  /** Réinitialise UNIQUEMENT l'audit détaillé (réf. 60816-01, suite,
+   *  12/09/2026) — demandé juste après réinitialiserTest() ci-dessus,
+   *  signalé comme "stupide" à raison : reconstruire un pré-audit de 37
+   *  pages pour devoir le réeffacer chaque fois qu'on veut retester
+   *  uniquement l'audit détaillé n'a aucun sens. Ne touche ni les champs
+   *  aperçu / pré-audit / fiche d'action (laissés intacts), ni le
+   *  découpage en chapitres du livre (chapitres_detectes et
+   *  chapitres_confirmes, qui ne changent pas). */
+  async réinitialiserAuditDetailleSeul(auditId) {
+    const { error: erreurSections } = await supabase
+      .from("audit_sections")
+      .update({ resultat_analyse: null })
+      .eq("audit_id", auditId);
+    if (erreurSections) return { error: erreurSections };
+
+    const { error } = await supabase
+      .from("audits")
+      .update({
+        statut:                  "paye",
+        synthese_audit_statut:   "non_demande",
+        synthese_audit_resultat: null,
+        ia_echecs_consecutifs:   0,
+        ia_dernier_echec_le:     null,
+      })
+      .eq("id", auditId);
+    return { error };
+  },
+
   /** Débloque le pré-audit d'un audit SANS passer par du SQL manuel (réf.
    *  60816-01, suite, 12/09/2026) — réservé au propriétaire du projet côté
    *  écran (voir estProprietaire dans CursAuditDetail.jsx) : l'exception
