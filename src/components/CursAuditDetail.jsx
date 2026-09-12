@@ -378,7 +378,7 @@ function ConfirmationChapitres({ audit, onTermine }) {
   );
 }
 
-function ApercuGlobal({ audit, nombreMots, onTermine, onEnvoyerCursEdit }) {
+function ApercuGlobal({ audit, nombreMots, onTermine }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
   // Repli façon Word (réf. 60816-01, suite, 26/08/2026) — une fois le
@@ -483,9 +483,6 @@ function ApercuGlobal({ audit, nombreMots, onTermine, onEnvoyerCursEdit }) {
                   palier {résultat.audit_recommande.palier}
                   {résultat.audit_recommande.priorites?.length > 0 && ` — priorités : ${résultat.audit_recommande.priorites.join(", ")}`}
                 </div>
-              )}
-              {onEnvoyerCursEdit && (
-                <BoutonEnvoyerCursEdit onEnvoyer={() => onEnvoyerCursEdit(`Aperçu — ${audit.titre}`, apercuVersHtml(résultat))} />
               )}
             </div>
           )}
@@ -771,7 +768,7 @@ function FicheExecutive({ fiche }) {
   );
 }
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, onEnvoyerCursEdit, estProprietaire }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, estProprietaire }) {
   const [déblocageEnCours, setDéblocageEnCours] = useState(false);
   const [erreurDéblocage, setErreurDéblocage] = useState(null);
   const débloquerPreaudit = async () => {
@@ -1050,12 +1047,7 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
       )}
 
       {audit.fiche_action_statut === "termine" && audit.fiche_action_resultat && (
-        <>
-          <FicheActionAffichage titre="Fiche d'action éditoriale (pré-audit) — court et actionnable" fiche={audit.fiche_action_resultat} />
-          {onEnvoyerCursEdit && (
-            <BoutonEnvoyerCursEdit onEnvoyer={() => onEnvoyerCursEdit(`Pré-audit — ${audit.titre}`, ficheVersHtml(audit.fiche_action_resultat))} />
-          )}
-        </>
+        <FicheActionAffichage titre="Fiche d'action éditoriale (pré-audit) — court et actionnable" fiche={audit.fiche_action_resultat} />
       )}
 
       {audit.preaudit_statut === "termine" && résultat && (
@@ -1414,6 +1406,64 @@ function échapperHtml(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Même dérivation que le composant CadreLecture plus haut (natureLabel,
+// profil effectif selon auteurEstUtilisateur...) — reprise en fonction pure
+// pour être injectée comme chapitre CursEdit, pas seulement affichée à
+// l'écran. `profilCompte` : résultat de profilAuteurAPI.récupérer(), à
+// fournir par l'appelant (pas re-fetché ici, pour ne pas dupliquer l'appel
+// réseau à chaque envoi).
+function cadreLectureVersHtml(audit, profilCompte) {
+  const contrat = audit.contrat_intention;
+  if (!contrat) return null;
+  const profil = contrat.auteurEstUtilisateur === false && contrat.profilAuteurAudit
+    ? { profession: contrat.profilAuteurAudit.profession, niveau_etudes: contrat.profilAuteurAudit.niveauEtudes }
+    : profilCompte;
+  const natureLabel = contrat.natureProjet?.label || "";
+  const intentionPrincipale = [natureLabel, contrat.ouEnEtesVous, (contrat.objectifs || []).join(", ")]
+    .filter(Boolean).join(" · ") || "non précisée";
+  const lecteurVisé = (contrat.destinataires || []).join(", ") || "non précisé";
+  const attentePrincipale = (contrat.attentesCursus || []).join(", ") || "non précisé";
+  const critèreRéussite = (contrat.criteresReussite || []).join(", ") || "non précisé";
+  const questionCentrale = audit.question_libre || "non précisée";
+  const degréLabel = LABELS_DEGRE_INTERVENTION_COURT[audit.degre_intervention] || audit.degre_intervention || "non précisé";
+  const profilUtilisé = profil && (profil.profession || profil.niveau_etudes)
+    ? [profil.profession, profil.niveau_etudes].filter(Boolean).join(", ") : null;
+  return (
+    `<p><strong>Profil auteur utilisé :</strong> ${échapperHtml(profilUtilisé || "non renseigné")}</p>` +
+    `<p><strong>Intention principale :</strong> ${échapperHtml(intentionPrincipale)}</p>` +
+    `<p><strong>Lecteur visé :</strong> ${échapperHtml(lecteurVisé)}</p>` +
+    `<p><strong>Attente principale :</strong> ${échapperHtml(attentePrincipale)}</p>` +
+    `<p><strong>Critère de réussite :</strong> ${échapperHtml(critèreRéussite)}</p>` +
+    `<p><strong>Question centrale posée à l'audit :</strong> ${échapperHtml(questionCentrale)}</p>` +
+    `<p><em><strong>Conséquence sur l'analyse :</strong> CursAudit priorise ces critères dans son analyse — ${échapperHtml(attentePrincipale)} — avec un degré d'intervention limité à « ${échapperHtml(degréLabel)} ».</em></p>`
+  );
+}
+
+// Rendu HTML d'un lot d'unités analysées (une "scène" CursEdit = un chapitre
+// du livre audité) — mêmes champs que LigneSection plus bas, mis à plat en
+// HTML lisible plutôt qu'un accordéon interactif.
+function unitésVersHtml(unités) {
+  return unités.map((u) => {
+    const résultat = u.resultat_analyse;
+    let bloc = `<p>${échapperHtml(u.texte_source)}</p>`;
+    if (résultat?.erreur) {
+      bloc += `<p><em>Échec d'analyse : ${échapperHtml(résultat.erreur)}</em></p>`;
+    } else if (résultat?.analyse) {
+      if (résultat.analyse.proposition) {
+        bloc += `<p><strong>Proposition :</strong> ${échapperHtml(résultat.analyse.proposition)}</p>`;
+      }
+      for (const [clé, val] of Object.entries(résultat.analyse)) {
+        if (clé === "proposition" || !val) continue;
+        const valeur = Array.isArray(val.valeur) ? val.valeur.join(", ") : val.valeur;
+        bloc += `<p><strong>${échapperHtml(humaniserCle(clé))} — ${échapperHtml(valeur)}</strong>${val.commentaire ? ` : ${échapperHtml(val.commentaire)}` : ""}</p>`;
+      }
+    } else {
+      bloc += `<p><em>Pas encore analysée.</em></p>`;
+    }
+    return bloc;
+  }).join("<hr/>");
+}
+
 function apercuVersHtml(résultat) {
   const listeHtml = (arr) => (arr?.length ? `<ul>${arr.map((x) => `<li>${échapperHtml(x)}</li>`).join("")}</ul>` : "");
   let html = "";
@@ -1456,34 +1506,7 @@ function ficheVersHtml(fiche) {
   return html;
 }
 
-function BoutonEnvoyerCursEdit({ onEnvoyer }) {
-  const [enCours, setEnCours] = useState(false);
-  const [erreur, setErreur] = useState(null);
-  const cliquer = async () => {
-    setEnCours(true);
-    setErreur(null);
-    try {
-      await onEnvoyer();
-    } catch (e) {
-      setErreur(e.message);
-    } finally {
-      setEnCours(false);
-    }
-  };
-  return (
-    <div style={{ marginTop: 8 }}>
-      <button onClick={cliquer} disabled={enCours} style={{
-        background: "#fff", color: "#378ADD", border: "1px solid #378ADD80", borderRadius: 8,
-        padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: enCours ? "default" : "pointer",
-      }}>
-        {enCours ? "Envoi…" : "Envoyer vers CursEdit (modifiable)"}
-      </button>
-      {erreur && <div style={{ marginTop: 4, fontSize: 11, color: "#A32D2D" }}>{erreur}</div>}
-    </div>
-  );
-}
-
-export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, onProjetsChanged }) {
+export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, onProjetsChanged, onOuvrirProjet }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
   const [reglesPrix, setReglesPrix] = useState(null);
@@ -1624,39 +1647,133 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
 
   const arrêterAnalyse = () => { arrêtRef.current?.abort(); };
 
-  // Envoie un rapport vers CursEdit comme nouveau chapitre du projet lié à
-  // cet audit (créé au premier envoi si aucun n'existe encore) — voir le
-  // docblock au-dessus de ce composant. Propage toute erreur à l'appelant
-  // (BoutonEnvoyerCursEdit l'affiche) plutôt que de l'avaler ici.
-  const envoyerVersCursEdit = async (titreChapitre, html) => {
-    let projetId = audit.projet_id;
-    if (!projetId) {
-      const { data: projet, error: erreurProjet } = await projetsAPI.créer({
-        titre: audit.titre || "Audit CursAudit",
-        genre: "Autre",
-        statut: "En cours",
-        couleur: "#8A8A8A",
-        objectifMots: 80000,
-        description: `Créé automatiquement depuis l'audit CursAudit « ${audit.titre} », pour retravailler ses rapports comme un manuscrit normal.`,
-      });
-      if (erreurProjet) throw new Error(erreurProjet.message || "Impossible de créer le projet CursEdit — un abonnement CursEdit actif est peut-être nécessaire.");
-      projetId = projet.id;
-      const { error: erreurLien } = await auditsAPI.lierProjet(audit.id, projetId);
-      if (erreurLien) throw new Error(erreurLien.message);
+  // "Envoyer vers CursEdit" (12/09/2026, réécrit le jour même) — demandé
+  // explicitement : le livre audité a le plus souvent DÉJÀ son propre
+  // projet CursEdit (constaté en test réel — créer un second projet
+  // séparé pour l'audit était un doublon absurde). Propose donc de choisir
+  // un projet existant plutôt que d'en créer un systématiquement, et
+  // organise TOUT l'audit en une seule "Partie" structurée plutôt qu'en
+  // chapitres épars créés un par un :
+  //   Partie « Audit CursAudit — <date> »
+  //     1. Cadre de lecture retenu par CursAudit
+  //     2. Aperçu gratuit du manuscrit
+  //     3. Rapport de décision éditoriale (pré-audit)
+  //     4. Audit détaillé (son propre texte = rapport consolidé si généré,
+  //        puis une scène par chapitre du livre, via chapitres_detectes /
+  //        chapitre_index — même regroupement que Supervision.jsx)
+  // Chaque section n'est créée que si le rapport correspondant existe déjà
+  // (aucune section vide). `audit.projet_id` mémorise le choix pour les
+  // envois suivants du même audit (jamais reproposé).
+  const [choixProjetCursEditOuvert, setChoixProjetCursEditOuvert] = useState(false);
+  const [projetsPourChoix, setProjetsPourChoix] = useState(null);
+  const [projetChoisiId, setProjetChoisiId] = useState("");
+  const [envoiCursEditEnCours, setEnvoiCursEditEnCours] = useState(false);
+  const [erreurEnvoiCursEdit, setErreurEnvoiCursEdit] = useState(null);
+
+  const envoyerAuditCompletVersCursEdit = async (projetIdChoisi) => {
+    setEnvoiCursEditEnCours(true);
+    setErreurEnvoiCursEdit(null);
+    try {
+      let projetId = projetIdChoisi || audit.projet_id;
+      if (!projetId) {
+        const { data: projet, error: erreurProjet } = await projetsAPI.créer({
+          titre: audit.titre || "Audit CursAudit",
+          genre: "Autre",
+          statut: "En cours",
+          couleur: "#8A8A8A",
+          objectifMots: 80000,
+          description: `Créé automatiquement depuis l'audit CursAudit « ${audit.titre} ».`,
+        });
+        if (erreurProjet) throw new Error(erreurProjet.message || "Impossible de créer le projet CursEdit — un abonnement CursEdit actif est peut-être nécessaire.");
+        projetId = projet.id;
+      }
+      if (audit.projet_id !== projetId) {
+        const { error: erreurLien } = await auditsAPI.lierProjet(audit.id, projetId);
+        if (erreurLien) throw new Error(erreurLien.message);
+      }
+
+      const { data: nœudsExistants, error: erreurListe } = await nœudsAPI.listerParProjet(projetId);
+      if (erreurListe) throw new Error(erreurListe.message);
+      const ordreRacine = (nœudsExistants || []).filter((n) => !n.parent_id).length;
+
+      const { data: partie, error: erreurPartie } = await nœudsAPI.créer(
+        { type: "partie", titre: `Audit CursAudit — ${new Date().toLocaleDateString("fr-FR")}`, ordre: ordreRacine },
+        projetId
+      );
+      if (erreurPartie) throw new Error(erreurPartie.message);
+
+      let ordreChapitre = 0;
+      const créerChapitre = async (titre, texte) => {
+        const { data, error } = await nœudsAPI.créer({ parentId: partie.id, type: "chapitre", titre, texte, ordre: ordreChapitre }, projetId);
+        if (error) throw new Error(error.message);
+        ordreChapitre += 1;
+        return data;
+      };
+
+      if (audit.contrat_intention) {
+        const { data: profilCompte } = await profilAuteurAPI.récupérer();
+        const html = cadreLectureVersHtml(audit, profilCompte || null);
+        if (html) await créerChapitre("Cadre de lecture retenu par CursAudit", html);
+      }
+      if (audit.apercu_statut === "termine" && audit.apercu_resultat) {
+        await créerChapitre("Aperçu gratuit du manuscrit", apercuVersHtml(audit.apercu_resultat));
+      }
+      if (audit.fiche_action_statut === "termine" && audit.fiche_action_resultat) {
+        await créerChapitre("Rapport de décision éditoriale (pré-audit)", ficheVersHtml(audit.fiche_action_resultat));
+      }
+      if (analysées > 0) {
+        const introAuditDétaillé = audit.synthese_audit_statut === "termine" && audit.synthese_audit_resultat
+          ? ficheVersHtml(audit.synthese_audit_resultat)
+          : `<p>${analysées} / ${total} unité${total > 1 ? "s" : ""} analysée${analysées > 1 ? "s" : ""}.</p>`;
+        const chapitreAudit = await créerChapitre("Audit détaillé", introAuditDétaillé);
+
+        if (Array.isArray(audit.chapitres_detectes) && audit.chapitres_detectes.length > 0) {
+          let ordreScene = 0;
+          for (let i = 0; i < audit.chapitres_detectes.length; i++) {
+            const unitésDeCettePartie = (sections || []).filter((s) => s.chapitre_index === i);
+            if (unitésDeCettePartie.length === 0) continue;
+            const { error: erreurScene } = await nœudsAPI.créer({
+              parentId: chapitreAudit.id, type: "scene",
+              titre: `${i + 1}. ${audit.chapitres_detectes[i].titre}`,
+              texte: unitésVersHtml(unitésDeCettePartie),
+              ordre: ordreScene,
+            }, projetId);
+            if (erreurScene) throw new Error(erreurScene.message);
+            ordreScene += 1;
+          }
+        } else {
+          const { error: erreurScene } = await nœudsAPI.créer({
+            parentId: chapitreAudit.id, type: "scene", titre: "Toutes les unités",
+            texte: unitésVersHtml(sections || []), ordre: 0,
+          }, projetId);
+          if (erreurScene) throw new Error(erreurScene.message);
+        }
+      }
+
+      await charger();
+      // CORRECTIF 12/09/2026 — page blanche en arrivant sur l'éditeur : un
+      // projet/nœud créé directement via projetsAPI/nœudsAPI n'existe
+      // qu'en base tant que l'état `projets` d'App.jsx (dont dépend tout
+      // l'écran éditeur) n'a pas été rafraîchi. Doit être attendu AVANT de
+      // naviguer, pas en parallèle.
+      await onProjetsChanged?.();
+      setChoixProjetCursEditOuvert(false);
+      onOuvrirProjet?.(projetId);
+    } catch (e) {
+      setErreurEnvoiCursEdit(e.message);
+    } finally {
+      setEnvoiCursEditEnCours(false);
     }
-    const { data: nœudsExistants, error: erreurListe } = await nœudsAPI.listerParProjet(projetId);
-    if (erreurListe) throw new Error(erreurListe.message);
-    const ordre = (nœudsExistants || []).filter((n) => !n.parent_id).length;
-    const { data: nœud, error: erreurNœud } = await nœudsAPI.créer({ type: "chapitre", titre: titreChapitre, texte: html, ordre }, projetId);
-    if (erreurNœud) throw new Error(erreurNœud.message);
-    await charger();
-    // CORRECTIF 12/09/2026 — page blanche en arrivant sur l'éditeur : le
-    // projet/nœud créés ci-dessus n'existaient qu'en base, jamais dans
-    // l'état `projets` d'App.jsx (dont projetActif/nœudActif dépendent
-    // entièrement) tant que cette liste n'était pas rafraîchie. Doit être
-    // attendu AVANT de basculer vers l'éditeur, pas en parallèle.
-    await onProjetsChanged?.();
-    onOuvrirÉditeur?.(projetId, nœud.id, audit.id);
+  };
+
+  const ouvrirChoixCursEdit = async () => {
+    setErreurEnvoiCursEdit(null);
+    if (audit.projet_id) { await envoyerAuditCompletVersCursEdit(audit.projet_id); return; }
+    setChoixProjetCursEditOuvert(true);
+    if (!projetsPourChoix) {
+      const { data } = await projetsAPI.lister();
+      setProjetsPourChoix(data || []);
+    }
   };
 
   const lancerSynthese = async () => {
@@ -1761,10 +1878,57 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
         </div>
       )}
 
+      {(audit.contrat_intention || audit.apercu_resultat || audit.fiche_action_resultat || analysées > 0) && (
+        <div style={{ background: "#EEF6FC", border: "0.5px solid #378ADD50", borderRadius: 8, padding: "12px 16px", marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 12, color: "var(--texte-secondaire)" }}>
+              {audit.projet_id
+                ? "Déjà relié à un projet CursEdit — les rapports disponibles s'ajouteront comme une nouvelle partie."
+                : "Envoie ce qui est disponible (cadre de lecture, aperçu, pré-audit, audit détaillé) comme une partie modifiable d'un projet CursEdit."}
+            </div>
+            <button onClick={ouvrirChoixCursEdit} disabled={envoiCursEditEnCours} style={{
+              background: "#378ADD", color: "#fff", border: "none", borderRadius: 8,
+              padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: envoiCursEditEnCours ? "default" : "pointer", flexShrink: 0,
+            }}>
+              {envoiCursEditEnCours ? "Envoi…" : "Envoyer vers CursEdit"}
+            </button>
+          </div>
+
+          {choixProjetCursEditOuvert && !audit.projet_id && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid #378ADD40", display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 11.5, color: "var(--texte-secondaire)" }}>
+                Ce livre a-t-il déjà un projet CursEdit ? Relie-le plutôt que d'en créer un nouveau :
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <select value={projetChoisiId} onChange={(e) => setProjetChoisiId(e.target.value)} style={{
+                  flex: "1 1 220px", padding: "7px 10px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", fontSize: 12.5,
+                }}>
+                  <option value="">— Choisir un projet existant —</option>
+                  {(projetsPourChoix || []).map((p) => <option key={p.id} value={p.id}>{p.titre}</option>)}
+                </select>
+                <button onClick={() => envoyerAuditCompletVersCursEdit(projetChoisiId)} disabled={!projetChoisiId || envoiCursEditEnCours} style={{
+                  background: "#378ADD", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px",
+                  fontSize: 12, fontWeight: 600, cursor: (!projetChoisiId || envoiCursEditEnCours) ? "default" : "pointer", opacity: !projetChoisiId ? 0.5 : 1,
+                }}>
+                  Utiliser ce projet
+                </button>
+                <button onClick={() => envoyerAuditCompletVersCursEdit(null)} disabled={envoiCursEditEnCours} style={{
+                  background: "none", color: "#378ADD", border: "0.5px solid #378ADD80", borderRadius: 6, padding: "7px 12px",
+                  fontSize: 12, fontWeight: 600, cursor: envoiCursEditEnCours ? "default" : "pointer",
+                }}>
+                  Créer un nouveau projet
+                </button>
+              </div>
+            </div>
+          )}
+          {erreurEnvoiCursEdit && <div style={{ marginTop: 8, fontSize: 11.5, color: "#A32D2D" }}>{erreurEnvoiCursEdit}</div>}
+        </div>
+      )}
+
       <CadreLecture audit={audit} />
 
       {nombreMots > 0 && (
-        <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} onEnvoyerCursEdit={envoyerVersCursEdit} />
+        <ApercuGlobal audit={audit} nombreMots={nombreMots} onTermine={charger} />
       )}
 
       {audit.apercu_statut === "termine" && (
@@ -1778,7 +1942,6 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
           chapitreLimite={chapitreLimite}
           onChapitreLimiteChange={setChapitreLimite}
           totalUnites={total}
-          onEnvoyerCursEdit={envoyerVersCursEdit}
           estProprietaire={estProprietaire}
         />
       )}
@@ -1889,7 +2052,6 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
             <>
               <FicheExecutive fiche={audit.synthese_audit_resultat} />
               <FicheActionAffichage titre="Rapport consolidé de l'audit détaillé — analyse complète" fiche={audit.synthese_audit_resultat} masquerResumeCourt />
-              <BoutonEnvoyerCursEdit onEnvoyer={() => envoyerVersCursEdit(`Rapport consolidé — ${audit.titre}`, ficheVersHtml(audit.synthese_audit_resultat))} />
             </>
           )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, marginTop: 12 }}>

@@ -2482,7 +2482,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : détail d'un audit (résultat, réf. 60816-01, suite, 22/08/2026) */}
         {vue === "auditdetail" && auditActifId && (
-          <CursAuditDetail auditId={auditActifId} onRetour={() => setVue("mesaudits")} onOuvrirÉditeur={ouvrirÉditeur} onProjetsChanged={chargerProjets} />
+          <CursAuditDetail auditId={auditActifId} onRetour={() => setVue("mesaudits")} onOuvrirÉditeur={ouvrirÉditeur} onProjetsChanged={chargerProjets} onOuvrirProjet={ouvrirProjet} />
         )}
 
         {/* Vue : Administration (codes promo) — réf. 60804-03, reliée le 16/08/2026 */}
