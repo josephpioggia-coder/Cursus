@@ -495,7 +495,7 @@ export default function CursAuditQuestionnaire({ onValider, sectionTexte }) {
   // peut auditer plusieurs auteur·ices différent·es dans le temps.
   const [auteurEstUtilisateur, setAuteurEstUtilisateur] = useState(() => brouillonInitial?.auteurEstUtilisateur ?? true);
   const [profilAuteurAudit, setProfilAuteurAudit] = useState(() => brouillonInitial?.profilAuteurAudit ?? {
-    profession: "", identiteGenre: "", trancheAge: "", niveauEtudes: "", matieresEtudiees: "",
+    profession: "", identiteGenre: "", trancheAge: "", niveauEtudes: "", matieresEtudiees: "", présentation: "",
   });
   const màjProfilAuteurAudit = (clé, valeur) => setProfilAuteurAudit((p) => ({ ...p, [clé]: valeur }));
   const copierMonProfilVersAuteur = () => {
@@ -947,6 +947,21 @@ export default function CursAuditQuestionnaire({ onValider, sectionTexte }) {
                       Copier mon profil
                     </button>
                   )}
+                  {/* 12/09/2026 — demandé par l'auteur du projet : une brève
+                      présentation libre de l'auteur·ice DU TEXTE (pas les
+                      champs structurés ci-dessous, un vrai texte court —
+                      parcours, ce qui la/le définit) plutôt que rien du tout
+                      entre le choix "autre auteur·ice" et les champs. */}
+                  <div>
+                    <label style={labelStyle}>Brève présentation de cet(te) auteur·ice (facultatif)</label>
+                    <textarea
+                      style={{ ...champStyle, resize: "vertical" }}
+                      rows={3}
+                      value={profilAuteurAudit.présentation || ""}
+                      onChange={(e) => màjProfilAuteurAudit("présentation", e.target.value)}
+                      placeholder="Quelques phrases : qui est cette personne, son parcours, ce qui compte pour situer ce texte."
+                    />
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div>
                       <label style={labelStyle}>Profession</label>
