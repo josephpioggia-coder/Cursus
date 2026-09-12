@@ -20,13 +20,17 @@
  * deux fichiers divergent un jour, c'est ce commentaire qu'il faut mettre à
  * jour en premier.
  *
- * GESTION D'ÉCHEC PAR UNITÉ : si l'appel IA échoue pour une unité (erreur
- * réseau, sortie non conforme...), la section reçoit
- * `resultat_analyse = { erreur: "..." }` plutôt que de rester vide — elle
- * ne sera donc PAS retentée automatiquement au prochain appel (pour éviter
- * une boucle qui échoue indéfiniment sur la même unité et bloque tout le
- * lot). Aucun mécanisme de nouvelle tentative manuelle n'existe encore —
- * à construire si des échecs réels apparaissent en usage.
+ * GESTION D'ÉCHEC PAR UNITÉ : si l'appel IA échoue pour une unité après
+ * épuisement des tentatives de reprise automatiques (voir
+ * analyserUneSectionAvecReprise — jusqu'à 3 essais, mais UNIQUEMENT pour
+ * les erreurs transitoires 429/500/503/529/réseau, ajoutées le 12/09/2026
+ * en même temps que le traitement par groupes de CONCURRENCE unités en
+ * parallèle), la section reçoit `resultat_analyse = { erreur: "..." }`
+ * plutôt que de rester vide — elle ne sera donc PAS retentée au prochain
+ * appel de cette fonction (pour éviter une boucle qui échoue indéfiniment
+ * sur la même unité et bloque tout le lot). Pas de nouvelle tentative
+ * manuelle depuis l'interface pour l'instant — à construire si des échecs
+ * réels persistants apparaissent en usage.
  *
  * SECRETS REQUIS : ANTHROPIC_KEY, OPENAI_API_KEY, SUPABASE_URL,
  * SERVICE_ROLE_KEY (déjà en place).
@@ -191,7 +195,18 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     }),
   });
   const résultat = await réponse.json();
-  if (!réponse.ok) throw new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
+  if (!réponse.ok) {
+    // .status conservé sur l'erreur (12/09/2026) — pour distinguer, côté
+    // appelant, un dépassement de débit/surcharge (429/529, transitoire,
+    // à retenter) d'un vrai problème de fond (à laisser échouer tout de
+    // suite) : voir estErreurRéessayable() plus bas, utilisée maintenant
+    // que plusieurs unités sont traitées en parallèle (paralléliser sans
+    // ce filet aurait transformé un simple pic de débit en échecs
+    // définitifs, jamais retentés).
+    const erreur = new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`) as Error & { status?: number };
+    erreur.status = réponse.status;
+    throw erreur;
+  }
   // Détection explicite de troncature (réf. 60816-01, suite, 26/08/2026) —
   // pour un message d'erreur clair sur cette section précise plutôt qu'une
   // erreur de schéma cryptique si la réponse est coupée en plein milieu
@@ -221,7 +236,11 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
     }),
   });
   const résultat = await réponse.json();
-  if (!réponse.ok) throw new Error(résultat?.error?.message || `Échec de l'appel GPT (${réponse.status}).`);
+  if (!réponse.ok) {
+    const erreur = new Error(résultat?.error?.message || `Échec de l'appel GPT (${réponse.status}).`) as Error & { status?: number };
+    erreur.status = réponse.status;
+    throw erreur;
+  }
   const contenuBrut = résultat.choices?.[0]?.message?.content;
   if (!contenuBrut) throw new Error("GPT n'a renvoyé aucun contenu — sortie structurée absente.");
   let data: unknown;
@@ -639,6 +658,55 @@ async function analyserUneSection(
   return { analyse, controle_gpt: controleGPT, mode_ia: modeIA, analyse_le: new Date().toISOString(), usage: { claude: usageClaude, gpt: usageGPT } };
 }
 
+// Parallélisation (12/09/2026) — signalé après test réel : ~40-46s par
+// unité en mode "1 IA" est un temps de génération Claude normal (sortie
+// structurée riche, contexte de voisinage + pré-audit), pas un problème à
+// corriger côté prompt. Le vrai levier est que les unités étaient
+// traitées UNE PAR UNE alors que l'attente est purement réseau — voir la
+// boucle plus bas, qui traite désormais CONCURRENCE unités à la fois.
+// Risque induit : un pic de débit Anthropic (429/529) devient plus
+// probable avec des appels simultanés, et sans ce filet, chaque section
+// touchée serait marquée en échec définitif (voir le commentaire "GESTION
+// D'ÉCHEC PAR UNITÉ" en tête de fichier — pas de nouvelle tentative
+// automatique). Nouvelle tentative UNIQUEMENT pour ces erreurs
+// transitoires (jamais pour un problème de fond — schéma non conforme,
+// troncature — qui échouerait à l'identique).
+const CONCURRENCE = 3;
+const TENTATIVES_MAX = 3;
+
+function estErreurRéessayable(err: unknown): boolean {
+  const status = (err as { status?: number } | undefined)?.status;
+  if (status === 429 || status === 500 || status === 503 || status === 529) return true;
+  // Coupure réseau avant toute réponse HTTP (le fetch lui-même a échoué,
+  // pas de `.status` du tout) : TypeError native de fetch, à distinguer
+  // des erreurs applicatives volontaires (schéma non conforme, troncature,
+  // "analyse quasi vide"...) levées via `new Error(...)` sans `.status` —
+  // celles-là échoueraient à l'identique à la reprise, donc PAS retentées.
+  return err instanceof TypeError;
+}
+
+async function analyserUneSectionAvecReprise(
+  texteAvecContexte: string,
+  modeIA: string,
+  criteres: CritereActif[],
+  schema: Record<string, unknown>,
+  consigneCriteres: string,
+  contexteQualification: string,
+  consigneSyntheseEditoriale: string,
+): Promise<Record<string, unknown>> {
+  let dernièreErreur: unknown;
+  for (let tentative = 1; tentative <= TENTATIVES_MAX; tentative++) {
+    try {
+      return await analyserUneSection(texteAvecContexte, modeIA, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+    } catch (err) {
+      dernièreErreur = err;
+      if (!estErreurRéessayable(err) || tentative === TENTATIVES_MAX) throw err;
+      await new Promise((résoudre) => setTimeout(résoudre, 2000 * tentative)); // 2s, 4s
+    }
+  }
+  throw dernièreErreur;
+}
+
 // ─── Handler principal ─────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -769,34 +837,44 @@ Deno.serve(async (req) => {
     let traiteesCetteFois = 0;
     let echoueesCetteFois = 0;
 
-    for (const section of aTraiter) {
+    // Traitement par groupes de CONCURRENCE unités en parallèle (12/09/2026
+    // — voir le commentaire au-dessus d'analyserUneSectionAvecReprise) : le
+    // budget de temps est vérifié avant CHAQUE groupe, pas avant chaque
+    // unité — un groupe démarré va jusqu'au bout même s'il dépasse
+    // BUDGET_MS, exactement comme une unité seule le faisait déjà avant.
+    for (let début = 0; début < aTraiter.length; début += CONCURRENCE) {
       if (Date.now() - départ > BUDGET_MS) break; // lot suivant au prochain appel
+      const groupe = aTraiter.slice(début, début + CONCURRENCE);
 
-      const texteAvant = texteParOrdre.get(section.ordre - 1);
-      const texteAprès = texteParOrdre.get(section.ordre + 1);
-      const lectureChapitre = typeof section.chapitre_index === "number" ? lectureChapitres?.[section.chapitre_index]?.lecture : undefined;
-      const contextePréaudit = lectureChapitre
-        ? `\n\n[Repère : lecture de ce chapitre par le pré-audit — informe ta lecture, NE PAS le recopier ni le noter directement]\n` +
-          (lectureChapitre.point_faible ? `Point faible relevé : ${lectureChapitre.point_faible}\n` : "") +
-          (lectureChapitre.a_verifier ? `À vérifier : ${lectureChapitre.a_verifier}\n` : "") +
-          (lectureChapitre.a_approfondir_audit_final ? `À approfondir ici : ${lectureChapitre.a_approfondir_audit_final}` : "")
-        : "";
-      const texteAvecContexte =
-        (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
-        `[Unité à analyser]\n${section.texte_source}` +
-        (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "") +
-        contextePréaudit;
+      await Promise.all(groupe.map(async (section) => {
+        const texteAvant = texteParOrdre.get(section.ordre - 1);
+        const texteAprès = texteParOrdre.get(section.ordre + 1);
+        const lectureChapitre = typeof section.chapitre_index === "number" ? lectureChapitres?.[section.chapitre_index]?.lecture : undefined;
+        const contextePréaudit = lectureChapitre
+          ? `\n\n[Repère : lecture de ce chapitre par le pré-audit — informe ta lecture, NE PAS le recopier ni le noter directement]\n` +
+            (lectureChapitre.point_faible ? `Point faible relevé : ${lectureChapitre.point_faible}\n` : "") +
+            (lectureChapitre.a_verifier ? `À vérifier : ${lectureChapitre.a_verifier}\n` : "") +
+            (lectureChapitre.a_approfondir_audit_final ? `À approfondir ici : ${lectureChapitre.a_approfondir_audit_final}` : "")
+          : "";
+        const texteAvecContexte =
+          (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
+          `[Unité à analyser]\n${section.texte_source}` +
+          (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "") +
+          contextePréaudit;
 
-      try {
-        const résultat = await analyserUneSection(texteAvecContexte, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
-        await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
-        traiteesCetteFois++;
-      } catch (err) {
-        // Marquée en échec plutôt que laissée vide, pour ne pas être
-        // retentée en boucle au prochain appel (voir note en tête de fichier).
-        await admin.from("audit_sections").update({ resultat_analyse: { erreur: err.message, analyse_le: new Date().toISOString() } }).eq("id", section.id);
-        echoueesCetteFois++;
-      }
+        try {
+          const résultat = await analyserUneSectionAvecReprise(texteAvecContexte, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+          await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
+          traiteesCetteFois++;
+        } catch (err) {
+          // Marquée en échec plutôt que laissée vide, pour ne pas être
+          // retentée en boucle au prochain appel (voir note en tête de
+          // fichier) — après épuisement des tentatives de reprise ci-dessus
+          // pour les erreurs transitoires.
+          await admin.from("audit_sections").update({ resultat_analyse: { erreur: err.message, analyse_le: new Date().toISOString() } }).eq("id", section.id);
+          echoueesCetteFois++;
+        }
+      }));
     }
 
     // Le compte de "restantes" respecte lui aussi le bornage — sinon la
