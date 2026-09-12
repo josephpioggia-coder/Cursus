@@ -102,16 +102,30 @@ Deno.serve(async (req) => {
       if (erreurAudit) return réponse({ error: erreurAudit.message }, 500);
       if (!audit) return réponse({ error: "Audit introuvable ou supervision non consentie." }, 404);
 
-      const { data: sections, error: erreurSections } = await supabase
-        .from("audit_sections")
-        .select("ordre, texte_source, chapitre_index")
-        .eq("audit_id", auditId)
-        .order("ordre", { ascending: true });
-      if (erreurSections) return réponse({ error: erreurSections.message }, 500);
+      // 12/09/2026 — signalé par l'auteur du projet : "Texte soumis (1000
+      // unités)" pile rond sur un vrai audit, alors que le vrai nombre
+      // d'unités dépassait clairement ce chiffre. Cause : PostgREST plafonne
+      // une requête .select() à 1000 lignes par défaut, silencieusement,
+      // sans erreur — un audit d'un livre complet (souvent plusieurs
+      // milliers d'unités) se retrouvait tronqué sans avertissement. Pagine
+      // par blocs de 1000 jusqu'à épuisement plutôt qu'une seule requête.
+      const sections: { ordre: number; texte_source: string; chapitre_index: number | null }[] = [];
+      const TAILLE_PAGE = 1000;
+      for (let début = 0; ; début += TAILLE_PAGE) {
+        const { data: page, error: erreurSections } = await supabase
+          .from("audit_sections")
+          .select("ordre, texte_source, chapitre_index")
+          .eq("audit_id", auditId)
+          .order("ordre", { ascending: true })
+          .range(début, début + TAILLE_PAGE - 1);
+        if (erreurSections) return réponse({ error: erreurSections.message }, 500);
+        sections.push(...(page || []));
+        if (!page || page.length < TAILLE_PAGE) break;
+      }
 
       const emails = await emailParUserId([audit.user_id]);
 
-      return réponse({ audit: { ...audit, email: emails[audit.user_id] || "(compte introuvable)" }, sections: sections || [] });
+      return réponse({ audit: { ...audit, email: emails[audit.user_id] || "(compte introuvable)" }, sections });
     }
 
     return réponse({ error: "Action inconnue." }, 400);
