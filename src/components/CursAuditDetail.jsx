@@ -1776,6 +1776,24 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
     }
   };
 
+  // "Changer de projet" (12/09/2026) — un audit déjà relié (ex. par erreur,
+  // à un projet créé avant que le choix ne soit proposé) doit pouvoir
+  // rouvrir le choix plutôt que rester coincé à réutiliser le même projet
+  // indéfiniment. Délie côté base avant de rouvrir le sélecteur.
+  const changerProjetLié = async () => {
+    setEnvoiCursEditEnCours(true);
+    setErreurEnvoiCursEdit(null);
+    const { error } = await auditsAPI.lierProjet(audit.id, null);
+    setEnvoiCursEditEnCours(false);
+    if (error) { setErreurEnvoiCursEdit(error.message); return; }
+    await charger();
+    setChoixProjetCursEditOuvert(true);
+    if (!projetsPourChoix) {
+      const { data } = await projetsAPI.lister();
+      setProjetsPourChoix(data || []);
+    }
+  };
+
   const lancerSynthese = async () => {
     setSyntheseEnCours(true);
     setErreurSynthese(null);
@@ -1885,6 +1903,14 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
               {audit.projet_id
                 ? "Déjà relié à un projet CursEdit — les rapports disponibles s'ajouteront comme une nouvelle partie."
                 : "Envoie ce qui est disponible (cadre de lecture, aperçu, pré-audit, audit détaillé) comme une partie modifiable d'un projet CursEdit."}
+              {audit.projet_id && (
+                <button onClick={changerProjetLié} disabled={envoiCursEditEnCours} style={{
+                  marginLeft: 8, background: "none", border: "none", color: "#378ADD", fontSize: 11.5,
+                  textDecoration: "underline", cursor: envoiCursEditEnCours ? "default" : "pointer", fontFamily: "inherit", padding: 0,
+                }}>
+                  Changer de projet
+                </button>
+              )}
             </div>
             <button onClick={ouvrirChoixCursEdit} disabled={envoiCursEditEnCours} style={{
               background: "#378ADD", color: "#fff", border: "none", borderRadius: 8,
