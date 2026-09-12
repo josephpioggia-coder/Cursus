@@ -1829,6 +1829,16 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   // des unités sans résultat (ni succès, ni échec enregistré).
   const nonTraitées = total - analysées - échouées;
   const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement" || (audit.statut === "termine" && nonTraitées > 0);
+  // Parcours forcé (12/09/2026) — demandé par l'auteur du projet : le
+  // bouton "Lancer/Continuer l'analyse" (audit détaillé, le plus cher)
+  // était accessible dès l'arrivée sur la page, avant même l'aperçu
+  // gratuit — quelqu'un qui ne connaît pas le parcours pourrait cliquer
+  // directement dessus, perdant l'intérêt (et la réduction déductible) du
+  // pré-audit. Masqué tant que l'aperçu n'est pas terminé ET qu'aucune
+  // unité n'a encore été analysée — un audit déjà commencé avant ce
+  // correctif (ou dont l'aperçu a été réinitialisé depuis) doit pouvoir
+  // continuer sans se retrouver bloqué rétroactivement.
+  const parcoursPréalableFait = audit.apercu_statut === "termine" || analysées > 0;
 
   // Bloc bouton "Lancer/Continuer l'analyse" (12/09/2026) — extrait dans une
   // variable pour être affiché DEUX FOIS : en haut de page (déjà là) ET en
@@ -1887,7 +1897,11 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
             </button>
           )}
         </div>
-        {peutLancer && boutonAnalyse}
+        {peutLancer && (parcoursPréalableFait ? boutonAnalyse : (
+          <div style={{ fontSize: 11.5, color: "var(--texte-tertiaire)", textAlign: "right", maxWidth: 200 }}>
+            Commencez par l'aperçu gratuit ci-dessous avant l'audit détaillé.
+          </div>
+        ))}
       </div>
 
       {!peutLancer && audit.statut === "brouillon" && (
@@ -2120,7 +2134,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
         </>
       )}
 
-      {peutLancer && total > 0 && (
+      {peutLancer && parcoursPréalableFait && total > 0 && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: "0.5px solid var(--border)" }}>
           {boutonAnalyse}
         </div>
