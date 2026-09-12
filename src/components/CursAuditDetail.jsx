@@ -1615,6 +1615,11 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   const débutSessionAnalyseRef = useRef(null);
   const unitésTraitéesSessionRef = useRef(0);
   const [tempsRestantEstiméMs, setTempsRestantEstiméMs] = useState(null);
+  // Compteur affiché pendant l'analyse (12/09/2026, suite le même jour) —
+  // calculé LOCALEMENT à partir des déltas renvoyés par chaque lot, sans
+  // requête DB : voir le commentaire dans lancerAnalyse() sur le
+  // ralentissement causé par charger() rappelé à chaque lot.
+  const [progressionLive, setProgressionLive] = useState(null);
   // Bornage optionnel à un sous-ensemble de chapitres pour tester l'audit
   // détaillé sans attendre le livre entier (réf. 60816-01, suite,
   // 25/08/2026) — "" = tout le livre, sinon l'index (0-based) du dernier
@@ -1722,29 +1727,44 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
     débutSessionAnalyseRef.current = Date.now();
     unitésTraitéesSessionRef.current = 0;
     setTempsRestantEstiméMs(null);
+    let analyséesCumulées = analysées;
+    let échouéesCumulées = échouées;
+    setProgressionLive({ analysées: analyséesCumulées, échouées: échouéesCumulées, restantes: total - analyséesCumulées - échouéesCumulées });
     const limite = chapitreLimite === "" ? undefined : Number(chapitreLimite);
     const controller = new AbortController();
     arrêtRef.current = controller;
+    let nbLots = 0;
     try {
       let restantes = 1;
       while (restantes > 0) {
         const résultat = await appelerOrchestrateur(auditId, controller.signal, limite);
         restantes = résultat.restantes ?? 0;
+        nbLots++;
         unitésTraitéesSessionRef.current += (résultat.traitees_cette_fois ?? 0) + (résultat.echouees_cette_fois ?? 0);
         const tempsÉcouléMs = Date.now() - débutSessionAnalyseRef.current;
         if (unitésTraitéesSessionRef.current > 0 && tempsÉcouléMs > 0) {
           const msParUnité = tempsÉcouléMs / unitésTraitéesSessionRef.current;
           setTempsRestantEstiméMs(restantes * msParUnité);
         }
+        analyséesCumulées += résultat.traitees_cette_fois ?? 0;
+        échouéesCumulées += résultat.echouees_cette_fois ?? 0;
         setProgression({ traitées: résultat.traitees_cette_fois, échouées: résultat.echouees_cette_fois, restantes });
+        setProgressionLive({ analysées: analyséesCumulées, échouées: échouéesCumulées, restantes });
         // CORRECTIF 26/08/2026 — charger() n'était appelé qu'APRÈS la fin de
         // toute la boucle (potentiellement ~2h sur un livre entier) : pendant
         // tout ce temps, "X / total analysées" restait figé à sa valeur de
         // départ, seule la ligne "Dernier lot" changeait — signalé par
         // l'auteur du projet comme illisible ("je ne sais pas où ça en
-        // est"). Rafraîchi maintenant après CHAQUE lot, pour un vrai
-        // compteur qui avance en direct.
-        await charger();
+        // est"). Rafraîchi après chaque lot à l'origine — CORRECTIF
+        // 12/09/2026 (suite le même jour) : ce rafraîchissement recharge
+        // TOUTES les audit_sections (select *, y compris resultat_analyse
+        // déjà rempli), un payload qui grossit à chaque unité analysée —
+        // signalé : "ça ralentit d'unité en unité", l'ETA passant de 2h30 à
+        // 5h en cours de route alors que le rythme réel de Claude n'avait
+        // pas changé. Le compteur/ETA ci-dessus ne dépendent plus de
+        // charger() (calcul local à partir des déltas du lot) ; la table de
+        // résultats, elle, n'a besoin d'être rafraîchie que périodiquement.
+        if (nbLots % 5 === 0) await charger();
       }
     } catch (e) {
       // Interruption volontaire (bouton "Stop" ci-dessous) — pas une vraie
@@ -1754,6 +1774,8 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
     } finally {
       setEnCours(false);
       arrêtRef.current = null;
+      setProgressionLive(null);
+      await charger();
     }
   };
 
@@ -2118,10 +2140,10 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
         <div style={{ background: "#FBE9E9", color: "#A32D2D", padding: "10px 14px", borderRadius: 6, fontSize: 13, marginBottom: 16 }}>{erreur}</div>
       )}
 
-      {enCours && progression && (
+      {enCours && progression && progressionLive && (
         <div style={{ background: "#EFF3FF", border: "0.5px solid #4C6FE780", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "var(--texte-secondaire)" }}>
           <div style={{ fontWeight: 600, color: "#4C6FE7", marginBottom: 2 }}>Audit détaillé en cours — ne ferme pas cet onglet</div>
-          {analysées} / {total} unités analysées jusqu'ici{échouées > 0 ? ` (${échouées} échec(s))` : ""} · encore {progression.restantes} restante(s).
+          {progressionLive.analysées} / {total} unités analysées jusqu'ici{progressionLive.échouées > 0 ? ` (${progressionLive.échouées} échec(s))` : ""} · encore {progressionLive.restantes} restante(s).
           {tempsRestantEstiméMs !== null && ` · ≈ ${formaterDuréeRestante(tempsRestantEstiméMs)} restant, au rythme actuel.`}
         </div>
       )}
