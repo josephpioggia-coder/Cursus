@@ -168,18 +168,23 @@ function échantillonner(diagnostics: DiagnosticCompact[]): DiagnosticCompact[] 
   return retenus;
 }
 
-function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyées: number, nombreMots: number, plafondMots: number): string {
-  const noteÉchantillon = nombreUnitésEnvoyées < nombreUnitésTotal
-    ? `Attention : tu reçois un échantillon de ${nombreUnitésEnvoyées} unités sur ${nombreUnitésTotal} au total (livre trop long pour tout envoyer en un seul appel), régulièrement réparti dans l'ordre du livre — traite-le comme représentatif, pas exhaustif.\n\n`
-    : "";
-  return (
+// Mise en cache (12/09/2026) — restructuré en {statique, dynamique} pour
+// marquer la partie fixe avec cache_control (voir le commentaire complet
+// dans orchestrer-audit-cursaudit/analyser-unite-cursaudit) : les nombres
+// (échantillon, longueur cible) étaient jusqu'ici mêlés au texte fixe en
+// plein milieu du prompt, empêchant toute réutilisation du préfixe d'un
+// appel à l'autre. Même contenu, réorganisé : tout le texte fixe d'abord
+// (identique à chaque appel, donc mis en cache), les nombres regroupés à
+// la fin dans un second bloc, jamais mis en cache. Rien n'est supprimé —
+// juste déplacé en fin de prompt plutôt qu'inséré au milieu.
+function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyées: number, nombreMots: number, plafondMots: number): { statique: string; dynamique: string } {
+  const statique =
     "Tu reçois les diagnostics déjà produits, unité par unité, par l'audit détaillé d'un livre entier. Pour " +
     "chaque unité : ses catégories (recevable/à nuancer/à sourcer/à reformuler/à vérifier) et le commentaire " +
     "qui justifie ce diagnostic. Tu ne relis pas le texte source du livre. Tu ne refais pas l'audit. Tu " +
     "produis une fiche d'action éditoriale complète, structurée, priorisée et directement exploitable — " +
     "l'objectif est de transformer des centaines de diagnostics isolés en un vrai document de travail pour " +
     "l'auteur·ice, à la hauteur d'un livre entier, pas un résumé expédié.\n\n" +
-    noteÉchantillon +
     "RÈGLES NON NÉGOCIABLES :\n" +
     "- Ne reprends jamais un diagnostic unité par unité, ne résume pas mécaniquement la liste reçue.\n" +
     "- Regroupe les constats récurrents à travers le livre (le même problème répété dans des dizaines " +
@@ -188,8 +193,7 @@ function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyé
     "réécriture à l'échelle du livre entier.\n" +
     "- Chaque point retenu contient un geste concret développé, jamais un simple constat en une ligne.\n" +
     "- N'invente aucun problème absent des diagnostics reçus.\n" +
-    `- Ce document doit se rapprocher autant que possible de ${plafondMots} mots au total sans le dépasser ` +
-    `(texte source : ${nombreMots} mots, ${nombreUnitésTotal} unités analysées). SUR UN LIVRE DE CETTE ` +
+    "- Respecte la longueur cible indiquée à la fin de ce message, sans la dépasser. SUR UN LIVRE DE CETTE " +
     "AMPLEUR, UN DOCUMENT DE DEUX PAGES EST UN ÉCHEC : développe chaque section sur plusieurs phrases, " +
     "appuie-toi sur des exemples concrets tirés des diagnostics reçus, ne te limite jamais à des puces " +
     "minimalistes.\n\n" +
@@ -209,8 +213,17 @@ function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyé
     "livre entier.\n" +
     "6. action_immediate : une seule action, tranchée, immédiatement applicable, expliquée en plusieurs " +
     "phrases — la toute première chose à faire.\n" +
-    "7. a_eviter : 3 à 6 fausses bonnes idées à éviter, chacune développée en une à deux phrases."
-  );
+    "7. a_eviter : 3 à 6 fausses bonnes idées à éviter, chacune développée en une à deux phrases.";
+
+  const noteÉchantillon = nombreUnitésEnvoyées < nombreUnitésTotal
+    ? `Attention : tu reçois un échantillon de ${nombreUnitésEnvoyées} unités sur ${nombreUnitésTotal} au total (livre trop long pour tout envoyer en un seul appel), régulièrement réparti dans l'ordre du livre — traite-le comme représentatif, pas exhaustif.\n\n`
+    : "";
+  const dynamique =
+    noteÉchantillon +
+    `Longueur cible : ce document doit se rapprocher autant que possible de ${plafondMots} mots au total ` +
+    `sans le dépasser (texte source : ${nombreMots} mots, ${nombreUnitésTotal} unités analysées).`;
+
+  return { statique, dynamique };
 }
 
 Deno.serve(async (req) => {
@@ -271,13 +284,18 @@ Deno.serve(async (req) => {
     const nombreMots = (audit.apercu_resultat as { nombre_mots?: number } | null)?.nombre_mots ?? 0;
     const plafondMots = choisirPlafondMots(nombreMots);
 
+    const { statique: systemStatique, dynamique: systemDynamique } =
+      construireSystemPrompt(diagnostics.length, diagnosticsEnvoyés.length, nombreMots, plafondMots);
     const réponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 16000,
-        system: construireSystemPrompt(diagnostics.length, diagnosticsEnvoyés.length, nombreMots, plafondMots),
+        system: [
+          { type: "text", text: systemStatique, cache_control: { type: "ephemeral" } },
+          { type: "text", text: systemDynamique },
+        ],
         messages: [{ role: "user", content: JSON.stringify(diagnosticsEnvoyés) }],
         tools: [{
           name: "fiche_action",

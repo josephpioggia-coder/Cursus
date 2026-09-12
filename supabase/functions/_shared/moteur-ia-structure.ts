@@ -57,6 +57,13 @@ function validerContreSchema(data: unknown, schema: Record<string, unknown>): vo
   }
 }
 
+// Mise en cache (12/09/2026) — voir le commentaire complet dans
+// orchestrer-audit-cursaudit/analyser-unite-cursaudit. Ici, `params.system`
+// est en pratique une chaîne parmi un petit nombre fixe (voir les appelants
+// dans verification-deux-ia : "consigne" y est toujours l'une de deux
+// chaînes statiques selon le tour, A1 ou A2, jamais une valeur générée
+// dynamiquement) — le bloc entier reste donc identique d'un appel à
+// l'autre pour un même tour, sans restructuration nécessaire côté appelant.
 async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
 
@@ -71,7 +78,7 @@ async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurI
     body: JSON.stringify({
       model: params.modele,
       max_tokens: params.max_tokens ?? 4096,
-      system: params.system,
+      system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
       tools: [
         {

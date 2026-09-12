@@ -404,6 +404,12 @@ function normaliserTableauxNuls(schema: Record<string, unknown>, data: unknown):
   return résultat;
 }
 
+// Mise en cache (12/09/2026) — voir le commentaire complet dans
+// orchestrer-audit-cursaudit/analyser-unite-cursaudit. `params.system` est
+// en pratique une chaîne parmi deux valeurs fixes selon le tour (A1 ou A2,
+// voir plus bas où "consigne" est toujours l'une de deux chaînes statiques,
+// jamais générée dynamiquement) — reste donc identique d'un appel à
+// l'autre pour un même tour, réutilisable en cache sans restructuration.
 async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelMoteurIAResultat> {
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
 
@@ -418,7 +424,7 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     body: JSON.stringify({
       model: params.modele,
       max_tokens: params.max_tokens ?? 4096,
-      system: params.system,
+      system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
       tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],
       tool_choice: { type: "tool", name: nomOutil },

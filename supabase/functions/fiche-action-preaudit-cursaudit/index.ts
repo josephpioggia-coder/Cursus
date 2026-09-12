@@ -165,8 +165,13 @@ function choisirPlafondMots(nombreMots: number): number {
   return Math.min(nombreMots, plafondCommercial);
 }
 
-function construireSystemPrompt(nombreMots: number, plafondMots: number): string {
-  return (
+// Mise en cache (12/09/2026) — restructuré en {statique, dynamique}, même
+// principe que le correctif jumeau dans synthese-audit-detaille-cursaudit
+// (voir son commentaire complet) : les nombres regroupés à la fin plutôt
+// que mêlés en plein milieu du texte fixe, pour que le préfixe soit
+// identique d'un appel à l'autre et donc réutilisable en cache.
+function construireSystemPrompt(nombreMots: number, plafondMots: number): { statique: string; dynamique: string } {
+  const statique =
     "Tu reçois un pré-audit déjà produit pour un texte. Tu ne relis pas le manuscrit. Tu ne refais pas " +
     "l'audit. Tu produis une fiche d'action éditoriale courte, lisible, priorisée et directement " +
     "exploitable — l'objectif est de transformer l'audit déjà fait en décisions de travail pour " +
@@ -178,8 +183,8 @@ function construireSystemPrompt(nombreMots: number, plafondMots: number): string
     "de réécriture.\n" +
     "- Chaque point retenu contient un geste concret, jamais un simple constat.\n" +
     "- N'invente aucun problème absent du pré-audit reçu.\n" +
-    `- Ce document ne doit JAMAIS dépasser environ ${plafondMots} mots au total (texte source : ` +
-    `${nombreMots} mots) — reste concis, en points denses, jamais en paragraphes développés.\n\n` +
+    "- Respecte la longueur cible indiquée à la fin de ce message — reste concis, en points denses, jamais " +
+    "en paragraphes développés.\n\n" +
     "Produis :\n" +
     "1. diagnostic : une phrase — le texte fonctionne-t-il, sous quelle forme réelle, avec quelle réserve " +
     "principale.\n" +
@@ -191,8 +196,13 @@ function construireSystemPrompt(nombreMots: number, plafondMots: number): string
     "5. risque_principal : une phrase nette — ce qui se passe si rien ne change.\n" +
     "6. action_immediate : une seule action, tranchée, immédiatement applicable — la toute première chose " +
     "à faire.\n" +
-    "7. a_eviter : 1 à 3 fausses bonnes idées à éviter."
-  );
+    "7. a_eviter : 1 à 3 fausses bonnes idées à éviter.";
+
+  const dynamique =
+    `Longueur cible : ce document ne doit JAMAIS dépasser environ ${plafondMots} mots au total ` +
+    `(texte source : ${nombreMots} mots).`;
+
+  return { statique, dynamique };
 }
 
 Deno.serve(async (req) => {
@@ -225,13 +235,17 @@ Deno.serve(async (req) => {
     const nombreMots = (audit.apercu_resultat as { nombre_mots?: number } | null)?.nombre_mots ?? 0;
     const plafondMots = choisirPlafondMots(nombreMots || 2000);
 
+    const { statique: systemStatique, dynamique: systemDynamique } = construireSystemPrompt(nombreMots, plafondMots);
     const réponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 4096,
-        system: construireSystemPrompt(nombreMots, plafondMots),
+        system: [
+          { type: "text", text: systemStatique, cache_control: { type: "ephemeral" } },
+          { type: "text", text: systemDynamique },
+        ],
         messages: [{ role: "user", content: JSON.stringify(audit.preaudit_resultat) }],
         tools: [{
           name: "fiche_action",
