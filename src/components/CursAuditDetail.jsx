@@ -1791,8 +1791,22 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
       {total > 0 && (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
-            <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
-              {analysées} / {total} analysée{total > 1 ? "s" : ""}{échouées > 0 ? ` · ${échouées} échec(s)` : ""}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>
+                {analysées} / {total} analysée{total > 1 ? "s" : ""}{échouées > 0 ? ` · ${échouées} échec(s)` : ""}
+              </div>
+              {/* 12/09/2026 — dupliqué ici (déjà en haut de page) : signalé
+                  par l'auteur du projet que le bouton en haut est invisible
+                  depuis l'endroit où les résultats se lisent réellement,
+                  même défaut déjà corrigé pour "Continuer l'analyse". */}
+              {estProprietaire && (
+                <button onClick={réinitialiser} disabled={réinitialisationEnCours} style={{
+                  background: "none", border: "0.5px solid #A32D2D66", borderRadius: 6,
+                  padding: "3px 8px", fontSize: 11, color: "#A32D2D", cursor: réinitialisationEnCours ? "default" : "pointer",
+                }}>
+                  {réinitialisationEnCours ? "…" : "↺ Repartir de zéro (test)"}
+                </button>
+              )}
             </div>
             {/* Signalé par l'auteur du projet le 27/08/2026 : une fois l'audit
                 détaillé terminé, rien n'était proposé pour l'exporter — puis,
