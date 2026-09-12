@@ -171,38 +171,76 @@ export default function Supervision() {
                         ) : erreurDétail ? (
                           <div style={{ color: "#A32D2D", fontSize: 13 }}>{erreurDétail}</div>
                         ) : détail ? (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                            <div>
-                              <h3 style={{ fontSize: 13, color: COULEURS.bordeaux, marginBottom: 10 }}>Cadrage</h3>
-                              {champDétail("Type de document", détail.audit.type_document)}
-                              {champDétail("Finalité de l'audit", Array.isArray(détail.audit.finalite_audit) ? détail.audit.finalite_audit.join(", ") : détail.audit.finalite_audit)}
-                              {champDétail("Question posée à CursAudit", détail.audit.question_libre)}
-                              {champDétail("Degré d'intervention souhaité", détail.audit.degre_intervention)}
-                              {champDétail("Contraintes académiques", détail.audit.contraintes_academiques && (
-                                `Autorisation IA : ${détail.audit.contraintes_academiques.autorisationIA || "—"}` +
-                                (détail.audit.contraintes_academiques.conditions?.length ? ` · Conditions : ${détail.audit.contraintes_academiques.conditions.join(", ")}` : "")
-                              ))}
-                              {champDétail("Relation à l'IA", détail.audit.relation_ia && (
-                                `Adresse : ${détail.audit.relation_ia.adresse} · Ton : ${détail.audit.relation_ia.ton} · Posture : ${détail.audit.relation_ia.posture} · Longueur : ${détail.audit.relation_ia.longueur} · Rôle : ${détail.audit.relation_ia.role}`
-                              ))}
-                              {détail.audit.contrat_intention && (
-                                <details style={{ marginTop: 8 }}>
-                                  <summary style={{ fontSize: 11.5, color: COULEURS.texteClair, cursor: "pointer" }}>Contrat d'intention complet (JSON)</summary>
-                                  <pre style={{ fontSize: 10.5, whiteSpace: "pre-wrap", background: "#fff", padding: 8, borderRadius: 6, marginTop: 6, maxHeight: 240, overflowY: "auto" }}>
-                                    {JSON.stringify(détail.audit.contrat_intention, null, 2)}
-                                  </pre>
-                                </details>
-                              )}
-                            </div>
-                            <div>
-                              <h3 style={{ fontSize: 13, color: COULEURS.bordeaux, marginBottom: 10 }}>
-                                Texte soumis ({détail.sections.length} unité{détail.sections.length > 1 ? "s" : ""})
-                              </h3>
-                              <div style={{ maxHeight: 420, overflowY: "auto", background: "#fff", borderRadius: 6, padding: 10, fontSize: 12.5, lineHeight: 1.5, color: COULEURS.texte, whiteSpace: "pre-wrap" }}>
-                                {détail.sections.map((s) => s.texte_source).join("\n\n")}
+                          <>
+                            <h2 style={{ fontFamily: "Georgia, serif", fontSize: 18, color: COULEURS.bordeaux, marginBottom: 14 }}>
+                              {détail.audit.titre || "(sans titre)"}
+                            </h2>
+                            {détail.audit.question_libre && (
+                              <div style={{ background: "#fff", border: `1px solid ${COULEURS.or}66`, borderRadius: 6, padding: "12px 14px", marginBottom: 18 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, color: COULEURS.or, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>
+                                  Message de l'auteur·ice
+                                </div>
+                                <div style={{ fontSize: 13.5, color: COULEURS.texte, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+                                  {détail.audit.question_libre}
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                              <div>
+                                <h3 style={{ fontSize: 13, color: COULEURS.bordeaux, marginBottom: 10 }}>Cadrage</h3>
+                                {champDétail("Type de document", détail.audit.type_document)}
+                                {champDétail("Finalité de l'audit", Array.isArray(détail.audit.finalite_audit) ? détail.audit.finalite_audit.join(", ") : détail.audit.finalite_audit)}
+                                {champDétail("Degré d'intervention souhaité", détail.audit.degre_intervention)}
+                                {champDétail("Contraintes académiques", détail.audit.contraintes_academiques && (
+                                  `Autorisation IA : ${détail.audit.contraintes_academiques.autorisationIA || "—"}` +
+                                  (détail.audit.contraintes_academiques.conditions?.length ? ` · Conditions : ${détail.audit.contraintes_academiques.conditions.join(", ")}` : "")
+                                ))}
+                                {champDétail("Relation à l'IA", détail.audit.relation_ia && (
+                                  `Adresse : ${détail.audit.relation_ia.adresse} · Ton : ${détail.audit.relation_ia.ton} · Posture : ${détail.audit.relation_ia.posture} · Longueur : ${détail.audit.relation_ia.longueur} · Rôle : ${détail.audit.relation_ia.role}`
+                                ))}
+                                {détail.audit.contrat_intention && (
+                                  <details style={{ marginTop: 8 }}>
+                                    <summary style={{ fontSize: 11.5, color: COULEURS.texteClair, cursor: "pointer" }}>Contrat d'intention complet (JSON)</summary>
+                                    <pre style={{ fontSize: 10.5, whiteSpace: "pre-wrap", background: "#fff", padding: 8, borderRadius: 6, marginTop: 6, maxHeight: 240, overflowY: "auto" }}>
+                                      {JSON.stringify(détail.audit.contrat_intention, null, 2)}
+                                    </pre>
+                                  </details>
+                                )}
+                              </div>
+                              <div>
+                                <h3 style={{ fontSize: 13, color: COULEURS.bordeaux, marginBottom: 10 }}>
+                                  Texte soumis ({détail.sections.length} unité{détail.sections.length > 1 ? "s" : ""})
+                                </h3>
+                                <div style={{ maxHeight: 420, overflowY: "auto", background: "#fff", borderRadius: 6, padding: 10, fontSize: 12.5, lineHeight: 1.5, color: COULEURS.texte }}>
+                                  {(() => {
+                                    // 12/09/2026 — regroupe les unités par chapitre_index plutôt
+                                    // qu'un seul bloc continu : un audit couvre souvent plusieurs
+                                    // chapitres, et l'auteur·ice attend de retrouver la structure
+                                    // de son livre, pas un texte en vrac.
+                                    const chapitres = [];
+                                    for (const s of détail.sections) {
+                                      const dernier = chapitres[chapitres.length - 1];
+                                      if (!dernier || dernier.index !== s.chapitre_index) {
+                                        chapitres.push({ index: s.chapitre_index, textes: [s.texte_source] });
+                                      } else {
+                                        dernier.textes.push(s.texte_source);
+                                      }
+                                    }
+                                    return chapitres.map((c, i) => (
+                                      <div key={i} style={{ marginBottom: 18 }}>
+                                        {c.index !== null && c.index !== undefined && (
+                                          <div style={{ fontSize: 11, fontWeight: 700, color: COULEURS.texteClair, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+                                            Chapitre {c.index + 1}
+                                          </div>
+                                        )}
+                                        <div style={{ whiteSpace: "pre-wrap" }}>{c.textes.join("\n\n")}</div>
+                                      </div>
+                                    ));
+                                  })()}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                          </>
                         ) : null}
                       </td>
                     </tr>
