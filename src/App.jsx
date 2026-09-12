@@ -1932,24 +1932,30 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     vérifier();
   }, [projetActifId, projetVenantDêtreCréé]);
 
-  // Chargement initial des projets depuis Supabase
-  useEffect(() => {
-    const init = async () => {
-      setChargement(true);
-      const { data, error } = await projetsAPI.lister();
-      if (!error && data) {
-        const projetsAvecStructure = await Promise.all(
-          data.map(async (p) => {
-            const { data: noeuds } = await nœudsAPI.listerParProjet(p.id);
-            return { ...normaliserProjet(p), structure: construireArbre(noeuds || []) };
-          })
-        );
-        setProjets(projetsAvecStructure);
-      }
-      setChargement(false);
-    };
-    init();
+  // Chargement des projets depuis Supabase — extrait en fonction réutilisable
+  // (12/09/2026) : CursAuditDetail.jsx crée désormais un projet CursEdit
+  // directement via projetsAPI/nœudsAPI ("Envoyer vers CursEdit") sans
+  // jamais passer par cet état `projets` — projetActif/nœudActif (dérivés de
+  // `projets` juste en dessous) restaient introuvables, menant à une page
+  // blanche en arrivant sur l'éditeur. onProjetsChanged (passé à
+  // CursAuditDetail) permet de rafraîchir cette liste avant de basculer vers
+  // l'éditeur, exactement comme au premier chargement.
+  const chargerProjets = useCallback(async () => {
+    setChargement(true);
+    const { data, error } = await projetsAPI.lister();
+    if (!error && data) {
+      const projetsAvecStructure = await Promise.all(
+        data.map(async (p) => {
+          const { data: noeuds } = await nœudsAPI.listerParProjet(p.id);
+          return { ...normaliserProjet(p), structure: construireArbre(noeuds || []) };
+        })
+      );
+      setProjets(projetsAvecStructure);
+    }
+    setChargement(false);
   }, []);
+
+  useEffect(() => { chargerProjets(); }, [chargerProjets]);
 
   // Normalise les noms de colonnes Supabase → noms React (camelCase)
   const normaliserProjet = (p) => ({
@@ -2476,7 +2482,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : détail d'un audit (résultat, réf. 60816-01, suite, 22/08/2026) */}
         {vue === "auditdetail" && auditActifId && (
-          <CursAuditDetail auditId={auditActifId} onRetour={() => setVue("mesaudits")} onOuvrirÉditeur={ouvrirÉditeur} />
+          <CursAuditDetail auditId={auditActifId} onRetour={() => setVue("mesaudits")} onOuvrirÉditeur={ouvrirÉditeur} onProjetsChanged={chargerProjets} />
         )}
 
         {/* Vue : Administration (codes promo) — réf. 60804-03, reliée le 16/08/2026 */}

@@ -1483,7 +1483,7 @@ function BoutonEnvoyerCursEdit({ onEnvoyer }) {
   );
 }
 
-export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur }) {
+export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, onProjetsChanged }) {
   const [audit, setAudit] = useState(null);
   const [sections, setSections] = useState(null);
   const [reglesPrix, setReglesPrix] = useState(null);
@@ -1650,6 +1650,12 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur })
     const { data: nœud, error: erreurNœud } = await nœudsAPI.créer({ type: "chapitre", titre: titreChapitre, texte: html, ordre }, projetId);
     if (erreurNœud) throw new Error(erreurNœud.message);
     await charger();
+    // CORRECTIF 12/09/2026 — page blanche en arrivant sur l'éditeur : le
+    // projet/nœud créés ci-dessus n'existaient qu'en base, jamais dans
+    // l'état `projets` d'App.jsx (dont projetActif/nœudActif dépendent
+    // entièrement) tant que cette liste n'était pas rafraîchie. Doit être
+    // attendu AVANT de basculer vers l'éditeur, pas en parallèle.
+    await onProjetsChanged?.();
     onOuvrirÉditeur?.(projetId, nœud.id, audit.id);
   };
 
