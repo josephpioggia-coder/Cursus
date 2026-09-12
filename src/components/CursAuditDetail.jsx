@@ -1368,6 +1368,15 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   const [page, setPage] = useState(1);
   const [enCours, setEnCours] = useState(false);
   const [progression, setProgression] = useState(null);
+  // Stop (12/09/2026) — demandé par l'auteur du projet : aucun moyen
+  // d'interrompre une analyse en cours sinon quitter la page, ce qui ne
+  // l'arrêtait pas vraiment côté serveur et laissait un état confus au
+  // retour ("Continuer l'analyse" comme si de rien n'était). appelerOrchestrateur
+  // acceptait déjà un `signal` AbortController, jamais câblé jusqu'ici.
+  // Abandonner n'annule que le PROCHAIN appel (celui en cours, déjà envoyé
+  // au serveur, va à son terme normalement — un lot reste court) ; charger()
+  // après chaque lot garantit que l'état affiché reste exact quoi qu'il arrive.
+  const arrêtRef = useRef(null);
   // Bornage optionnel à un sous-ensemble de chapitres pour tester l'audit
   // détaillé sans attendre le livre entier (réf. 60816-01, suite,
   // 25/08/2026) — "" = tout le livre, sinon l'index (0-based) du dernier
@@ -1436,10 +1445,12 @@ export default function CursAuditDetail({ auditId, onRetour }) {
     setEnCours(true);
     setErreur(null);
     const limite = chapitreLimite === "" ? undefined : Number(chapitreLimite);
+    const controller = new AbortController();
+    arrêtRef.current = controller;
     try {
       let restantes = 1;
       while (restantes > 0) {
-        const résultat = await appelerOrchestrateur(auditId, undefined, limite);
+        const résultat = await appelerOrchestrateur(auditId, controller.signal, limite);
         restantes = résultat.restantes ?? 0;
         setProgression({ traitées: résultat.traitees_cette_fois, échouées: résultat.echouees_cette_fois, restantes });
         // CORRECTIF 26/08/2026 — charger() n'était appelé qu'APRÈS la fin de
@@ -1452,11 +1463,17 @@ export default function CursAuditDetail({ auditId, onRetour }) {
         await charger();
       }
     } catch (e) {
-      setErreur(e.message);
+      // Interruption volontaire (bouton "Stop" ci-dessous) — pas une vraie
+      // erreur, rien à afficher : l'état déjà chargé après le dernier lot
+      // complet reflète exactement où l'analyse s'est arrêtée.
+      if (e.name !== "AbortError") setErreur(e.message);
     } finally {
       setEnCours(false);
+      arrêtRef.current = null;
     }
   };
+
+  const arrêterAnalyse = () => { arrêtRef.current?.abort(); };
 
   const lancerSynthese = async () => {
     setSyntheseEnCours(true);
@@ -1494,6 +1511,42 @@ export default function CursAuditDetail({ auditId, onRetour }) {
   const nonTraitées = total - analysées - échouées;
   const peutLancer = audit.statut === "paye" || audit.statut === "en_traitement" || (audit.statut === "termine" && nonTraitées > 0);
 
+  // Bloc bouton "Lancer/Continuer l'analyse" (12/09/2026) — extrait dans une
+  // variable pour être affiché DEUX FOIS : en haut de page (déjà là) ET en
+  // bas, après le relevé des unités — demandé par l'auteur du projet, "il
+  // est contre-intuitif de remonter sur la page" une fois arrivé en bas
+  // pour continuer une analyse déjà bien avancée sur un livre entier.
+  const boutonAnalyse = (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+      {Array.isArray(audit.chapitres_detectes) && audit.chapitres_detectes.length > 0 && (
+        <select value={chapitreLimite} onChange={(e) => setChapitreLimite(e.target.value)} disabled={enCours}
+          style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
+          <option value="">Tout le livre ({total} unités)</option>
+          {audit.chapitres_detectes.map((c, i) => (
+            <option key={i} value={i}>Jusqu'à « {c.titre} » ({i + 1} chapitre{i + 1 > 1 ? "s" : ""})</option>
+          ))}
+        </select>
+      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={lancerAnalyse} disabled={enCours} style={{
+          background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
+          padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
+          opacity: enCours ? 0.6 : 1,
+        }}>
+          {enCours ? "Analyse en cours…" : (audit.statut === "en_traitement" || nonTraitées > 0) ? "Continuer l'analyse" : "Lancer l'analyse"}
+        </button>
+        {enCours && (
+          <button onClick={arrêterAnalyse} style={{
+            background: "#fff", color: "#A32D2D", border: "1px solid #A32D2D80", borderRadius: 8,
+            padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer",
+          }}>
+            Stop
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 920 }}>
       <button onClick={onRetour} style={{ fontSize: 12.5, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 12 }}>
@@ -1507,26 +1560,7 @@ export default function CursAuditDetail({ auditId, onRetour }) {
             {total} unité{total > 1 ? "s" : ""} · palier {audit.palier_dimensions} · mode {audit.mode_ia} · statut {audit.statut}
           </p>
         </div>
-        {peutLancer && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-            {Array.isArray(audit.chapitres_detectes) && audit.chapitres_detectes.length > 0 && (
-              <select value={chapitreLimite} onChange={(e) => setChapitreLimite(e.target.value)} disabled={enCours}
-                style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: "0.5px solid var(--border)", fontFamily: "inherit", color: "var(--texte-secondaire)" }}>
-                <option value="">Tout le livre ({total} unités)</option>
-                {audit.chapitres_detectes.map((c, i) => (
-                  <option key={i} value={i}>Jusqu'à « {c.titre} » ({i + 1} chapitre{i + 1 > 1 ? "s" : ""})</option>
-                ))}
-              </select>
-            )}
-            <button onClick={lancerAnalyse} disabled={enCours} style={{
-              background: "#1D9E75", color: "#fff", border: "none", borderRadius: 8,
-              padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: enCours ? "default" : "pointer",
-              opacity: enCours ? 0.6 : 1,
-            }}>
-              {enCours ? "Analyse en cours…" : (audit.statut === "en_traitement" || nonTraitées > 0) ? "Continuer l'analyse" : "Lancer l'analyse"}
-            </button>
-          </div>
-        )}
+        {peutLancer && boutonAnalyse}
       </div>
 
       {!peutLancer && audit.statut === "brouillon" && (
@@ -1687,6 +1721,12 @@ export default function CursAuditDetail({ auditId, onRetour }) {
             </div>
           )}
         </>
+      )}
+
+      {peutLancer && total > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24, paddingTop: 16, borderTop: "0.5px solid var(--border)" }}>
+          {boutonAnalyse}
+        </div>
       )}
     </div>
   );
