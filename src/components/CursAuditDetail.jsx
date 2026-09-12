@@ -163,6 +163,18 @@ function humaniserCle(cle) {
   return cle.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
+// Temps restant estimé (12/09/2026) — voir lancerAnalyse() dans
+// CursAuditDetail pour le calcul (vitesse moyenne depuis le début de la
+// session de clic en cours, façon GPS).
+function formaterDuréeRestante(ms) {
+  const minutesTotal = Math.round(ms / 60000);
+  if (minutesTotal < 1) return "moins d'une minute";
+  if (minutesTotal < 60) return `${minutesTotal} min`;
+  const heures = Math.floor(minutesTotal / 60);
+  const minutes = minutesTotal % 60;
+  return `${heures} h${minutes > 0 ? ` ${minutes}` : ""}`;
+}
+
 // chapitreMaxIndex (réf. 60816-01, suite, 25/08/2026) — optionnel, pour
 // tester l'audit détaillé sur "la partie 1" d'un livre (les premiers
 // chapitres confirmés) plutôt que d'attendre les 752 unités/2h d'un livre
@@ -1596,6 +1608,13 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   // au serveur, va à son terme normalement — un lot reste court) ; charger()
   // après chaque lot garantit que l'état affiché reste exact quoi qu'il arrive.
   const arrêtRef = useRef(null);
+  // Temps restant estimé (12/09/2026) — demandé par l'auteur du projet,
+  // "comme le fait un GPS en fonction de la vitesse moyenne" : voir
+  // lancerAnalyse() plus bas pour le calcul, remis à zéro à chaque
+  // relance plutôt qu'accumulé sur plusieurs sessions de clic.
+  const débutSessionAnalyseRef = useRef(null);
+  const unitésTraitéesSessionRef = useRef(0);
+  const [tempsRestantEstiméMs, setTempsRestantEstiméMs] = useState(null);
   // Bornage optionnel à un sous-ensemble de chapitres pour tester l'audit
   // détaillé sans attendre le livre entier (réf. 60816-01, suite,
   // 25/08/2026) — "" = tout le livre, sinon l'index (0-based) du dernier
@@ -1694,6 +1713,15 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   const lancerAnalyse = async () => {
     setEnCours(true);
     setErreur(null);
+    // Temps restant estimé (12/09/2026) — demandé par l'auteur du projet,
+    // "comme le fait un GPS en fonction de la vitesse moyenne" : vitesse
+    // recalculée à chaque lot à partir du début de CETTE session de clic
+    // (pas d'une moyenne figée globale) — remise à zéro à chaque nouveau
+    // "Lancer/Continuer l'analyse", exactement comme un trajet GPS repart
+    // de zéro si on redémarre le calcul d'itinéraire.
+    débutSessionAnalyseRef.current = Date.now();
+    unitésTraitéesSessionRef.current = 0;
+    setTempsRestantEstiméMs(null);
     const limite = chapitreLimite === "" ? undefined : Number(chapitreLimite);
     const controller = new AbortController();
     arrêtRef.current = controller;
@@ -1702,6 +1730,12 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
       while (restantes > 0) {
         const résultat = await appelerOrchestrateur(auditId, controller.signal, limite);
         restantes = résultat.restantes ?? 0;
+        unitésTraitéesSessionRef.current += (résultat.traitees_cette_fois ?? 0) + (résultat.echouees_cette_fois ?? 0);
+        const tempsÉcouléMs = Date.now() - débutSessionAnalyseRef.current;
+        if (unitésTraitéesSessionRef.current > 0 && tempsÉcouléMs > 0) {
+          const msParUnité = tempsÉcouléMs / unitésTraitéesSessionRef.current;
+          setTempsRestantEstiméMs(restantes * msParUnité);
+        }
         setProgression({ traitées: résultat.traitees_cette_fois, échouées: résultat.echouees_cette_fois, restantes });
         // CORRECTIF 26/08/2026 — charger() n'était appelé qu'APRÈS la fin de
         // toute la boucle (potentiellement ~2h sur un livre entier) : pendant
@@ -2088,6 +2122,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
         <div style={{ background: "#EFF3FF", border: "0.5px solid #4C6FE780", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "var(--texte-secondaire)" }}>
           <div style={{ fontWeight: 600, color: "#4C6FE7", marginBottom: 2 }}>Audit détaillé en cours — ne ferme pas cet onglet</div>
           {analysées} / {total} unités analysées jusqu'ici{échouées > 0 ? ` (${échouées} échec(s))` : ""} · encore {progression.restantes} restante(s).
+          {tempsRestantEstiméMs !== null && ` · ≈ ${formaterDuréeRestante(tempsRestantEstiméMs)} restant, au rythme actuel.`}
         </div>
       )}
 
