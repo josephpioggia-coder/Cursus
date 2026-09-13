@@ -56,10 +56,24 @@ import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiqu
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
 import CursAuditQuestionnaire, { CLÉ_BROUILLON_QUESTIONNAIRE } from "./CursAuditQuestionnaire.jsx";
 
+// CORRECTIF 13/09/2026 — Approfondi et Expert retirés de l'offre (pas
+// supprimés du code, juste non affichés : `disponible: false`) le temps
+// de rendre la base rentable. Raison : leur facteur de prix
+// (dimensions/8) n'a jamais été calibré sur un vrai audit — seul
+// Essentiel (8 dimensions) a été mesuré en conditions réelles (voir
+// 2026-08-22-tarification-cout-reel.sql). Le poste le plus cher (les
+// tokens de sortie) risque de grossir plus vite que proportionnellement
+// au nombre de critères ajoutés, ce qui pourrait sous-facturer Approfondi
+// et Expert par rapport à leur vrai coût — donc les VENDRE reviendrait à
+// prendre un risque de marge non vérifié, l'inverse de ce que l'auteur du
+// projet a demandé ("ne pas laisser le travail supplémentaire diminuer la
+// rentabilité en valeur absolue"). À réactiver (disponible: true) une fois
+// un vrai audit chronométré dans l'un de ces deux paliers, comme celui du
+// 22/08/2026 pour Essentiel.
 const PALIERS = [
-  { id: "essentiel", nom: "Essentiel", dimensions: 8, description: "Lecture exhaustive, coût minimal." },
-  { id: "approfondi", nom: "Approfondi", dimensions: 15, description: "Analyse plus éditoriale." },
-  { id: "expert", nom: "Expert", dimensions: 30, description: "Profondeur maximale." },
+  { id: "essentiel", nom: "Essentiel", dimensions: 8, description: "Lecture exhaustive, coût minimal.", disponible: true },
+  { id: "approfondi", nom: "Approfondi", dimensions: 15, description: "Analyse plus éditoriale.", disponible: false },
+  { id: "expert", nom: "Expert", dimensions: 30, description: "Profondeur maximale.", disponible: false },
 ];
 
 // CORRECTIF 13/09/2026 — "2 IA" contrôlait chaque unité par une seconde
@@ -141,7 +155,14 @@ export default function CursAudit({ onVoirAudits } = {}) {
   const [erreurImport, setErreurImport] = useState(null);
   const inputFichierRef = useRef(null);
 
-  const [palier, setPalier] = useState(() => brouillonInitial?.palier ?? "essentiel");
+  const [palier, setPalier] = useState(() => {
+    const restauré = brouillonInitial?.palier ?? "essentiel";
+    // Filet de sécurité (13/09/2026) — un brouillon restauré depuis
+    // localStorage peut pointer vers "approfondi"/"expert", retirés de
+    // l'offre depuis (voir PALIERS ci-dessus) : reviens à "essentiel"
+    // plutôt que de garder un palier qui n'apparaît plus dans le choix.
+    return PALIERS.find((p) => p.id === restauré)?.disponible ? restauré : "essentiel";
+  });
   const [modeIA, setModeIA] = useState(() => brouillonInitial?.modeIA ?? "1 IA");
   const [typeRapport, setTypeRapport] = useState(() => brouillonInitial?.typeRapport ?? "Aucun");
   const [reglesPrix, setReglesPrix] = useState(null);
@@ -702,7 +723,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--texte-secondaire)", marginBottom: 5 }}>Palier de profondeur</label>
             <div style={{ display: "flex", gap: 8 }}>
-              {PALIERS.map((p) => (
+              {PALIERS.filter((p) => p.disponible).map((p) => (
                 <button key={p.id} onClick={() => setPalier(p.id)}
                   style={{
                     flex: 1, padding: "10px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
