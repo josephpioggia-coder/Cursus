@@ -25,7 +25,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { auditsAPI, profilAuteurAPI, projetsAPI, nœudsAPI } from "../lib/api.js";
+import { auditsAPI, profilAuteurAPI, projetsAPI, nœudsAPI, aAccèsGratuitPreaudit } from "../lib/api.js";
 import { supabase } from "../lib/supabase.js";
 import { analyserStructureDocx, regrouperParNiveaux } from "../lib/segmenterCursAudit.js";
 import { calculerPrixPreauditPourcentage } from "../lib/tarifCursAudit.js";
@@ -780,7 +780,7 @@ function FicheExecutive({ fiche }) {
   );
 }
 
-function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, estProprietaire }) {
+function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaille, peutLancerAuditDetaille, auditDetailleEnCours, chapitreLimite, onChapitreLimiteChange, totalUnites, estProprietaire, peutDébloquerPreauditGratuit }) {
   const [déblocageEnCours, setDéblocageEnCours] = useState(false);
   const [erreurDéblocage, setErreurDéblocage] = useState(null);
   const débloquerPreaudit = async () => {
@@ -986,18 +986,22 @@ function PreauditApprofondi({ audit, reglesPrix, onTermine, onLancerAuditDetaill
 
       {ouvert && <>
       {audit.preaudit_statut === "non_demande" && (
-        estProprietaire ? (
+        peutDébloquerPreauditGratuit ? (
           // Corrige un vrai blocage vécu par le propriétaire : les audits créés
           // avant le 12/09/2026 restent sur "non_demande" malgré l'exception
           // (voir auditsAPI.créer) — ce bouton évite un flip SQL manuel, ici
           // et pour tout futur cas similaire, plutôt qu'une simple promesse
-          // que "la prochaine fois ça marchera".
+          // que "la prochaine fois ça marchera". Étendu le 13/09/2026 aux
+          // comptes de démonstration/évaluation nommés (voir
+          // aAccèsGratuitPreaudit dans api.js) — même bouton, même besoin :
+          // un audit déjà créé AVANT l'ajout d'un email à cette liste reste
+          // sur "non_demande" tant que personne ne clique ici.
           <div style={{ marginTop: 8 }}>
             <button onClick={débloquerPreaudit} disabled={déblocageEnCours} style={{
               background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8,
               padding: "7px 14px", fontSize: 12, fontWeight: 600, cursor: déblocageEnCours ? "default" : "pointer",
             }}>
-              {déblocageEnCours ? "…" : "Débloquer ce pré-audit (compte propriétaire, test)"}
+              {déblocageEnCours ? "…" : "Débloquer ce pré-audit (accès gratuit)"}
             </button>
             {erreurDéblocage && <div style={{ marginTop: 6, fontSize: 11.5, color: "#A32D2D" }}>{erreurDéblocage}</div>}
           </div>
@@ -1591,8 +1595,18 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
   // session (appelerOrchestrateur, etc.), mais celui-ci n'a besoin que de
   // l'email, pas d'un jeton d'accès.
   const [estProprietaire, setEstProprietaire] = useState(false);
+  // Accès gratuit nommé au pré-audit (13/09/2026) — voir
+  // aAccèsGratuitPreaudit dans api.js : distinct d'estProprietaire, sert
+  // UNIQUEMENT à afficher le bouton de déblocage du pré-audit (jamais les
+  // boutons de réinitialisation, restés strictement réservés au
+  // propriétaire) pour des comptes de démonstration/évaluation nommés.
+  const [peutDébloquerPreauditGratuit, setPeutDébloquerPreauditGratuit] = useState(false);
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEstProprietaire(data?.user?.email === EMAIL_PROPRIETAIRE));
+    supabase.auth.getUser().then(({ data }) => {
+      const email = data?.user?.email;
+      setEstProprietaire(email === EMAIL_PROPRIETAIRE);
+      setPeutDébloquerPreauditGratuit(email === EMAIL_PROPRIETAIRE || aAccèsGratuitPreaudit(email));
+    });
   }, []);
   const [erreur, setErreur] = useState(null);
   const [filtresActifs, setFiltresActifs] = useState([]);
@@ -2152,6 +2166,7 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
           onChapitreLimiteChange={setChapitreLimite}
           totalUnites={total}
           estProprietaire={estProprietaire}
+          peutDébloquerPreauditGratuit={peutDébloquerPreauditGratuit}
         />
       )}
 

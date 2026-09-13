@@ -35,6 +35,25 @@ const userId = async () => {
 // que d'introduire un nouvel import partagé entre api.js et App.jsx.
 const EMAIL_PROPRIETAIRE = "joseph.pioggia@gmail.com";
 
+// Accès gratuit au pré-audit, nommément (13/09/2026) — le pré-audit n'a
+// pas encore de circuit Stripe (voir tarifCursAudit.js), donc un compte
+// normal reste bloqué à "non_demande" sans aucun moyen de le débloquer.
+// Demandé pour permettre à des comptes de démonstration/évaluation
+// (testeurs, futur réviseur d'entreprise pour la valorisation de l'outil)
+// d'aller au-delà du simple aperçu gratuit SANS ouvrir l'accès à tout le
+// monde — chaque appel au pré-audit coûte réellement, contrairement à
+// l'aperçu (un seul appel léger). Liste nommée plutôt qu'un interrupteur
+// global, pour garder le coût borné et connu. Exporté (pas dupliqué comme
+// EMAIL_PROPRIETAIRE) : cette liste est amenée à changer souvent, un seul
+// endroit à tenir à jour réduit le risque de désynchronisation entre
+// créer() ci-dessous et le bouton de déblocage dans CursAuditDetail.jsx.
+export const EMAILS_ACCES_GRATUIT_PREAUDIT = new Set([
+  "annielale@icloud.com",
+]);
+export function aAccèsGratuitPreaudit(email) {
+  return !!email && EMAILS_ACCES_GRATUIT_PREAUDIT.has(email);
+}
+
 // ─── PROJETS ──────────────────────────────────────────────────────────────────
 
 export const projetsAPI = {
@@ -654,6 +673,7 @@ export const auditsAPI = {
     const { data: { user: utilisateurCourant } } = await supabase.auth.getUser();
     const uid = utilisateurCourant?.id || null;
     const estProprietaire = utilisateurCourant?.email === EMAIL_PROPRIETAIRE;
+    const accèsGratuitPreaudit = estProprietaire || aAccèsGratuitPreaudit(utilisateurCourant?.email);
 
     const { data: audit, error: erreurAudit } = await supabase
       .from("audits")
@@ -685,7 +705,7 @@ export const auditsAPI = {
         // manuel pour débloquer son propre pré-audit de test — signalé par
         // l'auteur du projet ("il y a peu les préaudits existaient").
         statut:            estProprietaire ? "paye" : "brouillon",
-        preaudit_statut:   estProprietaire ? "paye" : "non_demande",
+        preaudit_statut:   accèsGratuitPreaudit ? "paye" : "non_demande",
         type_document:           typeDocument,
         statut_texte:            statutTexte,
         finalite_audit:          finaliteAudit,
