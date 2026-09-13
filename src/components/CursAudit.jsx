@@ -62,9 +62,15 @@ const PALIERS = [
   { id: "expert", nom: "Expert", dimensions: 30, description: "Profondeur maximale." },
 ];
 
+// CORRECTIF 13/09/2026 — "2 IA" contrôlait chaque unité par une seconde
+// IA (coût quasi doublé, prix de vente hors marché constaté sur un vrai
+// livre : plus de 2000 €). Ne s'applique désormais qu'aux parties
+// conclusives de chaque chapitre (~10% des unités, voir
+// estUnitéConclusive() dans orchestrer-audit-cursaudit) — description mise
+// à jour pour ne pas promettre un contrôle systématique qui n'existe plus.
 const MODES_IA = [
   { id: "1 IA", nom: "1 IA", description: "Une IA analyse toutes les unités." },
-  { id: "2 IA", nom: "2 IA", description: "Une deuxième IA relit et contrôle la première." },
+  { id: "2 IA", nom: "2 IA", description: "Une deuxième IA relit et contrôle les parties conclusives de chaque chapitre (~10 % des unités)." },
 ];
 
 const TYPES_RAPPORT = [

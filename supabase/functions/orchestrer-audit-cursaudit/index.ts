@@ -816,16 +816,49 @@ Deno.serve(async (req) => {
     // traité doit quand même pouvoir servir de repère). Un seul aller-
     // retour par appel d'orchestrateur, pas par unité.
     const texteParOrdre = new Map<number, string>();
+    // chapitreIndexParOrdre (13/09/2026) — sert à repérer les "parties
+    // conclusives" pour le second regard GPT, voir estUnitéConclusive()
+    // plus bas : récupéré dans le même aller-retour que texteParOrdre,
+    // pas de requête séparée.
+    const chapitreIndexParOrdre = new Map<number, number | null>();
+    let dernierOrdre = -1;
     for (let page = 0; ; page++) {
       const { data: lot } = await admin
         .from("audit_sections")
-        .select("ordre, texte_source")
+        .select("ordre, texte_source, chapitre_index")
         .eq("audit_id", auditId)
         .order("ordre", { ascending: true })
         .range(page * TAILLE_PAGE, page * TAILLE_PAGE + TAILLE_PAGE - 1);
       if (!lot || lot.length === 0) break;
-      for (const s of lot) texteParOrdre.set(s.ordre, s.texte_source);
+      for (const s of lot) {
+        texteParOrdre.set(s.ordre, s.texte_source);
+        chapitreIndexParOrdre.set(s.ordre, s.chapitre_index ?? null);
+        if (s.ordre > dernierOrdre) dernierOrdre = s.ordre;
+      }
       if (lot.length < TAILLE_PAGE) break;
+    }
+
+    // Second regard GPT réservé aux "parties conclusives" (13/09/2026) —
+    // demandé explicitement par l'auteur du projet pour rendre "2 IA"
+    // commercialement viable : un second appel IA sur CHAQUE unité double
+    // le coût réel, ce qui rend le prix de vente hors marché ("plus de
+    // 2000 € pour un livre", constaté le jour même). Plutôt qu'un contrôle
+    // systématique, le second regard ne s'applique désormais qu'à la
+    // DERNIÈRE unité de chaque chapitre détecté (sa conclusion) — sur un
+    // livre au découpage régulier, ça représente environ 10 % des unités,
+    // exactement l'ordre de grandeur donné en exemple ("maximum 10 % du
+    // temps"), sans mécanisme de quota arbitraire à maintenir. Sans
+    // chapitres détectés (texte collé sans structure), à défaut d'un repère
+    // de "conclusion", on retombe sur une unité sur dix environ (même
+    // ordre de grandeur, par la position plutôt que par le sens). Choix
+    // assumé comme point de départ, à revoir "quand on maîtrisera mieux les
+    // coûts réels et que les clients commenceront à payer" (ses mots).
+    function estUnitéConclusive(section: { ordre: number; chapitre_index: number | null }): boolean {
+      if (section.chapitre_index !== null) {
+        const chapitreIndexSuivant = chapitreIndexParOrdre.get(section.ordre + 1);
+        return chapitreIndexSuivant === undefined || chapitreIndexSuivant !== section.chapitre_index;
+      }
+      return section.ordre % 10 === 9 || section.ordre === dernierOrdre;
     }
 
     // Continuité avec le pré-audit, chapitre par chapitre (12/09/2026,
@@ -862,8 +895,10 @@ Deno.serve(async (req) => {
           (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "") +
           contextePréaudit;
 
+        const modeIAEffectif = audit.mode_ia === "2 IA" && !estUnitéConclusive(section) ? "1 IA" : audit.mode_ia;
+
         try {
-          const résultat = await analyserUneSectionAvecReprise(texteAvecContexte, audit.mode_ia, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+          const résultat = await analyserUneSectionAvecReprise(texteAvecContexte, modeIAEffectif, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
           await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
           traiteesCetteFois++;
         } catch (err) {

@@ -65,18 +65,23 @@ export function calculerPrixCursAudit(regles, { palier, modeIA, typeRapport, nom
  *
  * Ce qui fait réellement varier le temps, d'après `analyser-unite-cursaudit`
  * (60816-01) : un appel IA (Claude) par unité, et un second appel (GPT),
- * SÉQUENTIEL et non parallèle, si mode_ia = "2 IA" — donc environ le
- * double de temps, pas le même temps avec un contrôle en plus "gratuit".
- * Le palier (nombre de critères demandés) et le format de rapport
- * n'allongent PAS le traitement dans l'implémentation actuelle : le
- * palier ne change que la taille du schéma de sortie par appel, pas le
- * nombre d'appels ; le format de rapport n'est pas encore généré du tout
- * (chantier séparé, non commencé) donc ne consomme aucun temps aujourd'hui.
+ * SÉQUENTIEL et non parallèle, si mode_ia = "2 IA". Le palier (nombre de
+ * critères demandés) et le format de rapport n'allongent PAS le traitement
+ * dans l'implémentation actuelle : le palier ne change que la taille du
+ * schéma de sortie par appel, pas le nombre d'appels ; le format de
+ * rapport n'est pas encore généré du tout (chantier séparé, non commencé)
+ * donc ne consomme aucun temps aujourd'hui.
+ *
+ * CORRECTIF 13/09/2026 — le second appel GPT ne porte plus sur 100% des
+ * unités mais uniquement sur les "parties conclusives" (~10%, voir
+ * estUnitéConclusive() dans orchestrer-audit-cursaudit) : décision prise
+ * pour rendre "2 IA" commercialement viable (voir
+ * 2026-09-13-mode-ia-cout-reduit.sql). 1,1 plutôt que 2 par cohérence.
  */
 const DUREE_MOYENNE_PAR_APPEL_IA_SECONDES = 10;
 
 export function estimerDuréeCursAudit({ modeIA, nombreUnites }) {
-  const appelsParUnité = modeIA === "2 IA" ? 2 : 1;
+  const appelsParUnité = modeIA === "2 IA" ? 1.1 : 1;
   const secondes = nombreUnites * appelsParUnité * DUREE_MOYENNE_PAR_APPEL_IA_SECONDES;
 
   if (secondes < 60) return { secondes, texte: "moins d'une minute" };
