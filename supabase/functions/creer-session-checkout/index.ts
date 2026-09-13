@@ -58,6 +58,37 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Copie fidèle de calculerPrixCursAudit (src/lib/tarifCursAudit.js) —
+// voir le correctif 13/09/2026 ci-dessous dans Deno.serve : recalcule le
+// prix en centimes à partir des paramètres RÉELS de l'audit en base,
+// jamais depuis une valeur envoyée par le client.
+const MULTIPLICATEUR_PAR_PALIER: Record<string, number> = { essentiel: 3, approfondi: 3, expert: 3, libre: 3 };
+
+function recalculerPrixAuditServeur(
+  regles: { categorie: string; cle: string; valeur_numerique: number }[],
+  params: { palier: string; modeIA: string; typeRapport: string; nombreUnites: number },
+): number {
+  const val = (categorie: string, cle: string) =>
+    regles.find((r) => r.categorie === categorie && r.cle === cle)?.valeur_numerique;
+
+  const dimensions = val("palier_dimensions", params.palier) ?? 8;
+  const facteurMode = val("mode_ia", params.modeIA) ?? 1;
+  const coutRapport = val("type_rapport", params.typeRapport) ?? 0;
+  const coutUniteBase = val("parametre_global", "cout_unite_base") ?? 0.013;
+  const dimensionsRef = val("parametre_global", "dimensions_reference") ?? 8;
+  const margeSecuritePct = val("parametre_global", "marge_securite_pct") ?? 15;
+  const tvaPct = val("parametre_global", "tva_pct") ?? 21;
+
+  const coutBrut = params.nombreUnites * coutUniteBase * (dimensions / dimensionsRef) * facteurMode;
+  const coutAvecRapport = coutBrut + coutRapport;
+  const coutSecurise = coutAvecRapport * (1 + margeSecuritePct / 100);
+  const multiplicateur = MULTIPLICATEUR_PAR_PALIER[params.palier] ?? 3;
+  const prixHT = coutSecurise * multiplicateur;
+  const prixTTC = prixHT * (1 + tvaPct / 100);
+
+  return Math.round(prixTTC * 100);
+}
+
 Deno.serve(async (req) => {
   // Préflight CORS — obligatoire avant toute logique, comme dans claude-prox
   if (req.method === "OPTIONS") {
@@ -84,6 +115,76 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "auditId requis avec montantCentimes" }), {
         status: 400,
         headers: { "Content-Type": "application/json", ...CORS },
+      });
+    }
+
+    // CORRECTIF 13/09/2026 — faille réelle trouvée en revue : `montantCentimes`
+    // était jusqu'ici pris TEL QUEL depuis le corps de la requête et envoyé
+    // à Stripe comme `unit_amount`, sans jamais être recalculé ni vérifié
+    // côté serveur contre les paramètres réels de l'audit (nombre d'unités,
+    // palier, mode IA). N'importe qui capable de modifier cette seule
+    // requête (outils de dev du navigateur, appel direct de la fonction)
+    // pouvait donc payer quelques centimes pour un audit dont le vrai prix
+    // dépasse 2000 € — stripe-webhook aurait quand même marqué l'audit
+    // "payé" sur la base de CE paiement minime, débloquant tout le travail
+    // IA complet derrière. Le montant facturé est désormais TOUJOURS
+    // recalculé ici, à partir de l'audit réel en base (jamais depuis une
+    // valeur envoyée par le client) — voir recalculerPrixAuditServeur()
+    // plus bas, copie fidèle de calculerPrixCursAudit()
+    // (src/lib/tarifCursAudit.js), dupliquée ici par cohérence avec le
+    // reste des Edge Functions CursAudit ("fichier autonome", voir leur
+    // commentaire d'en-tête).
+    let montantCentimesFacture = montantCentimes;
+    if (auditId) {
+      const enTeteAuthAudit = req.headers.get("authorization") || "";
+      const jetonAudit = enTeteAuthAudit.replace(/^Bearer\s+/i, "");
+      const { data: { user: appelantAudit } } = jetonAudit
+        ? await supabase.auth.getUser(jetonAudit)
+        : { data: { user: null } };
+      if (!appelantAudit) {
+        return new Response(JSON.stringify({ error: "Authentification requise pour payer un audit." }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
+      }
+
+      const { data: auditRéel, error: erreurAudit } = await supabase
+        .from("audits")
+        .select("id, user_id, statut, palier_dimensions, mode_ia, type_rapport")
+        .eq("id", auditId)
+        .maybeSingle();
+      if (erreurAudit || !auditRéel) {
+        return new Response(JSON.stringify({ error: "Audit introuvable." }), {
+          status: 404,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
+      }
+      if (auditRéel.user_id !== appelantAudit.id) {
+        return new Response(JSON.stringify({ error: "Cet audit ne t'appartient pas." }), {
+          status: 403,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
+      }
+      if (auditRéel.statut === "paye" || auditRéel.statut === "en_traitement" || auditRéel.statut === "termine") {
+        return new Response(JSON.stringify({ error: "Cet audit est déjà payé." }), {
+          status: 409,
+          headers: { "Content-Type": "application/json", ...CORS },
+        });
+      }
+
+      const { count: nombreUnitesRéel } = await supabase
+        .from("audit_sections")
+        .select("id", { count: "exact", head: true })
+        .eq("audit_id", auditId);
+      const { data: reglesPrix } = await supabase
+        .from("audit_pricing_rules")
+        .select("categorie, cle, valeur_numerique");
+
+      montantCentimesFacture = recalculerPrixAuditServeur(reglesPrix || [], {
+        palier: auditRéel.palier_dimensions,
+        modeIA: auditRéel.mode_ia,
+        typeRapport: auditRéel.type_rapport,
+        nombreUnites: nombreUnitesRéel || 0,
       });
     }
 
@@ -199,11 +300,11 @@ Deno.serve(async (req) => {
       mode: modeCheckout,
       payment_method_types: ["card"],
       line_items: [
-        montantCentimes
+        montantCentimesFacture
           ? {
               price_data: {
                 currency: "eur",
-                unit_amount: montantCentimes,
+                unit_amount: montantCentimesFacture,
                 product_data: { name: nomProduit || "Audit CursAudit" },
               },
               quantity: 1,
