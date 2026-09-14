@@ -1260,7 +1260,24 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const consigneContinuation = estContinuation
         ? "\n\n(Ta réponse précédente a été coupée par la limite de longueur, en plein milieu d'une phrase. Continue exactement là où tu t'es arrêté, sans rien répéter de ce qui précède.)"
         : "";
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
+      // CORRECTIF 14/09/2026 — signalé en usage réel : après avoir modifié
+      // son texte, l'auteur·ice demandait au co-pilote, dans le MÊME fil de
+      // discussion, s'il voyait ses changements — réponse : non, il fallait
+      // ressortir du chapitre, refaire toute l'analyse et reposer la
+      // question ("perte de temps"). Cause : `contexteCarte` est un
+      // instantané figé au moment du diagnostic initial, jamais rafraîchi
+      // pendant tout le fil — logique pour le DIAGNOSTIC d'origine (qui doit
+      // rester stable), mais aveugle à toute modification faite depuis.
+      // Le texte actuel (texteActif, mis à jour à chaque frappe côté
+      // éditeur) est maintenant ajouté à CHAQUE message envoyé dans le fil,
+      // en plus de l'analyse d'origine — sans rien réinitialiser : le
+      // diagnostic de départ reste le repère, mais le co-pilote peut voir
+      // et commenter ce qui a changé depuis, dès qu'on le lui demande.
+      const { texte: texteActuel } = extraireTexte((analyserSélection && texteSélectionné) ? texteSélectionné : texteActif);
+      const contexteTexteActuel = texteActuel.trim()
+        ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version) :\n"""\n${texteActuel}\n"""`
+        : "";
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
         promptDialogue(langueProjet),
@@ -1285,7 +1302,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur]);
+  }, [dialogues, langueProjet, messageErreur, analyserSélection, texteSélectionné, texteActif, typeNœud]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
