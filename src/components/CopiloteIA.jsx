@@ -1223,7 +1223,20 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     });
   }, []);
 
-  const envoyerQuestionDialogue = useCallback(async (cléCarte, question, estContinuation = false) => {
+  // CORRECTIF 14/09/2026 — bug réel signalé en usage : "Questionne-moi" (et
+  // les 4 autres suivis de blocage, voir lancerSuiviBlocage) répondait "il
+  // semble que l'analyse initiale ne m'ait pas été transmise (le champ est
+  // vide)" alors que le diagnostic précédent citait le texte mot pour mot.
+  // Cause : lancerSuiviBlocage appelle ouvrirDialogue(...) PUIS
+  // envoyerQuestionDialogue(...) dans le même appel synchrone — `dialogues`
+  // capturé dans la fermeture de ce useCallback est encore l'état D'AVANT
+  // le setDialogues de ouvrirDialogue (React ne l'a pas encore réappliqué),
+  // donc `dialogues[cléCarte]` valait `undefined` et `contexteCarte`
+  // tombait sur "" juste en dessous. `contexteCarteInitial`, optionnel,
+  // permet à un appelant qui vient tout juste d'ouvrir le dialogue de
+  // fournir directement le contexte plutôt que de compter sur une relecture
+  // de l'état, sujette à ce décalage.
+  const envoyerQuestionDialogue = useCallback(async (cléCarte, question, estContinuation = false, contexteCarteInitial) => {
     setDialogues((d) => ({
       ...d,
       [cléCarte]: {
@@ -1247,7 +1260,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const consigneContinuation = estContinuation
         ? "\n\n(Ta réponse précédente a été coupée par la limite de longueur, en plein milieu d'une phrase. Continue exactement là où tu t'es arrêté, sans rien répéter de ce qui précède.)"
         : "";
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
         promptDialogue(langueProjet),
@@ -1752,7 +1765,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     if (!diagnosticBlocage) return;
     const contexteCarte = construireContexteDialogueBlocage(diagnosticBlocage, texteAnalyséBlocage);
     ouvrirDialogue(cléCarteBlocage, contexteCarte);
-    envoyerQuestionDialogue(cléCarteBlocage, message);
+    envoyerQuestionDialogue(cléCarteBlocage, message, false, contexteCarte);
   }, [diagnosticBlocage, texteAnalyséBlocage, ouvrirDialogue, envoyerQuestionDialogue]);
 
   useEffect(() => {
