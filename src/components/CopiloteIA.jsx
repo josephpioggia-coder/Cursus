@@ -723,9 +723,16 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
       {(dialogue.messages || []).map((m, i) => (
         <div key={i} style={{
           fontSize: 11.5, lineHeight: 1.5, marginBottom: 6,
-          color: m.role === "auteur" ? "#1a1a1a" : "#555",
+          color: m.role === "auteur" ? "#1a1a1a" : "#2A3A66",
+          // Trame bleue légère pour distinguer les réponses du co-pilote
+          // (demande explicite, 14/09/2026) — fixe, pas liée à `couleur`
+          // (qui varie par projet) : le co-pilote garde une identité
+          // visuelle stable d'un projet à l'autre.
+          background: m.role === "copilote" ? "#EFF3FF" : "transparent",
+          borderRadius: 6,
+          padding: m.role === "copilote" ? "6px 8px" : 0,
         }}>
-          <span style={{ fontWeight: 600, color: m.role === "auteur" ? couleur : "#999" }}>
+          <span style={{ fontWeight: 600, color: m.role === "auteur" ? couleur : "#4C6FE7" }}>
             {m.role === "auteur" ? t("dialogue.vous", "Vous") : t("dialogue.copilote", "Co-pilote")}
           </span>
           {" — "}{m.contenu}
