@@ -270,6 +270,8 @@ Avant de signaler une répétition ou un écho comme un défaut : vérifie que l
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
 
+RÈGLE NON NÉGOCIABLE sur le ton du champ "suggestion" — signalé en usage réel (14/09/2026) : "Supprimer cette récapitulation ou la fondre directement dans la phrase suivante" est une INJONCTION (verbe à l'impératif), pas une recommandation, alors même que le diagnostic sous-jacent peut être faux (voir la règle sur le tressage délibéré ci-dessus — ça vient justement d'arriver). Le champ "suggestion" doit toujours être formulé comme une option proposée à l'auteur·ice, jamais comme un ordre à exécuter : pas de verbe à l'impératif en tête de phrase ("Supprimer...", "Corriger...", "Reformuler..."), mais une tournure qui laisse la décision ouverte ("Tu pourrais...", "Une option : ...", "Envisage de...", "Ça vaudrait peut-être la peine de..."). L'auteur·ice reste seul·e décisionnaire.
+
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
 
@@ -291,6 +293,8 @@ Repère spécifiquement :
 AVANT DE CONCLURE À UNE REDITE OU UNE "GLOSE REDONDANTE" — signalé en usage réel (14/09/2026) : une série de trois expressions au rythme et à la construction similaires ("Mon amitié dans le silence", "Le lien dans la distance", "Le tout vécu ensemble") avait été signalée comme une paraphrase redondante alors que chacune reprenait un fil DISTINCT tissé plus haut dans le texte (une citation d'un correspondant, une question posée par quelqu'un d'autre, une référence littéraire) — une analyse purement structurelle (même rythme, même construction) avait pris le pas sur le sens réel. Avant de signaler une redite, vérifie si chaque expression apparemment répétitive reprend un élément DISTINCT déjà présent ailleurs dans le texte (une citation, une question, un mot propre à une source précise) : un tressage délibéré de plusieurs échos distincts en une même clausule est une technique légitime, pas une redite, même si la construction grammaticale se ressemble d'un élément à l'autre. Ne conclus à une vraie redite que si les expressions portent réellement la MÊME idée, sans qu'aucune n'ajoute une source ou une nuance distincte.
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si un point mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
+
+RÈGLE NON NÉGOCIABLE sur le ton du champ "suggestion" — signalé en usage réel (14/09/2026) sur ce point précis de "glose redondante" (§ ci-dessus) : "Supprimer cette récapitulation ou la fondre directement dans la phrase suivante" est une INJONCTION (verbe à l'impératif), pas une recommandation, alors même que le diagnostic sous-jacent peut être faux. Le champ "suggestion" doit toujours être formulé comme une option proposée à l'auteur·ice, jamais comme un ordre à exécuter : pas de verbe à l'impératif en tête de phrase ("Supprimer...", "Corriger...", "Fondre..."), mais une tournure qui laisse la décision ouverte ("Tu pourrais...", "Une option : ...", "Envisage de...", "Ça vaudrait peut-être la peine de..."). L'auteur·ice reste seul·e décisionnaire.
 
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"glose redondante","sévérité":"attention","description":"...","suggestion":"..."}]}
