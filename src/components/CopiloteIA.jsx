@@ -266,6 +266,8 @@ Le champ "statut" vaut exactement "vérifié", "détail_non_confirmé" ou "non_t
 
   cohérence: (type) => `Tu es éditeur professionnel relisant un ${type === "fiction" ? "roman" : "essai"}. Détecte incohérences, répétitions, transitions manquantes.
 
+Avant de signaler une répétition ou un écho comme un défaut : vérifie que les passages visés portent réellement la MÊME idée sans rien y ajouter — une série d'expressions au rythme similaire qui reprennent chacune un élément DISTINCT déjà présent ailleurs dans le texte (une citation, une question posée par quelqu'un d'autre, une référence) est un tressage délibéré, pas une redite, même si leur construction grammaticale se ressemble.
+
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
 
 Réponds UNIQUEMENT en JSON valide :
@@ -285,6 +287,8 @@ Repère spécifiquement :
 - les transitions manquantes ou abruptes entre deux idées ou deux scènes ;
 - les ruptures de registre ou de voix ;
 - les échos ou rappels internes (un motif, une réplique, un objet) qui mériteraient d'être renforcés, ou à l'inverse qui créent une redite.
+
+AVANT DE CONCLURE À UNE REDITE OU UNE "GLOSE REDONDANTE" — signalé en usage réel (14/09/2026) : une série de trois expressions au rythme et à la construction similaires ("Mon amitié dans le silence", "Le lien dans la distance", "Le tout vécu ensemble") avait été signalée comme une paraphrase redondante alors que chacune reprenait un fil DISTINCT tissé plus haut dans le texte (une citation d'un correspondant, une question posée par quelqu'un d'autre, une référence littéraire) — une analyse purement structurelle (même rythme, même construction) avait pris le pas sur le sens réel. Avant de signaler une redite, vérifie si chaque expression apparemment répétitive reprend un élément DISTINCT déjà présent ailleurs dans le texte (une citation, une question, un mot propre à une source précise) : un tressage délibéré de plusieurs échos distincts en une même clausule est une technique légitime, pas une redite, même si la construction grammaticale se ressemble d'un élément à l'autre. Ne conclus à une vraie redite que si les expressions portent réellement la MÊME idée, sans qu'aucune n'ajoute une source ou une nuance distincte.
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si un point mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
 
