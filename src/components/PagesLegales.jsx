@@ -58,10 +58,10 @@ const IDENTITE_EDITEUR = {
   adresse: "Rue de la Houillère 17, 4041 Vottem, Belgique",
   numéroEntreprise: "0500.956.401 (BCE)",
   administrateur: "Giuseppe Pioggia, administrateur délégué et actionnaire unique",
-  // Aucune adresse email professionnelle dédiée n'a été fournie au moment
-  // de la rédaction — à remplacer par une adresse de contact réelle
-  // (support@..., contact@...) dès qu'elle existe.
-  email: "joseph.pioggia@gmail.com",
+  // Adresse de contact dédiée (15/09/2026, fournie par l'auteur du
+  // projet) — remplace l'email personnel utilisé en placeholder le temps
+  // de la rédaction initiale.
+  email: "infocursus.proia@gmail.com",
 };
 
 function Page({ titre, misÀJour, children, onRetour, onNaviguer }) {
