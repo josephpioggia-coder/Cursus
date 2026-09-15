@@ -29,7 +29,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
-import { mémoireNarrativeAPI } from "../lib/api.js";
+import { mémoireNarrativeAPI, dialoguesCopiloteAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
@@ -1226,6 +1226,23 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // l'absolu).
   const [dialogues, setDialogues] = useState({});
 
+  // Persistance des fils de dialogue (15/09/2026) — demandé explicitement
+  // après un vrai test : sans ça, tout le fil disparaissait à chaque
+  // rechargement de page, puisque `dialogues` n'existait qu'en mémoire du
+  // navigateur. Chargé une fois au montage / à chaque changement de
+  // nœud — voir dialoguesCopiloteAPI.parNœud (api.js). Les fils déjà
+  // sauvegardés arrivent repliés (ouvert: false) : on retrouve
+  // l'historique sans que la colonne se rouvre toute seule au chargement
+  // de la page.
+  useEffect(() => {
+    if (!nœudId) return;
+    let annulé = false;
+    dialoguesCopiloteAPI.parNœud(nœudId).then(({ data }) => {
+      if (!annulé && data) setDialogues((d) => ({ ...data, ...d }));
+    });
+    return () => { annulé = true; };
+  }, [nœudId]);
+
   const messageErreur = useCallback((err) => {
     if (err.message === "SESSION_EXPIREE") return t("erreur.sessionExpiree");
     if (err.message === "__ERREUR_GENERIQUE__") return t("erreur.generique");
@@ -1316,21 +1333,28 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         true
       );
 
+      const contexteCarteFinal = état?.contexteCarte || contexteCarteInitial || "";
+      const nouveauxMessages = [...(état?.messages || []), ...(estContinuation ? [] : [{ role: "auteur", contenu: question }]), { role: "copilote", contenu: texte.trim(), tronqué }];
       setDialogues((d) => ({
         ...d,
         [cléCarte]: {
           ...d[cléCarte],
           enCours: false,
-          messages: [...(d[cléCarte]?.messages || []), { role: "copilote", contenu: texte.trim(), tronqué }],
+          messages: nouveauxMessages,
         },
       }));
+      // Persistance (15/09/2026) — voir le useEffect de chargement plus
+      // haut. En arrière-plan, pas de blocage de l'interface si ça échoue
+      // (au pire, ce message-ci ne survivra pas à un rechargement, comme
+      // avant cette fonctionnalité — jamais pire qu'avant).
+      if (nœudId) dialoguesCopiloteAPI.sauvegarder(nœudId, cléCarte, { contexteCarte: contexteCarteFinal, messages: nouveauxMessages });
     } catch (err) {
       setDialogues((d) => ({
         ...d,
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud]);
+  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le

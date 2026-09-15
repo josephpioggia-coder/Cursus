@@ -458,6 +458,58 @@ export const mémoireNarrativeAPI = {
   },
 };
 
+// ─── DIALOGUES CO-PILOTE (persistance des fils de discussion, réf.
+// 60816-01, suite, 15/09/2026) ─────────────────────────────────────────
+// Voir 2026-09-15-dialogues-copilote.sql — une ligne par (nœud, carte),
+// `cléCarte` reprend exactement la clé déjà utilisée côté client pour
+// indexer l'état `dialogues` de CopiloteIA.jsx ("suggestions:0",
+// "blocage:0"...), aucune nouvelle convention. Demandé après un vrai
+// test : les fils de discussion disparaissaient à chaque rechargement de
+// page, n'existant qu'en mémoire du navigateur.
+export const dialoguesCopiloteAPI = {
+
+  /** Charge tous les fils de discussion d'un nœud, sous la même forme que
+   *  l'état `dialogues` de CopiloteIA.jsx (objet indexé par cléCarte). */
+  async parNœud(nœudId) {
+    const { data, error } = await supabase
+      .from("dialogues_copilote")
+      .select("cle_carte, contexte_carte, messages")
+      .eq("noeud_id", nœudId);
+    if (error) return { data: null, error };
+    const parClé = {};
+    for (const ligne of data) {
+      parClé[ligne.cle_carte] = {
+        ouvert: false, // replié par défaut au chargement, pas de ré-ouverture forcée
+        contexteCarte: ligne.contexte_carte,
+        messages: ligne.messages || [],
+        enCours: false,
+        erreur: null,
+      };
+    }
+    return { data: parClé, error: null };
+  },
+
+  /** Enregistre (crée ou met à jour) le fil de discussion d'UNE carte —
+   *  upsert sur (noeud_id, cle_carte), pas de suivi de version fine :
+   *  la dernière écriture gagne, comme pour l'état React qu'elle reflète. */
+  async sauvegarder(nœudId, cléCarte, { contexteCarte, messages }) {
+    const uid = await userId();
+    const { error } = await supabase
+      .from("dialogues_copilote")
+      .upsert(
+        [{
+          user_id: uid,
+          noeud_id: nœudId,
+          cle_carte: cléCarte,
+          contexte_carte: contexteCarte ?? null,
+          messages: messages || [],
+        }],
+        { onConflict: "noeud_id,cle_carte" }
+      );
+    return { error };
+  },
+};
+
 // ─── SESSIONS ─────────────────────────────────────────────────────────────────
 
 export const sessionsAPI = {
