@@ -4,9 +4,32 @@
  * Ajoutées le 14-15/09/2026 en réponse à un vrai manque identifié lors de
  * l'audit de préparation à la commercialisation : AUCUNE page légale
  * n'existait nulle part dans l'application, un point bloquant pour toute
- * vente réelle en Belgique/UE (obligations de la loi du 11 mars 2003 sur
- * certains aspects juridiques des services de la société de l'information,
- * RGPD, Code de droit économique belge).
+ * vente réelle en Belgique/UE.
+ *
+ * RÉFÉRENCES LÉGALES VÉRIFIÉES (15/09/2026, suite à une question directe
+ * de l'auteur du projet — "donne-moi les références légales") :
+ *  - Identification du prestataire en ligne (nom, forme juridique, adresse
+ *    du siège, numéro d'entreprise, coordonnées de contact) : Code de
+ *    droit économique, Livre XII ("Droit de l'économie électronique"),
+ *    Titre 1er, Chapitre 3 "Information et transparence", article XII.6 —
+ *    codification actuelle (depuis la loi du 15/12/2013) de l'ancienne loi
+ *    du 11 mars 2003, elle-même transposant la directive européenne
+ *    2000/31/CE ("directive e-commerce").
+ *  - Information du consommateur avant/après une vente à distance (CGV) :
+ *    Code de droit économique, Livre VI ("Pratiques du marché et
+ *    protection du consommateur"), notamment les art. VI.45 et suivants,
+ *    et le droit de rétractation/ses exceptions à l'art. VI.53.
+ *  - Mention "RPM + tribunal compétent" à côté du numéro d'entreprise :
+ *    exigée pour tout document émanant d'une personne morale (Code des
+ *    sociétés et des associations).
+ *  - Protection des données : RGPD (règlement UE 2016/679).
+ * CE QUE CES TEXTES N'EXIGENT PAS explicitement, contrairement à une
+ * première version de cette page : nommer un individu précis comme
+ * "directeur de la publication" — c'est une notion du droit FRANÇAIS
+ * (LCEN, loi du 21/06/2004, art. 6-III, héritée de la loi de 1881 sur la
+ * presse), pas une exigence du droit belge. Corrigé : la page identifie
+ * désormais l'entreprise elle-même comme éditeur, avec son représentant
+ * légal cité à titre d'information, pas comme une case juridique obligée.
  *
  * IDENTITÉ UTILISÉE — fournie explicitement par l'auteur du projet le
  * 14/09/2026 : structure "en nom propre" actuelle sans activité
@@ -16,9 +39,13 @@
  * structure réelle est arrêtée définitivement — voir IDENTITE_EDITEUR
  * ci-dessous, seul endroit à modifier le jour où ça change.
  *
- * LIMITE ASSUMÉE : rédigé à partir de trames standards de droit belge
- * (Code de droit économique, RGPD) adaptées aux fonctionnalités réelles de
- * Cursus (vérifiées dans le code : Stripe pour le paiement, Supabase pour
+ * LIMITE ASSUMÉE : ces références ont été vérifiées via des sources
+ * secondaires fiables (cabinets juridiques, fédérations professionnelles
+ * belges), pas en relisant le texte codifié primaire mot pour mot — à
+ * confirmer sur economie.fgov.be ou ejustice.just.fgov.be pour une
+ * certitude absolue avant une mise en ligne publique définitive. Rédigé à
+ * partir de ces trames adaptées aux fonctionnalités réelles de Cursus
+ * (vérifiées dans le code : Stripe pour le paiement, Supabase pour
  * l'hébergement/l'authentification, Claude/Anthropic et GPT-4o/OpenAI pour
  * l'analyse IA, aucun cookie de suivi publicitaire trouvé dans le code).
  * Ce n'est PAS une relecture par un avocat — recommandé avant toute mise
@@ -97,13 +124,12 @@ export function MentionsLegales({ onRetour, onNaviguer }) {
       <P>
         {id.raisonSociale}<br />
         {id.adresse}<br />
-        Numéro d'entreprise : {id.numéroEntreprise}<br />
-        {id.administrateur}<br />
+        Numéro d'entreprise : {id.numéroEntreprise} — RPM Liège<br />
         Contact : {id.email}
       </P>
-
-      <H2>Directeur de la publication</H2>
-      <P>Giuseppe Pioggia.</P>
+      <P>
+        Représentant légal : {id.administrateur}.
+      </P>
 
       <H2>Hébergement</H2>
       <P>
