@@ -127,9 +127,6 @@ export function MentionsLegales({ onRetour, onNaviguer }) {
         Numéro d'entreprise : {id.numéroEntreprise} — RPM Liège<br />
         Contact : {id.email}
       </P>
-      <P>
-        Représentant légal : {id.administrateur}.
-      </P>
 
       <H2>Hébergement</H2>
       <P>
