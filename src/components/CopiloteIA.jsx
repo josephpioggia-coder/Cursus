@@ -1290,7 +1290,18 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // en plus de l'analyse d'origine — sans rien réinitialiser : le
       // diagnostic de départ reste le repère, mais le co-pilote peut voir
       // et commenter ce qui a changé depuis, dès qu'on le lui demande.
-      const { texte: texteActuel } = extraireTexte((analyserSélection && texteSélectionné) ? texteSélectionné : texteActif);
+      // CORRECTIF 15/09/2026 — le bug persistait même sur une session
+      // neuve (pas un souci de cache navigateur) : `texteSélectionné`
+      // peut rester "collé" sur une ancienne sélection surlignée dans
+      // l'éditeur bien après qu'on ait cliqué ailleurs (dans la boîte de
+      // dialogue du co-pilote) — l'éditeur ne l'efface que si on reclique
+      // DANS le texte pour la désélectionner, pas simplement en quittant
+      // le focus. Une question de suivi comme "vois-tu mes changements ?"
+      // porte sur le document entier, pas sur un vieux fragment figé —
+      // on utilise donc toujours texteActif ici, jamais la sélection
+      // (qui reste pertinente pour le bouton "Analyser", pas pour le fil
+      // de dialogue).
+      const { texte: texteActuel } = extraireTexte(texteActif);
       const contexteTexteActuel = texteActuel.trim()
         ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version) :\n"""\n${texteActuel}\n"""`
         : "";
@@ -1319,7 +1330,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, analyserSélection, texteSélectionné, texteActif, typeNœud]);
+  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
