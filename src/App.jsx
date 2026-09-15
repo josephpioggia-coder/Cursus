@@ -35,6 +35,7 @@ import { journaliserErreur } from "./lib/journalErreurs.js";
 import Editeur from "./components/Editeur.jsx";
 import TableauDeBord from "./components/TableauDeBord.jsx";
 import Bibliotheque from "./components/Bibliotheque.jsx";
+import { MentionsLegales, CGV, PolitiqueConfidentialite } from "./components/PagesLegales.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
@@ -2243,6 +2244,10 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           />
           {espaceActif === "cursaudit" ? "CursAudit" : "CursEdit"} ⇄
         </button>
+        <button onClick={() => setVue("mentions")}
+          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          Légal
+        </button>
         <button onClick={déconnecter}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("deconnexion")}
@@ -2438,6 +2443,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {vue === "bibliotheque" && (
           <Bibliotheque projets={projets} />
         )}
+
+        {/* Pages légales (15/09/2026) — accessibles aussi une fois connecté,
+            voir le bouton "Légal" plus haut. Voir aussi PageConnexion
+            (src/lib/auth.jsx) pour l'accès sans connexion. */}
+        {vue === "mentions" && <MentionsLegales onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
+        {vue === "cgv" && <CGV onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
+        {vue === "confidentialite" && <PolitiqueConfidentialite onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
 
         {/* Vue : tarification */}
         {vue === "tarification" && (

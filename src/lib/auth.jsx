@@ -12,6 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase.js";
+import { MentionsLegales, CGV, PolitiqueConfidentialite } from "../components/PagesLegales.jsx";
 
 export function useAuth() {
   const [user, setUser]           = useState(null);
@@ -64,6 +65,11 @@ export function PageConnexion() {
   const [chargement, setChargement] = useState(false);
   const [message, setMessage]   = useState(null);
   const [erreur, setErreur]     = useState(null);
+  // Pages légales (15/09/2026) — accessibles SANS connexion, obligation
+  // légale (mentions légales, CGV, confidentialité doivent être
+  // consultables par n'importe qui, pas seulement un compte existant).
+  // null = formulaire de connexion normal.
+  const [pageLégale, setPageLégale] = useState(null);
 
   const soumettre = async () => {
     if (!email || !motDePasse) return;
@@ -86,6 +92,10 @@ export function PageConnexion() {
     }
     setChargement(false);
   };
+
+  if (pageLégale === "mentions") return <MentionsLegales onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
+  if (pageLégale === "cgv") return <CGV onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
+  if (pageLégale === "confidentialite") return <PolitiqueConfidentialite onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
 
   return (
     <div style={{
@@ -175,6 +185,16 @@ export function PageConnexion() {
 
         <p style={{ fontSize: 11, color: "#bbb", textAlign: "center", marginTop: 24, lineHeight: 1.6 }}>
           Vos données sont stockées en toute sécurité sur Supabase.
+        </p>
+
+        {/* Pages légales (15/09/2026) — lien obligatoire, accessible sans
+            connexion. Voir src/components/PagesLegales.jsx. */}
+        <p style={{ fontSize: 10.5, color: "#ccc", textAlign: "center", marginTop: 10 }}>
+          <button onClick={() => setPageLégale("mentions")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>Mentions légales</button>
+          {" · "}
+          <button onClick={() => setPageLégale("cgv")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>CGV</button>
+          {" · "}
+          <button onClick={() => setPageLégale("confidentialite")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>Confidentialité</button>
         </p>
       </div>
     </div>
