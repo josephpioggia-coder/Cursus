@@ -1237,7 +1237,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   useEffect(() => {
     if (!nœudId) return;
     let annulé = false;
-    dialoguesCopiloteAPI.parNœud(nœudId).then(({ data }) => {
+    dialoguesCopiloteAPI.parNœud(nœudId).then(({ data, error }) => {
+      if (error) { console.error("[dialogues_copilote] échec du chargement :", error); return; }
       if (!annulé && data) setDialogues((d) => ({ ...data, ...d }));
     });
     return () => { annulé = true; };
@@ -1347,7 +1348,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // haut. En arrière-plan, pas de blocage de l'interface si ça échoue
       // (au pire, ce message-ci ne survivra pas à un rechargement, comme
       // avant cette fonctionnalité — jamais pire qu'avant).
-      if (nœudId) dialoguesCopiloteAPI.sauvegarder(nœudId, cléCarte, { contexteCarte: contexteCarteFinal, messages: nouveauxMessages });
+      if (nœudId) {
+        dialoguesCopiloteAPI.sauvegarder(nœudId, cléCarte, { contexteCarte: contexteCarteFinal, messages: nouveauxMessages })
+          .then(({ error }) => { if (error) console.error("[dialogues_copilote] échec de la sauvegarde :", error); });
+      }
     } catch (err) {
       setDialogues((d) => ({
         ...d,
