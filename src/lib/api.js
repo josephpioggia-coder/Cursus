@@ -510,6 +510,42 @@ export const dialoguesCopiloteAPI = {
   },
 };
 
+// ─── ANALYSES CO-PILOTE (persistance des résultats d'analyse, réf.
+// 60816-01, suite, 16/09/2026) ──────────────────────────────────────────
+// Voir 2026-09-16-analyses-copilote.sql — suite directe de
+// dialoguesCopiloteAPI ci-dessus : ici, c'est le RÉSULTAT d'analyse
+// lui-même (données.suggestions/.personnages/.références/.cohérence/
+// .vérification dans CopiloteIA.jsx) qui est persisté, pas seulement les
+// fils de discussion qui en découlent.
+export const analysesCopiloteAPI = {
+
+  /** Charge toutes les analyses d'un nœud, sous la même forme que l'état
+   *  `données` de CopiloteIA.jsx (objet indexé par nom d'onglet). */
+  async parNœud(nœudId) {
+    const { data, error } = await supabase
+      .from("analyses_copilote")
+      .select("onglet, resultat")
+      .eq("noeud_id", nœudId);
+    if (error) return { data: null, error };
+    const parOnglet = {};
+    for (const ligne of data) parOnglet[ligne.onglet] = ligne.resultat;
+    return { data: parOnglet, error: null };
+  },
+
+  /** Enregistre (crée ou met à jour) le résultat d'UN onglet — upsert sur
+   *  (noeud_id, onglet), même logique que dialoguesCopiloteAPI.sauvegarder. */
+  async sauvegarder(nœudId, onglet, résultat) {
+    const uid = await userId();
+    const { error } = await supabase
+      .from("analyses_copilote")
+      .upsert(
+        [{ user_id: uid, noeud_id: nœudId, onglet, resultat: résultat ?? null }],
+        { onConflict: "noeud_id,onglet" }
+      );
+    return { error };
+  },
+};
+
 // ─── SESSIONS ─────────────────────────────────────────────────────────────────
 
 export const sessionsAPI = {

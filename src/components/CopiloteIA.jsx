@@ -29,7 +29,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
-import { mémoireNarrativeAPI, dialoguesCopiloteAPI } from "../lib/api.js";
+import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
@@ -1198,6 +1198,40 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
   const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null });
+
+  // Persistance des résultats d'analyse (16/09/2026) — suite directe de la
+  // persistance des fils de dialogue (15/09/2026) : signalé en usage
+  // réel, les cartes d'analyse elles-mêmes (pas seulement les questions
+  // de suivi) disparaissaient en sortant du chapitre, obligeant à coller
+  // les résultats (ex. des références trouvées) dans le corps du texte
+  // juste pour ne pas les perdre — ce qui les faisait ensuite analyser
+  // comme de la prose. Voir analysesCopiloteAPI (api.js).
+  useEffect(() => {
+    if (!nœudId) return;
+    let annulé = false;
+    analysesCopiloteAPI.parNœud(nœudId).then(({ data, error }) => {
+      if (error) { console.error("[analyses_copilote] échec du chargement :", error); return; }
+      // ATTENTION à l'ordre de fusion (16/09/2026) : `données` démarre
+      // avec des clés déjà posées à `null` pour les 5 onglets (useState
+      // ci-dessus) — contrairement à `dialogues` (qui démarre à `{}`),
+      // `{...data, ...d}` écraserait systématiquement le résultat chargé
+      // par ces `null` de départ, rendant le chargement inopérant à
+      // chaque fois. `{...d, ...data}` : garde une analyse déjà relancée
+      // entre-temps (cas rare, le chargement est quasi immédiat), sinon
+      // remplit les `null` de départ avec ce qui a été chargé.
+      if (!annulé && data) setDonnées((d) => ({ ...d, ...data }));
+    });
+    return () => { annulé = true; };
+  }, [nœudId]);
+
+  const màjDonnées = useCallback((onglet, valeur) => {
+    setDonnées((d) => ({ ...d, [onglet]: valeur }));
+    if (nœudId) {
+      analysesCopiloteAPI.sauvegarder(nœudId, onglet, valeur)
+        .then(({ error }) => { if (error) console.error("[analyses_copilote] échec de la sauvegarde :", error); });
+    }
+  }, [nœudId]);
+
   const [chargement, setChargement] = useState({});
   const [erreur, setErreur] = useState({});
   // CORRECTIF 30/08/2026, signalé par Joseph : une erreur restait affichée
@@ -1591,11 +1625,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       if (ongletCible === "suggestions") {
         résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
+        màjDonnées("suggestions", p.suggestions || []);
       } else if (ongletCible === "personnages") {
         résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, personnages: p.personnages || [] }));
+        màjDonnées("personnages", p.personnages || []);
       } else if (ongletCible === "références") {
         // maxTokens relevé 4096 → 6144 : les blocs de résultats de recherche
         // web (server_tool_use / web_search_tool_result) consomment de la
@@ -1606,7 +1640,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
         try {
           const p = JSON.parse(jsonStr);
-          setDonnées(d => ({ ...d, références: p.références || [] }));
+          màjDonnées("références", p.références || []);
         } catch {
           // CORRECTIF 30/08/2026 : cette tentative de réparation pouvait
           // elle-même échouer (JSON toujours mal formé après extraction),
@@ -1618,7 +1652,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           try {
             if (!match) throw new Error();
             const partial = JSON.parse(`{${match[0]}}`);
-            setDonnées(d => ({ ...d, références: partial.références || [] }));
+            màjDonnées("références", partial.références || []);
           } catch {
             throw new Error("__ERREUR_GENERIQUE__");
           }
@@ -1626,13 +1660,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       } else if (ongletCible === "cohérence") {
         résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
         const p = parserJSON(résultat);
-        setDonnées(d => ({ ...d, cohérence: p.points || [] }));
+        màjDonnées("cohérence", p.points || []);
       } else if (ongletCible === "vérification") {
         // Protocole 60805-06 : orchestré côté serveur (verification-deux-ia),
         // pas un simple appel Claude à parser ici — la réponse est déjà
         // structurée. Peut prendre 10-30s (plusieurs tours IA enchaînés).
         const résultatVérification = await appelVerificationDeuxIA(projetId, nœudId, texte, sig);
-        setDonnées(d => ({ ...d, vérification: résultatVérification }));
+        màjDonnées("vérification", résultatVérification);
       }
 
       setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
@@ -1643,7 +1677,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId]);
+  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -1667,7 +1701,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         sig, 2048
       );
       const p = parserJSON(résultat);
-      setDonnées(d => ({ ...d, suggestions: p.suggestions || [] }));
+      màjDonnées("suggestions", p.suggestions || []);
       setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
       if (err.name !== "AbortError") {
@@ -1676,7 +1710,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, suggestions: false }));
     }
-  }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur]);
+  }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur, màjDonnées]);
 
   // Page blanche — brouillon complet (voir PROMPTS.pageBlanche ci-dessus).
   // État séparé de `données`/`suggestions` : ce n'est pas une liste de
