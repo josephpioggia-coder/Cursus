@@ -32,21 +32,13 @@ CREATE TABLE IF NOT EXISTS analyses_copilote (
 
 CREATE INDEX IF NOT EXISTS idx_analyses_copilote_noeud ON analyses_copilote(noeud_id);
 
-CREATE OR REPLACE FUNCTION set_analyses_copilote_mis_a_jour()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.mis_a_jour := now();
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_analyses_copilote_mis_a_jour ON analyses_copilote;
-CREATE TRIGGER trg_analyses_copilote_mis_a_jour
-BEFORE UPDATE ON analyses_copilote
-FOR EACH ROW
-EXECUTE FUNCTION set_analyses_copilote_mis_a_jour();
+-- Pas de trigger PL/pgSQL ici (contrairement à memoire_narrative/
+-- dialogues_copilote) — le bloc `AS $$ ... $$` a fait échouer le collage
+-- dans l'éditeur SQL du Dashboard Supabase ("unterminated dollar-quoted
+-- string"), probablement une réécriture automatique de l'éditeur qui l'a
+-- abîmé au passage. `mis_a_jour` est mis à jour directement par
+-- analysesCopiloteAPI.sauvegarder() (api.js) à chaque appel plutôt que
+-- par un trigger — plus simple, et ça évite ce bloc qui posait problème.
 
 -- RLS — même convention que dialogues_copilote et memoire_narrative.
 ALTER TABLE analyses_copilote ENABLE ROW LEVEL SECURITY;

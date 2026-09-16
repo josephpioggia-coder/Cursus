@@ -539,7 +539,11 @@ export const analysesCopiloteAPI = {
     const { error } = await supabase
       .from("analyses_copilote")
       .upsert(
-        [{ user_id: uid, noeud_id: nœudId, onglet, resultat: résultat ?? null }],
+        // mis_a_jour posé ici, pas par un trigger PL/pgSQL (voir
+        // 2026-09-16-analyses-copilote.sql — le bloc `$$...$$` d'un
+        // trigger a fait échouer le collage dans l'éditeur SQL du
+        // Dashboard Supabase).
+        [{ user_id: uid, noeud_id: nœudId, onglet, resultat: résultat ?? null, mis_a_jour: new Date().toISOString() }],
         { onConflict: "noeud_id,onglet" }
       );
     return { error };
