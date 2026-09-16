@@ -176,6 +176,7 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
         <li>Fournir le service : générer les analyses et suggestions IA que vous demandez.</li>
         <li>Facturer les services payants (audits, abonnements).</li>
         <li>Assurer la sécurité et le bon fonctionnement du service.</li>
+        <li>Améliorer le service et établir des statistiques d'usage agrégées (répartition par type de produit, tendances générales) — uniquement sous une forme agrégée, jamais nominative.</li>
       </Ul>
 
       <H2>Qui reçoit ces données</H2>

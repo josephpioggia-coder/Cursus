@@ -200,11 +200,37 @@ Deno.serve(async (req) => {
     // emailAppelant reste null : seuls les codes SANS restriction d'email
     // pourront alors s'appliquer, jamais un code ciblé accepté à l'aveugle.
     let emailAppelant = null;
+    let utilisateurAppelant = null;
     const enTeteAuth = req.headers.get("authorization") || "";
     const jeton = enTeteAuth.replace(/^Bearer\s+/i, "");
     if (jeton) {
       const { data: { user } } = await supabase.auth.getUser(jeton);
       emailAppelant = user?.email || null;
+      utilisateurAppelant = user || null;
+    }
+
+    // CORRECTIF 16/09/2026 — incident réel constaté : un même compte a
+    // accumulé 9 abonnements Stripe "actifs" en parallèle à force de
+    // retester le paiement CursEdit (chaque session Checkout complétée
+    // crée un NOUVEL abonnement, rien ne vérifiait qu'un abonnement actif
+    // existait déjà). Sans carte de test, ça aurait été facturé 9 fois.
+    // Bloque désormais la création d'une nouvelle session d'ABONNEMENT
+    // CursEdit si le compte en a déjà un actif — jamais pour CursAudit
+    // (paiement ponctuel, pas concerné).
+    if (modeCheckout === "subscription" && produitActuel === "cursedit" && utilisateurAppelant) {
+      const { data: abonnementExistant } = await supabase
+        .from("abonnements")
+        .select("id, palier")
+        .eq("user_id", utilisateurAppelant.id)
+        .eq("statut", "actif")
+        .limit(1)
+        .maybeSingle();
+      if (abonnementExistant) {
+        return new Response(JSON.stringify({
+          error: "abonnement_deja_actif",
+          message: `Un abonnement "${abonnementExistant.palier}" est déjà actif sur ce compte — gère-le avant d'en souscrire un nouveau plutôt que d'en cumuler plusieurs.`,
+        }), { status: 409, headers: { "Content-Type": "application/json", ...CORS } });
+      }
     }
 
     // Application du code promo (60804-02) — la table codes_promo fait

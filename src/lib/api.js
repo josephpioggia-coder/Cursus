@@ -607,6 +607,72 @@ const POIDS_PAR_MODELE = {
   "gpt-6-astra": 5,
 };
 
+// ─── ACCÈS CURSEDIT SELON L'ABONNEMENT (CGV art. 6, réf. 60816-01, suite,
+// 16/09/2026) ────────────────────────────────────────────────────────────
+// Décision explicite de l'auteur du projet : après annulation d'un
+// abonnement, l'IA s'arrête immédiatement, mais les textes restent
+// consultables (lecture seule) pendant 3 mois — pas de modification,
+// import ni création sans réabonnement. Au-delà de 3 mois, plus d'accès
+// du tout. Un compte n'ayant jamais souscrit n'a jamais eu accès non plus
+// (écran de choix de palier, comportement déjà existant).
+export const abonnementsAPI = {
+
+  /** { peutÉcrire, peutLire, motif } pour le compte connecté.
+   *
+   *  ATTENTION — LIMITE ASSUMÉE : contrôle fait CÔTÉ CLIENT uniquement,
+   *  comme le reste des tables CursEdit (écriture directe via RLS par
+   *  propriété, voir le commentaire en tête de la section AUDITS plus
+   *  haut). Aucune policy RLS ne bloque encore, côté base de données, un
+   *  compte techniquement capable d'appeler le SDK directement malgré ce
+   *  statut — seule l'interface le respecte pour l'instant. Même famille
+   *  de risque que la faille de prix Stripe corrigée le 13/09/2026, pas
+   *  encore traitée ici : modifier à l'aveugle les policies RLS
+   *  existantes sur `noeuds`/`projets` (jamais vues dans ce dépôt,
+   *  probablement posées directement depuis le Dashboard) risquerait de
+   *  casser l'accès de tout le monde sans un moyen sûr de les relire
+   *  d'abord. À durcir côté base de données avant un vrai lancement
+   *  commercial.
+   */
+  async statutAccès() {
+    const uid = await userId();
+    if (!uid) return { data: { peutÉcrire: false, peutLire: false, motif: "non_connecté" }, error: null };
+
+    // Vérifie d'abord l'EXISTENCE d'un abonnement actif, sans se fier au
+    // plus récemment modifié : un compte peut avoir plusieurs lignes
+    // "actif" en même temps (doublons de test, voir l'incident du
+    // 16/09/2026 — 9 abonnements Stripe actifs en parallèle sur un seul
+    // compte) — se fier au tri par updated_at aurait pu, par malchance,
+    // faire passer un compte réellement actif pour annulé si une ligne
+    // "annulé" plus ancienne avait été touchée plus récemment.
+    const { data: actif, error: erreurActif } = await supabase
+      .from("abonnements")
+      .select("id")
+      .eq("user_id", uid)
+      .eq("statut", "actif")
+      .limit(1)
+      .maybeSingle();
+    if (erreurActif) return { data: null, error: erreurActif };
+    if (actif) return { data: { peutÉcrire: true, peutLire: true, motif: "actif" }, error: null };
+
+    const { data: dernier, error: erreurDernier } = await supabase
+      .from("abonnements")
+      .select("updated_at")
+      .eq("user_id", uid)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (erreurDernier) return { data: null, error: erreurDernier };
+    if (!dernier) return { data: { peutÉcrire: false, peutLire: false, motif: "jamais_abonné" }, error: null };
+
+    const TROIS_MOIS_MS = 90 * 24 * 60 * 60 * 1000;
+    const depuisAnnulation = Date.now() - new Date(dernier.updated_at).getTime();
+    if (depuisAnnulation <= TROIS_MOIS_MS) {
+      return { data: { peutÉcrire: false, peutLire: true, motif: "annulé_recent" }, error: null };
+    }
+    return { data: { peutÉcrire: false, peutLire: false, motif: "annulé_ancien" }, error: null };
+  },
+};
+
 export const usageIAAPI = {
 
   // Retourne { palier, quotaMensuel, credits, consomme, disponible, pourcentage }

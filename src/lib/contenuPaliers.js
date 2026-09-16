@@ -135,7 +135,12 @@ export async function demarrerCheckout(priceId, nomPalier, codePromo) {
     });
     const data = await réponse.json();
     if (!réponse.ok) {
-      alert(data.error || "Ce code promo n'a pas pu être appliqué.");
+      // CORRECTIF 16/09/2026 — `data.message` (texte lisible) préféré à
+      // `data.error` (code technique, ex. "abonnement_deja_actif") quand
+      // il existe, voir creer-session-checkout : le blocage d'un second
+      // abonnement en double renvoie les deux, le message explique
+      // vraiment ce qui se passe à l'auteur·ice plutôt qu'un code brut.
+      alert(data.message || data.error || "Ce code promo n'a pas pu être appliqué.");
       return;
     }
     if (data.url) {

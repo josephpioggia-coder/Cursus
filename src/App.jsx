@@ -29,7 +29,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
-import { projetsAPI, nœudsAPI } from "./lib/api.js";
+import { projetsAPI, nœudsAPI, abonnementsAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
 import { journaliserErreur } from "./lib/journalErreurs.js";
 import Editeur from "./components/Editeur.jsx";
@@ -1776,6 +1776,19 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     setAuditOrigineId(null);
     setVue("auditdetail");
   };
+
+  // Accès CursEdit selon l'abonnement (16/09/2026, CGV art. 6) — voir
+  // abonnementsAPI.statutAccès (api.js) : chargé une fois à l'entrée dans
+  // l'espace, transmis à l'éditeur pour verrouiller la saisie si annulé.
+  // null tant que non chargé — traité comme "accès complet" par défaut le
+  // temps du chargement, pour ne jamais bloquer un compte réellement actif
+  // à cause d'un chargement lent (l'inverse — bloquer par défaut — aurait
+  // fait clignoter l'éditeur en lecture seule à chaque ouverture).
+  const [accèsCursEdit, setAccèsCursEdit] = useState(null);
+  useEffect(() => {
+    abonnementsAPI.statutAccès().then(({ data }) => { if (data) setAccèsCursEdit(data); });
+  }, []);
+
   // ── Mise en page mobile (23/08/2026) ── La grille "220px 1fr" était figée
   // quelle que soit la largeur d'écran : sur téléphone, ces 220px de barre
   // latérale ne laissaient presque plus de place au contenu, d'où des
@@ -2731,8 +2744,39 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         )}
 
         {/* Vue : éditeur riche + co-pilote IA — layout maquette */}
-        {vue === "editeur" && projetActif && nœudActif && (
+        {vue === "editeur" && projetActif && nœudActif && accèsCursEdit && !accèsCursEdit.peutLire && (
+          // Accès CursEdit expiré (16/09/2026, CGV art. 6) — abonnement
+          // annulé depuis plus de 3 mois, plus aucun accès, même en
+          // lecture. Bloque avant l'éditeur plutôt qu'un verrou partiel.
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 14, color: "var(--texte-tertiaire)", padding: 32, textAlign: "center" }}>
+            <div style={{ fontSize: 32 }}>🔒</div>
+            <div style={{ fontSize: 14, maxWidth: 420 }}>
+              L'accès à ce projet n'est plus disponible : la période de consultation de 3 mois après l'annulation de l'abonnement est passée. Réabonne-toi pour retrouver l'accès à tes textes.
+            </div>
+            <button onClick={() => setVue("tarification")} style={btnPrimaryStyle(projetActif.couleur)}>
+              Voir les abonnements
+            </button>
+          </div>
+        )}
+
+        {vue === "editeur" && projetActif && nœudActif && !(accèsCursEdit && !accèsCursEdit.peutLire) && (
           <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+            {accèsCursEdit && !accèsCursEdit.peutÉcrire && (
+              <div style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                background: "#FBE9E9", borderBottom: "0.5px solid var(--border)",
+                padding: "8px 20px", fontSize: 12.5, color: "#A32D2D", flexShrink: 0,
+              }}>
+                <span>Abonnement annulé — lecture seule (aucune modification possible) pendant 3 mois à compter de l'annulation.</span>
+                <button onClick={() => setVue("tarification")} style={{
+                  flexShrink: 0, fontSize: 12, color: "#A32D2D", background: "none",
+                  border: "0.5px solid #A32D2D", borderRadius: 6, padding: "4px 10px",
+                  cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Se réabonner
+                </button>
+              </div>
+            )}
             {auditOrigineId && (
               <div style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -2759,6 +2803,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               onTexteChange={màjTexteLocal}
               onSelectionChange={setTexteSélectionné}
               onRetour={() => setVue("projet")}
+              lectureSeule={!!(accèsCursEdit && !accèsCursEdit.peutÉcrire)}
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}
             <div style={{

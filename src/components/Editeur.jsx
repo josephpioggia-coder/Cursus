@@ -756,6 +756,11 @@ export default function Editeur({
                            // puisse analyser uniquement le passage surligné plutôt que
                            // tout le chapitre. Ajouté le 16/07/2026.
   onRetour,                // () => void
+  // Lecture seule forcée (16/09/2026, CGV art. 6) — abonnement annulé
+  // depuis moins de 3 mois : les textes restent consultables/exportables,
+  // mais ni modifiables ni importables. Voir abonnementsAPI.statutAccès
+  // (api.js) et App.jsx, qui calcule cette valeur.
+  lectureSeule = false,
 }) {
   const [modeFocus, setModeFocus] = useState(false);
   const [formatRéférence, setFormatRéférence] = useState("a4");
@@ -854,6 +859,7 @@ export default function Editeur({
 
   // Initialisation de l'éditeur TipTap
   const editor = useEditor({
+    editable: !lectureSeule,
     extensions: [
       StarterKit.configure({
         history: { depth: 100 },
@@ -1008,6 +1014,14 @@ export default function Editeur({
     window.addEventListener("resize", surRedimensionnement);
     return () => { window.removeEventListener("resize", surRedimensionnement); clearTimeout(timer); };
   }, [recalculerNumérosDeLigne]);
+
+  // Lecture seule (16/09/2026) — `editable` passé à useEditor() n'est lu
+  // qu'à la création de l'éditeur, pas réactif tout seul si `lectureSeule`
+  // change ensuite (ex. le statut d'abonnement arrive après le premier
+  // rendu, voir App.jsx). editor.setEditable() le met à jour dynamiquement.
+  useEffect(() => {
+    editor?.setEditable(!lectureSeule);
+  }, [editor, lectureSeule]);
 
   useEffect(() => {
     const timer = setTimeout(recalculerNumérosDeLigne, 60);
