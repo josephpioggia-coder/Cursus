@@ -259,6 +259,15 @@ export function CGV({ onRetour, onNaviguer }) {
         La résiliation d'un abonnement CursEdit se fait actuellement sur simple demande écrite à {id.email}. Un
         outil de gestion autonome de l'abonnement sera proposé directement dans l'application à terme.
       </P>
+      <P>
+        Après annulation, l'accès aux fonctionnalités d'intelligence artificielle (co-pilote, suggestions, audits)
+        est immédiatement suspendu. Vos textes et projets restent en revanche consultables — vous pouvez continuer
+        à les ouvrir, les lire et les exporter — pendant une durée de <strong>3 mois</strong> après la fin de
+        l'abonnement, mais en <strong>lecture seule</strong> : aucune modification, aucun nouvel import ni aucune
+        création de contenu n'est possible sans réabonnement. Cette limite existe pour que Cursus reste un service
+        payant d'assistance à l'écriture, et non un simple espace de stockage de texte gratuit une fois
+        l'abonnement arrêté.
+      </P>
 
       <H2>7. Nature du service — limites de l'intelligence artificielle</H2>
       <P>
