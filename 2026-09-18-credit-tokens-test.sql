@@ -34,7 +34,11 @@ where u.email = 'joseph.pioggia@gmail.com';
 --    automatiquement contrairement au quota mensuel — voir
 --    recupererConsommation() dans api.js qui les additionne en continu).
 --    Ajuster le chiffre selon le besoin réel de test restant.
-insert into credits_ia (user_id, tokens_offerts)
-select id, 3000000
+--    CORRECTIF 18/09/2026 : montant_paye est NOT NULL sur credits_ia (vu à
+--    l'exécution, cette colonne n'était encore référencée nulle part dans
+--    le dépôt) — mis à 0 puisqu'il s'agit d'un crédit de test, pas d'un
+--    vrai achat.
+insert into credits_ia (user_id, tokens_offerts, montant_paye)
+select id, 3000000, 0
 from auth.users
 where email = 'joseph.pioggia@gmail.com';
