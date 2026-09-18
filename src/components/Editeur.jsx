@@ -42,6 +42,8 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
+import Color from "@tiptap/extension-color";
+import TextStyle from "@tiptap/extension-text-style";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
@@ -320,8 +322,8 @@ function BoutonOutil({ actif, désactivé, onClick, titre, children }) {
         fontSize: 13, fontWeight: actif ? 600 : 400,
         fontFamily: "inherit", transition: "all 0.1s",
       }}
-      onMouseEnter={(e) => { if (!actif && !désactivé) e.target.style.background = "#f5f5f5"; }}
-      onMouseLeave={(e) => { if (!actif) e.target.style.background = "transparent"; }}
+      onMouseEnter={(e) => { if (!actif && !désactivé) e.currentTarget.style.background = "#f5f5f5"; }}
+      onMouseLeave={(e) => { if (!actif) e.currentTarget.style.background = "transparent"; }}
     >
       {children}
     </button>
@@ -467,11 +469,27 @@ function BoutonDictee({ editor }) {
 // ─── Composant : Barre d'outils ──────────────────────────────────────────────────
 
 function BarreOutils({ editor, modeFocus, onToggleFocus }) {
-  // Sélecteur de couleur de surlignage (16/09/2026, liste d'attente #2) —
-  // une petite palette plutôt qu'une seule couleur fixe pour tout le
-  // texte. État local à la barre d'outils : purement une question
-  // d'affichage (le popover ouvert ou non), rien à synchroniser ailleurs.
-  const [paletteOuverte, setPaletteOuverte] = useState(false);
+  // Sélecteurs de couleur — surlignage (16/09/2026) puis couleur de police
+  // (18/09/2026, même demande de liste d'attente #2, complétée après coup :
+  // "j'aurais voulu avoir une palette de couleur pour le texte"). Un seul
+  // état pour les deux popovers : ouvrir l'un ferme l'autre, plutôt que
+  // deux booléens indépendants qui pourraient rester ouverts ensemble.
+  const [paletteActive, setPaletteActive] = useState(null); // null | "surlignage" | "couleur"
+  const zoneCouleursRef = useRef(null);
+
+  // Ferme le popover ouvert au clic ailleurs dans la page — absent de la
+  // première version (16/09/2026), signalé comme lacune mineure en interne,
+  // corrigé ici en même temps que l'ajout de la couleur de police.
+  useEffect(() => {
+    if (!paletteActive) return;
+    const fermerSiExterieur = (e) => {
+      if (zoneCouleursRef.current && !zoneCouleursRef.current.contains(e.target)) {
+        setPaletteActive(null);
+      }
+    };
+    document.addEventListener("mousedown", fermerSiExterieur);
+    return () => document.removeEventListener("mousedown", fermerSiExterieur);
+  }, [paletteActive]);
 
   if (!editor) return null;
 
@@ -484,11 +502,27 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
   ];
   const appliquerCouleur = (couleur) => {
     editor.chain().focus().setHighlight({ color: couleur }).run();
-    setPaletteOuverte(false);
+    setPaletteActive(null);
   };
   const retirerSurlignage = () => {
     editor.chain().focus().unsetHighlight().run();
-    setPaletteOuverte(false);
+    setPaletteActive(null);
+  };
+
+  const COULEURS_TEXTE = [
+    { nom: "Rouge", valeur: "#D32F2F" },
+    { nom: "Bleu", valeur: "#1565C0" },
+    { nom: "Vert", valeur: "#2E7D32" },
+    { nom: "Violet", valeur: "#6A1B9A" },
+    { nom: "Orange", valeur: "#E65100" },
+  ];
+  const appliquerCouleurTexte = (couleur) => {
+    editor.chain().focus().setColor(couleur).run();
+    setPaletteActive(null);
+  };
+  const retirerCouleurTexte = () => {
+    editor.chain().focus().unsetColor().run();
+    setPaletteActive(null);
   };
 
   const Sep = () => (
@@ -531,33 +565,73 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
       <BoutonOutil actif={editor.isActive("underline")} titre="Souligné (Ctrl+U)"
         onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
-      {/* Surlignage multicolore (16/09/2026, liste d'attente #2) — un clic
-          ouvre une petite palette plutôt que de basculer une seule
-          couleur fixe. */}
-      <div style={{ position: "relative" }}>
-        <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner (choisir une couleur)"
-          onClick={() => setPaletteOuverte((v) => !v)}>✦</BoutonOutil>
-        {paletteOuverte && (
-          <div style={{
-            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
-            background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
-            padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-          }}>
-            {COULEURS_SURLIGNAGE.map((c) => (
-              <button key={c.valeur} onClick={() => appliquerCouleur(c.valeur)} title={c.nom}
+      {/* Couleur de texte + surlignage (16-18/09/2026, liste d'attente #2) —
+          regroupés dans une même zone (ref commune pour le clic-extérieur).
+          Icônes choisies pour être reconnaissables sans légende : "A"
+          souligné d'une barre colorée = couleur de police (convention
+          Word/Docs), crayon = surlignage — le "✦" d'origine ne se lisait
+          pas comme un outil de couleur. */}
+      <div ref={zoneCouleursRef} style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <div style={{ position: "relative" }}>
+          <BoutonOutil actif={editor.isActive("textStyle") && !!editor.getAttributes("textStyle").color}
+            titre="Couleur du texte"
+            onClick={() => setPaletteActive((v) => (v === "couleur" ? null : "couleur"))}>
+            <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
+              <span>A</span>
+              <span style={{
+                width: 12, height: 2.5, marginTop: 1, borderRadius: 1,
+                background: editor.getAttributes("textStyle").color || "#999",
+              }} />
+            </span>
+          </BoutonOutil>
+          {paletteActive === "couleur" && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
+              background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
+              padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            }}>
+              {COULEURS_TEXTE.map((c) => (
+                <button key={c.valeur} onClick={() => appliquerCouleurTexte(c.valeur)} title={c.nom}
+                  style={{
+                    width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
+                    background: c.valeur, border: "0.5px solid rgba(0,0,0,0.1)", padding: 0,
+                  }} />
+              ))}
+              <button onClick={retirerCouleurTexte} title="Couleur par défaut"
                 style={{
                   width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
-                  background: c.valeur, border: "0.5px solid rgba(0,0,0,0.1)", padding: 0,
-                }} />
-            ))}
-            <button onClick={retirerSurlignage} title="Retirer le surlignage"
-              style={{
-                width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
-                background: "#fff", border: "0.5px solid #ccc", color: "#999",
-                fontSize: 11, lineHeight: "18px", padding: 0,
-              }}>✕</button>
-          </div>
-        )}
+                  background: "#fff", border: "0.5px solid #ccc", color: "#999",
+                  fontSize: 11, lineHeight: "18px", padding: 0,
+                }}>✕</button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ position: "relative" }}>
+          <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner le texte"
+            onClick={() => setPaletteActive((v) => (v === "surlignage" ? null : "surlignage"))}>🖍️</BoutonOutil>
+          {paletteActive === "surlignage" && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
+              background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
+              padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            }}>
+              {COULEURS_SURLIGNAGE.map((c) => (
+                <button key={c.valeur} onClick={() => appliquerCouleur(c.valeur)} title={c.nom}
+                  style={{
+                    width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
+                    background: c.valeur, border: "0.5px solid rgba(0,0,0,0.1)", padding: 0,
+                  }} />
+              ))}
+              <button onClick={retirerSurlignage} title="Retirer le surlignage"
+                style={{
+                  width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
+                  background: "#fff", border: "0.5px solid #ccc", color: "#999",
+                  fontSize: 11, lineHeight: "18px", padding: 0,
+                }}>✕</button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Sep />
@@ -922,6 +996,12 @@ export default function Editeur({
       // couleur fixe pour tout le texte. Voir le sélecteur de couleur dans
       // la barre d'outils, juste après ce bouton.
       Highlight.configure({ multicolor: true }),
+      // Couleur de police (18/09/2026, suite liste d'attente #2) — demandée
+      // explicitement après le surlignage : TextStyle avant Color, c'est
+      // Color qui a besoin du mark "textStyle" pour porter l'attribut CSS
+      // color (voir doc TipTap, Color ne fonctionne pas seul).
+      TextStyle,
+      Color,
       CharacterCount,
       Placeholder.configure({
         placeholder: ({ node }) => {
