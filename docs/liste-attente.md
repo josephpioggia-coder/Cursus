@@ -54,12 +54,20 @@ couleur les réponses IA des questions écrivain".
 
 **Ce qui reste à construire** :
 - ~~Un vrai outil de couleur dans l'éditeur de texte principal...~~ **Fait le
-  18/09/2026** : `Highlight.configure({ multicolor: true })` +
-  sélecteur de couleur (5 teintes + retrait) dans la barre d'outils de
-  `Editeur.jsx`, appliqué sur la sélection via `setHighlight({ color })` /
-  `unsetHighlight()`. Reste en attente : couleur de police (distincte du
-  surlignage) si l'auteur la souhaite aussi — non demandée explicitement à
-  ce stade.
+  18/09/2026** : `Highlight.configure({ multicolor: true })` (surlignage) +
+  `Color`/`TextStyle` (couleur de police) dans `Editeur.jsx`, deux
+  sélecteurs distincts dans la barre d'outils (icône "A" soulignée d'une
+  barre colorée pour le texte, crayon 🖍️ pour le surlignage), chacun avec
+  5 teintes + un retrait, popovers qui se ferment au clic extérieur.
+  Couleur de police ajoutée après coup le même jour, sur demande explicite
+  ("j'aurais voulu avoir une palette de couleur pour le texte").
+- **Bonus non prévu, ajouté le 18/09/2026** : le vert du surlignage sert
+  désormais aussi de convention pour trier un texte long avant analyse —
+  "Analyser seulement le surligné en vert" dans le co-pilote (voir
+  `extraireTexteSurligneVert` dans `CopiloteIA.jsx`), plutôt que de devoir
+  sélectionner à la souris à chaque fois. Couleur dédiée fixe (`#A5D6A7`),
+  décision explicite de Joseph plutôt qu'un choix de couleur à chaque
+  analyse.
 - ~~Mise en forme paragraphée des réponses du co-pilote...~~ **Fait le
   18/09/2026** : rendu du fil de dialogue (`FilDialogue` dans
   `CopiloteIA.jsx`) passé en `whiteSpace: "pre-wrap"` pour respecter les
@@ -70,3 +78,34 @@ couleur les réponses IA des questions écrivain".
 **Pourquoi reporté** : demande explicite de l'auteur du projet de le
 mettre en liste d'attente plutôt que de l'implémenter dans la foulée —
 repris et terminé le 18/09/2026 à sa demande.
+
+---
+
+## #3 — Mode d'emploi complet, à l'usage de l'écrivain·e
+
+**Ajouté le** 18/09/2026.
+
+**Demande d'origine** : "il faudra un mode d'emploi pour toutes les
+fonctionnalités et codes internes à l'usage de l'écrivain" — dit en même
+temps que la demande #2 (couleur de texte), à propos du vert comme
+convention de tri avant analyse : une couleur qui a un sens fonctionnel
+caché (vert = "à analyser") n'est utilisable sans confusion que si elle
+est documentée quelque part pour l'auteur·ice qui écrit, pas seulement
+dans le code.
+
+**Ce qui existe déjà, à réunir/reformuler pour un public non technique** :
+- Éditeur (`Editeur.jsx`) : mise en forme, surlignage/couleur de texte
+  (et la convention vert = analyse), mode focus, dictée vocale,
+  historique de versions, objectifs de session.
+- Co-pilote IA (`CopiloteIA.jsx`) : les 5 onglets (Suggestions,
+  Personnages, Références, Cohérence, Vérification), le mode Auto,
+  "Aide-moi à avancer", "Conseils de recomposition", la mémoire narrative,
+  le choix de la source à analyser (sélection / chapitre / surligné vert).
+- Abonnement : quotas de tokens par palier, ce qui se passe en cas
+  d'annulation (lecture seule 3 mois, voir CGV art. 6).
+
+**Pourquoi reporté** : périmètre large ("toutes les fonctionnalités"), et
+une question de forme reste à trancher avant de l'écrire — document
+Markdown dans le dépôt, page d'aide dans l'application, ou document à part
+pour les premières testeuses (ex. Annie) — plutôt que de deviner et
+produire quelque chose qu'il faudra refaire.

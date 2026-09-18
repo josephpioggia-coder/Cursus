@@ -44,6 +44,29 @@ const extraireTexte = (html = "") => {
   return { texte: nettoyé, tronqué: false };
 };
 
+// Couleur dédiée fixe pour trier ce qui doit passer au co-pilote dans un
+// texte long, plutôt qu'une sélection à la souris à refaire à chaque fois
+// (18/09/2026, demande de Joseph : "une couleur dédiée fixe : vert"). Doit
+// rester synchronisée à la main avec la couleur "Vert" de
+// COULEURS_SURLIGNAGE dans Editeur.jsx — aucun import partagé entre les
+// deux fichiers aujourd'hui, comme le reste des constantes dupliquées de
+// ce projet (ex. EMAIL_PROPRIETAIRE).
+const COULEUR_VERT_ANALYSE = "#A5D6A7";
+
+// Extrait uniquement les fragments surlignés en vert du HTML d'un nœud —
+// un DOMParser plutôt qu'une regex, pour ne pas se faire piéger par un
+// <mark> mal formé ou imbriqué. Les fragments non contigus sont joints
+// par un séparateur visible, pour que l'IA ne les lise pas comme une
+// phrase continue involontaire.
+const extraireTexteSurligneVert = (html = "") => {
+  if (!html) return { texte: "", nbFragments: 0 };
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const fragments = Array.from(doc.querySelectorAll(`mark[data-color="${COULEUR_VERT_ANALYSE}"]`))
+    .map((m) => m.textContent.trim())
+    .filter(Boolean);
+  return { texte: fragments.join("\n\n[...]\n\n"), nbFragments: fragments.length };
+};
+
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
 
@@ -1184,20 +1207,38 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // et le recouvrement bloquant, pas besoin de les dupliquer ici).
   const [usageIA, setUsageIA] = useState(null);
   const usageBloqué = usageIA ? usageIA.disponible <= 0 : false;
-  // true = analyser uniquement le passage surligné dans l'éditeur, s'il y en a un.
-  // S'active automatiquement dès qu'une sélection substantielle apparaît (pour
-  // que le comportement par défaut soit intuitif), mais reste modifiable par
-  // l'auteur. Ajouté le 16/07/2026, en réponse au constat que le texte était
-  // silencieusement tronqué à 4000 caractères pour les longs chapitres.
-  const [analyserSélection, setAnalyserSélection] = useState(false);
+  // Source du texte envoyé à l'analyse : "selection" (passage surligné à la
+  // souris dans l'éditeur), "vert" (fragments marqués en vert, triés dans
+  // un texte long sans dépendre d'une sélection ponctuelle — 18/09/2026),
+  // ou "chapitre" (tout le texte actif). S'active automatiquement sur
+  // "selection" dès qu'une sélection substantielle apparaît (comportement
+  // par défaut intuitif, ajouté le 16/07/2026 contre la troncature
+  // silencieuse à 4000 caractères), mais reste modifiable par l'auteur —
+  // et ne réécrase plus un choix "vert" fait exprès quand la sélection à
+  // la souris disparaît (avant le 18/09/2026, ce cas retombait toujours
+  // sur "chapitre").
+  const [sourceAnalyse, setSourceAnalyse] = useState("chapitre"); // "chapitre" | "selection" | "vert"
 
   useEffect(() => {
     if (texteSélectionné && texteSélectionné.trim().length > 20) {
-      setAnalyserSélection(true);
-    } else if (!texteSélectionné) {
-      setAnalyserSélection(false);
+      setSourceAnalyse("selection");
+    } else {
+      setSourceAnalyse((m) => (m === "selection" ? "chapitre" : m));
     }
   }, [texteSélectionné]);
+
+  // Point de vérité unique pour le texte source de l'analyse principale —
+  // remplace la ternaire dupliquée à 3 endroits avant le 18/09/2026.
+  const obtenirSourceHTML = useCallback(() => {
+    if (sourceAnalyse === "selection" && texteSélectionné) return texteSélectionné;
+    if (sourceAnalyse === "vert") return extraireTexteSurligneVert(texteActif).texte;
+    return texteActif;
+  }, [sourceAnalyse, texteSélectionné, texteActif]);
+
+  const { nbFragments: nbFragmentsVerts } = useMemo(
+    () => extraireTexteSurligneVert(texteActif),
+    [texteActif]
+  );
 
   useEffect(() => {
     let annulé = false;
@@ -1255,7 +1296,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     // effacer — texteActif change à chaque frappe, inutile de re-rendre à
     // chaque caractère tapé quand il n'y a rien à nettoyer.
     setErreur((e) => (Object.keys(e).length ? {} : e));
-  }, [analyserSélection, texteSélectionné, texteActif]);
+  }, [sourceAnalyse, texteSélectionné, texteActif]);
   const [modeAuto, setModeAuto] = useState(false);
   const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
   const abortRef = useRef(null);
@@ -1615,7 +1656,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   }, [texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
 
   const analyser = useCallback(async (ongletCible) => {
-    const sourceTexte = (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif;
+    const sourceTexte = obtenirSourceHTML();
     const { texte } = extraireTexte(sourceTexte);
     if (compterMots(sourceTexte) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
@@ -1686,7 +1727,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [texteActif, texteSélectionné, analyserSélection, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
+  }, [obtenirSourceHTML, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -1835,7 +1876,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     setConfirmationBlocage(null);
     try {
       const sig = abortRef.current.signal;
-      const { texte } = extraireTexte((analyserSélection && texteSélectionné) ? texteSélectionné : texteActif);
+      const { texte } = extraireTexte(obtenirSourceHTML());
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADN),
         texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`,
@@ -1854,7 +1895,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargementBlocage(false);
     }
-  }, [analyserSélection, texteSélectionné, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
+  }, [obtenirSourceHTML, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
@@ -1922,9 +1963,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // montre qu'il coupe des analyses qui se seraient bien passées, ou qu'il
   // laisse encore passer des textes trop longs.
   const SEUIL_AVERTISSEMENT = 8000;
-  const { texte: sourceActuelleNettoyée } = extraireTexte(
-    (analyserSélection && texteSélectionné) ? texteSélectionné : texteActif
-  );
+  const { texte: sourceActuelleNettoyée } = extraireTexte(obtenirSourceHTML());
   const texteTropVolumineux = sourceActuelleNettoyée.length > SEUIL_AVERTISSEMENT;
 
   return (
@@ -2210,47 +2249,47 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             langueProjet={langueProjet}
           />
         )}
-        {texteSélectionné && texteSélectionné.trim().length > 20 && (
-          <>
-            {/* CORRECTIF 02/08/2026 — le bouton affichait un nombre de MOTS
-                alors que c'est un seuil en CARACTÈRES (texteTropVolumineux,
-                juste en dessous) qui décide si l'analyse sera bloquée :
-                aucun moyen de savoir si on s'en approche avant de cliquer.
-                Affiche désormais le nombre de caractères, la seule unité
-                pertinente ici. */}
+        {(() => {
+          const aUneSélection = texteSélectionné && texteSélectionné.trim().length > 20;
+          if (!aUneSélection && nbFragmentsVerts === 0) return null;
+          const BoutonSource = ({ valeur, enfant }) => (
+            <button
+              onClick={() => setSourceAnalyse(valeur)}
+              style={{
+                flex: 1, padding: "5px 6px", borderRadius: 5, border: "none",
+                background: sourceAnalyse === valeur ? "#fff" : "transparent",
+                color: sourceAnalyse === valeur ? couleurProjet : "#999",
+                fontWeight: sourceAnalyse === valeur ? 600 : 400,
+                fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
+                boxShadow: sourceAnalyse === valeur ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+              }}
+            >
+              {enfant}
+            </button>
+          );
+          return (
+            // CORRECTIF 02/08/2026 — le bouton "sélection" affichait un
+            // nombre de MOTS alors que c'est un seuil en CARACTÈRES
+            // (texteTropVolumineux, juste en dessous) qui décide si
+            // l'analyse sera bloquée — affiche le nombre de caractères.
+            // 18/09/2026 — 3e option "Surligné en vert" (liste d'attente
+            // #2, suite) : trier ce qui doit être analysé dans un texte
+            // long via une couleur dédiée plutôt qu'une sélection à
+            // refaire à chaque fois.
             <div style={{
               display: "flex", gap: 6, marginBottom: 4,
               background: "#f5f5f5", borderRadius: 7, padding: 3,
             }}>
-              <button
-                onClick={() => setAnalyserSélection(true)}
-                style={{
-                  flex: 1, padding: "5px 6px", borderRadius: 5, border: "none",
-                  background: analyserSélection ? "#fff" : "transparent",
-                  color: analyserSélection ? couleurProjet : "#999",
-                  fontWeight: analyserSélection ? 600 : 400,
-                  fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
-                  boxShadow: analyserSélection ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                }}
-              >
-                {t("selection.analyserSelection", { count: texteSélectionné.length })}
-              </button>
-              <button
-                onClick={() => setAnalyserSélection(false)}
-                style={{
-                  flex: 1, padding: "5px 6px", borderRadius: 5, border: "none",
-                  background: !analyserSélection ? "#fff" : "transparent",
-                  color: !analyserSélection ? couleurProjet : "#999",
-                  fontWeight: !analyserSélection ? 600 : 400,
-                  fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
-                  boxShadow: !analyserSélection ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
-                }}
-              >
-                {t("selection.analyserTout")}
-              </button>
+              {aUneSélection && (
+                <BoutonSource valeur="selection" enfant={t("selection.analyserSelection", { count: texteSélectionné.length })} />
+              )}
+              <BoutonSource valeur="chapitre" enfant={t("selection.analyserTout")} />
+              {nbFragmentsVerts > 0 && (
+                <BoutonSource valeur="vert" enfant={`🟢 Surligné (${nbFragmentsVerts})`} />
+              )}
             </div>
-          </>
-        )}
+          );
+        })()}
 
         {/* CORRECTIF 03/08/2026 — avant, rien n'indiquait où on se situait
             par rapport à la limite tant qu'on n'avait pas cliqué "Analyser"
