@@ -348,6 +348,26 @@ function BoutonDictee({ editor }) {
   const morceauxRef = useRef([]);
 
   const transcrire = useCallback(async (blob) => {
+    // Garde-fou (18/09/2026) — un blob quasi vide (micro coupé, mauvais
+    // périphérique d'entrée sélectionné côté système) produit un
+    // enregistrement quasi silencieux : les modèles de transcription de
+    // type Whisper "hallucinent" alors un texte de complaisance ("you",
+    // "Merci.", etc.) au lieu de renvoyer une erreur — c'est ce
+    // qu'a rencontré Joseph (18/09/2026, "toujours le you qui s'inscrit").
+    // Un enregistrement réel, même de 2-3 secondes, pèse largement plus
+    // que ce seuil en webm/opus ; en dessous, mieux vaut prévenir plutôt
+    // que d'envoyer un appel payant pour un résultat inutilisable.
+    console.info("[dictée] taille du blob audio :", blob.size, "octets");
+    if (blob.size < 3000) {
+      setErreur(
+        "Aucun son détecté (enregistrement quasi vide). Vérifie le micro " +
+        "sélectionné dans les réglages système/navigateur (pas un " +
+        "périphérique débranché ou coupé), puis réessaie en parlant dès le " +
+        "début de l'enregistrement."
+      );
+      setStatut("erreur");
+      return;
+    }
     setStatut("transcription");
     try {
       const formulaire = new FormData();
@@ -368,6 +388,17 @@ function BoutonDictee({ editor }) {
     setErreur(null);
     try {
       const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Détecte tôt un périphérique sélectionné mais coupé/débranché côté
+      // système (18/09/2026) — sans ça, l'enregistrement se déroule
+      // normalement à l'écran pendant que le flux audio est en réalité
+      // muet, et l'échec n'apparaît qu'après coup sous forme de "you".
+      const pisteAudio = flux.getAudioTracks()[0];
+      if (pisteAudio?.muted) {
+        flux.getTracks().forEach((piste) => piste.stop());
+        setErreur("Le micro sélectionné ne capte aucun son (coupé ou débranché côté système). Vérifie le périphérique d'entrée dans les réglages du navigateur/système.");
+        setStatut("erreur");
+        return;
+      }
       const enregistreur = new MediaRecorder(flux);
       morceauxRef.current = [];
       enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceauxRef.current.push(e.data); };
