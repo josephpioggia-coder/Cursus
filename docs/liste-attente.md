@@ -53,14 +53,20 @@ fil de dialogue ont déjà un fond bleu distinct des messages "Vous" (voir
 couleur les réponses IA des questions écrivain".
 
 **Ce qui reste à construire** :
-- Un vrai outil de couleur dans l'éditeur de texte principal (surlignage ou
-  couleur de police, au choix de l'auteur·ice sur une sélection) — rien
-  n'existe aujourd'hui dans `Editeur.jsx` pour ça (Highlight est configuré
-  en mono-couleur, `Highlight.configure({ multicolor: false })`).
-- Mise en forme paragraphée des réponses du co-pilote (actuellement du
-  texte brut affiché tel quel, un seul bloc) — reformuler le prompt pour
-  que Claude structure sa réponse en paragraphes distincts par point, et/ou
-  un rendu qui respecte les sauts de ligne plutôt qu'un bloc compact.
+- ~~Un vrai outil de couleur dans l'éditeur de texte principal...~~ **Fait le
+  18/09/2026** : `Highlight.configure({ multicolor: true })` +
+  sélecteur de couleur (5 teintes + retrait) dans la barre d'outils de
+  `Editeur.jsx`, appliqué sur la sélection via `setHighlight({ color })` /
+  `unsetHighlight()`. Reste en attente : couleur de police (distincte du
+  surlignage) si l'auteur la souhaite aussi — non demandée explicitement à
+  ce stade.
+- ~~Mise en forme paragraphée des réponses du co-pilote...~~ **Fait le
+  18/09/2026** : rendu du fil de dialogue (`FilDialogue` dans
+  `CopiloteIA.jsx`) passé en `whiteSpace: "pre-wrap"` pour respecter les
+  sauts de ligne, et le prompt (`promptDialogue`) instruit désormais Claude
+  de structurer une réponse à plusieurs points en paragraphes distincts
+  séparés par une ligne vide.
 
 **Pourquoi reporté** : demande explicite de l'auteur du projet de le
-mettre en liste d'attente plutôt que de l'implémenter dans la foulée.
+mettre en liste d'attente plutôt que de l'implémenter dans la foulée —
+repris et terminé le 18/09/2026 à sa demande.

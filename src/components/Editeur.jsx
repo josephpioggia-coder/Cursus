@@ -467,7 +467,29 @@ function BoutonDictee({ editor }) {
 // ─── Composant : Barre d'outils ──────────────────────────────────────────────────
 
 function BarreOutils({ editor, modeFocus, onToggleFocus }) {
+  // Sélecteur de couleur de surlignage (16/09/2026, liste d'attente #2) —
+  // une petite palette plutôt qu'une seule couleur fixe pour tout le
+  // texte. État local à la barre d'outils : purement une question
+  // d'affichage (le popover ouvert ou non), rien à synchroniser ailleurs.
+  const [paletteOuverte, setPaletteOuverte] = useState(false);
+
   if (!editor) return null;
+
+  const COULEURS_SURLIGNAGE = [
+    { nom: "Jaune", valeur: "#FFF176" },
+    { nom: "Vert", valeur: "#A5D6A7" },
+    { nom: "Bleu", valeur: "#90CAF9" },
+    { nom: "Rose", valeur: "#F48FB1" },
+    { nom: "Orange", valeur: "#FFCC80" },
+  ];
+  const appliquerCouleur = (couleur) => {
+    editor.chain().focus().setHighlight({ color: couleur }).run();
+    setPaletteOuverte(false);
+  };
+  const retirerSurlignage = () => {
+    editor.chain().focus().unsetHighlight().run();
+    setPaletteOuverte(false);
+  };
 
   const Sep = () => (
     <div style={{ width: 0.5, height: 18, background: "#e5e5e5", margin: "0 4px" }} />
@@ -509,8 +531,34 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
         onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
       <BoutonOutil actif={editor.isActive("underline")} titre="Souligné (Ctrl+U)"
         onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
-      <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner"
-        onClick={() => editor.chain().focus().toggleHighlight().run()}>✦</BoutonOutil>
+      {/* Surlignage multicolore (16/09/2026, liste d'attente #2) — un clic
+          ouvre une petite palette plutôt que de basculer une seule
+          couleur fixe. */}
+      <div style={{ position: "relative" }}>
+        <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner (choisir une couleur)"
+          onClick={() => setPaletteOuverte((v) => !v)}>✦</BoutonOutil>
+        {paletteOuverte && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
+            background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
+            padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+          }}>
+            {COULEURS_SURLIGNAGE.map((c) => (
+              <button key={c.valeur} onClick={() => appliquerCouleur(c.valeur)} title={c.nom}
+                style={{
+                  width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
+                  background: c.valeur, border: "0.5px solid rgba(0,0,0,0.1)", padding: 0,
+                }} />
+            ))}
+            <button onClick={retirerSurlignage} title="Retirer le surlignage"
+              style={{
+                width: 20, height: 20, borderRadius: "50%", cursor: "pointer",
+                background: "#fff", border: "0.5px solid #ccc", color: "#999",
+                fontSize: 11, lineHeight: "18px", padding: 0,
+              }}>✕</button>
+          </div>
+        )}
+      </div>
 
       <Sep />
 
@@ -869,7 +917,11 @@ export default function Editeur({
       Typography,
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      Highlight.configure({ multicolor: false }),
+      // multicolor (16/09/2026, liste d'attente #2) — permet de choisir la
+      // couleur du surlignage sur une sélection, plutôt qu'une seule
+      // couleur fixe pour tout le texte. Voir le sélecteur de couleur dans
+      // la barre d'outils, juste après ce bouton.
+      Highlight.configure({ multicolor: true }),
       CharacterCount,
       Placeholder.configure({
         placeholder: ({ node }) => {

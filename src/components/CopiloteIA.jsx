@@ -583,6 +583,8 @@ RÈGLE NON NÉGOCIABLE sur toute reformulation proposée — signalé en usage r
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse d'origine que tu développes) mentionne une personne nommée dans le texte de l'auteur, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas lui-même écrit — que ce soit dans ta première réponse ou dans une reformulation que tu proposes ici. Si l'auteur te fait remarquer que tu as inventé une caractérisation, reconnais-le sans détour : ne cherche pas à justifier ou à minimiser l'invention.
 
+MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
+
 ${instruction}`;
 }
 
@@ -732,6 +734,13 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
         <div key={i} style={{
           fontSize: 11.5, lineHeight: 1.5, marginBottom: 6,
           color: m.role === "auteur" ? "#1a1a1a" : "#2A3A66",
+          // Respecte les sauts de ligne du texte (16/09/2026, liste
+          // d'attente #2) — sans ça, un bloc de plusieurs paragraphes
+          // s'affichait comme un seul pavé compact, même si le modèle
+          // avait bien structuré sa réponse avec des sauts de ligne. Voir
+          // aussi promptDialogue : consigne explicite de structurer par
+          // paragraphes distincts.
+          whiteSpace: "pre-wrap",
           // Trame bleue légère pour distinguer les réponses du co-pilote
           // (demande explicite, 14/09/2026) — fixe, pas liée à `couleur`
           // (qui varie par projet) : le co-pilote garde une identité
