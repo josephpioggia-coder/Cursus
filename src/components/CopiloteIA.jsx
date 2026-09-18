@@ -169,8 +169,16 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null,
     body: JSON.stringify(corpsRequête),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${JSON.stringify(data)}`);
-  if (data.error) throw new Error(typeof data.error === "object" ? JSON.stringify(data.error) : data.error);
+  // CORRECTIF 18/09/2026 — un 429/403/500 de claude-prox (quota atteint,
+  // pas d'abonnement, etc.) renvoie toujours { error, message } avec un
+  // message déjà écrit pour l'auteur·ice (voir claude-prox/index.ts) ;
+  // avant ce correctif, la branche !response.ok l'ignorait complètement
+  // et affichait le JSON brut tel quel dans le fil de dialogue
+  // ("HTTP 429: {"error":"quota","message":"...","consomme":...}").
+  if (!response.ok) {
+    throw new Error(data?.message || (typeof data?.error === "string" ? data.error : null) || `Erreur serveur (HTTP ${response.status}).`);
+  }
+  if (data.error) throw new Error(data.message || (typeof data.error === "object" ? JSON.stringify(data.error) : data.error));
   // Avec un outil comme la recherche web, la réponse peut contenir plusieurs
   // blocs (server_tool_use, web_search_tool_result, text) avant le texte
   // final — content[0] n'est donc plus fiable pour l'extraire. On concatène

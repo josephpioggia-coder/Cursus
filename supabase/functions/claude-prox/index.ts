@@ -81,14 +81,30 @@ Deno.serve(async (req) => {
       0,
     );
 
+    // CORRECTIF 18/09/2026 — ce verdict ignorait totalement credits_ia
+    // (recharges ponctuelles, crédits de test) : recupererConsommation()
+    // côté client (api.js) les additionnait déjà au quota du palier pour
+    // l'affichage, mais LE SEUL VRAI GARDE-FOU (celui-ci, côté serveur —
+    // un contrôle uniquement côté client serait contournable) ne les
+    // voyait pas. Concrètement : un crédit ajouté manuellement (ex. le
+    // crédit de test du 18/09/2026) ne débloquait rien, l'auteur recevait
+    // quand même un 429 "quota atteint" alors que la jauge affichée
+    // montrait encore de la marge.
+    const { data: lignesCredits } = await admin
+      .from("credits_ia")
+      .select("tokens_offerts")
+      .eq("user_id", userId);
+    const credits = (lignesCredits ?? []).reduce((sum, l) => sum + (l.tokens_offerts ?? 0), 0);
+    const disponibleTotal = quota.tokens_mensuels + credits;
+
     // 4. VERDICT
-    if (consomme >= quota.tokens_mensuels) {
+    if (consomme >= disponibleTotal) {
       return json(
         {
           error: "quota",
           message: "Vous avez atteint votre quota mensuel d'assistance IA. Il se renouvelle le 1er du mois, ou passez à une formule supérieure.",
           consomme,
-          quota: quota.tokens_mensuels,
+          quota: disponibleTotal,
         },
         429,
       );
