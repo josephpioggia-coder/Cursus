@@ -46,22 +46,27 @@ const extraireTexte = (html = "") => {
 
 // Couleur dédiée fixe pour trier ce qui doit passer au co-pilote dans un
 // texte long, plutôt qu'une sélection à la souris à refaire à chaque fois
-// (18/09/2026, demande de Joseph : "une couleur dédiée fixe : vert"). Doit
-// rester synchronisée à la main avec la couleur "Vert" de
-// COULEURS_SURLIGNAGE dans Editeur.jsx — aucun import partagé entre les
-// deux fichiers aujourd'hui, comme le reste des constantes dupliquées de
-// ce projet (ex. EMAIL_PROPRIETAIRE).
-const COULEUR_VERT_ANALYSE = "#A5D6A7";
+// (18/09/2026, demande de Joseph). D'abord le vert (COULEURS_SURLIGNAGE),
+// changé pour le gris le jour même : le vert restait accessible dans la
+// palette de surlignage générale pour un usage purement décoratif, avec
+// un vrai risque de faire analyser par erreur un passage juste mis en
+// valeur. Le gris n'existe QUE via le bouton dédié "Surligneur pour
+// analyses" de Editeur.jsx (absent de la palette des 5 couleurs), donc
+// aucune ambiguïté possible. Doit rester synchronisée à la main avec
+// COULEUR_SURLIGNAGE_ANALYSE dans Editeur.jsx — aucun import partagé
+// entre les deux fichiers aujourd'hui, comme le reste des constantes
+// dupliquées de ce projet (ex. EMAIL_PROPRIETAIRE).
+const COULEUR_SURLIGNAGE_ANALYSE = "#BDBDBD";
 
-// Extrait uniquement les fragments surlignés en vert du HTML d'un nœud —
-// un DOMParser plutôt qu'une regex, pour ne pas se faire piéger par un
-// <mark> mal formé ou imbriqué. Les fragments non contigus sont joints
-// par un séparateur visible, pour que l'IA ne les lise pas comme une
-// phrase continue involontaire.
-const extraireTexteSurligneVert = (html = "") => {
+// Extrait uniquement les fragments marqués pour analyse (surlignage gris
+// dédié) du HTML d'un nœud — un DOMParser plutôt qu'une regex, pour ne
+// pas se faire piéger par un <mark> mal formé ou imbriqué. Les fragments
+// non contigus sont joints par un séparateur visible, pour que l'IA ne
+// les lise pas comme une phrase continue involontaire.
+const extraireTexteMarquéAnalyse = (html = "") => {
   if (!html) return { texte: "", nbFragments: 0 };
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const fragments = Array.from(doc.querySelectorAll(`mark[data-color="${COULEUR_VERT_ANALYSE}"]`))
+  const fragments = Array.from(doc.querySelectorAll(`mark[data-color="${COULEUR_SURLIGNAGE_ANALYSE}"]`))
     .map((m) => m.textContent.trim())
     .filter(Boolean);
   return { texte: fragments.join("\n\n[...]\n\n"), nbFragments: fragments.length };
@@ -1208,16 +1213,16 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [usageIA, setUsageIA] = useState(null);
   const usageBloqué = usageIA ? usageIA.disponible <= 0 : false;
   // Source du texte envoyé à l'analyse : "selection" (passage surligné à la
-  // souris dans l'éditeur), "vert" (fragments marqués en vert, triés dans
-  // un texte long sans dépendre d'une sélection ponctuelle — 18/09/2026),
-  // ou "chapitre" (tout le texte actif). S'active automatiquement sur
-  // "selection" dès qu'une sélection substantielle apparaît (comportement
-  // par défaut intuitif, ajouté le 16/07/2026 contre la troncature
-  // silencieuse à 4000 caractères), mais reste modifiable par l'auteur —
-  // et ne réécrase plus un choix "vert" fait exprès quand la sélection à
-  // la souris disparaît (avant le 18/09/2026, ce cas retombait toujours
-  // sur "chapitre").
-  const [sourceAnalyse, setSourceAnalyse] = useState("chapitre"); // "chapitre" | "selection" | "vert"
+  // souris dans l'éditeur), "analyse" (fragments marqués du surlignage
+  // gris dédié, triés dans un texte long sans dépendre d'une sélection
+  // ponctuelle — 18/09/2026), ou "chapitre" (tout le texte actif). S'active
+  // automatiquement sur "selection" dès qu'une sélection substantielle
+  // apparaît (comportement par défaut intuitif, ajouté le 16/07/2026
+  // contre la troncature silencieuse à 4000 caractères), mais reste
+  // modifiable par l'auteur — et ne réécrase plus un choix "analyse" fait
+  // exprès quand la sélection à la souris disparaît (avant le 18/09/2026,
+  // ce cas retombait toujours sur "chapitre").
+  const [sourceAnalyse, setSourceAnalyse] = useState("chapitre"); // "chapitre" | "selection" | "analyse"
 
   useEffect(() => {
     if (texteSélectionné && texteSélectionné.trim().length > 20) {
@@ -1231,12 +1236,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // remplace la ternaire dupliquée à 3 endroits avant le 18/09/2026.
   const obtenirSourceHTML = useCallback(() => {
     if (sourceAnalyse === "selection" && texteSélectionné) return texteSélectionné;
-    if (sourceAnalyse === "vert") return extraireTexteSurligneVert(texteActif).texte;
+    if (sourceAnalyse === "analyse") return extraireTexteMarquéAnalyse(texteActif).texte;
     return texteActif;
   }, [sourceAnalyse, texteSélectionné, texteActif]);
 
-  const { nbFragments: nbFragmentsVerts } = useMemo(
-    () => extraireTexteSurligneVert(texteActif),
+  const { nbFragments: nbFragmentsMarqués } = useMemo(
+    () => extraireTexteMarquéAnalyse(texteActif),
     [texteActif]
   );
 
@@ -2251,7 +2256,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         )}
         {(() => {
           const aUneSélection = texteSélectionné && texteSélectionné.trim().length > 20;
-          if (!aUneSélection && nbFragmentsVerts === 0) return null;
+          if (!aUneSélection && nbFragmentsMarqués === 0) return null;
           const BoutonSource = ({ valeur, enfant }) => (
             <button
               onClick={() => setSourceAnalyse(valeur)}
@@ -2272,10 +2277,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             // nombre de MOTS alors que c'est un seuil en CARACTÈRES
             // (texteTropVolumineux, juste en dessous) qui décide si
             // l'analyse sera bloquée — affiche le nombre de caractères.
-            // 18/09/2026 — 3e option "Surligné en vert" (liste d'attente
-            // #2, suite) : trier ce qui doit être analysé dans un texte
-            // long via une couleur dédiée plutôt qu'une sélection à
-            // refaire à chaque fois.
+            // 18/09/2026 — 3e option "Surligné pour analyse" (liste
+            // d'attente #2, suite) : trier ce qui doit être analysé dans
+            // un texte long via le surlignage gris dédié (bouton loupe
+            // dans Editeur.jsx), plutôt qu'une sélection à refaire à
+            // chaque fois. Gris plutôt que vert (choisi puis changé le
+            // jour même) : le vert restait piochable dans la palette
+            // générale pour un usage purement décoratif — risque réel de
+            // faire analyser un passage juste mis en valeur par erreur.
             <div style={{
               display: "flex", gap: 6, marginBottom: 4,
               background: "#f5f5f5", borderRadius: 7, padding: 3,
@@ -2284,8 +2293,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                 <BoutonSource valeur="selection" enfant={t("selection.analyserSelection", { count: texteSélectionné.length })} />
               )}
               <BoutonSource valeur="chapitre" enfant={t("selection.analyserTout")} />
-              {nbFragmentsVerts > 0 && (
-                <BoutonSource valeur="vert" enfant={`🟢 Surligné (${nbFragmentsVerts})`} />
+              {nbFragmentsMarqués > 0 && (
+                <BoutonSource valeur="analyse" enfant={`🔍 Surligné (${nbFragmentsMarqués})`} />
               )}
             </div>
           );

@@ -540,6 +540,25 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
     setPaletteActive(null);
   };
 
+  // Marqueur "à analyser" pour le co-pilote (18/09/2026, remplace le vert
+  // du 18/09/2026 même jour) — un bouton dédié à un clic, avec une couleur
+  // fixe hors de la palette de surlignage ci-dessus, plutôt qu'une des 5
+  // teintes déjà utilisables librement : demande explicite de Joseph
+  // ("pour éviter une erreur") — le vert pouvait aussi être surligné pour
+  // une tout autre raison (mise en valeur), ce qui aurait fait analyser
+  // par erreur un passage juste décoré. Le gris n'a aucun autre usage
+  // décoratif dans l'éditeur, donc aucune ambiguïté possible. Doit rester
+  // synchronisée à la main avec COULEUR_SURLIGNAGE_ANALYSE dans
+  // CopiloteIA.jsx (aucun import partagé entre les deux fichiers).
+  const COULEUR_SURLIGNAGE_ANALYSE = "#BDBDBD";
+  const basculerSurlignageAnalyse = () => {
+    if (editor.isActive("highlight", { color: COULEUR_SURLIGNAGE_ANALYSE })) {
+      editor.chain().focus().unsetHighlight().run();
+    } else {
+      editor.chain().focus().setHighlight({ color: COULEUR_SURLIGNAGE_ANALYSE }).run();
+    }
+  };
+
   const COULEURS_TEXTE = [
     { nom: "Rouge", valeur: "#D32F2F" },
     { nom: "Bleu", valeur: "#1565C0" },
@@ -663,6 +682,21 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
             </div>
           )}
         </div>
+
+        {/* Marqueur "à analyser" (18/09/2026) — bouton à un clic, couleur
+            fixe hors palette (voir commentaire sur COULEUR_SURLIGNAGE_ANALYSE
+            ci-dessus), pas de popover. */}
+        <BoutonOutil actif={editor.isActive("highlight", { color: COULEUR_SURLIGNAGE_ANALYSE })}
+          titre="Surligneur pour analyses"
+          onClick={basculerSurlignageAnalyse}>
+          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
+            <span>🔍</span>
+            <span style={{
+              width: 12, height: 2.5, marginTop: 1, borderRadius: 1,
+              background: COULEUR_SURLIGNAGE_ANALYSE,
+            }} />
+          </span>
+        </BoutonOutil>
       </div>
 
       <Sep />

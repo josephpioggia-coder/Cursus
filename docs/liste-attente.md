@@ -61,13 +61,17 @@ couleur les réponses IA des questions écrivain".
   5 teintes + un retrait, popovers qui se ferment au clic extérieur.
   Couleur de police ajoutée après coup le même jour, sur demande explicite
   ("j'aurais voulu avoir une palette de couleur pour le texte").
-- **Bonus non prévu, ajouté le 18/09/2026** : le vert du surlignage sert
-  désormais aussi de convention pour trier un texte long avant analyse —
-  "Analyser seulement le surligné en vert" dans le co-pilote (voir
-  `extraireTexteSurligneVert` dans `CopiloteIA.jsx`), plutôt que de devoir
-  sélectionner à la souris à chaque fois. Couleur dédiée fixe (`#A5D6A7`),
-  décision explicite de Joseph plutôt qu'un choix de couleur à chaque
-  analyse.
+- **Bonus non prévu, ajouté le 18/09/2026** : un surlignage gris dédié
+  ("Surligneur pour analyses", bouton loupe 🔍 séparé de la palette des 5
+  couleurs dans `Editeur.jsx`) sert de convention pour trier un texte long
+  avant analyse — "🔍 Surligné" apparaît dans le co-pilote dès qu'au moins
+  un fragment est marqué (voir `extraireTexteMarquéAnalyse` dans
+  `CopiloteIA.jsx`), plutôt que de devoir sélectionner à la souris à
+  chaque fois. D'abord fait avec le vert de la palette générale ; changé
+  pour un bouton gris à part le jour même, sur demande explicite de
+  Joseph ("pour éviter une erreur") — le vert restait aussi choisissable
+  pour une raison purement décorative, avec le risque réel de faire
+  analyser par erreur un passage juste mis en valeur.
 - ~~Mise en forme paragraphée des réponses du co-pilote...~~ **Fait le
   18/09/2026** : rendu du fil de dialogue (`FilDialogue` dans
   `CopiloteIA.jsx`) passé en `whiteSpace: "pre-wrap"` pour respecter les
@@ -87,20 +91,20 @@ repris et terminé le 18/09/2026 à sa demande.
 
 **Demande d'origine** : "il faudra un mode d'emploi pour toutes les
 fonctionnalités et codes internes à l'usage de l'écrivain" — dit en même
-temps que la demande #2 (couleur de texte), à propos du vert comme
-convention de tri avant analyse : une couleur qui a un sens fonctionnel
-caché (vert = "à analyser") n'est utilisable sans confusion que si elle
-est documentée quelque part pour l'auteur·ice qui écrit, pas seulement
-dans le code.
+temps que la demande #2 (couleur de texte), à propos d'une couleur ayant
+un sens fonctionnel caché (à l'origine le vert, devenu un bouton gris
+dédié le jour même — voir plus haut) : ce genre de convention n'est
+utilisable sans confusion que si elle est documentée quelque part pour
+l'auteur·ice qui écrit, pas seulement dans le code.
 
 **Ce qui existe déjà, à réunir/reformuler pour un public non technique** :
-- Éditeur (`Editeur.jsx`) : mise en forme, surlignage/couleur de texte
-  (et la convention vert = analyse), mode focus, dictée vocale,
+- Éditeur (`Editeur.jsx`) : mise en forme, surlignage/couleur de texte, le
+  "Surligneur pour analyses" dédié, mode focus, dictée vocale,
   historique de versions, objectifs de session.
 - Co-pilote IA (`CopiloteIA.jsx`) : les 5 onglets (Suggestions,
   Personnages, Références, Cohérence, Vérification), le mode Auto,
   "Aide-moi à avancer", "Conseils de recomposition", la mémoire narrative,
-  le choix de la source à analyser (sélection / chapitre / surligné vert).
+  le choix de la source à analyser (sélection / chapitre entier / surligné pour analyse).
 - Abonnement : quotas de tokens par palier, ce qui se passe en cas
   d'annulation (lecture seule 3 mois, voir CGV art. 6).
 
