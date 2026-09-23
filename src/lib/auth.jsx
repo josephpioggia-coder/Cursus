@@ -114,7 +114,31 @@ export function PageConnexion() {
               rester cohérent d'une page à l'autre. */}
           <img src="/logo-cursus.png" alt="Cursus" style={{ height: 98, width: 98, borderRadius: 16, marginBottom: 8 }} />
           <div style={{ fontSize: 28, fontWeight: 500, color: "#7F77DD", letterSpacing: "0.02em" }}>Cursus</div>
-          <div style={{ fontSize: 13, color: "#999", marginTop: 4 }}>CursEdit pour écrire, CursAudit pour auditer, CursDecision pour décider — l'écriture assistée par IA</div>
+          {/* Texte clarifié (23/09/2026, demande de Joseph) — cette page est,
+              en pratique, la SEULE page que voit un visiteur non connecté
+              (App.jsx : `if (!user) return <PageConnexion />;`), donc la
+              seule que les moteurs de recherche et IA de recherche peuvent
+              lire pour comprendre ce qu'est Cursus. L'ancienne version
+              (une ligne grise de 13px, "CursEdit pour écrire, CursAudit
+              pour auditer, CursDecision pour décider") était trop courte
+              pour ça : une IA de recherche a fini par décrire Cursus comme
+              un outil de "gestion de parcours de formation" et "d'audit de
+              conformité" faute de matière réelle à lire. Texte repris des
+              accroches déjà écrites et validées dans EcranChoixEspace.jsx
+              (le détail complet, lui, reste réservé aux comptes connectés).
+              La riche description en accès libre côté SEO reste un
+              compromis : plus de texte ici aide le référencement, mais
+              cette page est d'abord un formulaire de connexion, pas une
+              page de lancement dédiée (voir PageLancement.jsx, elle,
+              seulement accessible une fois connecté). */}
+          <p style={{ fontSize: 13, color: "#666", marginTop: 8, lineHeight: 1.5 }}>
+            Cursus est une suite d'écriture et d'audit assistée par IA, pour les auteurs, essayistes et rédacteurs de documents longs.
+          </p>
+          <div style={{ fontSize: 11.5, color: "#999", marginTop: 6, lineHeight: 1.6, textAlign: "left" }}>
+            <div><b style={{ color: "#8B2635" }}>CursEdit</b> — votre espace d'écriture accompagné par IA : structurer, rédiger et réviser un manuscrit.</div>
+            <div style={{ marginTop: 3 }}><b style={{ color: "#0E3374" }}>CursAudit</b> — auditer un texte déjà écrit : preuve, cohérence, risques, sur une grille de critères.</div>
+            <div style={{ marginTop: 3 }}><b style={{ color: "#0E7256" }}>CursDecision</b> — transformer une situation complexe ou floue en décision claire, argumentée et suivable.</div>
+          </div>
         </div>
 
         {/* Onglets */}
