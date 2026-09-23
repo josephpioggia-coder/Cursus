@@ -2499,6 +2499,20 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         {onglet === "cohérence" && Array.isArray(données_onglet) && (données_onglet.length === 0 ? <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center" }}>{t("coherence.aucunProbleme")}</p> : données_onglet.map((p, i) => <CarteCoherence key={i} p={p} cléCarte={`coherence:${i}`} dialogue={dialogues[`coherence:${i}`]} onOuvrirDialogue={ouvrirDialogue} onEnvoyerQuestion={envoyerQuestionDialogue} langueProjet={langueProjet} onMémoriserCarte={mémoriserIntention} mémorisationEnCours={mémorisationEnCoursParCarte} />))}
         {onglet === "vérification" && données_onglet && !Array.isArray(données_onglet) && <PanneauVerification résultat={données_onglet} />}
       </div>
+
+      {/* Précaution déontologique (23/09/2026, demande de Joseph) — fixe,
+          sous la colonne d'analyse entière (hors zone de défilement, donc
+          toujours visible, pas seulement sous l'onglet Vérification) : le
+          co-pilote fait des recherches web et donne des références
+          (onglet Références, protocole de vérification à deux IA), donc
+          tout ce qui est produit ici reste sujet à caution malgré la
+          double vérification. */}
+      <div style={{
+        padding: "6px 14px", borderTop: "0.5px solid #e5e5e5", flexShrink: 0,
+        fontSize: 10, color: "#999", fontStyle: "italic", lineHeight: 1.4,
+      }}>
+        Malgré la double vérification, une erreur reste possible — à vérifier avant usage.
+      </div>
     </div>
   );
 }
