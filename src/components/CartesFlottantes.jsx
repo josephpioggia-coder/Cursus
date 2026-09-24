@@ -14,10 +14,13 @@
  * planche — demande explicite de Joseph de garder toute la variété
  * plutôt que d'en réduire le nombre (une première passe n'en gardait
  * que 21, en écartant le livre "Cursus", les livres ouverts et les deux
- * cartes carte/photo comme "hors-sujet" ; revenu dessus). Planche
- * elle-même conservée nulle part ailleurs dans le dépôt — demander à
- * Joseph de la refournir avant tout nouveau recadrage. Redimensionnés à
- * 260-300px de large max et compressés en WebP qualité 84 : ~300 Ko pour
+ * cartes carte/photo comme "hors-sujet" ; revenu dessus). VRAIMENT
+ * détourés (fond transparent, pas un rectangle blanc autour de chaque
+ * livre en biais — voir CLAUDE.md pour la méthode, `rembg` donnait de
+ * mauvais résultats sur cette planche). Planche elle-même conservée
+ * nulle part ailleurs dans le dépôt — demander à Joseph de la refournir
+ * avant tout nouveau recadrage. Redimensionnés à 260-300px de large max
+ * et compressés en WebP qualité 84-88 : ~550 Ko pour
  * les 28 images, chargement encore léger malgré le passage au raster.
  *
  * Mécanique d'animation inchangée par rapport à la version précédente

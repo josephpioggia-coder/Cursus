@@ -78,6 +78,21 @@ Demandes explicites ayant façonné ce fichier, dans l'ordre :
    ouverts et la carte/photo (format paysage, plus larges que hauts)
    ont un `poids` (largeur relative) plus élevé dans `CARTES` pour
    garder une emprise visuelle cohérente avec les cartes portrait.
+4. Ces 28 étaient de simples recadrages RECTANGULAIRES (fond blanc
+   visible autour de chaque livre en biais) — jugé "pas digne d'un
+   professionnel". Chaque fichier est maintenant vraiment DÉTOURÉ (fond
+   transparent, pas de rectangle blanc). `rembg` (déjà utilisé pour
+   Æncre) donne de mauvais résultats ici — modèle de segmentation
+   d'objets naturels, pas adapté à un aplat blanc de studio : plusieurs
+   cartes ressortaient en brume grise translucide. Le détourage utilisé
+   à la place, plus fiable pour ce type de source (recadrages nets sur
+   fond blanc uni) : seuillage par distance à blanc (alpha = 0 en
+   dessous de ~234/255, rampe jusqu'à 252/255) + ne garder que la plus
+   grande composante connexe du masque (élimine les bouts de livre
+   voisin qui traînaient dans les coins du rectangle, quand deux livres
+   se touchent sur la planche) + flou léger sur le seul canal alpha
+   pour adoucir le bord. Les cadrages ont aussi été resserrés d'un
+   deuxième passage pour réduire ces bavures de voisinage à la source.
 
 La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
 28 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
