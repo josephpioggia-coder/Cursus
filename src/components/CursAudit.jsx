@@ -464,6 +464,18 @@ export default function CursAudit({ onVoirAudits } = {}) {
         </button>
       </div>
 
+      {/* Précision ajoutée le 24/09/2026, demande de Joseph après le
+          chantier "images dans le co-pilote" : CursAudit segmente le texte
+          en unités brutes (audit_sections.texte_source) — aucune image
+          n'est extraite ni analysée ici, contrairement au Co-pilote IA de
+          CursEdit, qui voit désormais le contenu des images insérées dans
+          un chapitre. Éviter qu'un·e auteur·ice découvre cette limite
+          après coup, comme ça a été le cas en interne sur "Oracle du
+          Sermon sur la montagne". */}
+      <div style={{ fontSize: 11, color: "#888", background: "#F5F5F7", borderRadius: 6, padding: "6px 10px", marginBottom: 8, lineHeight: 1.5 }}>
+        ℹ️ CursAudit analyse uniquement le texte — les images de votre document (Word ou texte collé) ne sont pas prises en compte. Pour une analyse qui tient compte des images, utilisez le Co-pilote IA directement dans CursEdit.
+      </div>
+
       {source === "coller" ? (
         <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={10} placeholder="Collez le texte ici…"
           style={{ width: "100%", padding: "9px 12px", border: "0.5px solid var(--border)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", resize: "vertical" }} />
