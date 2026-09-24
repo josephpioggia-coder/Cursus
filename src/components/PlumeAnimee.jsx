@@ -41,6 +41,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import CartesFlottantes from "./CartesFlottantes.jsx";
 
 const PHRASES = [
   "Un espace d'écriture accompagné par IA.",
@@ -145,7 +146,12 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
 export default function PlumeAnimee() {
   return (
     <div aria-hidden="true" className="plume-scene">
-      <ColonnePlume décalageDépart={0} vitesseMs={46} />
+      {/* Colonne gauche : cartes flottantes (24/09/2026) — remplace le
+          texte défilant, demande explicite de Joseph. La colonne droite
+          garde le texte défilant (ColonnePlume) inchangé. */}
+      <div className="plume-colonne">
+        <CartesFlottantes />
+      </div>
       <div className="plume-espace-carte" />
       <ColonnePlume décalageDépart={3} vitesseMs={52} />
 
