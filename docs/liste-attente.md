@@ -108,11 +108,20 @@ l'auteur·ice qui écrit, pas seulement dans le code.
 - Abonnement : quotas de tokens par palier, ce qui se passe en cas
   d'annulation (lecture seule 3 mois, voir CGV art. 6).
 
-**Pourquoi reporté** : périmètre large ("toutes les fonctionnalités"), et
-une question de forme reste à trancher avant de l'écrire — document
-Markdown dans le dépôt, page d'aide dans l'application, ou document à part
-pour les premières testeuses (ex. Annie) — plutôt que de deviner et
-produire quelque chose qu'il faudra refaire.
+**Fait le 24/09/2026** — Joseph a tranché : les trois formats envisagés
+sont nécessaires, pas un choix entre eux.
+- `docs/mode-emploi.md` — contenu de référence, dans le dépôt.
+- `src/components/ModeEmploi.jsx` — même contenu en page applicative,
+  accessible via le bouton "Mode d'emploi" (barre supérieure) et un lien
+  depuis la FAQ existante (`AideFAQ.jsx`).
+- Document séparé pour les testeuses (ex. Annie) — publié en artefact
+  autonome, partageable par lien sans connexion à l'application :
+  https://claude.ai/artifact/4KLRCZSmqCjSGbLDKT5Wvk (privé par défaut,
+  à partager explicitement par Joseph avec qui doit y accéder).
+
+Couvre CursEdit, le Co-pilote IA (y compris la vision des images) et
+CursAudit (avec sa limite explicite sur les images) — pas CursDecision,
+qui n'a aucune fonctionnalité réelle à documenter pour l'instant.
 
 ---
 
