@@ -3,24 +3,26 @@
  * ======================================================================
  * Sur le Mode d'emploi (page bien plus longue que l'écran — contrairement
  * à la page de connexion, où Æncre se contente d'un léger flottement sur
- * place, voir aencre-flotte dans auth.jsx), Æncre accompagne la lecture :
+ * place, voir aencre-flotte dans auth.jsx), Æncre accompagne la lecture
+ * en DEUX éléments séparés (aencre-encrier-detoure.png +
+ * aencre-plume-detouree.png, découpés depuis aencre-complet-detoure.png
+ * — voir CLAUDE.md) :
  *
- * - Au repos (haut de page, avant tout scroll), la plume reste posée près
- *   du titre — comme "près de l'encrier" en haut du guide.
- * - Dès qu'on scrolle, ne serait-ce qu'un peu, elle s'en détache et se met
- *   à suivre le mouvement, glissant le long de la marge droite jusqu'au
- *   bas de la page à mesure qu'on progresse dans la lecture.
+ * - L'encrier reste immobile en haut de page, quel que soit le scroll
+ *   (juste un très léger balancement sur place, pour ne pas être figé).
+ * - La plume, seule, descend et remonte avec la lecture : posée près de
+ *   l'encrier au repos (haut de page), elle s'en détache dès qu'on
+ *   scrolle pour suivre le mouvement jusqu'en bas, et revient si on
+ *   remonte (sa position suit `progression`, qui varie dans les deux
+ *   sens avec `scrollTop`).
  *
- * `position: fixed` + recalcul du `top` sur l'évènement scroll (et pas un
- * simple `sticky`) : on veut que sa position verticale suive la
- * progression de lecture, pas qu'elle reste juste collée à l'écran.
- * `progression` est passée dans une racine carrée (Math.sqrt) plutôt
- * qu'utilisée linéairement : la plume se détache vite dès les premiers
- * pixels de scroll ("à peine scrolle-t-on qu'elle se sépare"), puis
- * ralentit pour accompagner la suite de la lecture plus régulièrement.
- *
- * Utilise aencre-complet-detoure.png (fond transparent, voir CLAUDE.md)
- * pour pouvoir flotter par-dessus le contenu sans rectangle blanc.
+ * `position: fixed` + recalcul du `top` sur l'évènement scroll (et pas
+ * un simple `sticky`) : on veut que la position verticale de la plume
+ * suive la progression de lecture, pas qu'elle reste juste collée à
+ * l'écran. `progression` est passée dans une racine carrée (Math.sqrt)
+ * plutôt qu'utilisée linéairement : la plume se détache vite dès les
+ * premiers pixels de scroll, puis ralentit pour accompagner la suite de
+ * la lecture plus régulièrement.
  */
 
 import { useState, useEffect } from "react";
@@ -51,33 +53,60 @@ export default function AencreGuide() {
 
   if (étroit) return null;
 
-  // Position "posée" au repos (haut de page, près du titre) puis parcours
-  // jusqu'à 82% de la hauteur d'écran, pour ne jamais chevaucher le
-  // bouton "Retour" (en haut à gauche) ni sortir du viewport en bas.
-  const hautRepos = 9, hautMax = 82;
+  const margeDroite = "max(8px, calc(50vw - 460px))";
+
+  // Position "posée" au repos (haut de page, près de l'encrier) puis
+  // parcours jusqu'à 82% de la hauteur d'écran, pour ne jamais chevaucher
+  // le bouton "Retour" (en haut à gauche) ni sortir du viewport en bas.
+  const hautRepos = 12.5, hautMax = 82;
   const détachée = Math.sqrt(progression); // détachement rapide, puis ralenti
-  const top = `${hautRepos + détachée * (hautMax - hautRepos)}%`;
+  const topPlume = `${hautRepos + détachée * (hautMax - hautRepos)}%`;
   // Léger tangage pendant le trajet (rentre à plat au repos et à l'arrivée) :
   // donne l'impression d'une plume portée par le mouvement, pas un autocollant.
-  const rotation = Math.sin(progression * Math.PI) * -5;
+  const rotationPlume = Math.sin(progression * Math.PI) * -5;
 
   return (
-    <img
-      src="/aencre-complet-detoure.png"
-      alt=""
-      aria-hidden="true"
-      style={{
-        position: "fixed",
-        right: "max(8px, calc(50vw - 460px))",
-        top,
-        transform: `translateY(-50%) rotate(${rotation}deg)`,
-        width: 110,
-        opacity: 0.92,
-        filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.18))",
-        pointerEvents: "none",
-        zIndex: 900,
-        transition: "top 260ms cubic-bezier(0.33,1,0.68,1), transform 260ms cubic-bezier(0.33,1,0.68,1)",
-      }}
-    />
+    <>
+      <img
+        src="/aencre-encrier-detoure.png"
+        alt=""
+        aria-hidden="true"
+        className="aencre-encrier-fixe"
+        style={{
+          position: "fixed",
+          right: `calc(${margeDroite} + 38px)`,
+          top: 148,
+          width: 66,
+          opacity: 0.9,
+          filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.16))",
+          pointerEvents: "none",
+          zIndex: 899,
+        }}
+      />
+      <img
+        src="/aencre-plume-detouree.png"
+        alt=""
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          right: margeDroite,
+          top: topPlume,
+          transform: `translateY(-72%) rotate(${rotationPlume}deg)`,
+          width: 100,
+          opacity: 0.92,
+          filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.18))",
+          pointerEvents: "none",
+          zIndex: 900,
+          transition: "top 260ms cubic-bezier(0.33,1,0.68,1), transform 260ms cubic-bezier(0.33,1,0.68,1)",
+        }}
+      />
+      <style>{`
+        @keyframes aencre-encrier-flotte {
+          0%, 100% { transform: translateY(0) rotate(-1deg); }
+          50% { transform: translateY(-2px) rotate(1deg); }
+        }
+        .aencre-encrier-fixe { animation: aencre-encrier-flotte 3.6s ease-in-out infinite; }
+      `}</style>
+    </>
   );
 }
