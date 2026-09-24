@@ -744,7 +744,18 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
             }} />
           </span>
         </BoutonOutil>
-        <input ref={inputImageRef} type="file" accept="image/*" style={{ display: "none" }}
+        {/* CORRECTIF 24/09/2026 — accept="image/*" seul faisait apparaître un
+            dossier vide dans le sélecteur de fichiers sur le poste de
+            Joseph (quirk connu : certains navigateurs/OS traduisent
+            "image/*" en une liste d'extensions incomplète, qui exclut des
+            photos réelles au lieu de simplement filtrer). La validation
+            réelle se fait déjà côté JS (téléverserImage vérifie
+            fichier.type), donc l'attribut accept n'a plus qu'un rôle de
+            confort visuel — élargi avec des extensions explicites plutôt
+            que retiré, pour garder un filtrage utile quand il fonctionne. */}
+        <input ref={inputImageRef} type="file"
+          accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif"
+          style={{ display: "none" }}
           onChange={(e) => { téléverserImage(e.target.files?.[0]); e.target.value = ""; }} />
         <BoutonOutil désactivé={téléversementImage} titre="Insérer une image"
           onClick={() => inputImageRef.current?.click()}>
