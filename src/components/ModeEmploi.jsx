@@ -13,20 +13,37 @@
  * une page "légale", pas de raison de les coupler.
  *
  * Bouton "Retour" toujours visible (24/09/2026) — voir BoutonRetourFixe.jsx.
+ *
+ * SCROLL AUTONOME (24/09/2026, suite) — cette page est ouverte depuis
+ * trois endroits différents (auth.jsx avant connexion, EcranChoixEspace,
+ * et App.jsx une fois connecté·e), avec des parents très différents :
+ * certains laissent la fenêtre défiler normalement, d'autres (App.jsx,
+ * la grille principale en `height: 100dvh` + `overflow: hidden`) ne le
+ * permettent pas. Or Æncre (AencreGuide) doit suivre CE scroll pour que
+ * l'encrier reste immobile pendant que la plume seule voyage — si on
+ * écoutait le scroll de la fenêtre et que ce n'est pas elle qui défile,
+ * l'encrier "suit" le contenu au lieu de rester en place. On rend donc
+ * cette page responsable de son propre défilement (`ref` + `overflowY:
+ * auto` sur son propre conteneur, `flex`+`minHeight:0` pour bien
+ * s'ajuster quand un parent flex l'y contraint), et on passe cette
+ * référence à AencreGuide plutôt que de se fier à la fenêtre.
  */
 
+import { useRef } from "react";
 import BoutonRetourFixe from "./BoutonRetourFixe.jsx";
 import AencreGuide from "./AencreGuide.jsx";
 
 function Page({ titre, misÀJour, children, onRetour }) {
+  const conteneurRef = useRef(null);
   return (
-    <div style={{
-      minHeight: "100vh", background: "#f8f8f8",
+    <div ref={conteneurRef} style={{
+      height: "100dvh", flex: "1 1 auto", minHeight: 0, overflowY: "auto",
+      background: "#f8f8f8",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       padding: "40px 20px",
     }}>
       {onRetour && <BoutonRetourFixe onClick={onRetour} couleur="#7F77DD" label="Retour" />}
-      <AencreGuide />
+      <AencreGuide conteneurRef={conteneurRef} />
       <div style={{
         maxWidth: 760, margin: "0 auto", background: "#fff",
         border: "0.5px solid #e5e5e5", borderRadius: 16, padding: "36px 40px",

@@ -23,17 +23,28 @@
  * plutôt qu'utilisée linéairement : la plume se détache vite dès les
  * premiers pixels de scroll, puis ralentit pour accompagner la suite de
  * la lecture plus régulièrement.
+ *
+ * `conteneurRef` (obligatoire, fourni par ModeEmploi/Page) : le scroll
+ * écouté est celui de CE conteneur, pas celui de la fenêtre — ModeEmploi
+ * est ouverte depuis des parents différents selon l'endroit (avant
+ * connexion, ou depuis l'app une fois connecté·e, où la fenêtre elle-même
+ * ne défile pas), donc seul le conteneur que la page gère elle-même est
+ * fiable partout. Sans lui, l'encrier "suivrait" le contenu au lieu de
+ * rester immobile dès qu'on se trouve dans un parent où ce n'est pas la
+ * fenêtre qui scrolle.
  */
 
 import { useState, useEffect } from "react";
 
-export default function AencreGuide() {
+export default function AencreGuide({ conteneurRef }) {
   const [progression, setProgression] = useState(0);
   const [étroit, setÉtroit] = useState(window.innerWidth < 900);
 
   useEffect(() => {
+    const conteneur = conteneurRef?.current;
+    if (!conteneur) return;
     function auScroll() {
-      const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+      const { scrollTop, scrollHeight, clientHeight } = conteneur;
       const hauteurDisponible = scrollHeight - clientHeight;
       const ratio = hauteurDisponible > 0 ? scrollTop / hauteurDisponible : 0;
       setProgression(Math.min(1, Math.max(0, ratio)));
@@ -43,13 +54,13 @@ export default function AencreGuide() {
       setÉtroit(window.innerWidth < 900);
     }
     auScroll();
-    window.addEventListener("scroll", auScroll, { passive: true });
+    conteneur.addEventListener("scroll", auScroll, { passive: true });
     window.addEventListener("resize", auResize);
     return () => {
-      window.removeEventListener("scroll", auScroll);
+      conteneur.removeEventListener("scroll", auScroll);
       window.removeEventListener("resize", auResize);
     };
-  }, []);
+  }, [conteneurRef]);
 
   if (étroit) return null;
 
