@@ -1728,13 +1728,24 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       return;
     }
 
-    // Images du passage analysé (24/09/2026, phase 2) — plafonnées à 3 par
-    // appel : au-delà, le coût (chaque image ~= une unité de texte
-    // supplémentaire, voir appelClaude) grossit sans forcément apporter
-    // plus à l'analyse qu'un sous-ensemble représentatif. Absentes de
-    // "vérification" (protocole distinct, orchestré côté serveur par
-    // verification-deux-ia — pas dans ce périmètre).
-    const images = extraireImages(sourceTexte).slice(0, 3);
+    // Images du CHAPITRE (24/09/2026, phase 2 ; CORRECTIF le jour même,
+    // signalé en usage réel : passées en mode "Surligné pour analyse", ça
+    // ne remontait plus aucune image). Prises sur texteActif, jamais sur
+    // sourceTexte/obtenirSourceHTML() : la sélection à la souris et le
+    // surlignage gris sont tous les deux DÉJÀ du texte brut à ce stade
+    // (textBetween / textContent), une image ne peut pas survivre à une
+    // conversion en texte — chercher des <img> dedans ne pouvait
+    // structurellement rien trouver, quel que soit le passage réellement
+    // marqué. Une image insérée n'importe où dans le chapitre est un
+    // contexte visuel pertinent pour analyser N'IMPORTE quel passage de ce
+    // même chapitre, pas seulement celui qui la contient littéralement —
+    // plafonnée à 3 par appel : au-delà, le coût (chaque image ~= une
+    // unité de texte supplémentaire, voir appelClaude) grossit sans
+    // forcément apporter plus à l'analyse qu'un sous-ensemble
+    // représentatif. Absentes de "vérification" (protocole distinct,
+    // orchestré côté serveur par verification-deux-ia — pas dans ce
+    // périmètre).
+    const images = extraireImages(texteActif).slice(0, 3);
     const noteImages = images.length
       ? `\n\n(${images.length} image${images.length > 1 ? "s" : ""} jointe${images.length > 1 ? "s" : ""} au passage — observe-${images.length > 1 ? "les" : "la"} et tiens-en compte dans ton analyse.)`
       : "";
@@ -1803,7 +1814,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [obtenirSourceHTML, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
+  }, [obtenirSourceHTML, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -1954,12 +1965,16 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const sig = abortRef.current.signal;
       const sourceHTML = obtenirSourceHTML();
       const { texte } = extraireTexte(sourceHTML);
-      // CORRECTIF 24/09/2026 — "Aide-moi à avancer" ne voyait pas les
-      // images du passage (signalé en usage réel : "Je ne peux pas
-      // afficher ni lire d'image insérée dans ton texte"), alors que les
-      // 4 onglets principaux les voient déjà depuis le même jour — même
-      // plafond de 3 images qu'ailleurs.
-      const imagesBlocage = extraireImages(sourceHTML).slice(0, 3);
+      // CORRECTIF 24/09/2026, puis re-CORRECTIF le jour même — "Aide-moi
+      // à avancer" ne voyait pas les images. Premier correctif : cherchait
+      // les images dans `sourceHTML` (obtenirSourceHTML()) — mais en mode
+      // "Surligné pour analyse" ou "Sélection", cette source est DÉJÀ du
+      // texte brut (textContent / textBetween), qui ne peut structurellement
+      // plus contenir d'<img> — d'où "aucune image ne m'arrive" persistant
+      // même après le premier correctif. Comme pour analyser() : les
+      // images viennent de texteActif (le chapitre entier), jamais de la
+      // source filtrée par le sélecteur Sélection/Chapitre/Surligné.
+      const imagesBlocage = extraireImages(texteActif).slice(0, 3);
       const noteImagesBlocage = imagesBlocage.length
         ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
         : "";
@@ -1981,7 +1996,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargementBlocage(false);
     }
-  }, [obtenirSourceHTML, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
+  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
