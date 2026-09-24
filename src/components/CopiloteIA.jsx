@@ -1444,7 +1444,19 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const contexteTexteActuel = texteActuel.trim()
         ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version) :\n"""\n${texteActuel}\n"""`
         : "";
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
+      // CORRECTIF 24/09/2026 — signalé en usage réel : le fil de dialogue
+      // (toutes cartes confondues, pas seulement "Aide-moi à avancer") ne
+      // voyait aucune image du chapitre alors que "Analyser maintenant" et
+      // "Aide-moi à avancer" les voient déjà depuis le même jour — une
+      // question directe ("peux-tu analyser l'image en lien avec le
+      // texte ?") tombait donc systématiquement sur "aucune image ne m'est
+      // parvenue". Même source (texteActif, déjà une dépendance ici) donc
+      // même mécanique, juste jamais branchée sur CE point d'entrée.
+      const imagesDialogue = extraireImages(texteActif).slice(0, 3);
+      const noteImagesDialogue = imagesDialogue.length
+        ? `\n\n(${imagesDialogue.length} image${imagesDialogue.length > 1 ? "s" : ""} du ${typeNœud} jointe${imagesDialogue.length > 1 ? "s" : ""} — observe-${imagesDialogue.length > 1 ? "les" : "la"} si l'auteur·ice t'interroge dessus.)`
+        : "";
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
         promptDialogue(langueProjet),
@@ -1452,7 +1464,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         null,
         DIALOGUE_MAX_TOKENS,
         null,
-        true
+        true,
+        imagesDialogue
       );
 
       const contexteCarteFinal = état?.contexteCarte || contexteCarteInitial || "";
