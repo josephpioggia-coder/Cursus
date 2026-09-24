@@ -75,6 +75,17 @@ const extraireTexteMarquéAnalyse = (html = "") => {
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
 
+// Images insérées dans le passage analysé (24/09/2026, phase 2 — le
+// co-pilote "voit" enfin le contenu des images insérées via
+// Editeur.jsx/BoutonDictee, pas seulement leur présence). Un DOMParser,
+// comme extraireTexteMarquéAnalyse ci-dessus, pour la même raison :
+// fiable face à un HTML mal formé, contrairement à une regex.
+const extraireImages = (html = "") => {
+  if (!html) return [];
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return Array.from(doc.querySelectorAll("img[src]")).map((img) => img.getAttribute("src")).filter(Boolean);
+};
+
 // Découpe un texte en tranches chevauchantes — réf. 60816-01, suite,
 // 30/08/2026, "Conseils de recomposition". Permet d'analyser un chapitre
 // entier au-delà du seuil de 8000 caractères sans jamais résumer le texte
@@ -136,13 +147,26 @@ const OUTIL_RECHERCHE_WEB = [{ type: "web_search_20250305", name: "web_search", 
 // "continue !" à la main pour s'en sortir. Tous les autres appelants
 // n'ont rien à changer : par défaut, le comportement (chaîne simple) est
 // inchangé.
-async function appelClaude(system, user, signal, maxTokens = 1000, tools = null, avecDétails = false) {
+// `images`, 6e paramètre optionnel (24/09/2026, phase 2 des images dans
+// CursEdit) — URLs publiques (bucket Supabase Storage images-manuscrits)
+// à joindre au message en blocs "image" natifs de l'API Claude, en plus
+// du texte. `source: { type: "url", ... }` : Anthropic va chercher
+// l'image lui-même, pas besoin de la télécharger/encoder en base64 ici.
+// claude-prox (l'Edge Function) transmet `messages` tel quel à l'API
+// Anthropic sans y toucher, donc rien à changer côté serveur pour que ça
+// fonctionne. Par défaut (images=null ou vide), comportement strictement
+// inchangé : `content` reste la chaîne `user` telle quelle.
+async function appelClaude(system, user, signal, maxTokens = 1000, tools = null, avecDétails = false, images = null) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
   if (!token) {
     throw new Error("SESSION_EXPIREE");
   }
+
+  const contenu = (images && images.length)
+    ? [{ type: "text", text: user }, ...images.map((url) => ({ type: "image", source: { type: "url", url } }))]
+    : user;
 
   const corpsRequête = {
     // claude-sonnet-5 : moins cher ET plus récent que claude-sonnet-4-6
@@ -154,7 +178,7 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null,
     // cache_control (voir systemAvecLangue) — transmis tel quel, l'API
     // Anthropic accepte les deux formes.
     system,
-    messages: [{ role: "user", content: user }],
+    messages: [{ role: "user", content: contenu }],
   };
   if (tools) corpsRequête.tools = tools;
 
@@ -1676,6 +1700,17 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       return;
     }
 
+    // Images du passage analysé (24/09/2026, phase 2) — plafonnées à 3 par
+    // appel : au-delà, le coût (chaque image ~= une unité de texte
+    // supplémentaire, voir appelClaude) grossit sans forcément apporter
+    // plus à l'analyse qu'un sous-ensemble représentatif. Absentes de
+    // "vérification" (protocole distinct, orchestré côté serveur par
+    // verification-deux-ia — pas dans ce périmètre).
+    const images = extraireImages(sourceTexte).slice(0, 3);
+    const noteImages = images.length
+      ? `\n\n(${images.length} image${images.length > 1 ? "s" : ""} jointe${images.length > 1 ? "s" : ""} au passage — observe-${images.length > 1 ? "les" : "la"} et tiens-en compte dans ton analyse.)`
+      : "";
+
     abortRef.current?.abort();
     abortRef.current = new AbortController();
     setChargement(c => ({ ...c, [ongletCible]: true }));
@@ -1686,18 +1721,18 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const sig = abortRef.current.signal;
 
       if (ongletCible === "suggestions") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("suggestions", p.suggestions || []);
       } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("personnages", p.personnages || []);
       } else if (ongletCible === "références") {
         // maxTokens relevé 4096 → 6144 : les blocs de résultats de recherche
         // web (server_tool_use / web_search_tool_result) consomment de la
         // place dans la réponse en plus du JSON final attendu.
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}`, sig, 6144, OUTIL_RECHERCHE_WEB);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}${noteImages}`, sig, 6144, OUTIL_RECHERCHE_WEB, false, images);
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
@@ -1721,7 +1756,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           }
         }
       } else if (ongletCible === "cohérence") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}`, sig, 4096);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("cohérence", p.points || []);
       } else if (ongletCible === "vérification") {

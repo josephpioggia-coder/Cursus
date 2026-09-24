@@ -132,20 +132,31 @@ barre d'outils (`Editeur.jsx`), upload vers le bucket Supabase Storage
 `images-manuscrits` (un dossier par auteur, RLS par `user_id` — voir
 `2026-09-24-bucket-images-manuscrits.sql`), 8 Mo max par image.
 
-**Ce qui reste à construire (phase 2, non commencée)** : que CursAudit
-(et le Co-pilote IA) comprennent réellement le CONTENU d'une image, pas
-seulement qu'elle existe. Aujourd'hui, `extraireTexte()` aplatit tout le
-HTML en texte brut avant de l'envoyer à l'IA — une image insérée est donc
-invisible pour toute analyse, silencieusement perdue. Pour la lire
-vraiment, il faudrait basculer les appels concernés vers le mode vision
-de Claude (image transmise en plus du texte), ce qui coûte plus cher en
-tokens et demande de revoir l'extraction de texte pour repérer et
-transmettre les images au lieu de les jeter.
+**Ce qui est fait (phase 2 — Co-pilote IA seulement, 24/09/2026)** : les 4
+onglets principaux du Co-pilote (Suggestions, Personnages, Références,
+Cohérence — pas Vérification, protocole distinct) voient désormais
+réellement le CONTENU des images du passage analysé, pas seulement leur
+présence. `extraireImages()` repère les `<img>` du HTML analysé (jusqu'à 3
+par appel, pour plafonner le coût), et `appelClaude()` les transmet à
+Claude en blocs image natifs (`source: {type:"url", url}` — Anthropic va
+chercher l'image lui-même, pas de base64 à gérer côté client). Coût réel
+mesuré : une image ≈ une unité de texte supplémentaire (~1300 tokens pour
+une image de taille courante), pas un multiplicateur de coût comme
+d'abord estimé.
 
-**Pourquoi reporté** : accord explicite de Joseph pour découper en deux
-chantiers — la phase 1 (insertion + affichage) d'abord, la phase 2
-(compréhension par l'IA) plus tard, vu le coût et la complexité
-supplémentaires.
+**Ce qui reste à construire** : la même chose côté **CursAudit**
+(`orchestrer-audit-cursaudit`/`analyser-unite-cursaudit`, le pipeline
+serveur qui traite les unités d'un audit détaillé) — c'est le cas d'usage
+d'origine ("Oracle du Sermon sur la montagne", chaque carte associée à une
+image), pas encore couvert. Ce pipeline est plus complexe (concurrence,
+reprises, détection de chapitres) qu'un simple appel `appelClaude()`
+côté client — un chantier à part, pas juste un copier-coller du
+correctif Co-pilote.
+
+**Pourquoi la phase 2 a été reportée puis reprise le jour même** :
+d'abord estimée trop coûteuse en tokens, l'estimation a été corrigée
+après vérification des ordres de grandeur réels — le coût d'une image est
+comparable à une unité de texte déjà analysée, pas un poste à part.
 
 ---
 
