@@ -10,17 +10,15 @@
  * photos) — chaque livre, rapport, page d'analyse et carte oracle est
  * maintenant un vrai fragment de cette planche, pas un dessin refait.
  *
- * Fichiers sources : `public/cartes/*.webp`, 21 recadrages individuels
- * de la planche (conservée nulle part ailleurs dans le dépôt — demander
- * à Joseph de la refournir avant tout nouveau recadrage). Redimensionnés
- * à 260px de large max et compressés en WebP qualité 84 : ~225 Ko pour
- * les 21 images, chargement encore léger malgré le passage au raster.
- *
- * Volontairement exclus de la planche : le livre "Cursus" (bordeaux,
- * logo — c'est la marque, pas un exemple de contenu produit), les
- * livres ouverts (format paysage, ne rentrent pas dans le gabarit
- * "carte" portrait), et les deux cartes carte/photo de paysage en bas à
- * droite (hors-sujet par rapport à CursEdit/CursAudit/CursDecision).
+ * Fichiers sources : `public/cartes/*.webp`, LES 28 recadrages de la
+ * planche — demande explicite de Joseph de garder toute la variété
+ * plutôt que d'en réduire le nombre (une première passe n'en gardait
+ * que 21, en écartant le livre "Cursus", les livres ouverts et les deux
+ * cartes carte/photo comme "hors-sujet" ; revenu dessus). Planche
+ * elle-même conservée nulle part ailleurs dans le dépôt — demander à
+ * Joseph de la refournir avant tout nouveau recadrage. Redimensionnés à
+ * 260-300px de large max et compressés en WebP qualité 84 : ~300 Ko pour
+ * les 28 images, chargement encore léger malgré le passage au raster.
  *
  * Mécanique d'animation inchangée par rapport à la version précédente
  * (sac mélangé Fisher-Yates pour éviter les doublons visibles, deux
@@ -44,6 +42,7 @@ const CARTES = [
   { fichier: "horizons-interieurs", poids: 1 },
   { fichier: "art-des-liens", poids: 1 },
   { fichier: "memoire-des-lieux", poids: 1 },
+  { fichier: "cursus-livre", poids: 1 },
 
   // Livrables CursDecision
   { fichier: "diagnostic-organisationnel", poids: 1 },
@@ -66,6 +65,16 @@ const CARTES = [
   { fichier: "oracle-transformation", poids: 0.8 },
   { fichier: "oracle-clarte", poids: 0.8 },
   { fichier: "oracle-possibles", poids: 0.8 },
+
+  // Livres ouverts (format paysage, plus larges que hauts)
+  { fichier: "livre-ouvert-generique", poids: 1.3 },
+  { fichier: "livre-ouvert-astrologie", poids: 1.3 },
+  { fichier: "livre-ouvert-arbre", poids: 1.3 },
+  { fichier: "livre-ouvert-mer", poids: 1.3 },
+
+  // Carte géographique et photo (format paysage)
+  { fichier: "carte-geo", poids: 1.15 },
+  { fichier: "photo-cote", poids: 1.15 },
 ];
 
 // Sac mélangé (Fisher-Yates) : tire toutes les entrées d'une copie

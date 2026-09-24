@@ -53,26 +53,32 @@ ci-dessus convient déjà.
 
 ## Cartes flottantes — colonne gauche de la page de connexion
 
-`public/cartes/*.webp` (21 fichiers, ~270 Ko au total) — recadrages
-individuels d'une planche de référence fournie par Joseph le 24/09/2026
-(illustration IA : couvertures de livres peintes, rapports CursDecision,
-cartes oracle). Utilisés par `CartesFlottantes.jsx` (colonne gauche de
-la page de connexion, `src/lib/auth.jsx` → `PlumeAnimee.jsx`).
+`public/cartes/*.webp` (LES 28 fichiers de la planche, ~370 Ko au
+total) — recadrages individuels d'une planche de référence fournie par
+Joseph le 24/09/2026 (illustration IA : couvertures de livres peintes,
+rapports CursDecision, cartes oracle, livres ouverts, carte/photo de
+paysage). Utilisés par `CartesFlottantes.jsx` (colonne gauche de la page
+de connexion, `src/lib/auth.jsx` → `PlumeAnimee.jsx`).
 
-Demande explicite ayant motivé ce recadrage : les versions précédentes
-redessinaient le CONTENU en SVG (icône au trait + texte) plutôt que de
-réutiliser la planche fournie — jugé "amateur, pas professionnel de
-l'édition". Ne pas revenir à des couvertures dessinées en SVG ; si de
-nouvelles cartes sont nécessaires, redemander un fragment de planche
-(ou une nouvelle planche) à Joseph plutôt que d'en dessiner.
+Demandes explicites ayant façonné ce fichier, dans l'ordre :
+1. Les versions précédentes redessinaient le CONTENU en SVG (icône au
+   trait + texte) plutôt que de réutiliser la planche fournie — jugé
+   "amateur, pas professionnel de l'édition". Ne pas revenir à des
+   couvertures dessinées en SVG.
+2. Premier recadrage : bug d'aplatissement RGBA→RGB sans composer sur
+   fond blanc au préalable (`.convert('RGB')` direct sur une image avec
+   transparence partielle) → bruit noir pixelisé visible derrière
+   chaque carte une fois compressé en WebP. Toujours composer sur fond
+   blanc (`Image.new('RGB', ..., (255,255,255))` + `paste(..., mask=alpha)`)
+   avant tout recadrage depuis une planche source RGBA.
+3. Le premier recadrage n'avait gardé que 21 des 28 éléments de la
+   planche (écartés comme "hors-sujet" : le livre "Cursus", les 4
+   livres ouverts, la carte géo et la photo de côte) — retour explicite
+   de Joseph : garder LES 28, ne pas réduire la variété. Les livres
+   ouverts et la carte/photo (format paysage, plus larges que hauts)
+   ont un `poids` (largeur relative) plus élevé dans `CARTES` pour
+   garder une emprise visuelle cohérente avec les cartes portrait.
 
 La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
-21 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
-tout nouveau recadrage.
-
-Volontairement exclus de la planche au moment du recadrage : le livre
-"Cursus" bordeaux (logo/marque, pas un exemple de contenu produit), les
-livres ouverts (format paysage, ne rentrent pas dans le gabarit "carte"
-portrait), et les deux cartes carte/photo de paysage (hors-sujet par
-rapport à CursEdit/CursAudit/CursDecision) — à recadrer depuis la
-planche si Joseph la refournit et souhaite les ajouter.
+28 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
+tout nouveau recadrage ou ajustement des cadrages existants.
