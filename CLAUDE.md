@@ -20,10 +20,9 @@ disponibles pour toute réutilisation future) :
 - `public/aencre-complet-detoure.png` — même cadrage que
   `aencre-complet.jpg` (plume entière + encrier), mais détourée : livre
   et arrière-plan supprimés, fond transparent (PNG, ~620×870). Généré le
-  24/09/2026 par découpe automatique (rembg/isnet). Pas encore utilisé
-  ailleurs — à privilégier dès qu'on veut poser la plume sur un fond
-  personnalisé (page d'accueil, écran de bienvenue, etc.) sans redemander
-  l'image à Joseph.
+  24/09/2026 par découpe automatique (rembg/isnet). Usage actuel :
+  `AencreGuide.jsx`, flotte dans la marge droite du Mode d'emploi
+  (`ModeEmploi.jsx`) et descend avec la progression du scroll.
 
 Avant de demander une nouvelle version, un nouveau recadrage ou un
 nouveau détourage de cette image, vérifier si l'un des fichiers

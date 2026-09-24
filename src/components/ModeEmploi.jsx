@@ -16,6 +16,7 @@
  */
 
 import BoutonRetourFixe from "./BoutonRetourFixe.jsx";
+import AencreGuide from "./AencreGuide.jsx";
 
 function Page({ titre, misÀJour, children, onRetour }) {
   return (
@@ -25,6 +26,7 @@ function Page({ titre, misÀJour, children, onRetour }) {
       padding: "40px 20px",
     }}>
       {onRetour && <BoutonRetourFixe onClick={onRetour} couleur="#7F77DD" label="Retour" />}
+      <AencreGuide />
       <div style={{
         maxWidth: 760, margin: "0 auto", background: "#fff",
         border: "0.5px solid #e5e5e5", borderRadius: 16, padding: "36px 40px",
