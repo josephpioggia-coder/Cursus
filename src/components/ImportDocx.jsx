@@ -225,14 +225,32 @@ async function extraireChapitres(fichier, niveauPartie = 1, niveauChapitre = 2) 
       : (niveauxParStyle[style] !== undefined ? niveauxParStyle[style] : niveauDepuisNomStyle(style));
     const niveau = niveau0Based !== undefined ? niveau0Based + 1 : undefined;
 
-    if (niveau === niveauPartie && texte) {
-      clôturerChapitreCourant();
-      courant = { titre: texte, type: "partie" };
-      lignes = [];
-    } else if (niveau === niveauChapitre && texte) {
-      clôturerChapitreCourant();
-      courant = { titre: texte, type: "chapitre" };
-      lignes = [];
+    // CORRECTIF 24/09/2026 — bug réel trouvé en inspectant un fichier .docx
+    // fourni par Joseph ("A cœur retrouvé") : Word y scinde le titre d'une
+    // Partie sur PLUSIEURS paragraphes consécutifs, tous au même niveau
+    // Titre1 ("I" seul sur sa ligne, PUIS "LE TRAUMA, BLESSURE ET
+    // CICATRICE" sur la suivante — jusqu'à 3 paragraphes pour la Partie
+    // II : "II", "EXPLORATIONS, CHAOS", "FÉCONDS… GUÉRISON ?"). L'ancienne
+    // logique remplaçait `courant` à CHAQUE paragraphe de même niveau,
+    // donc clôturait le fragment précédent avec 0 mot (rien écrit entre
+    // deux fragments consécutifs d'un même titre) — silencieusement
+    // perdu par le filtre `mots > 0` en toute fin de fonction. Un titre de
+    // Partie qui n'a par nature aucun texte à lui (les chapitres suivent
+    // immédiatement, cas de la Partie I ici) subissait le même sort,
+    // entraînant en cascade tous ses chapitres marqués "orphelins" côté
+    // interface (aucune Partie vue avant eux dans le résultat renvoyé).
+    // Fusionne désormais deux titres consécutifs de MÊME niveau tant
+    // qu'aucune ligne de corps n'a encore été ajoutée entre eux — un vrai
+    // changement de section n'arrive qu'une fois du contenu réel écrit.
+    if ((niveau === niveauPartie || niveau === niveauChapitre) && texte) {
+      const type = niveau === niveauPartie ? "partie" : "chapitre";
+      if (courant && courant.type === type && lignes.length === 0) {
+        courant = { ...courant, titre: `${courant.titre} ${texte}` };
+      } else {
+        clôturerChapitreCourant();
+        courant = { titre: texte, type };
+        lignes = [];
+      }
     } else if (courant) {
       lignes.push({ texte, idsImages });
       idsImages.forEach((id) => idsImagesVus.add(id));
@@ -240,7 +258,12 @@ async function extraireChapitres(fichier, niveauPartie = 1, niveauChapitre = 2) 
   }
   clôturerChapitreCourant();
 
-  const chapitresAvecTexte = chapitres.filter(c => c.mots > 0);
+  // CORRECTIF 24/09/2026 (suite) — une Partie n'a normalement AUCUN mot à
+  // elle : ses chapitres suivent immédiatement, c'est une structure tout
+  // à fait normale (cas de la Partie I). Le filtre par nombre de mots ne
+  // doit donc écarter que les CHAPITRES vides (un titre créé par erreur,
+  // sans jamais rien écrire dessous) — jamais une Partie, même à 0 mot.
+  const chapitresAvecTexte = chapitres.filter(c => c.mots > 0 || c.type === "partie");
 
   // Téléversement des images UNE FOIS pour tout le document (pas par
   // chapitre) — un import peut couvrir des dizaines de chapitres, mieux
