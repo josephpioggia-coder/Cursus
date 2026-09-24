@@ -8,13 +8,17 @@
  * aencre-plume-detouree.png, découpés depuis aencre-complet-detoure.png
  * — voir CLAUDE.md) :
  *
- * - L'encrier reste immobile en haut de page, quel que soit le scroll
- *   (juste un très léger balancement sur place, pour ne pas être figé).
- * - La plume, seule, descend et remonte avec la lecture : posée près de
+ * - L'encrier est un élément de page normal (`position: absolute`, pas
+ *   `fixed`) posé près du titre : il défile AVEC le contenu et disparaît
+ *   par le haut dès qu'on avance dans la lecture, exactement comme le
+ *   titre "Mode d'emploi" juste à côté de lui — pas un élément qui reste
+ *   ancré à l'écran.
+ * - La plume, elle, descend et remonte avec la lecture : posée près de
  *   l'encrier au repos (haut de page), elle s'en détache dès qu'on
  *   scrolle pour suivre le mouvement jusqu'en bas, et revient si on
  *   remonte (sa position suit `progression`, qui varie dans les deux
- *   sens avec `scrollTop`).
+ *   sens avec `scrollTop`) — elle, reste "fixed" à l'écran pendant le
+ *   trajet.
  *
  * `position: fixed` + recalcul du `top` sur l'évènement scroll (et pas
  * un simple `sticky`) : on veut que la position verticale de la plume
@@ -84,7 +88,7 @@ export default function AencreGuide({ conteneurRef }) {
         aria-hidden="true"
         className="aencre-encrier-fixe"
         style={{
-          position: "fixed",
+          position: "absolute",
           right: `calc(${margeDroite} + 38px)`,
           top: 148,
           width: 66,

@@ -38,6 +38,8 @@ function Page({ titre, misÀJour, children, onRetour }) {
   return (
     <div ref={conteneurRef} style={{
       height: "100dvh", flex: "1 1 auto", minHeight: 0, overflowY: "auto",
+      position: "relative", // ancre l'encrier (position: absolute dans AencreGuide) à CE
+      // conteneur plutôt qu'à la page entière, pour qu'il défile avec son contenu.
       background: "#f8f8f8",
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       padding: "40px 20px",
