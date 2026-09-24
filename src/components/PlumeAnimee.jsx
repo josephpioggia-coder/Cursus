@@ -110,10 +110,15 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
         const y = rectCaret.top - rectConteneur.top;
         const t = (performance.now() - départRef.current) / 1000;
         const bob = Math.sin(t * 5.2) * 6; // ±6px, ~1,2 aller-retour/seconde
-        // Décalage recalibré (24/09/2026, plume à 72px) : centre
-        // approximativement le corps de la plume sur le caret plutôt que
-        // son coin haut-gauche.
-        plumeRef.current.style.transform = `translate(${x - 20}px, ${y + bob - 32}px) rotate(${Math.sin(t * 5.2) * 10 - 25}deg)`;
+        // CORRECTIF — signalé : la pointe de la plume tombait sur la ligne
+        // du DESSOUS plutôt que sur les lettres écrites. Cause : le calcul
+        // précédent centrait la BOÎTE de l'émoji (72×72) sur le caret, pas
+        // sa pointe (en bas à gauche du glyphe 🪶). Combiné à
+        // `transform-origin` déplacé sur cette même pointe (voir CSS) —
+        // la rotation pivote maintenant autour d'elle au lieu du centre de
+        // la boîte, donc la pointe reste ancrée près du caret même
+        // pendant l'oscillation, plutôt que de dériver avec la rotation.
+        plumeRef.current.style.transform = `translate(${x - 16}px, ${y + bob - 60}px) rotate(${Math.sin(t * 5.2) * 10 - 25}deg)`;
       }
 
       timerId = setTimeout(tick, vitesseMs);
@@ -174,6 +179,10 @@ export default function PlumeAnimee() {
           opacity: 0.7;
           filter: drop-shadow(0 0 1px rgba(139,38,53,0.3));
           will-change: transform;
+          /* Pivot sur la pointe du glyphe (bas-gauche), pas le centre de
+             la boîte — la rotation ne doit pas éloigner la pointe du
+             caret pendant l'oscillation. */
+          transform-origin: 22% 85%;
         }
         /* Sous ~980px, la boîte de connexion occupe presque toute la
            largeur : plus de place pour des colonnes latérales lisibles. */
