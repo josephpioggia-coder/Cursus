@@ -44,6 +44,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import Highlight from "@tiptap/extension-highlight";
 import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
+import Image from "@tiptap/extension-image";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
@@ -291,6 +292,8 @@ const STYLES_EDITEUR = `
   }
   .ProseMirror mark { background: #faeeda; border-radius: 2px; padding: 0 2px; }
   .ProseMirror hr { border: none; border-top: 1px solid #e5e5e5; margin: 2em 0; }
+  .ProseMirror img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.8em 0; display: block; }
+  .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #7F77DD; outline-offset: 2px; }
   .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     color: #bbb;
@@ -575,6 +578,50 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
     setPaletteActive(null);
   };
 
+  // Insertion d'image (24/09/2026, liste d'attente — demande de Joseph :
+  // "pouvoir intégrer des schémas ou des photos dans le texte, dans
+  // CursEdit"). Upload vers le bucket Supabase Storage `images-manuscrits`
+  // (public, un dossier par utilisateur via son user_id — voir la policy
+  // RLS d'insertion, envoyée séparément en SQL), puis insertion de l'URL
+  // publique dans l'éditeur. Phase 1 seulement : CursAudit/CopiloteIA ne
+  // "voient" pas encore le contenu de l'image (voir commentaire sur
+  // Image.configure plus bas dans useEditor).
+  const inputImageRef = useRef(null);
+  const [téléversementImage, setTéléversementImage] = useState(false);
+  const [erreurImage, setErreurImage] = useState(null);
+  const TAILLE_MAX_IMAGE = 8 * 1024 * 1024; // 8 Mo
+
+  const téléverserImage = async (fichier) => {
+    if (!fichier) return;
+    setErreurImage(null);
+    if (!fichier.type.startsWith("image/")) {
+      setErreurImage("Ce fichier n'est pas une image.");
+      return;
+    }
+    if (fichier.size > TAILLE_MAX_IMAGE) {
+      setErreurImage("Image trop lourde (8 Mo maximum).");
+      return;
+    }
+    setTéléversementImage(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Non connecté.");
+      const extension = (fichier.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const chemin = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+      const { error: erreurUpload } = await supabase.storage
+        .from("images-manuscrits")
+        .upload(chemin, fichier, { contentType: fichier.type, upsert: false });
+      if (erreurUpload) throw erreurUpload;
+      const { data: { publicUrl } } = supabase.storage.from("images-manuscrits").getPublicUrl(chemin);
+      editor.chain().focus().setImage({ src: publicUrl, alt: fichier.name }).run();
+    } catch (err) {
+      journaliserErreur("Editeur:téléverserImage", err.message);
+      setErreurImage("Échec de l'envoi de l'image. Réessaie.");
+    } finally {
+      setTéléversementImage(false);
+    }
+  };
+
   const Sep = () => (
     <div style={{ width: 0.5, height: 18, background: "#e5e5e5", margin: "0 4px" }} />
   );
@@ -697,7 +744,16 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
             }} />
           </span>
         </BoutonOutil>
+        <input ref={inputImageRef} type="file" accept="image/*" style={{ display: "none" }}
+          onChange={(e) => { téléverserImage(e.target.files?.[0]); e.target.value = ""; }} />
+        <BoutonOutil désactivé={téléversementImage} titre="Insérer une image"
+          onClick={() => inputImageRef.current?.click()}>
+          {téléversementImage ? "…" : "🖼️"}
+        </BoutonOutil>
       </div>
+      {erreurImage && (
+        <div style={{ fontSize: 11, color: "#A32D2D", padding: "2px 4px", width: "100%" }}>{erreurImage}</div>
+      )}
 
       <Sep />
 
@@ -1067,6 +1123,14 @@ export default function Editeur({
       // color (voir doc TipTap, Color ne fonctionne pas seul).
       TextStyle,
       Color,
+      // Images (24/09/2026, demande de Joseph : "pouvoir intégrer des
+      // schémas ou des photos dans le texte, dans CursEdit") — phase 1
+      // (insertion + affichage) uniquement : le pipeline d'analyse
+      // (extraireTexte dans CopiloteIA.jsx) continue de tout aplatir en
+      // texte brut, une image insérée est donc invisible pour l'IA à ce
+      // stade — une vraie lecture par IA (mode vision de Claude) est un
+      // chantier séparé, plus coûteux, pas encore fait.
+      Image.configure({ inline: false, allowBase64: false }),
       CharacterCount,
       Placeholder.configure({
         placeholder: ({ node }) => {

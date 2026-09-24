@@ -113,3 +113,51 @@ une question de forme reste à trancher avant de l'écrire — document
 Markdown dans le dépôt, page d'aide dans l'application, ou document à part
 pour les premières testeuses (ex. Annie) — plutôt que de deviner et
 produire quelque chose qu'il faudra refaire.
+
+---
+
+## #4 — Images dans CursEdit, lues par CursAudit
+
+**Ajouté le** 24/09/2026.
+
+**Demande d'origine** : "pouvoir intégrer des schémas ou des photos dans
+le texte, dans CursEdit, et pouvoir les lire dans CursAudit [...] certains
+livres ont cela [...] parfois les références textuelles se rapportent à
+ces photos [...] dans Oracle du Sermon sur la montagne, chaque carte est
+associée à une image, et là je n'en ai aucune."
+
+**Ce qui est fait (phase 1, 24/09/2026)** : insertion et affichage
+d'images dans CursEdit — `@tiptap/extension-image`, bouton 🖼️ dans la
+barre d'outils (`Editeur.jsx`), upload vers le bucket Supabase Storage
+`images-manuscrits` (un dossier par auteur, RLS par `user_id` — voir
+`2026-09-24-bucket-images-manuscrits.sql`), 8 Mo max par image.
+
+**Ce qui reste à construire (phase 2, non commencée)** : que CursAudit
+(et le Co-pilote IA) comprennent réellement le CONTENU d'une image, pas
+seulement qu'elle existe. Aujourd'hui, `extraireTexte()` aplatit tout le
+HTML en texte brut avant de l'envoyer à l'IA — une image insérée est donc
+invisible pour toute analyse, silencieusement perdue. Pour la lire
+vraiment, il faudrait basculer les appels concernés vers le mode vision
+de Claude (image transmise en plus du texte), ce qui coûte plus cher en
+tokens et demande de revoir l'extraction de texte pour repérer et
+transmettre les images au lieu de les jeter.
+
+**Pourquoi reporté** : accord explicite de Joseph pour découper en deux
+chantiers — la phase 1 (insertion + affichage) d'abord, la phase 2
+(compréhension par l'IA) plus tard, vu le coût et la complexité
+supplémentaires.
+
+---
+
+## #5 — Éléments graphiques dans CursDecision
+
+**Ajouté le** 24/09/2026.
+
+**Demande d'origine** : envisager des éléments graphiques (tableaux
+comparatifs, matrices de risques) pour présenter les résultats de
+CursDecision autrement qu'en texte.
+
+**Pourquoi reporté** : CursDecision n'a aujourd'hui aucune fonctionnalité
+réelle (page marketing seule, zéro backend) — ajouter des graphiques
+suppose d'abord de construire CursDecision depuis zéro, un chantier en
+soi. Discuté mais pas priorisé pour l'instant.
