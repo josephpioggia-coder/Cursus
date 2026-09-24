@@ -86,8 +86,11 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
         const x = rectCaret.left - rectConteneur.left;
         const y = rectCaret.top - rectConteneur.top;
         const t = (performance.now() - départRef.current) / 1000;
-        const bob = Math.sin(t * 5.2) * 5; // ±5px, ~1,2 aller-retour/seconde
-        plumeRef.current.style.transform = `translate(${x - 4}px, ${y + bob - 6}px) rotate(${Math.sin(t * 5.2) * 10 - 25}deg)`;
+        const bob = Math.sin(t * 5.2) * 6; // ±6px, ~1,2 aller-retour/seconde
+        // Décalage recalibré (24/09/2026, plume agrandie) : centre
+        // approximativement le corps de la plume sur le caret plutôt que
+        // son coin haut-gauche.
+        plumeRef.current.style.transform = `translate(${x - 10}px, ${y + bob - 16}px) rotate(${Math.sin(t * 5.2) * 10 - 25}deg)`;
       }
 
       timerId = setTimeout(tick, vitesseMs);
@@ -143,8 +146,8 @@ export default function PlumeAnimee() {
         }
         .plume-icone {
           position: absolute; top: 0; left: 0;
-          font-size: 20px;
-          opacity: 0.5;
+          font-size: 36px;
+          opacity: 0.7;
           filter: drop-shadow(0 0 1px rgba(139,38,53,0.3));
           will-change: transform;
         }
