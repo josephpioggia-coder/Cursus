@@ -14,6 +14,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "./supabase.js";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "../components/PagesLegales.jsx";
 import ModeEmploi from "../components/ModeEmploi.jsx";
+import PlumeAnimee from "../components/PlumeAnimee.jsx";
 
 export function useAuth() {
   const [user, setUser]           = useState(null);
@@ -107,10 +108,13 @@ export function PageConnexion() {
     <div style={{
       minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
       background: "#f8f8f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      position: "relative", overflow: "hidden",
     }}>
+      <PlumeAnimee />
       <div style={{
         background: "#fff", border: "0.5px solid #e5e5e5",
         borderRadius: 16, padding: "40px 48px", width: 380,
+        position: "relative", zIndex: 1,
       }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
