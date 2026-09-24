@@ -61,6 +61,20 @@ function Encadré({ children, couleur = "#7F77DD" }) {
     </div>
   );
 }
+function Table({ lignes }) {
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0 16px", fontSize: 13 }}>
+      <tbody>
+        {lignes.map(([a, b], i) => (
+          <tr key={i} style={{ borderBottom: "0.5px solid #eee" }}>
+            <td style={{ padding: "6px 10px 6px 0", fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "top" }}>{a}</td>
+            <td style={{ padding: "6px 0", color: "#555" }}>{b}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export default function ModeEmploi({ onRetour }) {
   return (
@@ -72,7 +86,45 @@ export default function ModeEmploi({ onRetour }) {
         <strong>CursDecision</strong> (pas encore construit — page de présentation seulement).
       </P>
 
-      <H2>1. CursEdit — l'espace d'écriture</H2>
+      <H2>1. Premiers pas</H2>
+
+      <H3>Créer un compte</H3>
+      <P>
+        Sur <code>cursus.pro</code>, l'écran d'accueil propose deux onglets : <strong>Connexion</strong> et{" "}
+        <strong>Créer un compte</strong>. Pour un nouveau compte : email + mot de passe, puis un email de
+        confirmation est envoyé — il faut cliquer sur le lien qu'il contient avant de pouvoir se connecter.
+      </P>
+
+      <H3>Choisir un espace</H3>
+      <P>
+        Une fois connecté·e, un écran présente les trois espaces : CursEdit, CursAudit, CursDecision. C'est le
+        point de départ à chaque connexion tant qu'aucun espace n'a été choisi dans la session en cours.
+      </P>
+
+      <H3>S'abonner</H3>
+      <P>
+        CursEdit nécessite un abonnement payant ("Tarification" dans le menu de gauche une fois dans l'espace
+        CursEdit) — cinq paliers cumulatifs. CursAudit se débloque à partir du palier Essentiel, puis se facture{" "}
+        <strong>en plus</strong>, à l'acte, par audit réalisé — ce n'est pas inclus dans l'abonnement CursEdit.
+      </P>
+
+      <H3>Se repérer dans le menu de gauche</H3>
+      <Table lignes={[
+        ["Tableau de bord", "Vue d'ensemble : projets, mots écrits, sessions récentes"],
+        ["Mes projets", "Liste de tous vos projets"],
+        ["Éditeur", "Le dernier chapitre ouvert"],
+        ["Bibliothèque", "Citations et références enregistrées"],
+        ["Carnet d'idées", "Notes et fragments capturés hors chapitre"],
+        ["Tarification (CursEdit)", "Les 5 paliers d'abonnement"],
+        ["CursAudit", "Créer un nouvel audit"],
+        ["Mes audits", "Vos audits en cours et terminés"],
+      ]} />
+      <P style={{ fontSize: 12, color: "#999" }}>
+        Deux entrées supplémentaires (Administration, Supervision) n'apparaissent que sur le compte propriétaire
+        du projet Cursus — pas destinées aux auteur·ice·s testeuses.
+      </P>
+
+      <H2>2. CursEdit — l'espace d'écriture</H2>
 
       <H3>Structurer un projet</H3>
       <P>
@@ -116,7 +168,7 @@ export default function ModeEmploi({ onRetour }) {
         <li><strong>Objectifs de session</strong> — mots ou temps, avec minuteur</li>
       </Ul>
 
-      <H2>2. Le Co-pilote IA</H2>
+      <H2>3. Le Co-pilote IA</H2>
       <P>Le panneau à droite de l'éditeur, cinq onglets :</P>
       <Ul>
         <li><strong>Suggestions</strong> — propositions contextuelles sur le passage analysé</li>
@@ -167,7 +219,7 @@ export default function ModeEmploi({ onRetour }) {
         Au-delà, les analyses sont en pause jusqu'au renouvellement, ou un crédit ponctuel peut être ajouté.
       </P>
 
-      <H2>3. CursAudit — l'espace d'audit critique</H2>
+      <H2>4. CursAudit — l'espace d'audit critique</H2>
       <P>
         Différent du Co-pilote : CursAudit <strong>audite un texte déjà écrit</strong>, depuis un espace séparé,
         pas depuis l'éditeur.
@@ -184,7 +236,7 @@ export default function ModeEmploi({ onRetour }) {
         compte d'images, utilisez le Co-pilote dans CursEdit.
       </Encadré>
 
-      <H2>4. Abonnement et accès</H2>
+      <H2>5. Abonnement et accès</H2>
       <P>
         Cinq paliers CursEdit, cumulatifs : chaque palier supérieur débloque progressivement CursAudit (dès
         Essentiel) puis CursDecision (dès Initié).

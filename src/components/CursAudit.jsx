@@ -555,7 +555,14 @@ export default function CursAudit({ onVoirAudits } = {}) {
   );
 
   return (
-    <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 720 }}>
+    // CORRECTIF 24/09/2026 — signalé en usage réel ("pourquoi ces grands
+    // espaces à droite se sont ouverts") : maxWidth sans margin auto
+    // plafonne la largeur du formulaire mais le laisse plaqué à gauche de
+    // sa zone flex — sur un écran large, tout l'espace au-delà de 720px
+    // reste vide au lieu d'être réparti des deux côtés. margin: "0 auto"
+    // centre la boîte dans l'espace que le flex lui alloue (comportement
+    // standard des marges auto en flexbox).
+    <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 720, margin: "0 auto" }}>
       <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--texte-primaire)", marginBottom: 4 }}>CursAudit</h1>
       <p style={{ fontSize: 13, color: "var(--texte-tertiaire)", marginBottom: 24 }}>
         Créer un nouvel audit — collez un texte ou importez un fichier Word, choisissez la profondeur d'analyse.

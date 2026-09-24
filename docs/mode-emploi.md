@@ -8,7 +8,38 @@ Cursus s'articule autour de trois espaces, débloqués progressivement selon vot
 
 ---
 
-## 1. CursEdit — l'espace d'écriture
+## 1. Premiers pas
+
+### Créer un compte
+
+Sur `cursus.pro`, l'écran d'accueil propose deux onglets : **Connexion** et **Créer un compte**. Pour un nouveau compte : email + mot de passe, puis un email de confirmation est envoyé — il faut cliquer sur le lien qu'il contient avant de pouvoir se connecter.
+
+### Choisir un espace
+
+Une fois connecté·e, un écran présente les trois espaces : **CursEdit**, **CursAudit**, **CursDecision**. C'est le point de départ à chaque connexion tant qu'aucun espace n'a été choisi dans la session en cours.
+
+### S'abonner
+
+CursEdit nécessite un abonnement payant (voir "Tarification" dans le menu de gauche une fois dans l'espace CursEdit) — cinq paliers cumulatifs, du moins cher au plus complet. CursAudit se débloque à partir du palier Essentiel, puis se facture **en plus**, à l'acte, par audit réalisé (ce n'est pas inclus dans l'abonnement CursEdit).
+
+### Se repérer dans le menu de gauche (espace CursEdit)
+
+| Entrée | À quoi ça sert |
+|---|---|
+| Tableau de bord | Vue d'ensemble : projets, mots écrits, sessions récentes |
+| Mes projets | Liste de tous vos projets |
+| Éditeur | Le dernier chapitre ouvert |
+| Bibliothèque | Citations et références enregistrées |
+| Carnet d'idées | Notes et fragments capturés hors chapitre |
+| Tarification (CursEdit) | Les 5 paliers d'abonnement |
+| CursAudit | Créer un nouvel audit |
+| Mes audits | Vos audits en cours et terminés |
+
+Deux entrées supplémentaires (**Administration**, **Supervision**) n'apparaissent que sur le compte propriétaire du projet Cursus — elles ne sont pas destinées aux auteur·ice·s testeuses.
+
+---
+
+## 2. CursEdit — l'espace d'écriture
 
 ### Structurer un projet
 
@@ -51,7 +82,7 @@ Un objectif de mots ou de temps peut être fixé par séance d'écriture, avec u
 
 ---
 
-## 2. Le Co-pilote IA
+## 3. Le Co-pilote IA
 
 Le panneau à droite de l'éditeur. Cinq onglets :
 
@@ -104,7 +135,7 @@ Chaque palier d'abonnement inclut un quota mensuel de tokens IA (visible en haut
 
 ---
 
-## 3. CursAudit — l'espace d'audit critique
+## 4. CursAudit — l'espace d'audit critique
 
 Différent du Co-pilote : CursAudit **audite un texte déjà écrit**, plutôt que d'accompagner l'écriture en cours. Il s'utilise depuis un espace séparé, pas depuis l'éditeur.
 
@@ -126,7 +157,7 @@ Le mode "2 IA" fait relire chaque unité par un second modèle (GPT), qui signal
 
 ---
 
-## 4. Abonnement et accès
+## 5. Abonnement et accès
 
 ### Les paliers
 
