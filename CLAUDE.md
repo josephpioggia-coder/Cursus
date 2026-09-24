@@ -50,3 +50,29 @@ l'écran ou non — à garder pour toute future intégration :
 Avant de demander une nouvelle version, un nouveau recadrage ou un
 nouveau détourage de cette image, vérifier si l'un des fichiers
 ci-dessus convient déjà.
+
+## Cartes flottantes — colonne gauche de la page de connexion
+
+`public/cartes/*.webp` (21 fichiers, ~270 Ko au total) — recadrages
+individuels d'une planche de référence fournie par Joseph le 24/09/2026
+(illustration IA : couvertures de livres peintes, rapports CursDecision,
+cartes oracle). Utilisés par `CartesFlottantes.jsx` (colonne gauche de
+la page de connexion, `src/lib/auth.jsx` → `PlumeAnimee.jsx`).
+
+Demande explicite ayant motivé ce recadrage : les versions précédentes
+redessinaient le CONTENU en SVG (icône au trait + texte) plutôt que de
+réutiliser la planche fournie — jugé "amateur, pas professionnel de
+l'édition". Ne pas revenir à des couvertures dessinées en SVG ; si de
+nouvelles cartes sont nécessaires, redemander un fragment de planche
+(ou une nouvelle planche) à Joseph plutôt que d'en dessiner.
+
+La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
+21 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
+tout nouveau recadrage.
+
+Volontairement exclus de la planche au moment du recadrage : le livre
+"Cursus" bordeaux (logo/marque, pas un exemple de contenu produit), les
+livres ouverts (format paysage, ne rentrent pas dans le gabarit "carte"
+portrait), et les deux cartes carte/photo de paysage (hors-sujet par
+rapport à CursEdit/CursAudit/CursDecision) — à recadrer depuis la
+planche si Joseph la refournit et souhaite les ajouter.
