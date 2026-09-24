@@ -38,7 +38,7 @@ function Entrée({ question, réponse }) {
   );
 }
 
-export default function AideFAQ({ onFermer }) {
+export default function AideFAQ({ onFermer, onVoirModeEmploi }) {
   const { t } = useTranslation("common");
   const faq = t("faq", { returnObjects: true }) || [];
 
@@ -83,6 +83,18 @@ export default function AideFAQ({ onFermer }) {
 
         <div style={{ padding: "14px 22px", borderTop: "0.5px solid #f0f0f0", fontSize: 11, color: "#999", textAlign: "center" }}>
           {t("aide.pied")}
+          {/* 24/09/2026, liste d'attente #3 — lien vers le guide complet
+              (ModeEmploi.jsx), cette FAQ ne couvrant que quelques
+              questions ponctuelles, pas l'ensemble des fonctionnalités. */}
+          {onVoirModeEmploi && (
+            <>
+              {" · "}
+              <button onClick={onVoirModeEmploi}
+                style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#7F77DD", fontSize: 11, fontFamily: "inherit", textDecoration: "underline" }}>
+                Voir le mode d'emploi complet
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

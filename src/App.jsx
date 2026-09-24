@@ -36,6 +36,7 @@ import Editeur from "./components/Editeur.jsx";
 import TableauDeBord from "./components/TableauDeBord.jsx";
 import Bibliotheque from "./components/Bibliotheque.jsx";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "./components/PagesLegales.jsx";
+import ModeEmploi from "./components/ModeEmploi.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
@@ -2247,6 +2248,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           style={{ fontSize: 11, color: "#7F77DD", background: "none", border: "0.5px solid #7F77DD40", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("aide.bouton")}
         </button>
+        <button onClick={() => setVue("mode-emploi")}
+          title="Guide complet des fonctionnalités"
+          style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
+          Mode d'emploi
+        </button>
         <button onClick={onChangerEspace}
           title="Changer d'espace (CursEdit / CursAudit)"
           style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -2463,6 +2469,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {vue === "mentions" && <MentionsLegales onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
         {vue === "cgv" && <CGV onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
         {vue === "confidentialite" && <PolitiqueConfidentialite onRetour={() => setVue("tableau")} onNaviguer={setVue} />}
+
+        {/* Mode d'emploi (24/09/2026, liste d'attente #3) — même principe
+            que les pages légales ci-dessus, mais pas de navigation croisée
+            entre les deux (contenus indépendants). */}
+        {vue === "mode-emploi" && <ModeEmploi onRetour={() => setVue("tableau")} />}
 
         {/* Vue : tarification */}
         {vue === "tarification" && (
@@ -2855,7 +2866,12 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
       </div>
 
       {/* Centre d'aide — accessible depuis n'importe quel écran */}
-      {aideOuverte && <AideFAQ onFermer={() => setAideOuverte(false)} />}
+      {aideOuverte && (
+        <AideFAQ
+          onFermer={() => setAideOuverte(false)}
+          onVoirModeEmploi={() => { setAideOuverte(false); setVue("mode-emploi"); }}
+        />
+      )}
 
       {/* Modal import Word */}
       {importOuvert && projetActif && (
