@@ -154,15 +154,37 @@ export function PageConnexion() {
               Joseph, "ne serait-ce que parce qu'il indique les premiers
               pas à l'inscription" — utile à voir AVANT même de remplir le
               formulaire, pas juste accessible en cherchant tout en bas. Le
-              lien du pied de page reste aussi, pour qui revient plus tard. */}
-          <button onClick={() => setPageLégale("mode-emploi")}
+              lien du pied de page reste aussi, pour qui revient plus tard.
+              RENDU LUDIQUE (24/09/2026, suite) — demande explicite : "rendre
+              l'accès au mode d'emploi plus ludique" en y incorporant la
+              mascotte de Cursus, baptisée "Æncre" par Joseph (jeu de mots
+              avec "encre") — la plume animée du logo, ici recadrée en
+              portrait (public/aencre-icone.png, issu de l'illustration
+              fournie). Léger mouvement continu (flottement) + réaction au
+              survol, pour donner un peu de vie plutôt qu'un simple bouton
+              texte. */}
+          <button onClick={() => setPageLégale("mode-emploi")} className="bouton-aencre"
             style={{
-              marginTop: 14, width: "100%", padding: "8px 12px", borderRadius: 8,
+              marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 14px 7px 7px", borderRadius: 30, textAlign: "left",
               border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
               fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
             }}>
-            📖 Voir le mode d'emploi — premiers pas, fonctionnalités
+            <img src="/aencre-icone.png" alt="Æncre" className="aencre-avatar" style={{
+              width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+              boxShadow: "0 2px 6px rgba(127,119,221,0.35)",
+            }} />
+            <span><b>Æncre</b> vous guide — mode d'emploi, premiers pas</span>
           </button>
+          <style>{`
+            @keyframes aencre-flotte {
+              0%, 100% { transform: translateY(0) rotate(-2deg); }
+              50% { transform: translateY(-3px) rotate(2deg); }
+            }
+            .aencre-avatar { animation: aencre-flotte 2.8s ease-in-out infinite; }
+            .bouton-aencre:hover .aencre-avatar { animation-play-state: paused; transform: scale(1.12) rotate(-6deg); }
+            .bouton-aencre:hover { border-color: #7F77DD80; }
+          `}</style>
         </div>
 
         {/* Onglets */}
