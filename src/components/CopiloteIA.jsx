@@ -1671,14 +1671,29 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       if (compterMots(texteActif) < 20) {
         throw new Error(t("erreur.motsInsuffisants"));
       }
+      // CORRECTIF 24/09/2026 — signalé en usage réel (le bandeau générique
+      // "Le co-pilote n'a pas pu traiter ce passage" apparaissait ici,
+      // sous "Conseils de recomposition") : découperEnTranches travaille
+      // sur le texte déjà aplati par extraireTexte, donc la position des
+      // images dans le chapitre est perdue AVANT le découpage — impossible
+      // d'attribuer une image à sa bonne tranche. Faute de mieux, les
+      // mêmes images (plafonnées à 3) sont jointes à CHAQUE tranche plutôt
+      // que triées par position — moins précis qu'un vrai découpage
+      // image-aware, mais un chapitre dépasse rarement 1-2 tranches en
+      // pratique (seuil de 8000 caractères), donc le coût de répétition
+      // reste limité.
+      const images = extraireImages(texteActif).slice(0, 3);
+      const noteImages = images.length
+        ? `\n\n(${images.length} image${images.length > 1 ? "s" : ""} du chapitre jointe${images.length > 1 ? "s" : ""} — observe-${images.length > 1 ? "les" : "la"} et tiens-en compte.)`
+        : "";
       const tranches = découperEnTranches(texte);
       const résultatsParTranche = [];
       for (let i = 0; i < tranches.length; i++) {
         setRecompositionProgression(tranches.length > 1 ? `Tranche ${i + 1}/${tranches.length}…` : "Analyse en cours…");
         const résultat = await appelClaude(
           systemAvecLangue(PROMPTS.recomposition(typeProjet), langueProjet, contexteADN),
-          `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}`,
-          null, 4096
+          `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}${noteImages}`,
+          null, 4096, null, false, images
         );
         const p = parserJSON(résultat);
         résultatsParTranche.push(...(p.points || []));
