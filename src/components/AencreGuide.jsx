@@ -73,7 +73,7 @@ export default function AencreGuide({ conteneurRef }) {
   // Position "posée" au repos (haut de page, près de l'encrier) puis
   // parcours jusqu'à 82% de la hauteur d'écran, pour ne jamais chevaucher
   // le bouton "Retour" (en haut à gauche) ni sortir du viewport en bas.
-  const hautRepos = 12.5, hautMax = 82;
+  const hautRepos = 15.5, hautMax = 82;
   const détachée = Math.sqrt(progression); // détachement rapide, puis ralenti
   const topPlume = `${hautRepos + détachée * (hautMax - hautRepos)}%`;
   // Léger tangage pendant le trajet (rentre à plat au repos et à l'arrivée) :
@@ -104,7 +104,7 @@ export default function AencreGuide({ conteneurRef }) {
         aria-hidden="true"
         style={{
           position: "fixed",
-          right: margeDroite,
+          right: `calc(${margeDroite} + 34px)`,
           top: topPlume,
           transform: `translateY(-72%) rotate(${rotationPlume}deg)`,
           width: 100,
