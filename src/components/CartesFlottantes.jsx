@@ -1,30 +1,45 @@
 /**
  * CURSUS — Cartes flottantes, colonne gauche de la page de connexion (24/09/2026)
  * ======================================================================
- * Troisième itération, demande de Joseph avec planche de référence
- * ("bien plus représentatif de la production de CursEdit et Decision") :
- * la première itération ne montrait que des livres génériques (I/II/III,
- * "En cours", "À auditer") — celle-ci élargit le contenu à ce que Cursus
- * produit réellement :
- *  - des couvertures de manuscrit CursEdit (récit, essai, carnet) ;
- *  - des couvertures d'essai façon croquis (icône centrale + titre) ;
- *  - des couvertures de livrable CursDecision (diagnostic, stratégie,
- *    analyse des besoins) ;
- *  - des pages d'analyse CursDecision (barres, courbe, réseau d'acteurs) ;
- *  - des cartes façon tarot reprenant le vocabulaire de décision de la
- *    planche fournie (Le Chemin, L'Ancrage, La Transformation, La
- *    Clarté, Les Possibles).
+ * Quatrième itération, demande de Joseph avec planche de référence
+ * ("bien plus représentatif de la production de CursEdit et Decision").
  *
- * ÉCART ASSUMÉ : la planche fournie est une illustration IA détaillée
- * (couvertures peintes, textures de cuir, photos) ; ceci reste du SVG
- * abstrait au trait, dans la continuité du choix déjà fait pour cette
- * scène ("chargement beaucoup plus léger", pas d'images raster). Même
- * mécanique d'animation que la version précédente (deux plans de
- * profondeur + pluie Matrix) — seul le CONTENU des cartes change.
+ * REPRISE COMPLÈTE (24/09/2026, suite) — trois défauts précis remontés
+ * sur la version précédente, corrigés ici :
+ *  1. "trop de livres identiques" — le tirage précédent était un pur
+ *     `Math.random()` sur un pool de 18 entrées avec remise : avec 12
+ *     cartes affichées en même temps, les doublons visibles étaient
+ *     quasi garantis. Remplacé par un SAC MÉLANGÉ (Fisher-Yates, sans
+ *     remise tant que le sac n'est pas épuisé) par couche, et le pool
+ *     est passé à plus de 30 entrées.
+ *  2. "trop de livres fermés... les livres doivent avoir une couverture
+ *     comme les modèles présentés et pas comme ceux que tu reprends qui
+ *     ressemblent à des cartes" — le rendu précédent (CarteLivre) posait
+ *     juste une icône au trait + 2 lignes de texte sur un aplat dégradé :
+ *     illisible comme "couverture illustrée". Remplacé par de vraies
+ *     PETITES SCÈNES vectorielles (colline+maison+reflet, ville de nuit
+ *     + silhouettes, montagnes+étoiles, arbre+racines, mosaïque de
+ *     blocs colorés...) occupant l'essentiel de la couverture, avec un
+ *     bandeau-titre opaque en pied — la grammaire visuelle d'une vraie
+ *     couverture de livre (illustration + bandeau), pas d'une carte à
+ *     jouer.
+ *  3. "il manque les cartes d'oracles" — les 5 cartes tarot existaient
+ *     déjà (Le Chemin, L'Ancrage, La Transformation, La Clarté, Les
+ *     Possibles, vocabulaire de la planche fournie) mais avec la même
+ *     icône au trait sur aplat que les livres : invisibles comme
+ *     "oracle". Chacune a maintenant sa propre petite scène (lune sur
+ *     les montagnes, arbre et ses racines, héron sur l'eau, soleil
+ *     rayonnant, boussole sur une carte) pour vraiment lire comme un
+ *     jeu d'oracle.
+ *  4. Rapports pro (CursDecision) : gardés (CarteRapport/CarteGraphique)
+ *     et le pool élargi (2 rapports et 2 pages d'analyse de plus) pour
+ *     qu'ils sortent aussi souvent que le reste dans le sac mélangé.
  *
- * Sélection aléatoire (pas juste `i % CARTES.length`) pour que le pool
- * élargi soit vraiment visible : avec l'ancien index séquentiel, les
- * dernières entrées du tableau n'apparaissaient quasiment jamais.
+ * ÉCART ASSUMÉ (inchangé) : la planche fournie est une illustration IA
+ * détaillée (couvertures peintes, textures de cuir, photos) ; ceci
+ * reste du SVG vectoriel (pas d'images raster, chargement léger) — mais
+ * poussé nettement plus loin dans le sens de la planche (scènes plutôt
+ * qu'une icône isolée).
  */
 
 import { useMemo } from "react";
@@ -32,28 +47,8 @@ import { useMemo } from "react";
 const OR = "#C4973A";
 const CREME = "#F7F4EF";
 
-const ICONES = {
-  élan: <path d="M32 14 C 44 14 44 30 32 34 C 20 38 20 50 32 50" />,
-  passage: <path d="M18 46 V30 C18 18 46 18 46 30 V46" />,
-  vague: <path d="M14 36 C 22 24 26 24 34 36 C 42 48 46 48 54 36" />,
-  double: <path d="M16 30 C 24 20 32 20 40 30 M20 42 C 28 32 36 32 44 42" />,
-  spirale: <circle cx="32" cy="32" r="14" />,
-  chemin: <path d="M14 50 C 20 40 14 32 24 26 C 34 20 28 10 38 4" />,
-  montagne: <path d="M4 42 L20 14 L30 30 L42 6 L58 42" />,
-  arbre: <path d="M32 14 V36 M32 20 C 24 16 20 10 16 6 M32 20 C 40 16 44 10 48 6 M32 36 C 24 40 20 46 16 52 M32 36 C 40 40 44 46 48 52" />,
-  soleil: <>
-    <circle cx="32" cy="30" r="10" />
-    <path d="M32 6 V12 M32 48 V54 M8 30 H14 M50 30 H56 M15 13 L19 17 M45 43 L49 47 M49 13 L45 17 M19 43 L15 47" />
-  </>,
-  boussole: <>
-    <circle cx="32" cy="30" r="16" />
-    <path d="M32 18 L38 30 L32 42 L26 30 Z" />
-  </>,
-};
-
-// Palette élargie (24/09/2026, "plus colorées") — garde les trois couleurs
-// de marque (bordeaux/bleu marine/vert) et leur ajoute des teintes
-// voisines de la même famille chaude/littéraire, pas des couleurs criardes.
+// Palette élargie — trois couleurs de marque (bordeaux/bleu marine/vert)
+// + teintes voisines de la même famille chaude/littéraire.
 const PALETTE = [
   { base: "#8B2635", sombre: "#5E1A24" }, // bordeaux CursEdit
   { base: "#0E3374", sombre: "#092350" }, // bleu marine CursAudit
@@ -65,55 +60,315 @@ const PALETTE = [
 
 function idCouleur(i) { return PALETTE[i % PALETTE.length]; }
 
-function CarteTarot({ chiffre, titre, couleur, icone }) {
-  const id = `tarotGrad${chiffre}${couleur.base}`;
+// ————————————————————————————————————————————————————————————————
+// Petites scènes réutilisables (couverture de livre ET cartes oracle) —
+// chaque scène reçoit `id` (dérivé du contenu, donc stable et sans
+// collision : deux cartes identiques partagent le même gradient, deux
+// cartes différentes ont des id différents) et `couleur`.
+// ————————————————————————————————————————————————————————————————
+
+// Colline + maison + reflet dans l'eau, ciel dégradé à l'aube.
+function SceneCollines({ id, couleur }) {
   return (
-    <svg viewBox="0 0 120 168" width="120" height="168">
+    <g>
       <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={couleur.base} />
+        <linearGradient id={`ciel${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={CREME} />
+          <stop offset="100%" stopColor={`${couleur.base}55`} />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#ciel${id})`} />
+      <path d="M4 78 C 30 58 46 70 62 60 C 82 48 100 62 116 54 V116 H4 Z" fill={couleur.base} opacity="0.85" />
+      <path d="M4 92 C 26 78 50 86 70 76 C 90 68 104 78 116 72 V116 H4 Z" fill={couleur.sombre} />
+      <rect x="52" y="60" width="16" height="14" fill={CREME} opacity="0.95" />
+      <polygon points="50,60 60,50 70,60" fill={couleur.sombre} />
+      <rect x="57" y="65" width="5" height="9" fill={couleur.sombre} opacity="0.7" />
+      <rect x="4" y="98" width="112" height="18" fill={couleur.sombre} opacity="0.5" />
+    </g>
+  );
+}
+
+// Arbre et ses racines visibles, esquisse au trait (comme "Le langage du vivant").
+// `clair` : version en tons clairs (crème/or) pour un fond sombre —
+// sans lui, les branches en couleur.sombre devenaient quasi invisibles
+// sur le fond nuit de la carte oracle "L'Ancrage" (repéré en debug grid).
+function SceneArbreRacines({ id, couleur, fond = CREME, monochrome = false, clair = false }) {
+  const traitBranches = clair ? CREME : (monochrome ? couleur.base : couleur.sombre);
+  const traitRacines = clair ? OR : couleur.base;
+  return (
+    <g>
+      <rect x="4" y="4" width="112" height="112" fill={fond} />
+      <line x1="10" y1="60" x2="110" y2="60" stroke={clair ? OR : couleur.base} strokeWidth="0.75" opacity="0.5" />
+      <g fill="none" stroke={traitBranches} strokeWidth="2" strokeLinecap="round">
+        <path d="M60 60 V30" />
+        <path d="M60 40 C 48 32 42 24 38 14 M60 36 C 72 28 78 20 82 12 M60 30 C 54 24 52 18 50 10 M60 30 C 66 24 68 18 70 10" />
+      </g>
+      {!monochrome && <circle cx="60" cy="20" r="16" fill={clair ? OR : couleur.base} opacity={clair ? 0.35 : 0.22} />}
+      <g fill="none" stroke={traitRacines} strokeWidth="1.6" strokeLinecap="round" opacity="0.85">
+        <path d="M60 60 C 52 68 46 74 36 78 M60 60 C 68 68 74 74 84 78 M60 60 C 56 72 54 82 50 92 M60 60 C 64 72 66 82 70 92" />
+      </g>
+    </g>
+  );
+}
+
+// Silhouette de ville la nuit, deux passants, réverbère.
+function SceneVille({ id, couleur }) {
+  const immeubles = [
+    { x: 8, w: 14, h: 40 }, { x: 24, w: 10, h: 60 }, { x: 36, w: 16, h: 34 },
+    { x: 54, w: 12, h: 52 }, { x: 68, w: 18, h: 44 }, { x: 88, w: 14, h: 64 },
+    { x: 104, w: 10, h: 30 },
+  ];
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`nuit${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={couleur.sombre} />
+          <stop offset="100%" stopColor="#1A1210" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#nuit${id})`} />
+      <circle cx="94" cy="24" r="7" fill={CREME} opacity="0.85" />
+      {immeubles.map((im, i) => (
+        <rect key={i} x={im.x} y={116 - im.h} width={im.w} height={im.h} fill={couleur.base} opacity="0.75" />
+      ))}
+      <line x1="4" y1="116" x2="116" y2="116" stroke={OR} strokeWidth="1" opacity="0.4" />
+      <line x1="30" y1="78" x2="30" y2="116" stroke={OR} strokeWidth="1.4" opacity="0.7" />
+      <circle cx="30" cy="76" r="3" fill={OR} opacity="0.9" />
+      <g stroke={CREME} strokeWidth="1.6" strokeLinecap="round" opacity="0.75">
+        <path d="M50 116 V104 M50 104 L44 110 M50 104 L56 110" />
+        <circle cx="50" cy="99" r="2.6" fill={CREME} stroke="none" />
+        <path d="M64 116 V106 M64 106 L59 112 M64 106 L69 111" />
+        <circle cx="64" cy="101" r="2.4" fill={CREME} stroke="none" />
+      </g>
+    </g>
+  );
+}
+
+// Mosaïque de blocs colorés — abstrait, comme "Penser autrement".
+function SceneBlocs({ id, couleur }) {
+  const blocs = [
+    { x: 4, y: 4, w: 40, h: 36, c: couleur.base },
+    { x: 44, y: 4, w: 34, h: 20, c: "#EADFCB" },
+    { x: 78, y: 4, w: 38, h: 52, c: couleur.sombre },
+    { x: 44, y: 24, w: 34, h: 32, c: "#7FA9AE" },
+    { x: 4, y: 40, w: 40, h: 30, c: "#EADFCB" },
+    { x: 78, y: 56, w: 38, h: 22, c: couleur.base },
+    { x: 4, y: 70, w: 40, h: 46, c: couleur.sombre },
+    { x: 44, y: 56, w: 34, h: 60, c: couleur.base },
+    { x: 78, y: 78, w: 38, h: 38, c: "#7FA9AE" },
+  ];
+  return (
+    <g>
+      <rect x="4" y="4" width="112" height="112" fill={CREME} />
+      {blocs.map((b, i) => <rect key={i} x={b.x} y={b.y} width={b.w} height={b.h} fill={b.c} opacity="0.88" />)}
+    </g>
+  );
+}
+
+// Montagnes superposées, étoiles, fin croissant de lune.
+function SceneMontagnesEtoiles({ id, couleur }) {
+  const étoiles = [[14, 18], [30, 10], [50, 22], [70, 12], [90, 20], [104, 14], [22, 30], [98, 32]];
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`nuit2${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={couleur.sombre} />
+          <stop offset="100%" stopColor="#0B0F1A" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#nuit2${id})`} />
+      {étoiles.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1" fill={CREME} opacity="0.8" />)}
+      <path d="M92 18 A8 8 0 1 1 88 16.5 A6.2 6.2 0 1 0 92 18 Z" fill={CREME} opacity="0.9" />
+      <path d="M4 82 L26 50 L42 68 L60 38 L80 66 L96 46 L116 76 V116 H4 Z" fill={couleur.base} opacity="0.55" />
+      <path d="M4 96 L30 72 L50 86 L74 60 L96 84 L116 68 V116 H4 Z" fill={couleur.sombre} />
+    </g>
+  );
+}
+
+// Lune pleine sur une ligne de montagnes — "Le Chemin".
+function SceneLuneMontagnes({ id, couleur }) {
+  return (
+    <g>
+      <defs>
+        <radialGradient id={`lune${id}`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={CREME} />
+          <stop offset="100%" stopColor="#E7D9B8" />
+        </radialGradient>
+        <linearGradient id={`cielnuit${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#141A2E" />
           <stop offset="100%" stopColor={couleur.sombre} />
         </linearGradient>
       </defs>
-      <rect x="2" y="2" width="116" height="164" rx="10" fill={`url(#${id})`} />
-      <rect x="7" y="7" width="106" height="154" rx="7" fill="none" stroke={OR} strokeWidth="1" opacity="0.75" />
-      <text x="60" y="26" textAnchor="middle" fontFamily="Georgia, serif" fontSize="11" fill={OR} opacity="0.9">{chiffre}</text>
-      <g transform="translate(28, 46)" fill="none" stroke={OR} strokeWidth="1.6" opacity="0.95" strokeLinecap="round">
-        {ICONES[icone]}
+      <rect x="4" y="4" width="112" height="112" fill={`url(#cielnuit${id})`} />
+      <circle cx="60" cy="40" r="20" fill={`url(#lune${id})`} opacity="0.95" />
+      <path d="M4 90 L24 60 L40 76 L60 48 L82 74 L100 58 L116 82 V116 H4 Z" fill={couleur.base} opacity="0.85" />
+      <path d="M4 104 L30 84 L54 96 L76 76 L96 92 L116 80 V116 H4 Z" fill={couleur.sombre} />
+    </g>
+  );
+}
+
+// Héron immobile au bord de l'eau, cercles concentriques — "La Transformation".
+// Héron debout au bord de l'eau, silhouette pleine (pas juste un trait) —
+// repris en plus grand et plus contrasté après vérification en debug
+// grid : la version précédente (fine ligne + petite ellipse) se lisait
+// mal, pas franchement comme un oiseau.
+function SceneHeronEau({ id, couleur }) {
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`eauciel${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={`${couleur.base}33`} />
+          <stop offset="100%" stopColor={CREME} />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#eauciel${id})`} />
+      <rect x="4" y="86" width="112" height="30" fill={couleur.base} opacity="0.2" />
+      {[[34, 100, 9], [34, 100, 16], [86, 106, 7], [86, 106, 13]].map(([cx, cy, r], i) => (
+        <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={couleur.base} strokeWidth="0.8" opacity="0.4" />
+      ))}
+      {/* Corps ovale + cou en S (trait épais) + tête + bec : lu comme un
+          oiseau debout plutôt qu'une forme abstraite. */}
+      <ellipse cx="60" cy="86" rx="7.5" ry="13" fill={couleur.sombre} />
+      <path d="M59 74 C 54 66 55 56 46 46 C 42 41 42 35 46 31" fill="none" stroke={couleur.sombre} strokeWidth="3.4" strokeLinecap="round" />
+      <circle cx="47" cy="29" r="3.4" fill={couleur.sombre} />
+      <path d="M44 28 L32 25" stroke={couleur.sombre} strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="48.5" cy="28" r="0.8" fill={CREME} />
+      {/* Pattes, fines, ancrées dans l'eau */}
+      <g stroke={couleur.sombre} strokeWidth="2" strokeLinecap="round">
+        <path d="M56 96 L52 112" />
+        <path d="M64 96 L68 112" />
       </g>
-      <text x="60" y="140" textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="11.5" fill={CREME}>{titre}</text>
+    </g>
+  );
+}
+
+// Soleil rayonnant, halo dégradé — "La Clarté".
+function SceneSoleilRayons({ id, couleur }) {
+  return (
+    <g>
+      <defs>
+        <radialGradient id={`soleil${id}`} cx="50%" cy="42%" r="60%">
+          <stop offset="0%" stopColor="#FFF6DE" />
+          <stop offset="60%" stopColor={couleur.base} />
+          <stop offset="100%" stopColor={couleur.sombre} />
+        </radialGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#soleil${id})`} />
+      <circle cx="60" cy="50" r="16" fill="#FFF6DE" opacity="0.95" />
+      <g stroke="#FFF6DE" strokeWidth="2" strokeLinecap="round" opacity="0.85">
+        <path d="M60 18 V26 M60 74 V82 M28 50 H36 M84 50 H92 M38 28 L44 34 M76 66 L82 72 M82 28 L76 34 M44 66 L38 72" />
+      </g>
+      <path d="M4 100 C 30 92 46 104 60 96 C 78 86 96 100 116 92 V116 H4 Z" fill={couleur.sombre} opacity="0.5" />
+    </g>
+  );
+}
+
+// Boussole posée sur une carte (contours pointillés) — "Les Possibles".
+function SceneBoussoleCarte({ id, couleur }) {
+  return (
+    <g>
+      <rect x="4" y="4" width="112" height="112" fill={CREME} />
+      <g stroke={couleur.base} strokeWidth="0.75" strokeDasharray="2 3" opacity="0.4" fill="none">
+        <path d="M10 30 C 40 20 60 40 96 26" />
+        <path d="M14 60 C 46 50 70 68 110 56" />
+        <path d="M10 90 C 44 82 66 98 108 88" />
+      </g>
+      <circle cx="60" cy="58" r="30" fill="none" stroke={couleur.base} strokeWidth="1.4" opacity="0.85" />
+      <circle cx="60" cy="58" r="22" fill="none" stroke={couleur.base} strokeWidth="0.8" opacity="0.5" />
+      <path d="M60 58 L67 46 L60 34 L53 46 Z" fill={couleur.sombre} />
+      <path d="M60 58 L67 70 L60 82 L53 70 Z" fill={couleur.base} opacity="0.65" />
+      <circle cx="60" cy="58" r="3" fill={OR} />
+      <text x="60" y="24" textAnchor="middle" fontFamily="Georgia, serif" fontSize="8" fill={couleur.base} opacity="0.8">N</text>
+    </g>
+  );
+}
+
+// Vagues douces / dunes, dégradé chaud — variante nature générique.
+function SceneVagueDouce({ id, couleur }) {
+  return (
+    <g>
+      <defs>
+        <linearGradient id={`vague${id}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={CREME} />
+          <stop offset="100%" stopColor={`${couleur.base}44`} />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="112" height="112" fill={`url(#vague${id})`} />
+      {[70, 84, 98].map((y, i) => (
+        <path key={i} d={`M4 ${y} C 30 ${y - 12} 50 ${y + 10} 76 ${y - 6} C 96 ${y - 16} 108 ${y + 4} 116 ${y - 4} V116 H4 Z`}
+          fill={i === 2 ? couleur.sombre : couleur.base} opacity={0.4 + i * 0.22} />
+      ))}
+    </g>
+  );
+}
+
+// ————————————————————————————————————————————————————————————————
+// Cartes
+// ————————————————————————————————————————————————————————————————
+
+const SCENES_TAROT = {
+  chemin: SceneLuneMontagnes,
+  ancrage: (p) => <SceneArbreRacines {...p} fond="#141A2E" clair />,
+  transformation: SceneHeronEau,
+  clarté: SceneSoleilRayons,
+  possibles: SceneBoussoleCarte,
+};
+
+function CarteTarot({ id, chiffre, titre, soustitre, scene, couleur }) {
+  const SceneComp = SCENES_TAROT[scene];
+  return (
+    <svg viewBox="0 0 120 168" width="120" height="168">
+      <rect x="2" y="2" width="116" height="164" rx="10" fill="#12141c" />
+      <clipPath id={`clipTarot${id}`}><rect x="6" y="18" width="108" height="112" rx="3" /></clipPath>
+      <g clipPath={`url(#clipTarot${id})`}>
+        <SceneComp id={id} couleur={couleur} />
+      </g>
+      <rect x="6" y="18" width="108" height="112" rx="3" fill="none" stroke={OR} strokeWidth="0.75" opacity="0.6" />
+      <rect x="2" y="2" width="116" height="164" rx="10" fill="none" stroke={OR} strokeWidth="1.4" opacity="0.85" />
+      <text x="60" y="12" textAnchor="middle" fontFamily="Georgia, serif" fontSize="9" letterSpacing="2" fill={OR} opacity="0.9">{chiffre}</text>
+      <text x="60" y="146" textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="12.5" fontWeight="600" fill={CREME}>{titre}</text>
+      <text x="60" y="159" textAnchor="middle" fontFamily="Georgia, serif" fontSize="8" letterSpacing="1" fill={OR} opacity="0.75">{soustitre}</text>
     </svg>
   );
 }
 
-// "Plus proche de vrais livres" — dégradé de couverture (pas un aplat),
-// tranche des pages sur 2 côtés (droite + bas, façon livre fermé vu de
-// 3/4), reflet diagonal clair en haut à gauche façon couverture vernie.
-function CarteLivre({ catégorie, lignes, couleur, icone }) {
-  const id = `livreGrad${catégorie}${couleur.base}`;
+const SCENES_LIVRE = {
+  collines: SceneCollines,
+  ville: SceneVille,
+  montagnes: SceneMontagnesEtoiles,
+  blocs: SceneBlocs,
+  arbre: SceneArbreRacines,
+  vague: SceneVagueDouce,
+};
+
+// Vraie couverture de livre : scène illustrée sur les 2/3 supérieurs +
+// bandeau-titre opaque en pied (comme la planche de référence), tranche
+// des pages sur le bord droit, reflet vernis en diagonale.
+function CarteLivre({ id, catégorie, lignes, scene, couleur }) {
+  const SceneComp = SCENES_LIVRE[scene];
   return (
     <svg viewBox="0 0 120 168" width="120" height="168">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={couleur.base} />
-          <stop offset="100%" stopColor={couleur.sombre} />
-        </linearGradient>
-      </defs>
-      {/* Tranche des pages (droite + bas) */}
+      {/* Tranche des pages */}
       <rect x="8" y="6" width="108" height="160" rx="3" fill="#F3E9D2" />
-      <rect x="4" y="2" width="108" height="160" rx="4" fill={`url(#${id})`} />
-      <rect x="4" y="2" width="10" height="160" rx="2" fill="#000" opacity="0.18" />
-      {/* Reflet façon couverture vernie */}
-      <polygon points="14,2 60,2 20,90 14,90" fill="#fff" opacity="0.08" />
-      <text x="64" y="24" textAnchor="middle" fontFamily="Georgia, serif" fontSize="8" letterSpacing="1.5" fill={OR} opacity="0.9">{catégorie}</text>
-      {lignes.map((ligne, i) => (
-        <text key={i} x="64" y={40 + i * 15} textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="12" fill={CREME}>
-          {ligne}
-        </text>
-      ))}
-      <g transform={`translate(38, ${98 + (lignes.length - 1) * 10})`} fill="none" stroke={OR} strokeWidth="1.6" opacity="0.9" strokeLinecap="round">
-        {ICONES[icone]}
+      <rect x="4" y="2" width="108" height="160" rx="4" fill={CREME} />
+      <clipPath id={`clipLivre${id}`}><rect x="4" y="2" width="108" height="160" rx="4" /></clipPath>
+      <g clipPath={`url(#clipLivre${id})`}>
+        <g transform="translate(0, -2) scale(0.964, 1)">
+          <SceneComp id={id} couleur={couleur} />
+        </g>
+        {/* Bandeau-titre en pied */}
+        <rect x="4" y="128" width="108" height="34" fill={couleur.sombre} />
+        <rect x="4" y="128" width="108" height="2.5" fill={OR} opacity="0.85" />
+        <text x="58" y="140" textAnchor="middle" fontFamily="Georgia, serif" fontSize="7" letterSpacing="2" fill={OR} opacity="0.85">{catégorie}</text>
+        {lignes.map((ligne, i) => (
+          <text key={i} x="58" y={151 + i * 12} textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="10.5" fill={CREME}>
+            {ligne}
+          </text>
+        ))}
       </g>
+      <rect x="4" y="2" width="10" height="160" rx="2" fill="#000" opacity="0.16" />
+      <polygon points="14,2 60,2 20,90 14,90" fill="#fff" opacity="0.07" />
+      <rect x="4" y="2" width="108" height="160" rx="4" fill="none" stroke="#00000018" />
     </svg>
   );
 }
@@ -132,32 +387,39 @@ function CartePapier({ étiquette, titre, couleur }) {
   );
 }
 
-// Couverture d'essai façon croquis (24/09/2026) — fond crème, icône au
-// trait centrée, titre en dessous : reprend l'esprit des couvertures
-// "Les chemins de l'invisible" / "Le langage du vivant" de la planche
-// fournie (illustration simple + titre littéraire), en abstrait.
-function CarteCroquis({ lignes, icone, couleur }) {
+const SCENES_CROQUIS = {
+  collines: (p) => <SceneCollines {...p} />,
+  arbre: (p) => <SceneArbreRacines {...p} monochrome />,
+  vague: (p) => <SceneVagueDouce {...p} />,
+};
+
+// Couverture d'essai façon croquis — fond crème, petite scène au trait,
+// titre en dessous : reprend l'esprit "illustration simple + titre
+// littéraire" de la planche fournie, en plus détaillé qu'une icône seule.
+function CarteCroquis({ id, lignes, scene, couleur }) {
+  const SceneComp = SCENES_CROQUIS[scene];
   return (
     <svg viewBox="0 0 120 168" width="120" height="168">
       <rect x="2" y="2" width="116" height="164" rx="6" fill={CREME} stroke="#00000014" />
-      <rect x="7" y="7" width="106" height="154" rx="4" fill="none" stroke={couleur.base} strokeWidth="1" opacity="0.3" />
-      <g transform="translate(28, 26)" fill="none" stroke={couleur.base} strokeWidth="1.6" opacity="0.85" strokeLinecap="round">
-        {ICONES[icone]}
+      <clipPath id={`clipCroquis${id}`}><rect x="10" y="10" width="100" height="88" rx="3" /></clipPath>
+      <g clipPath={`url(#clipCroquis${id})`}>
+        <g transform="translate(-2, 4) scale(0.9)">
+          <SceneComp id={id} couleur={couleur} />
+        </g>
       </g>
+      <rect x="10" y="10" width="100" height="88" rx="3" fill="none" stroke={couleur.base} strokeWidth="0.75" opacity="0.35" />
       {lignes.map((ligne, i) => (
-        <text key={i} x="60" y={128 + i * 15} textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="11" fill="#2C1810">
+        <text key={i} x="60" y={122 + i * 16} textAnchor="middle" fontFamily="'Playfair Display', Georgia, serif" fontSize="12" fill="#2C1810">
           {ligne}
         </text>
       ))}
-      <line x1="34" y1="150" x2="86" y2="150" stroke={couleur.base} strokeWidth="0.75" opacity="0.4" />
+      <line x1="34" y1="152" x2="86" y2="152" stroke={couleur.base} strokeWidth="0.75" opacity="0.4" />
     </svg>
   );
 }
 
-// Couverture de livrable CursDecision (24/09/2026) — fond clair, repère
-// "plume" Cursus, bandeau de couleur en pied : reprend les couvertures
-// "Diagnostic organisationnel" / "Stratégie & Développement" de la
-// planche fournie.
+// Couverture de livrable CursDecision — repère "plume" Cursus, bandeau
+// de couleur en pied.
 function CarteRapport({ lignes, sousTitre, couleur }) {
   return (
     <svg viewBox="0 0 120 168" width="120" height="168">
@@ -177,9 +439,7 @@ function CarteRapport({ lignes, sousTitre, couleur }) {
   );
 }
 
-// Page d'analyse CursDecision (24/09/2026) — barres, courbe ou réseau
-// d'acteurs : reprend "Résultats et tendances" / "Analyse comparative" /
-// "Cartographie des acteurs" de la planche fournie.
+// Page d'analyse CursDecision — barres, courbe ou réseau d'acteurs.
 function CarteGraphique({ titre, type, couleur }) {
   return (
     <svg viewBox="0 0 120 168" width="120" height="168">
@@ -214,54 +474,95 @@ function CarteGraphique({ titre, type, couleur }) {
   );
 }
 
+// ————————————————————————————————————————————————————————————————
+// Catalogue — pool large (35 entrées) pour que le sac mélangé produise
+// une vraie variété. Réparti volontairement : oracle 5, livres 12,
+// croquis 6, rapports 5, graphiques 5, notes 2 — les livres fermés ne
+// sont plus l'écrasante majorité.
+// ————————————————————————————————————————————————————————————————
 const CARTES = [
-  // Tarot — vocabulaire de décision (planche fournie : Le Chemin,
-  // L'Ancrage, La Transformation, La Clarté, Les Possibles)
-  { Comp: CarteTarot, props: { chiffre: "I", titre: "Le Chemin", icone: "chemin" }, couleur: 1 },
-  { Comp: CarteTarot, props: { chiffre: "II", titre: "L'Ancrage", icone: "arbre" }, couleur: 2 },
-  { Comp: CarteTarot, props: { chiffre: "III", titre: "La Transformation", icone: "vague" }, couleur: 0 },
-  { Comp: CarteTarot, props: { chiffre: "IV", titre: "La Clarté", icone: "soleil" }, couleur: 5 },
-  { Comp: CarteTarot, props: { chiffre: "V", titre: "Les Possibles", icone: "boussole" }, couleur: 4 },
+  // Oracle — vocabulaire de décision de la planche fournie
+  { Comp: CarteTarot, props: { chiffre: "I", titre: "Le Chemin", soustitre: "Intuition", scene: "chemin" }, couleur: 1 },
+  { Comp: CarteTarot, props: { chiffre: "II", titre: "L'Ancrage", soustitre: "Stabilité", scene: "ancrage" }, couleur: 2 },
+  { Comp: CarteTarot, props: { chiffre: "III", titre: "La Transformation", soustitre: "Mouvement", scene: "transformation" }, couleur: 0 },
+  { Comp: CarteTarot, props: { chiffre: "IV", titre: "La Clarté", soustitre: "Révélation", scene: "clarté" }, couleur: 5 },
+  { Comp: CarteTarot, props: { chiffre: "V", titre: "Les Possibles", soustitre: "Exploration", scene: "possibles" }, couleur: 4 },
 
-  // Manuscrits CursEdit en cours
-  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["Fragments", "d'une époque"], icone: "vague" }, couleur: 3 },
-  { Comp: CarteLivre, props: { catégorie: "ESSAI", lignes: ["Penser", "autrement"], icone: "double" }, couleur: 2 },
-  { Comp: CarteLivre, props: { catégorie: "CARNET", lignes: ["Horizons", "intérieurs"], icone: "montagne" }, couleur: 1 },
-  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["L'art", "des liens"], icone: "double" }, couleur: 0 },
+  // Manuscrits CursEdit — vraies couvertures illustrées
+  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["Fragments", "d'une époque"], scene: "ville" }, couleur: 3 },
+  { Comp: CarteLivre, props: { catégorie: "ESSAI", lignes: ["Penser", "autrement"], scene: "blocs" }, couleur: 2 },
+  { Comp: CarteLivre, props: { catégorie: "CARNET", lignes: ["Horizons", "intérieurs"], scene: "montagnes" }, couleur: 1 },
+  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["L'art", "des liens"], scene: "collines" }, couleur: 0 },
+  { Comp: CarteLivre, props: { catégorie: "ESSAI", lignes: ["Le langage", "du vivant"], scene: "arbre" }, couleur: 2 },
+  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["La mémoire", "des lieux"], scene: "vague" }, couleur: 5 },
+  { Comp: CarteLivre, props: { catégorie: "ESSAI", lignes: ["Les chemins", "de l'invisible"], scene: "collines" }, couleur: 1 },
+  { Comp: CarteLivre, props: { catégorie: "CARNET", lignes: ["Traversées"], scene: "montagnes" }, couleur: 4 },
+  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["La part", "du silence"], scene: "ville" }, couleur: 0 },
+  { Comp: CarteLivre, props: { catégorie: "ESSAI", lignes: ["Réapprendre", "à lire"], scene: "blocs" }, couleur: 3 },
+  { Comp: CarteLivre, props: { catégorie: "CARNET", lignes: ["Le fil", "des jours"], scene: "vague" }, couleur: 5 },
+  { Comp: CarteLivre, props: { catégorie: "RÉCIT", lignes: ["Ce que", "la mer garde"], scene: "collines" }, couleur: 2 },
 
   // Essais façon croquis
-  { Comp: CarteCroquis, props: { lignes: ["Les chemins", "de l'invisible"], icone: "chemin" }, couleur: 1 },
-  { Comp: CarteCroquis, props: { lignes: ["Le langage", "du vivant"], icone: "arbre" }, couleur: 2 },
-  { Comp: CarteCroquis, props: { lignes: ["La mémoire", "des lieux"], icone: "arbre" }, couleur: 5 },
+  { Comp: CarteCroquis, props: { lignes: ["Notes", "de terrain"], scene: "collines" }, couleur: 1 },
+  { Comp: CarteCroquis, props: { lignes: ["Racines"], scene: "arbre" }, couleur: 2 },
+  { Comp: CarteCroquis, props: { lignes: ["Esquisses", "d'un lieu"], scene: "vague" }, couleur: 5 },
+  { Comp: CarteCroquis, props: { lignes: ["Carnet", "de bord"], scene: "collines" }, couleur: 0 },
+  { Comp: CarteCroquis, props: { lignes: ["Ce qui", "pousse"], scene: "arbre" }, couleur: 4 },
+  { Comp: CarteCroquis, props: { lignes: ["Marées"], scene: "vague" }, couleur: 3 },
 
   // Livrables CursDecision
   { Comp: CarteRapport, props: { lignes: ["Diagnostic", "organisationnel"], sousTitre: "Analyse et recommandations" }, couleur: 1 },
   { Comp: CarteRapport, props: { lignes: ["Stratégie &", "Développement"], sousTitre: "Plan d'action" }, couleur: 2 },
   { Comp: CarteRapport, props: { lignes: ["Analyse des", "besoins"], sousTitre: "Plan qualitatif et quantitatif" }, couleur: 0 },
+  { Comp: CarteRapport, props: { lignes: ["Étude de", "faisabilité"], sousTitre: "Synthèse exécutive" }, couleur: 5 },
+  { Comp: CarteRapport, props: { lignes: ["Feuille de", "route"], sousTitre: "Prochaines étapes" }, couleur: 4 },
 
   // Pages d'analyse CursDecision
   { Comp: CarteGraphique, props: { titre: "Résultats et tendances", type: "barres" }, couleur: 1 },
   { Comp: CarteGraphique, props: { titre: "Analyse comparative", type: "lignes" }, couleur: 2 },
   { Comp: CarteGraphique, props: { titre: "Cartographie des acteurs", type: "reseau" }, couleur: 5 },
+  { Comp: CarteGraphique, props: { titre: "Suivi d'indicateurs", type: "lignes" }, couleur: 3 },
+  { Comp: CarteGraphique, props: { titre: "Répartition par thème", type: "barres" }, couleur: 0 },
 
   // Notes manuscrites
   { Comp: CartePapier, props: { étiquette: "NOTES", titre: "Idées éparses" }, couleur: 5 },
   { Comp: CartePapier, props: { étiquette: "BROUILLON", titre: "Proposition de projet" }, couleur: 3 },
 ];
 
+// Sac mélangé (Fisher-Yates) : tire toutes les entrées d'une copie
+// mélangée du pool avant d'en remélanger une nouvelle — garantit qu'une
+// même carte ne revient pas avant d'avoir vu tout le reste, au lieu du
+// pur hasard avec remise qui produisait des doublons visibles.
+function mélange(tableau) {
+  const copie = [...tableau];
+  for (let i = copie.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+  }
+  return copie;
+}
+
 function CoucheCartes({ nombre, tailleBase, opacite, vitesseMin, vitesseMax, zIndex }) {
-  const dispo = useMemo(() => Array.from({ length: nombre }, () => {
-    const carte = CARTES[Math.floor(Math.random() * CARTES.length)];
-    return {
-      carte,
-      couleur: idCouleur(carte.couleur + Math.floor(Math.random() * PALETTE.length)),
-      gauche: `${Math.round(Math.random() * 76) + 2}%`,
-      délai: +(Math.random() * vitesseMax).toFixed(1),
-      durée: +(vitesseMin + Math.random() * (vitesseMax - vitesseMin)).toFixed(1),
-      rotationDépart: Math.round(Math.random() * 14 - 7),
-    };
+  const dispo = useMemo(() => {
+    const sac = mélange(CARTES);
+    return Array.from({ length: nombre }, (_, i) => {
+      const carte = sac[i % sac.length];
+      return {
+        // Suffixe aléatoire (pas juste l'index) : deux couches affichent
+        // des index qui se recoupent (0..6 et 0..4), un id basé sur l'index
+        // seul collisionnerait entre elles et pourrait faire "fuiter" le
+        // mauvais dégradé d'une carte vers l'autre via url(#id).
+        id: `c${i}-${zIndex}-${Math.random().toString(36).slice(2, 9)}`,
+        carte,
+        couleur: idCouleur(carte.couleur + Math.floor(Math.random() * PALETTE.length)),
+        gauche: `${Math.round(Math.random() * 76) + 2}%`,
+        délai: +(Math.random() * vitesseMax).toFixed(1),
+        durée: +(vitesseMin + Math.random() * (vitesseMax - vitesseMin)).toFixed(1),
+        rotationDépart: Math.round(Math.random() * 14 - 7),
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [nombre, vitesseMin, vitesseMax]);
+  }, [nombre, vitesseMin, vitesseMax]);
 
   return (
     <div className="cartes-couche" style={{ opacity: opacite, zIndex }}>
@@ -280,7 +581,7 @@ function CoucheCartes({ nombre, tailleBase, opacite, vitesseMin, vitesseMax, zIn
               "--rot-depart": `${d.rotationDépart}deg`,
             }}
           >
-            <Comp {...props} couleur={d.couleur} />
+            <Comp {...props} id={d.id} couleur={d.couleur} />
           </div>
         );
       })}
@@ -296,10 +597,7 @@ function chaîneAléatoire(longueur) {
   return s;
 }
 
-// Effet "pluie Matrix" tout au fond, derrière les cartes — demande
-// explicite ("dans le fond un effet matrice de Matrix avec des lettres").
-// Teinte verte assourdie pour rester dans le registre de l'app plutôt
-// qu'un vert néon agressif.
+// Effet "pluie Matrix" tout au fond, derrière les cartes.
 function PluieMatrix() {
   const colonnes = useMemo(() => Array.from({ length: 16 }, (_, i) => ({
     gauche: `${i * 6.4 + Math.random() * 2}%`,
