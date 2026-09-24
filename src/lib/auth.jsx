@@ -145,6 +145,20 @@ export function PageConnexion() {
             <div style={{ marginTop: 3 }}><b style={{ color: "#0E3374" }}>CursAudit</b> — auditer un texte déjà écrit : preuve, cohérence, risques, sur une grille de critères.</div>
             <div style={{ marginTop: 3 }}><b style={{ color: "#0E7256" }}>CursDecision</b> — transformer une situation complexe ou floue en décision claire, argumentée et suivable.</div>
           </div>
+          {/* 24/09/2026 — remonté du pied de page (lien discret parmi les
+              pages légales) à un vrai bouton, ici : demande explicite de
+              Joseph, "ne serait-ce que parce qu'il indique les premiers
+              pas à l'inscription" — utile à voir AVANT même de remplir le
+              formulaire, pas juste accessible en cherchant tout en bas. Le
+              lien du pied de page reste aussi, pour qui revient plus tard. */}
+          <button onClick={() => setPageLégale("mode-emploi")}
+            style={{
+              marginTop: 14, width: "100%", padding: "8px 12px", borderRadius: 8,
+              border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
+              fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+            }}>
+            📖 Voir le mode d'emploi — premiers pas, fonctionnalités
+          </button>
         </div>
 
         {/* Onglets */}
