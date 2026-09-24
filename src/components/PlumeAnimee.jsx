@@ -109,7 +109,8 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
         const x = rectCaret.left - rectConteneur.left;
         const y = rectCaret.top - rectConteneur.top;
         const t = (performance.now() - départRef.current) / 1000;
-        const bob = Math.sin(t * 5.2) * 6; // ±6px, ~1,2 aller-retour/seconde
+        // Fréquence ralentie de 10% (24/09/2026, retour : "mal de mer").
+        const bob = Math.sin(t * 4.68) * 6; // ~1,1 aller-retour/seconde
         // CORRECTIF — signalé : la pointe de la plume tombait sur la ligne
         // du DESSOUS plutôt que sur les lettres écrites. Cause : le calcul
         // précédent centrait la BOÎTE de l'émoji (72×72) sur le caret, pas
@@ -120,7 +121,7 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
         // pendant l'oscillation, plutôt que de dériver avec la rotation.
         // Réajusté (24/09/2026, retour) : encore un peu plus haut, pointe
         // au niveau du bas des lettres (ligne de base), pas en dessous.
-        plumeRef.current.style.transform = `translate(${x - 16}px, ${y + bob - 74}px) rotate(${Math.sin(t * 5.2) * 10 - 25}deg)`;
+        plumeRef.current.style.transform = `translate(${x - 16}px, ${y + bob - 74}px) rotate(${Math.sin(t * 4.68) * 10 - 25}deg)`;
       }
 
       timerId = setTimeout(tick, vitesseMs);
