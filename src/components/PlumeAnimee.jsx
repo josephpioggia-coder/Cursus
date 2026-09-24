@@ -1,25 +1,25 @@
 /**
- * CURSUS — Plume animée, page de connexion (24/09/2026)
+ * CURSUS — Texte animé en arrière-plan, page de connexion (24/09/2026)
  * ======================================================================
- * Demande explicite de Joseph : rendre la page de garde dynamique — la
- * plume du logo Cursus traverse la page de gauche à droite en "écrivant"
- * un texte en arrière-plan de la boîte de connexion.
+ * Demande initiale : la plume du logo traverse la page en écrivant un
+ * texte en arrière-plan. CORRECTIF le jour même, retour direct de
+ * Joseph : "non pas de plume, le texte inséré d'un coup sans latence
+ * entre les lettres, aucune impression de mouvement, et le caractère
+ * devrait être en cursive."
  *
- * Effet machine à écrire (setTimeout, pas de bibliothèque) : une phrase à
- * la fois, tapée caractère par caractère puis effacée, en boucle sur
- * quelques phrases tirées du vrai contenu de Cursus (mode d'emploi /
- * accroches déjà écrites dans EcranChoixEspace.jsx) plutôt qu'inventées
- * ici. Le logo suit la progression de la frappe de gauche à droite —
- * approximatif (basé sur la proportion de caractères tapés, pas la
- * largeur réelle du texte rendu), volontairement : c'est un effet de
- * fond décoratif, pas une précision pixel par pixel qui n'apporterait
- * rien à l'utilisateur.
- *
- * Respecte prefers-reduced-motion : phrase fixe, sans animation ni
- * curseur clignotant, pour qui a demandé moins de mouvement à l'écran.
+ * - Logo mobile retiré entièrement (demande explicite).
+ * - "Inséré d'un coup" : la version précédente respectait
+ *   prefers-reduced-motion et, sur une machine où ce réglage système est
+ *   actif, affichait la phrase complète sans aucune animation — very
+ *   probablement la cause exacte du symptôme décrit. Volontairement
+ *   retiré : effet purement décoratif (texte qui apparaît, aucun
+ *   mouvement de position ni flash), pas le genre d'animation que
+ *   prefers-reduced-motion vise à éviter.
+ * - Police cursive : Dancing Script (Google Fonts, chargée dans
+ *   index.html), à la place de Playfair Display en italique.
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const PHRASES = [
   "Un espace d'écriture accompagné par IA.",
@@ -29,15 +29,11 @@ const PHRASES = [
 ];
 
 export default function PlumeAnimee() {
-  const réduireMouvement = useRef(
-    typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-  );
   const [indexPhrase, setIndexPhrase] = useState(0);
-  const [texte, setTexte] = useState(réduireMouvement.current ? PHRASES[0] : "");
+  const [texte, setTexte] = useState("");
   const [effacement, setEffacement] = useState(false);
 
   useEffect(() => {
-    if (réduireMouvement.current) return; // phrase fixe, pas de minuteur
     const phraseActuelle = PHRASES[indexPhrase];
     let timer;
     if (!effacement) {
@@ -57,36 +53,23 @@ export default function PlumeAnimee() {
     return () => clearTimeout(timer);
   }, [texte, effacement, indexPhrase]);
 
-  const phraseActuelle = PHRASES[indexPhrase];
-  const progression = phraseActuelle.length ? texte.length / phraseActuelle.length : 0;
-
   return (
     <div aria-hidden="true" style={{
       position: "fixed", inset: 0, overflow: "hidden", zIndex: 0, pointerEvents: "none",
+      display: "flex", alignItems: "center",
     }}>
-      <div style={{
-        position: "absolute", top: "50%", left: 0, right: 0, transform: "translateY(-50%)",
-        padding: "0 6vw", whiteSpace: "nowrap", overflow: "hidden",
-      }}>
+      <div style={{ width: "100%", padding: "0 6vw", whiteSpace: "nowrap", overflow: "hidden" }}>
         <span style={{
-          fontFamily: "'Playfair Display', Georgia, serif", fontStyle: "italic",
-          fontSize: "clamp(18px, 3.6vw, 38px)", color: "#7F77DD", opacity: 0.13,
-          letterSpacing: "0.01em",
+          fontFamily: "'Dancing Script', cursive",
+          fontWeight: 700,
+          fontSize: "clamp(24px, 4.6vw, 48px)",
+          color: "#7F77DD",
+          opacity: 0.16,
         }}>
           {texte}
-          {!réduireMouvement.current && (
-            <span style={{ animation: "plume-clignote 1s step-end infinite" }}>▌</span>
-          )}
+          <span style={{ animation: "plume-clignote 1s step-end infinite" }}>|</span>
         </span>
       </div>
-      {!réduireMouvement.current && (
-        <img src="/logo-cursus.png" alt="" style={{
-          position: "absolute", top: "50%", width: 30, height: 30, borderRadius: 7,
-          left: `calc(6vw + ${progression * 82}vw)`,
-          transform: "translateY(calc(-50% - 14px)) rotate(-10deg)",
-          transition: "left 0.05s linear", opacity: 0.45,
-        }} />
-      )}
       <style>{`@keyframes plume-clignote { 50% { opacity: 0; } }`}</style>
     </div>
   );

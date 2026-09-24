@@ -9,6 +9,14 @@
     <link rel="icon" type="image/png" href="/logo-cursus.png" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- 24/09/2026 — police cursive pour l'effet "plume" de la page de
+         connexion (PlumeAnimee.jsx) : aucune police Google n'était encore
+         chargée dans l'app (Playfair Display/Inter référencées ailleurs
+         dans le code retombaient silencieusement sur une police système,
+         faute de <link>). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet" />
     <meta name="theme-color" content="#ffffff" />
     <style>
       *, *::before, *::after { box-sizing: border-box; }
