@@ -13,6 +13,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase.js";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "../components/PagesLegales.jsx";
+import ModeEmploi from "../components/ModeEmploi.jsx";
 
 export function useAuth() {
   const [user, setUser]           = useState(null);
@@ -96,6 +97,11 @@ export function PageConnexion() {
   if (pageLégale === "mentions") return <MentionsLegales onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
   if (pageLégale === "cgv") return <CGV onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
   if (pageLégale === "confidentialite") return <PolitiqueConfidentialite onRetour={() => setPageLégale(null)} onNaviguer={setPageLégale} />;
+  // 24/09/2026 — "aide à l'inscription ou à l'ouverture, sur la 1ère
+  // page" : accessible ici, avant même la création d'un compte, pas
+  // seulement une fois connecté·e (voir EcranChoixEspace.jsx et
+  // AppConnectée dans App.jsx pour les deux autres points d'entrée).
+  if (pageLégale === "mode-emploi") return <ModeEmploi onRetour={() => setPageLégale(null)} />;
 
   return (
     <div style={{
@@ -214,6 +220,8 @@ export function PageConnexion() {
         {/* Pages légales (15/09/2026) — lien obligatoire, accessible sans
             connexion. Voir src/components/PagesLegales.jsx. */}
         <p style={{ fontSize: 10.5, color: "#ccc", textAlign: "center", marginTop: 10 }}>
+          <button onClick={() => setPageLégale("mode-emploi")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>Mode d'emploi</button>
+          {" · "}
           <button onClick={() => setPageLégale("mentions")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>Mentions légales</button>
           {" · "}
           <button onClick={() => setPageLégale("cgv")} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#ccc", fontSize: 10.5, fontFamily: "inherit", textDecoration: "underline" }}>CGV</button>

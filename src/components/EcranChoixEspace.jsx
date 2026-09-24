@@ -27,6 +27,7 @@
 import { useState } from "react";
 import CursDecisionPage from "./CursDecisionPage.jsx";
 import PageLancement from "./PageLancement.jsx";
+import ModeEmploi from "./ModeEmploi.jsx";
 
 const ESPACES = [
   {
@@ -263,12 +264,25 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
   // choisirEspace("cursedit") qui montait tout le shell applicatif pour
   // simplement afficher un tarif (voir note dans PageLancement.jsx).
   const [pageLancementOuverte, setPageLancementOuverte] = useState(false);
+  // 24/09/2026 — signalé en usage réel : "Mode d'emploi" n'existait que
+  // dans la barre de CursEdit/CursAudit (AppConnectée, App.jsx), jamais
+  // sur CET écran-ci — qui s'affiche pourtant à CHAQUE connexion, avant
+  // le choix d'un espace, et qui est le premier endroit où la question
+  // "je fais quoi maintenant ?" se pose. Même mécanique locale que
+  // pageDécisionOuverte/pageLancementOuverte ci-dessus : EcranChoixEspace
+  // vit hors de AppConnectée (voir App.jsx, `if (!espace) return
+  // <EcranChoixEspace .../>` avant même que le state `vue` n'existe), pas
+  // d'autre moyen de l'atteindre que de le gérer localement ici aussi.
+  const [modeEmploiOuvert, setModeEmploiOuvert] = useState(false);
 
   if (pageDécisionOuverte) {
     return <CursDecisionPage onRetour={() => setPageDécisionOuverte(false)} />;
   }
   if (pageLancementOuverte) {
     return <PageLancement onRetour={() => setPageLancementOuverte(false)} />;
+  }
+  if (modeEmploiOuvert) {
+    return <ModeEmploi onRetour={() => setModeEmploiOuvert(false)} />;
   }
 
   return (
@@ -285,19 +299,30 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
           reconnecter avec un autre compte — signalé par l'auteur du projet.
           Bouton discret plutôt qu'imposant, ce n'est pas l'action attendue
           ici la plupart du temps. */}
-      {onDéconnecter && (
+      <div style={{ position: "absolute", top: 16, right: 16, display: "flex", gap: 8 }}>
         <button
-          onClick={onDéconnecter}
+          onClick={() => setModeEmploiOuvert(true)}
           style={{
-            position: "absolute", top: 16, right: 16,
             background: "none", border: "0.5px solid #00000022", borderRadius: 6,
             padding: "5px 10px", fontSize: 11.5, color: "#666", cursor: "pointer",
             fontFamily: "inherit",
           }}
         >
-          Se déconnecter
+          Mode d'emploi
         </button>
-      )}
+        {onDéconnecter && (
+          <button
+            onClick={onDéconnecter}
+            style={{
+              background: "none", border: "0.5px solid #00000022", borderRadius: 6,
+              padding: "5px 10px", fontSize: 11.5, color: "#666", cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            Se déconnecter
+          </button>
+        )}
+      </div>
       {/* 22/08/2026, v3 — largeur = exactement celle des deux cartes
           CursEdit/CursAudit réunies (300 + 20 de gap + 300 = 620px), ratio
           732:280, liseré doré #C4973A, logo centré au-dessus du titre.
