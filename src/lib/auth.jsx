@@ -176,12 +176,22 @@ export function PageConnexion() {
             }} />
             <span><b>Æncre</b> vous guide — mode d'emploi, premiers pas</span>
           </button>
+          {/* 24/09/2026, suite — cette page tient entièrement dans l'écran
+              (contrairement au Mode d'emploi, bien plus long, où Æncre
+              accompagne le scroll — voir AencreGuide.jsx) : inutile de la
+              faire voyager ici, seulement un mouvement sur place, comme
+              soulevée par un souffle d'air — plus organique que le simple
+              va-et-vient précédent (léger balancement horizontal en plus
+              de la bascule verticale, easing asymétrique). */}
           <style>{`
             @keyframes aencre-flotte {
-              0%, 100% { transform: translateY(0) rotate(-2deg); }
-              50% { transform: translateY(-3px) rotate(2deg); }
+              0%   { transform: translate(0, 0) rotate(-3deg); }
+              30%  { transform: translate(1px, -3px) rotate(2deg); }
+              55%  { transform: translate(-1px, -1px) rotate(-1deg); }
+              80%  { transform: translate(1px, -4px) rotate(3deg); }
+              100% { transform: translate(0, 0) rotate(-3deg); }
             }
-            .aencre-avatar { animation: aencre-flotte 2.8s ease-in-out infinite; }
+            .aencre-avatar { animation: aencre-flotte 4.2s ease-in-out infinite; }
             .bouton-aencre:hover .aencre-avatar { animation-play-state: paused; transform: scale(1.12) rotate(-6deg); }
             .bouton-aencre:hover { border-color: #7F77DD80; }
           `}</style>
