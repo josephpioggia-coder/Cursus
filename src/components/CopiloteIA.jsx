@@ -1924,11 +1924,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     setConfirmationBlocage(null);
     try {
       const sig = abortRef.current.signal;
-      const { texte } = extraireTexte(obtenirSourceHTML());
+      const sourceHTML = obtenirSourceHTML();
+      const { texte } = extraireTexte(sourceHTML);
+      // CORRECTIF 24/09/2026 — "Aide-moi à avancer" ne voyait pas les
+      // images du passage (signalé en usage réel : "Je ne peux pas
+      // afficher ni lire d'image insérée dans ton texte"), alors que les
+      // 4 onglets principaux les voient déjà depuis le même jour — même
+      // plafond de 3 images qu'ailleurs.
+      const imagesBlocage = extraireImages(sourceHTML).slice(0, 3);
+      const noteImagesBlocage = imagesBlocage.length
+        ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
+        : "";
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADN),
-        texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`,
-        sig, 1024
+        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage,
+        sig, 1024, null, false, imagesBlocage
       );
       const p = parserJSON(résultat);
       setDiagnosticBlocage(p);
