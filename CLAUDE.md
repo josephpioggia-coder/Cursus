@@ -91,8 +91,19 @@ Demandes explicites ayant façonné ce fichier, dans l'ordre :
    grande composante connexe du masque (élimine les bouts de livre
    voisin qui traînaient dans les coins du rectangle, quand deux livres
    se touchent sur la planche) + flou léger sur le seul canal alpha
-   pour adoucir le bord. Les cadrages ont aussi été resserrés d'un
-   deuxième passage pour réduire ces bavures de voisinage à la source.
+   pour adoucir le bord.
+5. Ce détourage plus serré avait recoupé DANS le contenu de plusieurs
+   éléments (titre tronqué : "Curs" au lieu de "Cursus", "Les chemi..."
+   au lieu de "Les chemins de l'invisible", "Analyse comparative" coupé
+   en haut, etc.) — demande explicite : des images COMPLÈTES, pas des
+   bouts d'image, quitte à laisser un peu de bavure de voisinage plutôt
+   que de couper dans le sujet. Chacun des 28 cadrages a été revérifié
+   un par un (élément par élément, pas seulement en planche de contact)
+   et élargi côté contenu manquant / resserré côté bavure de voisin —
+   PAS de reconstruction générative (inpainting) : la planche source
+   contenait déjà tout le contenu manquant juste à côté du cadrage
+   précédent, il n'y avait donc rien à "recomposer", seulement à
+   recadrer correctement.
 
 La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
 28 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
