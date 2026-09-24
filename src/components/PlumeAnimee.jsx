@@ -18,16 +18,26 @@
  *    convertir la police en tracés vectoriels, hors de portée ici) pour
  *    donner une impression vivante plutôt qu'un simple curseur droit.
  *
- * TECHNIQUE — pas de gestion manuelle de défilement en JS : le texte
- * révélé vit dans un bloc ANCRÉ EN BAS (position: absolute, bottom: 0)
- * à l'intérieur d'un conteneur de hauteur fixe en overflow: hidden. À
- * mesure que le bloc grandit vers le haut, son sommet sort naturellement
- * de la zone visible — aucun calcul de scroll à faire. Un masque en
- * dégradé sur le conteneur fait disparaître les lignes en fondu plutôt
- * qu'en coupure nette. Deux colonnes indépendantes (gauche/droite),
- * laissant vide la largeur de la boîte de connexion entre les deux —
- * plus simple et plus robuste qu'un vrai contournement CSS
- * (shape-outside) autour d'un élément qui bouge selon l'écran.
+ * CORRECTIF (même jour) — l'ancrage en bas (bottom: 0) plaçait la ligne
+ * en cours d'écriture, et donc la plume, en permanence collée au bord
+ * inférieur de l'écran ("la plume se trouve sous la page"). Retour
+ * explicite : le texte doit démarrer normalement en haut à gauche et
+ * descendre ligne par ligne comme une page qui se remplit ; le
+ * défilement (anciennes lignes qui remontent hors champ) ne doit
+ * commencer qu'à partir des 3/4 de la hauteur — pas dès la première
+ * ligne — à la fois pour garder la plume visible et pour aérer le texte.
+ *
+ * TECHNIQUE — le bloc de texte reste en flux normal, ancré en HAUT
+ * (top: 0), et grandit naturellement vers le bas. Un décalage
+ * `translateY` négatif, recalculé à chaque caractère, ne s'applique que
+ * lorsque la hauteur du texte dépasse 75% de la hauteur du conteneur —
+ * en dessous de ce seuil, décalage nul, la page se remplit simplement.
+ * Un masque en dégradé sur le conteneur fait disparaître les lignes qui
+ * sortent par le haut en fondu plutôt qu'en coupure nette. Deux colonnes
+ * indépendantes (gauche/droite), laissant vide la largeur de la boîte de
+ * connexion entre les deux — plus simple et plus robuste qu'un vrai
+ * contournement CSS (shape-outside) autour d'un élément qui bouge selon
+ * l'écran.
  */
 
 import { useEffect, useRef } from "react";
@@ -45,6 +55,7 @@ const COULEUR = "#8B2635"; // bordeaux Cursus (CursEdit)
 
 function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
   const conteneurRef = useRef(null);
+  const blocRef = useRef(null);
   const texteRef = useRef(null);
   const caretRef = useRef(null);
   const plumeRef = useRef(null);
@@ -77,9 +88,21 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
       }
       if (texteRef.current) texteRef.current.textContent = flotRef.current;
 
-      // Position de la plume = position du caret (fin du texte révélé),
-      // plus un léger mouvement vertical continu (sinusoïde) pour ne pas
-      // rester rigide sur une ligne droite.
+      // Décalage vers le haut UNIQUEMENT après 3/4 de la hauteur du
+      // conteneur (demande explicite) — avant ce seuil, décalage nul, le
+      // texte se contente de remplir la page normalement depuis le haut.
+      if (blocRef.current && conteneurRef.current) {
+        const hauteurConteneur = conteneurRef.current.clientHeight;
+        const hauteurContenu = blocRef.current.scrollHeight;
+        const seuil = hauteurConteneur * 0.75;
+        const décalage = Math.max(0, hauteurContenu - seuil);
+        blocRef.current.style.transform = `translateY(-${décalage}px)`;
+      }
+
+      // Position de la plume = position du caret (fin du texte révélé,
+      // APRÈS application du décalage ci-dessus), plus un léger mouvement
+      // vertical continu (sinusoïde) pour ne pas rester rigide sur une
+      // ligne droite.
       if (caretRef.current && conteneurRef.current && plumeRef.current) {
         const rectCaret = caretRef.current.getBoundingClientRect();
         const rectConteneur = conteneurRef.current.getBoundingClientRect();
@@ -102,7 +125,7 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
 
   return (
     <div ref={conteneurRef} className="plume-colonne">
-      <div className="plume-bloc-bas">
+      <div ref={blocRef} className="plume-bloc">
         <span ref={texteRef} className="plume-texte" />
         <span ref={caretRef} style={{ display: "inline-block", width: 0 }}>{"​"}</span>
       </div>
@@ -132,8 +155,9 @@ export default function PlumeAnimee() {
           -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 4%, black 18%, black 100%);
           mask-image: linear-gradient(to bottom, transparent 0, transparent 4%, black 18%, black 100%);
         }
-        .plume-bloc-bas {
-          position: absolute; left: 24px; right: 24px; bottom: 0;
+        .plume-bloc {
+          position: absolute; left: 24px; right: 24px; top: 24px;
+          transition: transform 0.05s linear;
         }
         .plume-texte {
           font-family: 'Dancing Script', cursive;
