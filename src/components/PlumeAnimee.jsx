@@ -145,9 +145,9 @@ function ColonnePlume({ décalageDépart = 0, vitesseMs = 42 }) {
 export default function PlumeAnimee() {
   return (
     <div aria-hidden="true" className="plume-scene">
-      <ColonnePlume décalageDépart={0} vitesseMs={42} />
+      <ColonnePlume décalageDépart={0} vitesseMs={46} />
       <div className="plume-espace-carte" />
-      <ColonnePlume décalageDépart={3} vitesseMs={47} />
+      <ColonnePlume décalageDépart={3} vitesseMs={52} />
 
       <style>{`
         .plume-scene {
