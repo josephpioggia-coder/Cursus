@@ -2053,7 +2053,16 @@ export default function CursAuditDetail({ auditId, onRetour, onOuvrirÉditeur, o
 
   return (
     <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto", maxWidth: 1400 }}>
-      <button onClick={onRetour} style={{ fontSize: 12.5, color: "var(--texte-tertiaire)", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 12 }}>
+      {/* Toujours visible en haut à gauche pendant le défilement (24/09/2026)
+          — `sticky` plutôt que `fixed` : cette page reste dans le shell
+          applicatif (barre latérale toujours présente à gauche), un bouton
+          ancré à l'écran la chevaucherait ; sticky reste dans sa propre
+          colonne de contenu tout en restant ancré au défilement. */}
+      <button onClick={onRetour} style={{
+        position: "sticky", top: 0, zIndex: 5, fontSize: 12.5, color: "var(--texte-tertiaire)",
+        background: "var(--surface, #fff)", border: "none", cursor: "pointer", padding: "8px 0",
+        marginBottom: 4, marginLeft: -4, paddingLeft: 4,
+      }}>
         ← Mes audits
       </button>
 

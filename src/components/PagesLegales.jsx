@@ -64,6 +64,9 @@ const IDENTITE_EDITEUR = {
   email: "infocursus.proia@gmail.com",
 };
 
+// Bouton "Retour" toujours visible (24/09/2026) — voir BoutonRetourFixe.jsx.
+import BoutonRetourFixe from "./BoutonRetourFixe.jsx";
+
 function Page({ titre, misÀJour, children, onRetour, onNaviguer }) {
   return (
     <div style={{
@@ -71,18 +74,11 @@ function Page({ titre, misÀJour, children, onRetour, onNaviguer }) {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       padding: "40px 20px",
     }}>
+      {onRetour && <BoutonRetourFixe onClick={onRetour} couleur="#7F77DD" label="Retour" />}
       <div style={{
         maxWidth: 720, margin: "0 auto", background: "#fff",
         border: "0.5px solid #e5e5e5", borderRadius: 16, padding: "36px 40px",
       }}>
-        {onRetour && (
-          <button onClick={onRetour} style={{
-            background: "none", border: "none", cursor: "pointer", padding: 0,
-            fontSize: 12.5, color: "#7F77DD", marginBottom: 20, fontFamily: "inherit",
-          }}>
-            ← Retour
-          </button>
-        )}
         <h1 style={{ fontSize: 22, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>{titre}</h1>
         <p style={{ fontSize: 11.5, color: "#999", marginBottom: 28 }}>Dernière mise à jour : {misÀJour}</p>
         <div style={{ fontSize: 13.5, lineHeight: 1.7, color: "#333" }}>

@@ -18,18 +18,13 @@
 
 import { COULEURS } from "../lib/contenuPaliers.js";
 import GrillePaliers from "./GrillePaliers.jsx";
+import BoutonRetourFixe from "./BoutonRetourFixe.jsx";
 
 export default function PageLancement({ onRetour }) {
   return (
     <div style={{ minHeight: "100vh", background: COULEURS.fond, fontFamily: "Inter, sans-serif", padding: "40px 24px 80px" }}>
+      <BoutonRetourFixe onClick={onRetour} couleur={COULEURS.bordeaux} label="Retour au choix de l'espace" />
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <button onClick={onRetour} style={{
-          background: "none", border: "none", color: COULEURS.texteClair, fontSize: 13, cursor: "pointer",
-          fontFamily: "inherit", padding: 0, marginBottom: 28,
-        }}>
-          ← Retour au choix de l'espace
-        </button>
-
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 36, fontWeight: 600, color: COULEURS.bordeaux, margin: "0 0 12px" }}>
             Offre de lancement

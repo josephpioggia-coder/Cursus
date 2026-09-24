@@ -14,6 +14,8 @@
  * restera sur cette page.
  */
 
+import BoutonRetourFixe from "./BoutonRetourFixe.jsx";
+
 const COULEUR = "#0E7256";
 
 function Section({ titre, children }) {
@@ -38,14 +40,8 @@ export default function CursDecisionPage({ onRetour }) {
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       padding: "40px 24px 80px",
     }}>
+      <BoutonRetourFixe onClick={onRetour} couleur={COULEUR} label="Retour au choix de l'espace" />
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <button onClick={onRetour} style={{
-          background: "none", border: "none", color: "#999", fontSize: 13, cursor: "pointer",
-          fontFamily: "inherit", padding: 0, marginBottom: 28,
-        }}>
-          ← Retour au choix de l'espace
-        </button>
-
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{ fontSize: 28, fontWeight: 600, color: COULEUR, marginBottom: 6 }}>CursDecision</div>
           <div style={{ fontSize: 14, color: "#666", marginBottom: 22 }}>
