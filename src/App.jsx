@@ -38,6 +38,7 @@ import Bibliotheque from "./components/Bibliotheque.jsx";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "./components/PagesLegales.jsx";
 import ModeEmploi from "./components/ModeEmploi.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
+import ScrabbleSolveur from "./components/ScrabbleSolveur.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
@@ -2308,6 +2309,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
+            // Solveur Scrabble — 29/09/2026, demande de Joseph (jouer avec les
+            // lettres et les mots). Libellé en dur, comme "Mes audits".
+            { id: "scrabble",     label: "Jeu de mots (Scrabble)",        icone: "🔤" },
             // Précision "(CursEdit)" ajoutée le 22/08/2026 : cet onglet reste
             // visible même dans l'espace CursAudit (la navigation n'est pas
             // encore séparée par espace), et affiche exclusivement les
@@ -2457,6 +2461,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {vue === "carnet" && (
           <CarnetIdees projets={projets} />
         )}
+
+        {/* Vue : solveur Scrabble (29/09/2026) */}
+        {vue === "scrabble" && <ScrabbleSolveur />}
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (

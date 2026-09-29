@@ -108,3 +108,62 @@ Demandes explicites ayant façonné ce fichier, dans l'ordre :
 La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
 28 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
 tout nouveau recadrage ou ajustement des cadrages existants.
+
+## Solveur Scrabble (29/09/2026)
+
+Demande de Joseph (il joue au Scrabble sur mobile avec Claude) : un
+solveur "en situation", à partir d'une capture d'écran de la partie.
+Entrée de menu "Jeu de mots (Scrabble)" → `src/components/ScrabbleSolveur.jsx`.
+
+- `src/lib/scrabbleSolveur.js` : moteur PUR (trie en tableaux typés,
+  Appel & Jacobson, score avec primes + bonus 50). Vérifié le 29/09/2026
+  contre une génération brute-force indépendante (mêmes coups, mêmes
+  scores, sur 3 positions dont une avec joker) : ne pas le "simplifier"
+  sans refaire ce test. Aucun appel IA, gratuit.
+- Lecture de la capture : seul poste qui consomme des tokens, via
+  `claude-prox` avec un bloc image base64 (le proxy transmet le corps tel
+  quel, aucun changement serveur). Une capture zoomée n'affiche qu'une
+  PARTIE du 15×15 : l'IA renvoie la zone visible (lettres + codes de
+  prime des cases vides) et `aligner()` la recale sur le plateau standard
+  en comparant les primes. Grille toujours modifiable à la main.
+- Dictionnaire : `public/scrabble/mots-fr.txt` (~411 000 mots) +
+  `accents.txt` (formes accentuées, pour retrouver la page Wiktionnaire).
+  Source depuis le 29/09/2026 : Dicollecte / Grammalecte v7.5
+  (npm `dictionary-fr`, licence MPL 2.0 — texte dans
+  `public/scrabble/LICENCE-DICOLLECTE.txt`, à conserver). Régénération :
+  `scripts/generer-dico-scrabble.sh` (unmunch développe les affixes mais
+  sur-génère → chaque forme est revalidée par `hunspell -l`, puis les
+  racines-abréviations `||` sont écartées, puis
+  `preparer-dico-scrabble.mjs` normalise et applique une petite liste
+  d'abréviations interdites de 2 à 4 lettres, revue à la main). PAS
+  l'ODS officiel : des abréviations plus longues peuvent subsister et
+  des mots récents du Scrabble peuvent manquer. Morphalou et Lexique 3
+  (préférés au départ) sont inaccessibles depuis l'environnement de
+  dev (hôtes bloqués) : à retenter si un accès s'ouvre. L'ancienne
+  source (lorenbrichter/Words, licence non précisée) est abandonnée.
+  Chargé à la première demande de calcul seulement.
+- Non testé en conditions réelles : l'appel IA de lecture d'image
+  (nécessite abonnement + session). Le moteur et l'interface l'ont été.
+
+### Onglet "Outils de mots" (29/09/2026)
+
+Suite de la demande : "le modèle serait celui de scrabble solveur qui est
+très complet" (Joseph a fourni une capture puis le texte de la page du
+solveur dCode). Seules les FONCTIONS de dCode sont reprises, aucun de
+ses codes/données. `src/components/OutilsMots.jsx` + `src/lib/scrabbleMots.js` :
+- 4 modes de recherche + modèle complet : mot le plus long / anagrammes,
+  raccrocher une lettre du plateau (avec position début/milieu/fin),
+  prolonger/intégrer un motif (espace ou "-" = lettre libre), lettres
+  pouvant s'accrocher, modèle `C_R_US`. Joker du tirage : `?`, `-` ou `*`.
+- Score d'un mot = points des seules lettres du CHEVALET, sans primes ni
+  lettres du plateau (comme dCode). Mots butoirs marqués `|`, lettres non
+  utilisées, tri par clic sur l'en-tête, copie / CSV, filtres
+  commence/finit/contient/longueur.
+- Vérificateur de mot, définitions (API REST fr.wiktionary.org appelée
+  depuis le navigateur — NON TESTÉ, hôte bloqué depuis l'environnement de
+  dev ; `public/scrabble/accents.txt` sert à retrouver la forme accentuée),
+  tirage aléatoire (vrai sac de 102 tuiles), compteur de points,
+  compteur de lettres restantes (peut reprendre grille + chevalet).
+- Écart connu avec dCode : liste libre (Dicollecte), pas l'ODS9 →
+  validité et butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en
+  fournit pas une.
