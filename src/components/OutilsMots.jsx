@@ -181,7 +181,7 @@ function SolveurMots({ chevaletInitial }) {
       </details>
       <button style={bouton(!occupe)} disabled={occupe} onClick={lancer}>▶ Trouver les solutions</button>
       {erreur && <div style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>{erreur}</div>}
-      {mode === "accrochables" && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Pour chaque lettre A–Z : mots utilisant tout le tirage + cette lettre. Lettre libre : choisissez la plus utile sur le plateau.</div>}
+      {mode === "accrochables" && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Pour chaque lettre A–Z : mots utilisant tout le tirage + cette lettre. Lettre libre : choisis la plus utile sur le plateau.</div>}
 
       {resultat?.type === "accrochables" && (
         <div style={{ marginTop: 14 }}>
@@ -200,7 +200,7 @@ function SolveurMots({ chevaletInitial }) {
         <div style={{ marginTop: 14 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
             <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-              {resultat.total} mot{resultat.total > 1 ? "s" : ""}{resultat.total > resultat.liste.length ? ` (${resultat.liste.length} affichés au maximum)` : ""}. Cliquez sur un mot pour sa définition, sur un en-tête pour trier. Points = lettres du tirage seulement, sans primes.
+              {resultat.total} mot{resultat.total > 1 ? "s" : ""}{resultat.total > resultat.liste.length ? ` (${resultat.liste.length} affichés au maximum)` : ""}. Clique sur un mot pour sa définition, sur un en-tête pour trier. Points = lettres du tirage seulement, sans primes.
             </span>
             {liste.length > 0 && <>
               <button style={boutonClair} onClick={() => navigator.clipboard?.writeText(texteExport())}>⧉ Copier</button>
@@ -341,7 +341,7 @@ function CompteurRestantes({ deLaGrille }) {
       </div>
       <div style={{ fontSize: 13, marginBottom: 6 }}>
         <b>{r.restantTotal}</b> tuile{r.restantTotal > 1 ? "s" : ""} encore dans le sac ou chez l'adversaire.
-        {r.excedent.length > 0 && <span style={{ color: "#c0392b" }}> Trop de {r.excedent.map((x) => x.lettre === "?" ? "jokers" : x.lettre).join(", ")} saisis (vérifiez la saisie).</span>}
+        {r.excedent.length > 0 && <span style={{ color: "#c0392b" }}> Trop de {r.excedent.map((x) => x.lettre === "?" ? "jokers" : x.lettre).join(", ")} saisis (vérifie ta saisie).</span>}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
         {r.lignes.map(({ lettre, total, restant }) => (

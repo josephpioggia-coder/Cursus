@@ -77,7 +77,7 @@ function imageEnBase64(fichier) {
 
 async function lireImage(fichier) {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("Session expirée — reconnectez-vous.");
+  if (!session?.access_token) throw new Error("Session expirée — reconnecte-toi.");
   const data64 = await imageEnBase64(fichier);
   const rep = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
@@ -170,8 +170,8 @@ export default function ScrabbleSolveur() {
       setNote(
         `Zone lue : ${lignes.length} lignes × ${Math.max(...lignes.map((l) => l.length))} colonnes, recalée aux lignes ${dr + 1}–${dr + lignes.length}, `
         + `colonnes ${String.fromCharCode(65 + dc)}–${String.fromCharCode(64 + dc + Math.max(...lignes.map((l) => l.length)))} `
-        + `(fiabilité du recalage ${Math.round(score * 100)} %). Vérifiez les lettres, corrigez si besoin, puis calculez.`
-        + (score < 0.9 ? " Recalage incertain : utilisez les flèches de décalage pour aligner sur les cases de prime." : "")
+        + `(fiabilité du recalage ${Math.round(score * 100)} %). Vérifie les lettres, corrige si besoin, puis calcule.`
+        + (score < 0.9 ? " Recalage incertain : utilise les flèches de décalage pour aligner sur les cases de prime." : "")
       );
     } catch (err) {
       setErreur(err.message || String(err));
@@ -180,7 +180,7 @@ export default function ScrabbleSolveur() {
 
   const calculer = async () => {
     setErreur(""); setCoupActif(null);
-    if (!chevalet) { setErreur("Saisissez d'abord le chevalet."); return; }
+    if (!chevalet) { setErreur("Saisis d'abord le chevalet."); return; }
     setOccupe(true); setEtat("Calcul des coups…");
     try {
       const dico = await chargerDico();
@@ -207,8 +207,8 @@ export default function ScrabbleSolveur() {
           <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "var(--color-text-primary)" }}>Jouer avec les mots — solveur Scrabble</h1>
         </div>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 16px" }}>
-          Chargez une capture de votre partie : l'IA lit la grille et le chevalet, puis le solveur (sans IA, dans votre navigateur)
-          classe tous les coups possibles. Vous pouvez aussi tout saisir à la main. Le dictionnaire est une liste libre proche
+          Charge une capture de ta partie : l'IA lit la grille et le chevalet, puis le solveur (sans IA, dans ton navigateur)
+          classe tous les coups possibles. Tu peux aussi tout saisir à la main. Le dictionnaire est une liste libre proche
           du Scrabble, pas l'ODS officiel : un mot proposé peut être refusé en partie, et inversement.
         </p>
 
@@ -284,7 +284,7 @@ export default function ScrabbleSolveur() {
             {/* Barre d'édition (mobile) */}
             <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                {sel ? `Case ${sel.r + 1}${String.fromCharCode(65 + sel.c)} :` : "Touchez une case :"}
+                {sel ? `Case ${sel.r + 1}${String.fromCharCode(65 + sel.c)} :` : "Touche une case :"}
               </span>
               <input
                 maxLength={1} disabled={!sel} value=""
@@ -321,7 +321,7 @@ export default function ScrabbleSolveur() {
           <div style={{ flex: "1 1 280px", minWidth: 260 }}>
             {coups === null ? (
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-                Les meilleurs coups apparaîtront ici. Cliquez sur l'un d'eux pour le voir sur la grille (tuiles vertes).
+                Les meilleurs coups apparaîtront ici. Clique sur l'un d'eux pour le voir sur la grille (tuiles vertes).
               </div>
             ) : coups.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.6 }}>
