@@ -108,3 +108,28 @@ Demandes explicites ayant façonné ce fichier, dans l'ordre :
 La planche source elle-même n'est PAS conservée dans le dépôt (seuls les
 28 recadrages qui en sont tirés le sont) — la redemander à Joseph avant
 tout nouveau recadrage ou ajustement des cadrages existants.
+
+## Solveur Scrabble (29/09/2026)
+
+Demande de Joseph (il joue au Scrabble sur mobile avec Claude) : un
+solveur "en situation", à partir d'une capture d'écran de la partie.
+Entrée de menu "Jeu de mots (Scrabble)" → `src/components/ScrabbleSolveur.jsx`.
+
+- `src/lib/scrabbleSolveur.js` : moteur PUR (trie en tableaux typés,
+  Appel & Jacobson, score avec primes + bonus 50). Vérifié le 29/09/2026
+  contre une génération brute-force indépendante (mêmes coups, mêmes
+  scores, sur 3 positions dont une avec joker) : ne pas le "simplifier"
+  sans refaire ce test. Aucun appel IA, gratuit.
+- Lecture de la capture : seul poste qui consomme des tokens, via
+  `claude-prox` avec un bloc image base64 (le proxy transmet le corps tel
+  quel, aucun changement serveur). Une capture zoomée n'affiche qu'une
+  PARTIE du 15×15 : l'IA renvoie la zone visible (lettres + codes de
+  prime des cases vides) et `aligner()` la recale sur le plateau standard
+  en comparant les primes. Grille toujours modifiable à la main.
+- Dictionnaire : `public/scrabble/mots-fr.txt` (311 438 mots, généré par
+  `scripts/preparer-dico-scrabble.mjs` depuis lorenbrichter/Words,
+  liste Letterpress). PAS l'ODS officiel — écarts possibles avec le jeu.
+  Licence de la source non précisée dans son dépôt : à vérifier avant
+  toute diffusion publique. Chargé à la première demande de calcul.
+- Non testé en conditions réelles : l'appel IA de lecture d'image
+  (nécessite abonnement + session). Le moteur et l'interface l'ont été.
