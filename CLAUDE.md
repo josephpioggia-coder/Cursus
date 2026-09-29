@@ -126,11 +126,22 @@ Entrée de menu "Jeu de mots (Scrabble)" → `src/components/ScrabbleSolveur.jsx
   PARTIE du 15×15 : l'IA renvoie la zone visible (lettres + codes de
   prime des cases vides) et `aligner()` la recale sur le plateau standard
   en comparant les primes. Grille toujours modifiable à la main.
-- Dictionnaire : `public/scrabble/mots-fr.txt` (311 438 mots, généré par
-  `scripts/preparer-dico-scrabble.mjs` depuis lorenbrichter/Words,
-  liste Letterpress). PAS l'ODS officiel — écarts possibles avec le jeu.
-  Licence de la source non précisée dans son dépôt : à vérifier avant
-  toute diffusion publique. Chargé à la première demande de calcul.
+- Dictionnaire : `public/scrabble/mots-fr.txt` (~411 000 mots) +
+  `accents.txt` (formes accentuées, pour retrouver la page Wiktionnaire).
+  Source depuis le 29/09/2026 : Dicollecte / Grammalecte v7.5
+  (npm `dictionary-fr`, licence MPL 2.0 — texte dans
+  `public/scrabble/LICENCE-DICOLLECTE.txt`, à conserver). Régénération :
+  `scripts/generer-dico-scrabble.sh` (unmunch développe les affixes mais
+  sur-génère → chaque forme est revalidée par `hunspell -l`, puis les
+  racines-abréviations `||` sont écartées, puis
+  `preparer-dico-scrabble.mjs` normalise et applique une petite liste
+  d'abréviations interdites de 2 à 4 lettres, revue à la main). PAS
+  l'ODS officiel : des abréviations plus longues peuvent subsister et
+  des mots récents du Scrabble peuvent manquer. Morphalou et Lexique 3
+  (préférés au départ) sont inaccessibles depuis l'environnement de
+  dev (hôtes bloqués) : à retenter si un accès s'ouvre. L'ancienne
+  source (lorenbrichter/Words, licence non précisée) est abandonnée.
+  Chargé à la première demande de calcul seulement.
 - Non testé en conditions réelles : l'appel IA de lecture d'image
   (nécessite abonnement + session). Le moteur et l'interface l'ont été.
 
@@ -153,5 +164,6 @@ ses codes/données. `src/components/OutilsMots.jsx` + `src/lib/scrabbleMots.js` 
   dev ; `public/scrabble/accents.txt` sert à retrouver la forme accentuée),
   tirage aléatoire (vrai sac de 102 tuiles), compteur de points,
   compteur de lettres restantes (peut reprendre grille + chevalet).
-- Écart connu avec dCode : liste libre, pas l'ODS9 → validité et
-  butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en fournit pas une.
+- Écart connu avec dCode : liste libre (Dicollecte), pas l'ODS9 →
+  validité et butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en
+  fournit pas une.
