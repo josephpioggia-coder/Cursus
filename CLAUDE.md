@@ -133,3 +133,25 @@ Entrée de menu "Jeu de mots (Scrabble)" → `src/components/ScrabbleSolveur.jsx
   toute diffusion publique. Chargé à la première demande de calcul.
 - Non testé en conditions réelles : l'appel IA de lecture d'image
   (nécessite abonnement + session). Le moteur et l'interface l'ont été.
+
+### Onglet "Outils de mots" (29/09/2026)
+
+Suite de la demande : "le modèle serait celui de scrabble solveur qui est
+très complet" (Joseph a fourni une capture puis le texte de la page du
+solveur dCode). Seules les FONCTIONS de dCode sont reprises, aucun de
+ses codes/données. `src/components/OutilsMots.jsx` + `src/lib/scrabbleMots.js` :
+- 4 modes de recherche + modèle complet : mot le plus long / anagrammes,
+  raccrocher une lettre du plateau (avec position début/milieu/fin),
+  prolonger/intégrer un motif (espace ou "-" = lettre libre), lettres
+  pouvant s'accrocher, modèle `C_R_US`. Joker du tirage : `?`, `-` ou `*`.
+- Score d'un mot = points des seules lettres du CHEVALET, sans primes ni
+  lettres du plateau (comme dCode). Mots butoirs marqués `|`, lettres non
+  utilisées, tri par clic sur l'en-tête, copie / CSV, filtres
+  commence/finit/contient/longueur.
+- Vérificateur de mot, définitions (API REST fr.wiktionary.org appelée
+  depuis le navigateur — NON TESTÉ, hôte bloqué depuis l'environnement de
+  dev ; `public/scrabble/accents.txt` sert à retrouver la forme accentuée),
+  tirage aléatoire (vrai sac de 102 tuiles), compteur de points,
+  compteur de lettres restantes (peut reprendre grille + chevalet).
+- Écart connu avec dCode : liste libre, pas l'ODS9 → validité et
+  butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en fournit pas une.

@@ -27,6 +27,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
+import OutilsMots from "./OutilsMots.jsx";
 import {
   TAILLE, PRIMES, plateauVide, construireDico, genererCoups, notation,
   appliquerCoup, retirerDuChevalet, aligner, plateauDepuisLecture, pointsLettre,
@@ -117,6 +118,7 @@ export default function ScrabbleSolveur() {
   const [occupe, setOccupe] = useState(false);
   const [apercu, setApercu] = useState(null);
   const [note, setNote] = useState("");
+  const [onglet, setOnglet] = useState("grille"); // "grille" | "outils"
   const zoneRef = useRef(null);
 
   const modifier = useCallback((r, c, valeur) => {
@@ -209,6 +211,19 @@ export default function ScrabbleSolveur() {
           classe tous les coups possibles. Vous pouvez aussi tout saisir à la main. Le dictionnaire est une liste libre proche
           du Scrabble, pas l'ODS officiel : un mot proposé peut être refusé en partie, et inversement.
         </p>
+
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+          {[["grille", "🎯 Grille — meilleurs coups"], ["outils", "🔤 Outils de mots"]].map(([id, label]) => (
+            <button key={id} onClick={() => setOnglet(id)} style={{
+              background: "transparent", border: "none", padding: "8px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
+              fontWeight: onglet === id ? 600 : 400, color: onglet === id ? "#1D9E75" : "var(--color-text-secondary)",
+              borderBottom: onglet === id ? "2px solid #1D9E75" : "2px solid transparent", marginBottom: -1,
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {onglet === "outils" && <OutilsMots chevalet={chevalet} plateau={plateau} />}
+        <div style={{ display: onglet === "grille" ? "block" : "none" }}>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
           <label style={{ ...btn(!occupe), display: "inline-block" }}>
@@ -334,6 +349,7 @@ export default function ScrabbleSolveur() {
               </>
             )}
           </div>
+        </div>
         </div>
       </div>
     </div>
