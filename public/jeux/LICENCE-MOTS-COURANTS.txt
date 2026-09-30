@@ -1,0 +1,18 @@
+mots-courants.txt — liste des mots français courants, classés par fréquence
+=========================================================================
+
+Dérivée de « FrequencyWords » par Hermit Dave
+(https://github.com/hermitdave/FrequencyWords, content/2018/fr/fr_50k.txt),
+elle-même calculée à partir du corpus OpenSubtitles (https://opus.nlpl.eu/OpenSubtitles2018.php).
+
+Le CONTENU de FrequencyWords est publié sous licence
+Creative Commons Attribution - Partage dans les mêmes conditions 4.0 (CC BY-SA 4.0) :
+https://creativecommons.org/licenses/by-sa/4.0/deed.fr
+
+Modifications apportées : ne sont conservés que les mots présents dans le dictionnaire
+orthographique Dicollecte (voir public/scrabble/LICENCE-DICOLLECTE.txt) — donc sans noms
+propres ni abréviations —, de 3 à 12 lettres ; les mots grossiers sont retirés (liste npm
+« french-badwords-list », licence MIT, plus quelques ajouts manuels) ; les fréquences
+numériques sont supprimées, l'ordre du fichier donne le rang (ligne n = rang n).
+Le fichier mots-courants.txt reste, comme sa source, sous licence CC BY-SA 4.0.
+Script de génération : scripts/preparer-mots-courants.mjs.
