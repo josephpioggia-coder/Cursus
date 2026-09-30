@@ -15,11 +15,11 @@
  */
 
 import { useState, useEffect, useRef } from "react";
-import { PRIMES, pointsLettre, appliquerCoup, notation, genererCoups, plateauVide } from "../lib/scrabbleSolveur.js";
+import { appliquerCoup, notation, genererCoups, plateauVide } from "../lib/scrabbleSolveur.js";
+import { PlateauCanvas, TuileCanvas } from "./jeux/dessin.jsx";
 import { partiesJeuMotsAPI } from "../lib/api.js";
 import { chargerMoteur, nouveauSac, completer, evaluerCoup, choisirCoup, scoreFinal, NIVEAUX } from "../lib/jeuMots.js";
 
-const COULEUR_PRIME = { MT: "#d9534f", MD: "#d8a0c6", LT: "#1a7fc1", LD: "#a9d8f2" };
 const carte = { background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 };
 const bouton = (actif = true, couleur = "#1D9E75") => ({ background: actif ? couleur : "#ccc", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
 const boutonClair = (actif = true) => ({ background: "transparent", border: "0.5px solid var(--color-border-tertiary)", color: actif ? "var(--color-text-primary)" : "#aaa", borderRadius: 8, padding: "8px 12px", fontSize: 12, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
@@ -62,20 +62,6 @@ const TEXTE_SYNC = {
 const melanger = (t) => { const a = [...t]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const cle = (r, c) => `${r},${c}`;
 
-function Tuile({ l, taille = 40, etat = "", onClick, petit }) {
-  const fond = etat === "sel" ? "#ffd75e" : etat === "echange" ? "#f28b82" : "#f2b93b";
-  return (
-    <div onClick={onClick} style={{
-      width: taille, height: taille, borderRadius: 6, background: fond, border: etat === "sel" ? "2px solid #111" : "1px solid #b98a1a",
-      display: "flex", alignItems: "center", justifyContent: "center", position: "relative", fontWeight: 700, fontSize: taille * 0.5,
-      color: "#111", cursor: onClick ? "pointer" : "default", userSelect: "none", boxShadow: "0 1px 2px rgba(0,0,0,.25)",
-    }}>
-      {l === "?" ? "★" : l}
-      {!petit && <span style={{ position: "absolute", right: 3, bottom: 1, fontSize: taille * 0.25, fontWeight: 500 }}>{l === "?" ? "" : pointsLettre(l)}</span>}
-    </div>
-  );
-}
-
 export default function JeuDeMots() {
   const [niveau, setNiveau] = useState("moyen");
   const [p, setP] = useState(null); // partie en cours (null = pas commencée)
@@ -85,6 +71,7 @@ export default function JeuDeMots() {
   const [selection, setSelection] = useState(null); // index du chevalet
   const [pose, setPose] = useState([]);             // tuiles posées ce tour : [{r,c,idx,l,joker}]
   const [choixJoker, setChoixJoker] = useState(null);
+  const [zoom, setZoom] = useState(false);
   const [echange, setEchange] = useState(null);     // null | Set d'index à échanger
   const [message, setMessage] = useState("");
   const [restauration, setRestauration] = useState(true); // vrai le temps de lire les sauvegardes et de recharger le dictionnaire
@@ -281,7 +268,9 @@ export default function JeuDeMots() {
   };
 
   // ─── Rendu ───
-  const posees = new Map(pose.map((t) => [cle(t.r, t.c), t]));
+  const posees = new Map(pose.map((t) => [cle(t.r, t.c), { l: t.l, joker: t.joker }]));
+  const derniereCase = pose.length ? pose[pose.length - 1] : p && p.derniers.length ? { r: +p.derniers[0].split(",")[0], c: +p.derniers[0].split(",")[1] } : null;
+  const centrer = derniereCase ? { r: derniereCase.r, c: derniereCase.c, cle: `${derniereCase.r},${derniereCase.c},${pose.length}` } : undefined;
   const enJeu = p && p.tour !== "fini";
 
   if (restauration) return <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Recherche de ta partie sauvegardée…</div>;
@@ -314,41 +303,23 @@ export default function JeuDeMots() {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
       {/* ── Plateau et chevalet ── */}
-      <div style={{ flex: "1 1 460px", maxWidth: 640, minWidth: 300 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(15, 1fr)", gap: 1, background: "#222", padding: 1, borderRadius: 4 }}>
-          {p.plateau.map((ligne, r) => ligne.map((x, c) => {
-            const prime = PRIMES[r][c];
-            const tp = posees.get(cle(r, c));
-            const lettre = x || (tp ? tp.l : "");
-            const joker = (x && x === x.toLowerCase()) || (tp && tp.joker);
-            const derniere = p.derniers.includes(cle(r, c));
-            return (
-              <div key={cle(r, c)} onClick={() => surCase(r, c)} style={{
-                aspectRatio: "1", position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "clamp(9px, 2.4vw, 18px)", fontWeight: 700, userSelect: "none",
-                cursor: monTour && (tp || (!x && selection !== null)) ? "pointer" : "default",
-                background: x ? "#f2b93b" : tp ? "#7ed37e" : COULEUR_PRIME[prime] || "#fafafa",
-                color: lettre ? "#111" : "#fff",
-                boxShadow: derniere ? "inset 0 0 0 2px #e4572e" : "none",
-              }}>
-                {lettre ? (
-                  <>
-                    <span style={{ fontStyle: joker ? "italic" : "normal", opacity: joker ? 0.6 : 1 }}>{lettre.toUpperCase()}</span>
-                    <span style={{ position: "absolute", right: 1, bottom: 0, fontSize: "clamp(5px, 1.2vw, 8px)", fontWeight: 500 }}>{joker ? "" : pointsLettre(lettre)}</span>
-                  </>
-                ) : <span style={{ fontSize: "clamp(5px, 1.3vw, 9px)", fontWeight: 500 }}>{r === 7 && c === 7 ? "★" : prime}</span>}
-              </div>
-            );
-          }))}
+      <div style={{ flex: "1 1 320px", maxWidth: 640, minWidth: 0 }}>
+        <PlateauCanvas plateau={p.plateau} posees={posees} derniers={p.derniers} zoom={zoom} centrer={centrer} onCase={surCase} />
+        <div style={{ marginTop: 6 }}>
+          <button style={boutonClair()} onClick={() => setZoom(!zoom)}>{zoom ? "🔍 Vue d'ensemble" : "🔍 Agrandir les cases"}</button>
         </div>
 
         {/* Chevalet */}
-        <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap", alignItems: "center", minHeight: 46 }}>
-          {chevalet.map((l, i) => idxPoses.has(i) ? <div key={i} style={{ width: 40, height: 40, borderRadius: 6, border: "1px dashed #bbb" }} /> : (
-            <Tuile key={i} l={l} etat={echange?.has(i) ? "echange" : selection === i ? "sel" : ""} onClick={() => surTuile(i)} />
+        <div style={{ display: "flex", gap: 5, marginTop: 10, width: "100%", maxWidth: 7 * 54 + 30, alignItems: "center" }}>
+          {chevalet.map((l, i) => (
+            <div key={i} style={{ flex: "1 1 0", maxWidth: 54, minWidth: 0 }}>
+              {idxPoses.has(i)
+                ? <div style={{ aspectRatio: "1", borderRadius: 8, border: "1px dashed #bbb" }} />
+                : <TuileCanvas l={l} taille="100%" etat={echange?.has(i) ? "echange" : selection === i ? "sel" : "normal"} onClick={() => surTuile(i)} />}
+            </div>
           ))}
-          {enJeu && <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 6 }}>{echange ? "Touche les tuiles à échanger" : monTour ? "Touche une tuile, puis une case" : "L'ordinateur réfléchit…"}</span>}
         </div>
+        {enJeu && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>{echange ? "Touche les tuiles à échanger" : monTour ? "Touche une tuile, puis une case" : "L'ordinateur réfléchit…"}</div>}
 
         {/* Boutons */}
         {enJeu && (
@@ -374,7 +345,7 @@ export default function JeuDeMots() {
       </div>
 
       {/* ── Score et journal ── */}
-      <div style={{ flex: "1 1 260px", minWidth: 240 }}>
+      <div style={{ flex: "1 1 260px", minWidth: 0 }}>
         <div style={carte}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             <span style={{ color: monTour ? "#1D9E75" : "inherit" }}>Toi : {p.fin ? p.fin.final.joueur : p.scores.joueur}</span>

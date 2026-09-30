@@ -253,3 +253,34 @@ composant + moteur + une ligne dans `JEUX` de SalleDesJeux.jsx.
 - Vérifié le 30/09/2026 dans un navigateur (parties jouées de bout en bout, solution calculée
   par le moteur puis jouée dans l'interface) : Motus, Pendu, Boggle (dont fin du temps), Mot le
   plus long, Échelle (chemin optimal), Mots mêlés. Les statistiques sont locales à l'appareil.
+
+### Plateaux et tuiles sur <canvas> + règles de mise en page mobile (30/09/2026)
+
+Retour de Joseph (capture sur son mobile) : « la table est loin de ressembler au modèle » et
+« la mise en page de Cursus est mal fichue sur mon mobile ». Le jeu se jouera SURTOUT sur mobile.
+Deux causes, deux règles à garder :
+
+1. **Mode sombre forcé du navigateur mobile.** Cursus n'a aucun thème sombre (aucune variable
+   `--color-*` définie, aucun `prefers-color-scheme`) : le navigateur de Joseph l'assombrit de
+   force. Ce mode ASSOMBRIT les fonds clairs (cases blanches → noires) et INVERSE les textes
+   (lettres noires sur tuiles jaunes → blanches ; le texte dans un SVG aussi). Seul le contenu d'un
+   `<canvas>` échappe à ça. Donc plateaux, tuiles, grilles de lettres sont dessinés sur canvas :
+   `src/components/jeux/dessin.jsx` (`PlateauCanvas`, `TuileCanvas`, `GrilleCanvas`). Couleurs
+   d'après le vrai jeu montré par Joseph : cases claires arrondies sur fond noir, LD bleu clair,
+   LT bleu foncé, MD mauve, MT rouge, tuiles ambrées à lettre noire + points en indice, dernier
+   coup adverse en orange foncé, tuiles posées/aperçu en vert, case active cerclée d'or.
+   Contrepartie : pas de texte sélectionnable → chaque canvas a un `aria-label` (lettres).
+   Reproduire : `chromium --enable-features=WebContentsForceDark` (Playwright : `args`).
+   Ne PAS remettre de `<div>` colorés pour ces éléments, ni du SVG.
+2. **Aucun contenu ne doit être plus large que sa colonne.** Le shell de l'app (grille `1fr` sur
+   mobile) s'élargit à la largeur MINIMALE de son contenu (la barre du haut fait déjà ~712 px,
+   avant comme après ces changements), et le navigateur mobile dézoome alors toute la page :
+   le plateau (max 640 px fixe + `minWidth: 300`) l'avait fait déborder. Règles : jamais de
+   `minWidth`/largeur fixe > ~280 px dans un jeu ; `minWidth: 0` sur les enfants de flex/grid ;
+   un canvas dimensionné d'après la largeur de son CONTENEUR (ResizeObserver, pas `vw`), posé en
+   `position: absolute` dans un cadre `aspect-ratio: 1` (sinon sa taille en pixels compte dans la
+   largeur minimale → boucle d'élargissement). Vérifié à 320/360/390 px : `scrollWidth <= innerWidth`
+   pour tous les écrans de jeu. Mode « 🔍 Agrandir les cases » (cases de 44 px, cadre défilant)
+   pour jouer confortablement au doigt.
+Non corrigé (hors demande, existait déjà) : la barre du haut de l'app dépasse la largeur d'un
+téléphone (~712 px) → la page est dézoomée sur mobile avec ou sans les jeux.

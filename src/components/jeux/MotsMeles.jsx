@@ -7,6 +7,7 @@
  */
 import { useState } from "react";
 import { genererMotsMeles, motSurSegment } from "../../lib/jeuxDeMots.js";
+import { GrilleCanvas } from "./dessin.jsx";
 import { carte, bouton, boutonClair, champ, discret, EnTete, useChrono, formatTemps, lireStats, noterPartie } from "./commun.jsx";
 
 const NIVEAUX = { facile: { diagonales: false, inverses: false, nb: 7 }, moyen: { diagonales: true, inverses: false, nb: 8 }, difficile: { diagonales: true, inverses: true, nb: 10 } };
@@ -63,25 +64,16 @@ export default function MotsMeles({ donnees }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          <div style={{ flex: "1 1 300px", maxWidth: 440 }}>
+          <div style={{ flex: "1 1 300px", maxWidth: 440, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
               <span>⏱ {formatTemps(temps)}</span><span>{trouves.length} / {g.mots.length}</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 2, userSelect: "none" }}>
-              {g.grille.map((ligne, r) => ligne.map((l, c) => {
-                const t = teinte.get(`${r},${c}`);
-                const estDebut = debut && debut[0] === r && debut[1] === c;
-                return (
-                  <button key={`${r}-${c}`} onClick={() => toucher(r, c)} style={{
-                    aspectRatio: "1", border: estDebut ? "2px solid #111" : "0.5px solid var(--color-border-tertiary)", borderRadius: 6, padding: 0, fontFamily: "inherit",
-                    fontSize: "clamp(12px, 4vw, 20px)", fontWeight: 700, cursor: "pointer", background: estDebut ? "#ffd75e" : t || "var(--color-background-primary)", color: "#111",
-                  }}>{l}</button>
-                );
-              }))}
-            </div>
+            <GrilleCanvas n={10} maxLargeur={440} marque={debut ? debut[0] * 10 + debut[1] : undefined}
+              onCase={(i, r, c) => toucher(r, c)}
+              cellules={g.grille.flatMap((ligne, r) => ligne.map((l, c) => ({ l, fond: teinte.get(`${r},${c}`) || "#f4f4f4", texte: "#111" })))} />
             {message && <div style={{ marginTop: 8, fontSize: 13, color: message.startsWith("Trouvé") ? "#1D9E75" : "#c0392b" }}>{message}</div>}
           </div>
-          <div style={{ flex: "1 1 180px", minWidth: 160 }}>
+          <div style={{ flex: "1 1 180px", minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Mots à trouver</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
               {[...g.mots].sort((a, b) => a.mot.localeCompare(b.mot)).map((m) => {

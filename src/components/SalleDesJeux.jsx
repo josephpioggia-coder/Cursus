@@ -58,7 +58,7 @@ export default function SalleDesJeux() {
 
   if (courant?.propre) {
     return (
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "10px 20px 0" }}><button onClick={() => setJeu(null)} style={{ background: "transparent", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>← Tous les jeux</button></div>
         <ScrabbleSolveur />
       </div>
@@ -67,7 +67,7 @@ export default function SalleDesJeux() {
   if (courant) {
     const { Composant } = courant;
     return (
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px 60px" }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "16px 20px 60px" }}>
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
           <button onClick={() => setJeu(null)} style={{ background: "transparent", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 12 }}>← Tous les jeux</button>
           <Composant donnees={donnees} />
@@ -77,7 +77,7 @@ export default function SalleDesJeux() {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px 60px" }}>
+    <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "24px 20px 60px" }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
           <img src="/aencre-icone.png" alt="Æncre" style={{ width: 44, height: 44, borderRadius: "50%" }} />

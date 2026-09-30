@@ -29,16 +29,15 @@ import { useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 import OutilsMots from "./OutilsMots.jsx";
 import JeuDeMots from "./JeuDeMots.jsx";
+import { PlateauCanvas } from "./jeux/dessin.jsx";
 import {
-  TAILLE, PRIMES, plateauVide, construireDico, genererCoups, notation,
-  appliquerCoup, retirerDuChevalet, aligner, plateauDepuisLecture, pointsLettre,
+  TAILLE, plateauVide, construireDico, genererCoups, notation,
+  appliquerCoup, retirerDuChevalet, aligner, plateauDepuisLecture,
 } from "../lib/scrabbleSolveur.js";
 
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const COULEUR_PRIME = { MT: "#d9534f", MD: "#d8a0c6", LT: "#1a7fc1", LD: "#a9d8f2" };
-const TEXTE_PRIME = { MT: "#fff", MD: "#fff", LT: "#fff", LD: "#fff" };
 
 const CONSIGNE_LECTURE = `Tu lis une capture d'écran d'une partie de Scrabble (français). Réponds UNIQUEMENT par un objet JSON, sans texte autour ni bloc markdown :
 {"lignes": [[...], ...], "chevalet": "..."}
@@ -119,6 +118,7 @@ export default function ScrabbleSolveur() {
   const [occupe, setOccupe] = useState(false);
   const [apercu, setApercu] = useState(null);
   const [note, setNote] = useState("");
+  const [zoom, setZoom] = useState(false);
   const [onglet, setOnglet] = useState("grille"); // "grille" | "outils"
   const zoneRef = useRef(null);
 
@@ -197,11 +197,11 @@ export default function ScrabbleSolveur() {
     setCoups(null); setCoupActif(null);
   };
 
-  const tuilesApercu = new Map((coupActif?.tuiles || []).map((t) => [`${t.r},${t.c}`, t]));
+  const tuilesApercu = new Map((coupActif?.tuiles || []).map((t) => [`${t.r},${t.c}`, { l: t.l, joker: t.joker }]));
   const vide = plateau.every((l) => l.every((x) => !x));
 
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px 60px" }}>
+    <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "24px 20px 60px" }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
           <img src="/aencre-icone.png" alt="Æncre" style={{ width: 44, height: 44, borderRadius: "50%" }} />
@@ -213,7 +213,7 @@ export default function ScrabbleSolveur() {
           du Scrabble, pas l'ODS officiel : un mot proposé peut être refusé en partie, et inversement.
         </p>
 
-        <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginBottom: 16, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
           {[["grille", "🎯 Grille — meilleurs coups"], ["outils", "🔤 Outils de mots"], ["jeu", "🎮 Jouer contre l'ordinateur"]].map(([id, label]) => (
             <button key={id} onClick={() => setOnglet(id)} style={{
               background: "transparent", border: "none", padding: "8px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
@@ -246,42 +246,14 @@ export default function ScrabbleSolveur() {
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "flex-start" }}>
           {/* ── Grille ── */}
-          <div style={{ flex: "1 1 460px", maxWidth: 640, minWidth: 300 }}>
-            <div
-              ref={zoneRef} tabIndex={0} onKeyDown={surTouche}
-              style={{ display: "grid", gridTemplateColumns: "repeat(15, 1fr)", gap: 1, background: "#222", padding: 1, outline: "none", borderRadius: 4 }}
-            >
-              {plateau.map((ligne, r) => ligne.map((x, c) => {
-                const prime = PRIMES[r][c];
-                const ap = tuilesApercu.get(`${r},${c}`);
-                const lettre = x || (ap ? ap.l : "");
-                const estSel = sel && sel.r === r && sel.c === c;
-                return (
-                  <div
-                    key={`${r}-${c}`}
-                    onClick={() => { setSel({ r, c }); zoneRef.current?.focus(); }}
-                    style={{
-                      aspectRatio: "1", position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "clamp(9px, 2.4vw, 18px)", fontWeight: 700, userSelect: "none", cursor: "pointer",
-                      background: x ? "#f2b93b" : ap ? "#7ed37e" : (r === 7 && c === 7 && !prime) ? "#d8a0c6" : COULEUR_PRIME[prime] || "#fafafa",
-                      color: lettre ? "#111" : TEXTE_PRIME[prime] || "#999",
-                      opacity: ap && !x ? 0.95 : 1,
-                      boxShadow: estSel ? "inset 0 0 0 2px #111" : "none",
-                    }}
-                  >
-                    {lettre ? (
-                      <>
-                        <span style={{ fontStyle: (x && x === x.toLowerCase()) || (ap && ap.joker) ? "italic" : "normal", opacity: (x && x === x.toLowerCase()) || (ap && ap.joker) ? 0.6 : 1 }}>{lettre.toUpperCase()}</span>
-                        <span style={{ position: "absolute", right: 1, bottom: 0, fontSize: "clamp(5px, 1.2vw, 8px)", fontWeight: 500 }}>
-                          {pointsLettre(x || (ap.joker ? ap.l.toLowerCase() : ap.l)) || ""}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: "clamp(5px, 1.3vw, 9px)", fontWeight: 500 }}>{r === 7 && c === 7 ? "★" : prime}</span>
-                    )}
-                  </div>
-                );
-              }))}
+          <div style={{ flex: "1 1 320px", maxWidth: 640, minWidth: 0 }}>
+            <div ref={zoneRef} tabIndex={0} onKeyDown={surTouche} style={{ outline: "none", minWidth: 0 }}>
+              <PlateauCanvas plateau={plateau} apercu={tuilesApercu} selection={sel}
+                zoom={zoom} centrer={sel ? { r: sel.r, c: sel.c, cle: `${sel.r},${sel.c}` } : undefined}
+                onCase={(r, c) => { setSel({ r, c }); zoneRef.current?.focus(); }} />
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <button style={btnClair} onClick={() => setZoom(!zoom)}>{zoom ? "🔍 Vue d'ensemble" : "🔍 Agrandir les cases"}</button>
             </div>
 
             {/* Barre d'édition (mobile) */}
@@ -321,7 +293,7 @@ export default function ScrabbleSolveur() {
           </div>
 
           {/* ── Résultats ── */}
-          <div style={{ flex: "1 1 280px", minWidth: 260 }}>
+          <div style={{ flex: "1 1 260px", minWidth: 0 }}>
             {coups === null ? (
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
                 Les meilleurs coups apparaîtront ici. Clique sur l'un d'eux pour le voir sur la grille (tuiles vertes).
