@@ -303,3 +303,22 @@ compteurs, Aide, Mode d'emploi, Légal, Déconnexion) est dans le tiroir, sectio
 sur mobile, les mettre dans le tiroir. Piège de test : l'émulation mobile de Playwright
 (`isMobile: true`) ÉLARGIT la fenêtre au contenu et masque le problème ; tester avec une fenêtre
 fixe de 360 px (`isMobile: false`) et mesurer `scrollWidth` / la largeur de la colonne principale.
+
+### Partie : plateau agrandi manipulable, tuile plus basse, points en direct (30/09/2026)
+
+3 retours de Joseph après le glisser-déposer : « descends un peu plus la tuile » ; « quand le format des
+cases est agrandi on ne peut rien bouger, tout est figé » ; « quand on a un mot correct les points devraient
+s'afficher ».
+- **Tuile fantôme** : case visée = 28 px au-dessus du doigt (`DECALAGE`), tuile dessinée encore 30 px plus haut
+  (anneau doré visible sous elle). Toute mesure de test doit utiliser le MÊME décalage.
+- **Plateau agrandi** : pour la partie, `PlateauCanvas panNatif={false}` → `touch-action: none` sur le cadre
+  défilant LUI-MÊME. PIÈGE : le navigateur ne regarde `touch-action` que jusqu'au premier conteneur
+  défilant ; celui d'un parent est ignoré, et il annulait le glissement (`pointercancel`) pour défiler à la
+  place — d'où « tout est figé ». Le défilement est alors géré à la main (`commencerGlisse`, source `pan`) :
+  appui sur une tuile posée = on la déplace, ailleurs = on fait défiler ; défilement automatique près des bords
+  pendant un glissement. Le solveur de grille garde le défilement natif (`panNatif` par défaut).
+  Le plateau ne se recentre plus que sur le coup de l'ordinateur, jamais sur les tuiles posées par le joueur.
+- **Points en direct** : `evaluerCoup()` est appelé à chaque changement des tuiles posées ; mots valides →
+  ligne « ✔ MOT — N points » + pastille « +N » sur le plateau (`bulle` de `PlateauCanvas`) + bouton
+  « Jouer ce coup (+N) » ; sinon la raison en gris (rien tant que « pas encore un mot »).
+- Vérifié avec de vrais événements tactiles (CDP `Input.dispatchTouchEvent`), pas seulement à la souris.

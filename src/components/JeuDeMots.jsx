@@ -225,7 +225,7 @@ export default function JeuDeMots() {
   // posée (verte) ou la lâcher hors du plateau pour la reprendre. Les écouteurs sont sur `window`
   // (pas de capture de pointeur) et lisent `courant.current`, mis à jour à chaque rendu.
   courant.current = { p, pose, chevalet, zoom };
-  const DECALAGE = 46, PAS = 8;
+  const DECALAGE = 28, PAS = 8; // case visée à 28 px au-dessus du doigt ; la tuile fantôme est dessinée encore 30 px plus haut
   const celluleSous = (x, y) => {
     const canvas = zoneRef.current?.querySelector('canvas[aria-label^="Plateau"]');
     if (!canvas) return null;
@@ -239,23 +239,44 @@ export default function JeuDeMots() {
     const cur = courant.current;
     return !!c && cur.p.plateau[c.r][c.c] === "" && !cur.pose.some((t) => t !== ignorer && t.r === c.r && t.c === c.c);
   };
+  const cadrePlateau = () => zoneRef.current?.querySelector('canvas[aria-label^="Plateau"]')?.parentElement;
   const commencerGlisse = (e, source) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    const dep = { x: e.clientX, y: e.clientY, deplace: false };
+    const dep = { x: e.clientX, y: e.clientY, deplace: false, px: e.clientX, py: e.clientY, minuteur: null };
+    const cadre = source.type === "pan" ? source.cadre : null;
+    const sx = cadre ? cadre.scrollLeft : 0, sy = cadre ? cadre.scrollTop : 0;
+    // Mise à jour de la case visée d'après la position courante du doigt (aussi appelée quand le plateau défile seul).
+    const viser = () => {
+      const c = celluleSous(dep.px, dep.py - DECALAGE);
+      setCible(caseLibre(c, source.tuile) ? c : null);
+    };
+    // Plateau agrandi : près d'un bord du cadre visible, il défile tout seul pour atteindre les cases éloignées.
+    const defiler = () => {
+      const cd = cadrePlateau();
+      if (!cd || !courant.current.zoom) return;
+      const r = cd.getBoundingClientRect(), x = dep.px, y = dep.py - DECALAGE, M = 46, V = 14;
+      const vx = x < r.left + M ? -V * Math.min(1, (r.left + M - x) / M) : x > r.right - M ? V * Math.min(1, (x - (r.right - M)) / M) : 0;
+      const vy = y < r.top + M ? -V * Math.min(1, (r.top + M - y) / M) : y > r.bottom - M ? V * Math.min(1, (y - (r.bottom - M)) / M) : 0;
+      if (vx || vy) { cd.scrollLeft += vx; cd.scrollTop += vy; viser(); }
+    };
     const bouger = (ev) => {
       const cur = courant.current;
+      dep.px = ev.clientX; dep.py = ev.clientY;
       if (!dep.deplace) {
         if (Math.hypot(ev.clientX - dep.x, ev.clientY - dep.y) < PAS) return;
         dep.deplace = true;
+        if (source.type === "pan") return;
         if (source.type === "plateau") setPose(cur.pose.filter((t) => t !== source.tuile)); // la tuile quitte sa case
         setSelection(null); setMessage("");
+        dep.minuteur = setInterval(defiler, 16);
       }
+      if (source.type === "pan") { cadre.scrollLeft = sx - (ev.clientX - dep.x); cadre.scrollTop = sy - (ev.clientY - dep.y); return; }
       const l = source.type === "chevalet" ? cur.chevalet[source.idx] : source.tuile.l;
       setGlisse({ idx: source.type === "chevalet" ? source.idx : undefined, l, joker: source.type === "plateau" && source.tuile.joker, x: ev.clientX, y: ev.clientY - DECALAGE });
-      const c = celluleSous(ev.clientX, ev.clientY - DECALAGE);
-      setCible(caseLibre(c, source.tuile) ? c : null);
+      viser();
     };
     const arreter = () => {
+      clearInterval(dep.minuteur);
       window.removeEventListener("pointermove", bouger);
       window.removeEventListener("pointerup", relacher);
       window.removeEventListener("pointercancel", annuler);
@@ -265,6 +286,7 @@ export default function JeuDeMots() {
       arreter();
       if (!dep.deplace) return; // simple appui : le clic normal fait son travail
       apresGlisse.current = true; setTimeout(() => { apresGlisse.current = false; }, 80);
+      if (source.type === "pan") return;
       setGlisse(null); setCible(null);
       const cur = courant.current;
       const c = celluleSous(ev.clientX, ev.clientY - DECALAGE);
@@ -338,8 +360,19 @@ export default function JeuDeMots() {
 
   // ─── Rendu ───
   const posees = new Map(pose.map((t) => [cle(t.r, t.c), { l: t.l, joker: t.joker }]));
-  const derniereCase = pose.length ? pose[pose.length - 1] : p && p.derniers.length ? { r: +p.derniers[0].split(",")[0], c: +p.derniers[0].split(",")[1] } : null;
-  const centrer = derniereCase ? { r: derniereCase.r, c: derniereCase.c, cle: `${derniereCase.r},${derniereCase.c},${pose.length}` } : undefined;
+  // Aperçu du coup en cours (30/09/2026, demande de Joseph : « lorsqu'on a un mot correct les points
+  // devraient s'afficher ») : dès que les tuiles posées forment des mots valides, on affiche les mots et
+  // les points (ligne sous le chevalet, bulle sur le plateau, bouton). Sinon, la raison en gris — sauf
+  // pour « pas encore un mot », normal tant qu'on pose ses premières tuiles.
+  const evalPose = p && pose.length && moteur.current
+    ? evaluerCoup((m) => moteur.current.ensemble.has(m), p.plateau, pose.map((t) => ({ r: t.r, c: t.c, l: t.l, joker: t.joker })))
+    : null;
+  const derniereTuile = pose.length ? [...pose].sort((a, b) => a.r - b.r || a.c - b.c)[pose.length - 1] : null;
+  const bulle = evalPose?.ok && derniereTuile ? { r: derniereTuile.r, c: derniereTuile.c, texte: `+${evalPose.score}` } : null;
+  // Recentrage du plateau agrandi : seulement sur le dernier coup de l'ORDINATEUR (jamais sur les tuiles que
+  // le joueur pose lui-même, sinon le plateau saute sous son doigt à chaque tuile).
+  const derniereCase = p && p.derniers.length ? { r: +p.derniers[0].split(",")[0], c: +p.derniers[0].split(",")[1] } : null;
+  const centrer = derniereCase ? { r: derniereCase.r, c: derniereCase.c, cle: `${p.derniers.join(";")}` } : undefined;
   const enJeu = p && p.tour !== "fini";
 
   if (restauration) return <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Recherche de ta partie sauvegardée…</div>;
@@ -373,14 +406,17 @@ export default function JeuDeMots() {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
       {/* ── Plateau et chevalet ── */}
       <div style={{ flex: "1 1 320px", maxWidth: 640, minWidth: 0 }}>
-        <div ref={zoneRef} style={{ touchAction: !zoom && pose.length && monTour ? "none" : "auto" }}
+        {/* Plateau agrandi (30/09/2026) : le navigateur ne fait plus défiler au toucher (touch-action: none) ;
+            on gère nous-mêmes le glissement : sur une tuile posée = on la déplace, ailleurs = on fait défiler
+            le plateau. Sinon rien ne bougeait dans ce mode. */}
+        <div ref={zoneRef} style={{ touchAction: zoom || (pose.length && monTour) ? "none" : "auto" }}
           onPointerDown={(e) => {
-            if (!monTour || echange || zoom) return;
             const c = celluleSous(e.clientX, e.clientY);
-            const t = c && pose.find((x) => x.r === c.r && x.c === c.c);
+            const t = monTour && !echange && c && pose.find((x) => x.r === c.r && x.c === c.c);
             if (t) commencerGlisse(e, { type: "plateau", tuile: t });
+            else if (zoom) commencerGlisse(e, { type: "pan", cadre: cadrePlateau() });
           }}>
-          <PlateauCanvas plateau={p.plateau} posees={posees} derniers={p.derniers} selection={cible} zoom={zoom} centrer={centrer} onCase={surCase} />
+          <PlateauCanvas plateau={p.plateau} posees={posees} derniers={p.derniers} selection={cible} bulle={bulle} zoom={zoom} panNatif={false} centrer={centrer} onCase={surCase} />
         </div>
         <div style={{ marginTop: 6 }}>
           <button style={boutonClair()} onClick={() => setZoom(!zoom)}>{zoom ? "🔍 Vue d'ensemble" : "🔍 Agrandir les cases"}</button>
@@ -398,6 +434,13 @@ export default function JeuDeMots() {
             </div>
           ))}
         </div>
+        {enJeu && !echange && (
+          <div style={{ minHeight: 22, marginTop: 8, fontSize: 14, fontWeight: 600, color: evalPose?.ok ? "#1D9E75" : "var(--color-text-secondary)" }}>
+            {evalPose?.ok
+              ? `✔ ${evalPose.mots.map((m) => m.mot).join(", ")} — ${evalPose.score} point${evalPose.score > 1 ? "s" : ""}${pose.length === 7 ? " (dont 50 de bonus !)" : ""}`
+              : evalPose && !/au moins 2 lettres|Aucune tuile/.test(evalPose.erreur || "") ? <span style={{ fontWeight: 400, fontSize: 12 }}>{evalPose.erreur}</span> : null}
+          </div>
+        )}
         {enJeu && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>{echange ? "Touche les tuiles à échanger" : monTour ? "Fais glisser une tuile sur le plateau (ou touche-la, puis une case)" : "L'ordinateur réfléchit…"}</div>}
 
         {/* Boutons */}
@@ -410,7 +453,7 @@ export default function JeuDeMots() {
               </>
             ) : (
               <>
-                <button style={bouton(monTour && pose.length > 0)} disabled={!monTour || !pose.length} onClick={valider}>✔ Jouer ce coup</button>
+                <button style={bouton(monTour && pose.length > 0)} disabled={!monTour || !pose.length} onClick={valider}>✔ Jouer ce coup{evalPose?.ok ? ` (+${evalPose.score})` : ""}</button>
                 <button style={boutonClair(monTour && pose.length > 0)} disabled={!monTour || !pose.length} onClick={rappel}>↩ Rappel</button>
                 <button style={boutonClair(monTour && !pose.length)} disabled={!monTour || !!pose.length} onClick={() => setP({ ...p, chevalets: { ...p.chevalets, joueur: melanger(chevalet) } })}>🔀 Mélanger</button>
                 <button style={boutonClair(monTour && !pose.length && p.sac.length >= 7)} disabled={!monTour || !!pose.length || p.sac.length < 7} title={p.sac.length < 7 ? "Il faut au moins 7 tuiles dans le sac" : ""} onClick={() => { setEchange(new Set()); setSelection(null); }}>⇄ Échanger</button>
@@ -456,9 +499,9 @@ export default function JeuDeMots() {
         {enJeu && <button style={boutonClair()} onClick={() => { if (window.confirm("Abandonner la partie en cours ?")) setP(null); }}>Abandonner</button>}
       </div>
 
-      {/* Tuile qui suit le doigt pendant le glissement, posée 34 px AU-DESSUS de la case visée pour ne pas la cacher (anneau doré) */}
+      {/* Tuile qui suit le doigt pendant le glissement, posée 30 px AU-DESSUS de la case visée pour ne pas la cacher (anneau doré) */}
       {glisse && (
-        <div style={{ position: "fixed", left: glisse.x - 27, top: glisse.y - 27 - 34, width: 54, height: 54, opacity: 0.92, pointerEvents: "none", zIndex: 3000, filter: "drop-shadow(0 6px 8px rgba(0,0,0,.45))" }}>
+        <div style={{ position: "fixed", left: glisse.x - 27, top: glisse.y - 27 - 30, width: 54, height: 54, opacity: 0.92, pointerEvents: "none", zIndex: 3000, filter: "drop-shadow(0 6px 8px rgba(0,0,0,.45))" }}>
           <TuileCanvas l={glisse.l} joker={glisse.joker} taille={54} etat="sel" />
         </div>
       )}
