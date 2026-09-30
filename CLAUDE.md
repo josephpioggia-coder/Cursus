@@ -192,7 +192,13 @@ l'ordinateur), pas seulement un solveur. Nom volontairement neutre :
 - Ordinateur = le solveur (`genererCoups`) : facile (moitié basse de la
   liste), moyen (parmi les 8 meilleurs), fort (le meilleur). Échange s'il
   n'a aucun coup et que le sac a ≥ 7 tuiles, sinon passe.
-- Interaction au toucher/clic : tuile du chevalet puis case ; tuile posée
+- Interaction : GLISSER-DÉPOSER (30/09/2026, demande de Joseph : « poser le doigt sur une lettre et la
+  faire glisser vers la case ») au doigt et à la souris — événements `pointer` sur `window`, tuile
+  fantôme décalée AU-DESSUS du doigt, case visée cerclée d'or, lâcher = pose si case libre sinon la tuile
+  revient ; on peut aussi déplacer une tuile posée (verte) ou la lâcher hors plateau pour la reprendre ;
+  `touch-action: none` sur les tuiles du chevalet (et sur le plateau seulement quand des tuiles sont
+  posées, hors zoom) sinon le navigateur prend le glissement pour un défilement. Un appui < 8 px reste un
+  toucher : tuile du chevalet puis case ; tuile posée
   (verte) touchée = reprise ; joker → sélecteur de lettre ; rappel,
   mélanger, échanger, passer, indice (meilleur coup de l'aide).
 - L'onglet reste MONTÉ (masqué) quand on change d'onglet.
