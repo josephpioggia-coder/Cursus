@@ -195,16 +195,28 @@ l'ordinateur), pas seulement un solveur. Nom volontairement neutre :
   (verte) touchée = reprise ; joker → sélecteur de lettre ; rappel,
   mélanger, échanger, passer, indice (meilleur coup de l'aide).
 - L'onglet reste MONTÉ (masqué) quand on change d'onglet.
-- Sauvegarde (30/09/2026, demande de Joseph) : `localStorage`, clé
-  `cursus-jeu-de-mots-v1` (version 1), écrite à chaque changement, reprise
-  automatique à l'ouverture (dictionnaire rechargé d'abord, `moteur.current`
-  posé AVANT `setP` — sinon le tour de l'ordinateur plante). Contient aussi
-  les tuiles posées non validées. Propre à l'appareil/navigateur, PAS au
-  compte Cursus (deux comptes sur un même navigateur partagent la partie).
-  Validation de forme à la lecture : une sauvegarde corrompue est ignorée.
-  Effacée par « Abandonner » / « Rejouer ». Si la structure de l'état
-  change, incrémenter `version`. Contient le chevalet de l'ordinateur
-  (lisible dans les outils du navigateur).
-- Pas de contestation de mot ni de chronomètre. Pas de synchronisation
-  entre appareils. Même dictionnaire libre
+- Sauvegarde (30/09/2026, demande de Joseph) en DEUX copies :
+  1. `localStorage` (clé `cursus-jeu-de-mots-v1`, `version: 1`), écrite à
+     chaque changement — marche hors ligne, propre à l'appareil ;
+  2. table Supabase `parties_jeu_de_mots` (UNE partie par compte,
+     `user_id` clé primaire, `etat` jsonb, RLS propriétaire) via
+     `partiesJeuMotsAPI` (`src/lib/api.js`), envoyée 1,2 s après le
+     dernier changement (+ envoi immédiat quand l'onglet est masqué).
+     Migration : `2026-09-30-parties-jeu-de-mots.sql` — **à exécuter par
+     Joseph dans l'éditeur SQL de Supabase** (non exécutable depuis
+     l'environnement de dev). Tant qu'elle ne l'est pas, le jeu marche et
+     affiche « sauvegardée sur cet appareil seulement (table pas encore
+     créée) ».
+  Au chargement : la copie la plus récente (`enregistreLe`) gagne ; la
+  reprise recharge d'abord le dictionnaire (`moteur.current` posé AVANT
+  `setP`, sinon le tour de l'ordinateur plante). Garde-fous : si le compte
+  est injoignable au chargement, on n'y écrit plus de la session (évite
+  d'écraser une copie plus récente avec une copie locale périmée) ; on
+  n'efface le compte que si une partie a réellement existé (jamais sur un
+  simple échec de chargement) ; sauvegarde corrompue ignorée (validation de
+  forme). « Abandonner » / « Rejouer » effacent les deux copies. Si la
+  structure de l'état change, incrémenter `version`. Dernière écriture
+  gagnante (pas de fusion entre deux appareils jouant en même temps).
+  L'état contient le chevalet de l'ordinateur (jeu solo, sans enjeu).
+- Pas de contestation de mot ni de chronomètre.  Même dictionnaire libre
   (pas l'ODS) pour les deux joueurs.
