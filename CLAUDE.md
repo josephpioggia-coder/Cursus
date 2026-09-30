@@ -172,3 +172,29 @@ ses codes/données. `src/components/OutilsMots.jsx` + `src/lib/scrabbleMots.js` 
 - Écart connu avec dCode : liste libre (Dicollecte), pas l'ODS9 →
   validité et butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en
   fournit pas une.
+
+### Onglet "Jouer contre l'ordinateur" — le "jeu de mots" (30/09/2026)
+
+Demande de Joseph : "le jeu de mots" = créer un vrai jeu (toi contre
+l'ordinateur), pas seulement un solveur. Nom volontairement neutre :
+« Scrabble » est une marque (les règles, elles, ne sont pas protégées).
+`src/lib/jeuMots.js` (moteur pur) + `src/components/JeuDeMots.jsx` :
+- Sac de 102 tuiles, pioche, premier mot par ★, bonus 50, primes
+  seulement pour les tuiles nouvelles, joker = 0 point (primes MOT
+  conservées), fin de partie (sac vide + chevalet vide, ou 6 passes de
+  suite) avec décompte des tuiles restantes.
+- `evaluerCoup()` valide un coup posé à la main (alignement, pas de trou,
+  connexion, tous les mots formés, dictionnaire). Vérifié le 30/09/2026
+  par simulation de 6 parties entières (214 coups) : le score de
+  `evaluerCoup` est identique à celui du solveur, 0 coup légal refusé.
+  À refaire si l'un des deux est modifié.
+- Ordinateur = le solveur (`genererCoups`) : facile (moitié basse de la
+  liste), moyen (parmi les 8 meilleurs), fort (le meilleur). Échange s'il
+  n'a aucun coup et que le sac a ≥ 7 tuiles, sinon passe.
+- Interaction au toucher/clic : tuile du chevalet puis case ; tuile posée
+  (verte) touchée = reprise ; joker → sélecteur de lettre ; rappel,
+  mélanger, échanger, passer, indice (meilleur coup de l'aide).
+- L'onglet reste MONTÉ (masqué) quand on change d'onglet : la partie
+  n'est pas sauvegardée hors mémoire (rechargement de la page = perdue).
+- Pas de contestation de mot ni de chronomètre. Même dictionnaire libre
+  (pas l'ODS) pour les deux joueurs.
