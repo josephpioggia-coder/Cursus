@@ -201,22 +201,27 @@ export default function ScrabbleSolveur() {
   const vide = plateau.every((l) => l.every((x) => !x));
 
   return (
-    <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "24px 20px 60px" }}>
+    <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 20px 60px" }}>
       <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <img src="/aencre-icone.png" alt="Æncre" style={{ width: 44, height: 44, borderRadius: "50%" }} />
-          <h1 style={{ fontSize: 22, fontWeight: 500, margin: 0, color: "var(--color-text-primary)" }}>Jouer avec les mots — solveur Scrabble</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <img src="/aencre-icone.png" alt="Æncre" style={{ width: 32, height: 32, borderRadius: "50%" }} />
+          <h1 style={{ fontSize: 18, fontWeight: 500, margin: 0, color: "var(--color-text-primary)" }}>Jeu de mots sur grille</h1>
         </div>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 16px" }}>
-          Charge une capture de ta partie : l'IA lit la grille et le chevalet, puis le solveur (sans IA, dans ton navigateur)
-          classe tous les coups possibles. Tu peux aussi tout saisir à la main. Le dictionnaire est une liste libre proche
-          du Scrabble, pas l'ODS officiel : un mot proposé peut être refusé en partie, et inversement.
-        </p>
+        {/* Explication repliée par défaut (30/09/2026, demande de Joseph : libérer le haut de l'écran
+            sur mobile pour voir le plateau plus tôt). */}
+        <details style={{ marginBottom: 8 }}>
+          <summary style={{ fontSize: 12, color: "var(--color-text-secondary)", cursor: "pointer" }}>ℹ️ Comment ça marche ?</summary>
+          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "6px 0 0" }}>
+            Charge une capture de ta partie : l'IA lit la grille et le chevalet, puis le solveur (sans IA, dans ton navigateur)
+            classe tous les coups possibles. Tu peux aussi tout saisir à la main. Le dictionnaire est une liste libre proche
+            du Scrabble, pas l'ODS officiel : un mot proposé peut être refusé en partie, et inversement.
+          </p>
+        </details>
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginBottom: 16, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
-          {[["grille", "🎯 Grille — meilleurs coups"], ["outils", "🔤 Outils de mots"], ["jeu", "🎮 Jouer contre l'ordinateur"]].map(([id, label]) => (
-            <button key={id} onClick={() => setOnglet(id)} style={{
-              background: "transparent", border: "none", padding: "8px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
+        <div style={{ display: "flex", gap: 2, marginBottom: 10, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
+          {[["grille", "🎯 Grille", "Grille — meilleurs coups"], ["outils", "🔤 Outils", "Outils de mots"], ["jeu", "🎮 Partie", "Jouer contre l'ordinateur"]].map(([id, label, titre]) => (
+            <button key={id} onClick={() => setOnglet(id)} title={titre} style={{
+              background: "transparent", border: "none", padding: "6px 12px", fontSize: 13, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap",
               fontWeight: onglet === id ? 600 : 400, color: onglet === id ? "#1D9E75" : "var(--color-text-secondary)",
               borderBottom: onglet === id ? "2px solid #1D9E75" : "2px solid transparent", marginBottom: -1,
             }}>{label}</button>
