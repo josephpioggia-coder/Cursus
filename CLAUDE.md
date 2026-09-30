@@ -194,7 +194,17 @@ l'ordinateur), pas seulement un solveur. Nom volontairement neutre :
 - Interaction au toucher/clic : tuile du chevalet puis case ; tuile posée
   (verte) touchée = reprise ; joker → sélecteur de lettre ; rappel,
   mélanger, échanger, passer, indice (meilleur coup de l'aide).
-- L'onglet reste MONTÉ (masqué) quand on change d'onglet : la partie
-  n'est pas sauvegardée hors mémoire (rechargement de la page = perdue).
-- Pas de contestation de mot ni de chronomètre. Même dictionnaire libre
+- L'onglet reste MONTÉ (masqué) quand on change d'onglet.
+- Sauvegarde (30/09/2026, demande de Joseph) : `localStorage`, clé
+  `cursus-jeu-de-mots-v1` (version 1), écrite à chaque changement, reprise
+  automatique à l'ouverture (dictionnaire rechargé d'abord, `moteur.current`
+  posé AVANT `setP` — sinon le tour de l'ordinateur plante). Contient aussi
+  les tuiles posées non validées. Propre à l'appareil/navigateur, PAS au
+  compte Cursus (deux comptes sur un même navigateur partagent la partie).
+  Validation de forme à la lecture : une sauvegarde corrompue est ignorée.
+  Effacée par « Abandonner » / « Rejouer ». Si la structure de l'état
+  change, incrémenter `version`. Contient le chevalet de l'ordinateur
+  (lisible dans les outils du navigateur).
+- Pas de contestation de mot ni de chronomètre. Pas de synchronisation
+  entre appareils. Même dictionnaire libre
   (pas l'ODS) pour les deux joueurs.

@@ -23,6 +23,28 @@ const carte = { background: "var(--color-background-primary)", border: "0.5px so
 const bouton = (actif = true, couleur = "#1D9E75") => ({ background: actif ? couleur : "#ccc", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
 const boutonClair = (actif = true) => ({ background: "transparent", border: "0.5px solid var(--color-border-tertiary)", color: actif ? "var(--color-text-primary)" : "#aaa", borderRadius: 8, padding: "8px 12px", fontSize: 12, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
 
+// Sauvegarde locale de la partie (30/09/2026) : localStorage du navigateur — propre à cet
+// appareil et à ce navigateur, pas au compte Cursus. Tout accès est protégé (mode privé,
+// stockage bloqué ou plein) : le jeu fonctionne sans.
+const CLE_SAUVEGARDE = "cursus-jeu-de-mots-v1";
+const lireSauvegarde = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem(CLE_SAUVEGARDE) || "null");
+    const ok = s && s.version === 1 && s.p && Array.isArray(s.p.plateau) && s.p.plateau.length === 15
+      && s.p.plateau.every((l) => Array.isArray(l) && l.length === 15) && Array.isArray(s.p.sac)
+      && Array.isArray(s.p.chevalets?.joueur) && Array.isArray(s.p.chevalets?.ordi)
+      && typeof s.p.scores?.joueur === "number" && typeof s.p.scores?.ordi === "number"
+      && ["joueur", "ordi", "fini"].includes(s.p.tour) && Array.isArray(s.p.journal) && s.p.niveau in NIVEAUX;
+    return ok ? s : null;
+  } catch { return null; }
+};
+const ecrireSauvegarde = (p, pose) => {
+  try {
+    if (p) localStorage.setItem(CLE_SAUVEGARDE, JSON.stringify({ version: 1, p, pose }));
+    else localStorage.removeItem(CLE_SAUVEGARDE);
+  } catch { /* stockage indisponible : pas de sauvegarde */ }
+};
+
 const melanger = (t) => { const a = [...t]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const cle = (r, c) => `${r},${c}`;
 
@@ -51,6 +73,30 @@ export default function JeuDeMots() {
   const [choixJoker, setChoixJoker] = useState(null);
   const [echange, setEchange] = useState(null);     // null | Set d'index à échanger
   const [message, setMessage] = useState("");
+  const [restauration, setRestauration] = useState(() => !!lireSauvegarde()); // vrai le temps de recharger le dictionnaire
+
+  // ─── Reprise de la partie sauvegardée (à l'ouverture) ───
+  useEffect(() => {
+    const s = lireSauvegarde();
+    if (!s) return;
+    let actif = true;
+    chargerMoteur().then((m) => {
+      if (!actif) return;
+      moteur.current = m; // AVANT setP : le tour de l'ordinateur en a besoin
+      const idxValides = (s.pose || []).filter((t) => Number.isInteger(t.idx) && t.idx < s.p.chevalets.joueur.length && s.p.plateau[t.r]?.[t.c] === "");
+      setP(s.p);
+      setPose(s.p.tour === "joueur" ? idxValides : []);
+      setMessage(s.p.tour === "fini" ? "" : "Partie reprise là où tu l'avais laissée.");
+      setRestauration(false);
+    }).catch((e) => { if (actif) { setErreur(e.message || String(e)); setRestauration(false); } });
+    return () => { actif = false; };
+  }, []);
+
+  // ─── Sauvegarde à chaque changement (pas pendant la reprise, pour ne pas écraser) ───
+  useEffect(() => {
+    if (restauration) return;
+    ecrireSauvegarde(p, pose);
+  }, [p, pose, restauration]);
 
   // ─── Nouvelle partie ───
   const nouvellePartie = async () => {
@@ -177,6 +223,8 @@ export default function JeuDeMots() {
   // ─── Rendu ───
   const posees = new Map(pose.map((t) => [cle(t.r, t.c), t]));
   const enJeu = p && p.tour !== "fini";
+
+  if (restauration) return <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Reprise de ta partie…</div>;
 
   if (!p) {
     return (
