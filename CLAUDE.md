@@ -164,6 +164,11 @@ ses codes/données. `src/components/OutilsMots.jsx` + `src/lib/scrabbleMots.js` 
   dev ; `public/scrabble/accents.txt` sert à retrouver la forme accentuée),
   tirage aléatoire (vrai sac de 102 tuiles), compteur de points,
   compteur de lettres restantes (peut reprendre grille + chevalet).
+- Liens « Comparer / Vérifier sur dCode (ODS9) » (30/09/2026, demande de
+  Joseph : outil COMPLÉMENTAIRE, toujours en nouvel onglet
+  `target="_blank"` pour ne pas quitter Cursus) : simples liens, aucune
+  intégration (iframe non testable depuis l'environnement de dev, dCode
+  réserve son code et ses données).
 - Écart connu avec dCode : liste libre (Dicollecte), pas l'ODS9 →
   validité et butoirs approximatifs. Pas d'ODS9 tant que Joseph n'en
   fournit pas une.
