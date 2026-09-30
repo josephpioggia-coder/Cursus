@@ -98,6 +98,10 @@ const cle = (r, c) => `${r},${c}`;
  *  apercu             : Map "r,c" → { l, joker }  (aperçu d'un coup du solveur, vert)
  *  derniers           : tableau de "r,c" (dernier coup de l'adversaire, orange foncé)
  *  selection          : { r, c } | null (case active, anneau doré)
+ *  viseur             : { r, c } | null — case visée pendant un glissement : anneau doré + halo doré autour
+ *                       (la tuile fantôme est dessinée PAR-DESSUS, centrée sur cette case)
+ *  cadre              : { w, h } | undefined — taille disponible (mode plein écran). Vue d'ensemble : plateau
+ *                       carré du plus grand côté qui tient ; zoom : le cadre défilant fait exactement w × h.
  *  bulle              : { r, c, texte } | null — pastille verte (points du mot en cours) au coin de la case
  *  zoom               : false = 15×15 dans la largeur ; true = grandes cases, à faire défiler
  *  panNatif           : en mode zoom, laisse le navigateur faire défiler au toucher (défaut). À mettre à FALSE
@@ -108,11 +112,12 @@ const cle = (r, c) => `${r},${c}`;
  *  centrer            : { r, c, cle } — au changement de `cle` (ou du zoom), fait défiler jusque-là
  *  onCase(r, c)
  */
-export function PlateauCanvas({ plateau, posees, apercu, derniers = [], selection, bulle, zoom = false, panNatif = true, centrer, onCase }) {
+export function PlateauCanvas({ plateau, posees, apercu, derniers = [], selection, viseur, bulle, zoom = false, panNatif = true, cadre, centrer, onCase }) {
   const [refBoite, largeur] = useLargeur();
   const refCanvas = useRef(null);
   const CASES_ZOOM = 44;
-  const cellule = zoom ? CASES_ZOOM : Math.max(8, Math.floor(Math.min(largeur || 300, 640) / 15));
+  const cote = cadre ? Math.min(cadre.w, cadre.h) : 640;
+  const cellule = zoom ? CASES_ZOOM : Math.max(8, Math.floor(Math.min(largeur || 300, cote) / 15));
   const taille = cellule * 15;
 
   useEffect(() => {
@@ -143,6 +148,13 @@ export function PlateauCanvas({ plateau, posees, apercu, derniers = [], selectio
         ctx.lineWidth = Math.max(2, cellule * 0.09); ctx.strokeStyle = "#ffd700"; ctx.stroke();
       }
     }
+    if (viseur) {
+      const x = viseur.c * cellule, y = viseur.r * cellule;
+      rectArrondi(ctx, x - cellule * 0.6, y - cellule * 0.6, cellule * 2.2, cellule * 2.2, cellule * 0.4);
+      ctx.fillStyle = "rgba(255,215,0,.38)"; ctx.fill();
+      rectArrondi(ctx, x + 1, y + 1, cellule - 2, cellule - 2, cellule * 0.14);
+      ctx.lineWidth = Math.max(3, cellule * 0.12); ctx.strokeStyle = "#ffb400"; ctx.stroke();
+    }
     if (bulle) {
       const x = bulle.c * cellule, y = bulle.r * cellule;
       ctx.font = `700 ${Math.max(11, cellule * 0.42)}px ${POLICE}`;
@@ -153,7 +165,7 @@ export function PlateauCanvas({ plateau, posees, apercu, derniers = [], selectio
       ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(bulle.texte, bx + w / 2, by + h / 2 + 0.5);
     }
-  }, [plateau, posees, apercu, derniers, selection, cellule, taille, bulle?.r, bulle?.c, bulle?.texte]);
+  }, [plateau, posees, apercu, derniers, selection, cellule, taille, bulle?.r, bulle?.c, bulle?.texte, viseur?.r, viseur?.c]);
 
   // Défilement vers une case (mode zoom).
   useEffect(() => {
@@ -175,7 +187,9 @@ export function PlateauCanvas({ plateau, posees, apercu, derniers = [], selectio
   return (
     <div ref={refBoite} style={{
       position: "relative", width: "100%", minWidth: 0, borderRadius: 6, background: "#1b1b1b",
-      ...(zoom ? { maxWidth: "none", height: `min(68vh, ${taille}px)`, overflow: "auto", WebkitOverflowScrolling: "touch", touchAction: panNatif ? "auto" : "none" } : { maxWidth: 640, aspectRatio: "1", overflow: "hidden" }),
+      ...(zoom
+        ? { maxWidth: "none", height: cadre ? cadre.h : `min(68vh, ${taille}px)`, width: cadre ? cadre.w : "100%", overflow: "auto", WebkitOverflowScrolling: "touch", touchAction: panNatif ? "auto" : "none" }
+        : cadre ? { width: cote, height: cote, margin: "0 auto", overflow: "hidden" } : { maxWidth: 640, aspectRatio: "1", overflow: "hidden" }),
     }}>
       <canvas ref={refCanvas} onClick={clic} role="img" aria-label="Plateau de 15 par 15 cases"
         style={{ position: "absolute", left: 0, top: 0, touchAction: zoom ? (panNatif ? "auto" : "none") : "manipulation", cursor: onCase ? "pointer" : "default" }} />
