@@ -74,7 +74,7 @@ export function construireDico(texte) {
   return { lettre, premier, suivant, fin, noeuds: n };
 }
 
-const fils = (d, noeud, l) => {
+export const fils = (d, noeud, l) => {
   for (let c = d.premier[noeud]; c !== -1; c = d.suivant[c]) if (d.lettre[c] === l) return c;
   return -1;
 };

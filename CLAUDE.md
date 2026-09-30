@@ -113,7 +113,8 @@ tout nouveau recadrage ou ajustement des cadrages existants.
 
 Demande de Joseph (il joue au Scrabble sur mobile avec Claude) : un
 solveur "en situation", à partir d'une capture d'écran de la partie.
-Entrée de menu "Jeu de mots (Scrabble)" → `src/components/ScrabbleSolveur.jsx`.
+Entrée de menu "Jeux de mots" → `src/components/SalleDesJeux.jsx` (voir la section
+« Salle des jeux » plus bas), dont la 1re carte ouvre `src/components/ScrabbleSolveur.jsx`.
 
 - `src/lib/scrabbleSolveur.js` : moteur PUR (trie en tableaux typés,
   Appel & Jacobson, score avec primes + bonus 50). Vérifié le 29/09/2026
@@ -220,3 +221,35 @@ l'ordinateur), pas seulement un solveur. Nom volontairement neutre :
   L'état contient le chevalet de l'ordinateur (jeu solo, sans enjeu).
 - Pas de contestation de mot ni de chronomètre.  Même dictionnaire libre
   (pas l'ODS) pour les deux joueurs.
+
+## Salle des jeux de mots (30/09/2026)
+
+Décision de Joseph (30/09/2026) : AVANT d'ouvrir le jeu à plusieurs (invitation d'un ami par
+lien, mode invité, abonnement), étoffer le catalogue pour que les gens aient envie de rester.
+Plan arrêté avec lui pour la suite (rien de tout cela n'est construit) : parties à deux par
+lien d'invitation, jeu PAR CORRESPONDANCE (à confirmer), un invité peut REJOINDRE mais pas
+CRÉER une partie (créer = abonnement, le moins cher suffit), arbitre côté serveur (Edge
+Function : sac, chevalets privés, validation), tables génériques par jeu, comptes anonymes
+Supabase (à activer par Joseph), et AUDIT préalable des fonctions serveur pour qu'aucun
+compte invité ne puisse consommer de l'IA (pré-audit gratuit notamment). Lancement derrière
+un interrupteur, jusqu'à ce que le catalogue soit jugé suffisant.
+
+`SalleDesJeux.jsx` regroupe les jeux (menu « Jeux de mots ») ; chaque jeu est un composant
+`{ donnees }` dans `src/components/jeux/` (Motus, Boggle, MotLePlusLong, Pendu, EchelleDeMots,
+MotsMeles), son moteur PUR dans `src/lib/jeuxDeMots.js`, éléments communs (styles, clavier
+AZERTY, chrono, statistiques `localStorage`) dans `jeux/commun.jsx`. Pour AJOUTER un jeu :
+composant + moteur + une ligne dans `JEUX` de SalleDesJeux.jsx.
+- Deux listes : `public/scrabble/mots-fr.txt` (dictionnaire, ACCEPTE une réponse) et
+  `public/jeux/mots-courants.txt` (25 000 mots courants par fréquence, CHOISIT les mots à faire
+  deviner). Sources et licences : `mots-courants.txt` dérive de hermitdave/FrequencyWords
+  (**CC BY-SA 4.0**, attribution dans `public/jeux/LICENCE-MOTS-COURANTS.txt`, à conserver ;
+  la liste reste CC BY-SA). Régénération : `scripts/preparer-mots-courants.mjs` (mots grossiers
+  retirés via npm `french-badwords-list` + ajouts manuels ; filtre au mieux, pas infaillible).
+- Jeux imaginés pour le catalogue (demande « invente un ou plusieurs nouveaux jeux ») :
+  Échelle de mots (BFS sur tout le dictionnaire, « par » = plus court chemin) et Mots mêlés.
+- Mots croisés (demandés) NON faits : ils exigent des définitions (indices), or la seule source
+  prévue (Wiktionnaire) est inaccessible depuis l'environnement de dev et non testée. Les mots
+  mêlés les remplacent pour l'instant.
+- Vérifié le 30/09/2026 dans un navigateur (parties jouées de bout en bout, solution calculée
+  par le moteur puis jouée dans l'interface) : Motus, Pendu, Boggle (dont fin du temps), Mot le
+  plus long, Échelle (chemin optimal), Mots mêlés. Les statistiques sont locales à l'appareil.
