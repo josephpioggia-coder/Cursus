@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { PRIMES, pointsLettre, appliquerCoup, notation, genererCoups, plateauVide } from "../lib/scrabbleSolveur.js";
+import { partiesJeuMotsAPI } from "../lib/api.js";
 import { chargerMoteur, nouveauSac, completer, evaluerCoup, choisirCoup, scoreFinal, NIVEAUX } from "../lib/jeuMots.js";
 
 const COULEUR_PRIME = { MT: "#d9534f", MD: "#d8a0c6", LT: "#1a7fc1", LD: "#a9d8f2" };
@@ -23,26 +24,39 @@ const carte = { background: "var(--color-background-primary)", border: "0.5px so
 const bouton = (actif = true, couleur = "#1D9E75") => ({ background: actif ? couleur : "#ccc", color: "#fff", border: "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 500, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
 const boutonClair = (actif = true) => ({ background: "transparent", border: "0.5px solid var(--color-border-tertiary)", color: actif ? "var(--color-text-primary)" : "#aaa", borderRadius: 8, padding: "8px 12px", fontSize: 12, cursor: actif ? "pointer" : "default", fontFamily: "inherit" });
 
-// Sauvegarde locale de la partie (30/09/2026) : localStorage du navigateur — propre à cet
-// appareil et à ce navigateur, pas au compte Cursus. Tout accès est protégé (mode privé,
-// stockage bloqué ou plein) : le jeu fonctionne sans.
+// Sauvegarde de la partie (30/09/2026) — DEUX copies :
+//  - localStorage (immédiate, marche hors ligne, propre à l'appareil) ;
+//  - table `parties_jeu_de_mots` du compte (voir 2026-09-30-parties-jeu-de-mots.sql,
+//    envoyée après une courte attente, pour retrouver la partie sur tous les appareils).
+// Au chargement on prend la copie la plus RÉCENTE (`enregistreLe`). Tous les accès sont
+// protégés : sans stockage local, sans réseau ou sans la table, le jeu fonctionne quand même.
 const CLE_SAUVEGARDE = "cursus-jeu-de-mots-v1";
-const lireSauvegarde = () => {
-  try {
-    const s = JSON.parse(localStorage.getItem(CLE_SAUVEGARDE) || "null");
-    const ok = s && s.version === 1 && s.p && Array.isArray(s.p.plateau) && s.p.plateau.length === 15
-      && s.p.plateau.every((l) => Array.isArray(l) && l.length === 15) && Array.isArray(s.p.sac)
-      && Array.isArray(s.p.chevalets?.joueur) && Array.isArray(s.p.chevalets?.ordi)
-      && typeof s.p.scores?.joueur === "number" && typeof s.p.scores?.ordi === "number"
-      && ["joueur", "ordi", "fini"].includes(s.p.tour) && Array.isArray(s.p.journal) && s.p.niveau in NIVEAUX;
-    return ok ? s : null;
-  } catch { return null; }
+const formeValide = (s) => {
+  const ok = s && s.version === 1 && s.p && Array.isArray(s.p.plateau) && s.p.plateau.length === 15
+    && s.p.plateau.every((l) => Array.isArray(l) && l.length === 15) && Array.isArray(s.p.sac)
+    && Array.isArray(s.p.chevalets?.joueur) && Array.isArray(s.p.chevalets?.ordi)
+    && typeof s.p.scores?.joueur === "number" && typeof s.p.scores?.ordi === "number"
+    && ["joueur", "ordi", "fini"].includes(s.p.tour) && Array.isArray(s.p.journal) && s.p.niveau in NIVEAUX;
+  return ok ? s : null;
 };
-const ecrireSauvegarde = (p, pose) => {
+const lireLocal = () => {
+  try { return formeValide(JSON.parse(localStorage.getItem(CLE_SAUVEGARDE) || "null")); } catch { return null; }
+};
+/** Écrit la copie locale ; renvoie l'objet sauvegardé (à envoyer au compte) ou null si effacée. */
+const ecrireLocal = (p, pose) => {
+  const objet = p ? { version: 1, p, pose, enregistreLe: Date.now() } : null;
   try {
-    if (p) localStorage.setItem(CLE_SAUVEGARDE, JSON.stringify({ version: 1, p, pose }));
+    if (objet) localStorage.setItem(CLE_SAUVEGARDE, JSON.stringify(objet));
     else localStorage.removeItem(CLE_SAUVEGARDE);
-  } catch { /* stockage indisponible : pas de sauvegarde */ }
+  } catch { /* stockage local indisponible */ }
+  return objet;
+};
+const delai = (ms) => new Promise((r) => setTimeout(() => r("delai"), ms));
+const TEXTE_SYNC = {
+  compte: "☁ Sauvegardée dans ton compte",
+  attente: "☁ Sauvegarde en cours…",
+  absente: "💾 Sauvegardée sur cet appareil seulement (la table du compte n'est pas encore créée)",
+  horsligne: "💾 Sauvegardée sur cet appareil seulement (compte injoignable pour le moment)",
 };
 
 const melanger = (t) => { const a = [...t]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -73,30 +87,76 @@ export default function JeuDeMots() {
   const [choixJoker, setChoixJoker] = useState(null);
   const [echange, setEchange] = useState(null);     // null | Set d'index à échanger
   const [message, setMessage] = useState("");
-  const [restauration, setRestauration] = useState(() => !!lireSauvegarde()); // vrai le temps de recharger le dictionnaire
+  const [restauration, setRestauration] = useState(true); // vrai le temps de lire les sauvegardes et de recharger le dictionnaire
+  const [sync, setSync] = useState("attente");            // état de la sauvegarde dans le compte
+  const compteOk = useRef(true);      // faux : ne plus écrire dans le compte (table absente / injoignable)
+  const minuteur = useRef(null);
+  const enAttente = useRef(null);     // dernier objet pas encore envoyé au compte
+  const avaitPartie = useRef(false);  // évite d'effacer le compte quand aucune partie n'a jamais été chargée
 
   // ─── Reprise de la partie sauvegardée (à l'ouverture) ───
   useEffect(() => {
-    const s = lireSauvegarde();
-    if (!s) return;
     let actif = true;
-    chargerMoteur().then((m) => {
+    (async () => {
+      const local = lireLocal();
+      let distant = null;
+      try {
+        const r = await Promise.race([partiesJeuMotsAPI.charger(), delai(6000)]);
+        if (r === "delai" || r.indisponible) {
+          compteOk.current = false;
+          setSync(r !== "delai" && r.tableAbsente ? "absente" : "horsligne");
+        } else { distant = formeValide(r.etat); setSync("compte"); }
+      } catch { compteOk.current = false; setSync("horsligne"); }
       if (!actif) return;
-      moteur.current = m; // AVANT setP : le tour de l'ordinateur en a besoin
-      const idxValides = (s.pose || []).filter((t) => Number.isInteger(t.idx) && t.idx < s.p.chevalets.joueur.length && s.p.plateau[t.r]?.[t.c] === "");
-      setP(s.p);
-      setPose(s.p.tour === "joueur" ? idxValides : []);
-      setMessage(s.p.tour === "fini" ? "" : "Partie reprise là où tu l'avais laissée.");
+      // la copie la plus récente gagne
+      const choix = local && distant ? (distant.enregistreLe > local.enregistreLe ? distant : local) : (local || distant);
+      const duCompte = !!choix && choix === distant && choix !== local;
+      if (!choix) { setRestauration(false); return; }
+      try {
+        const m = await chargerMoteur();
+        if (!actif) return;
+        moteur.current = m; // AVANT setP : le tour de l'ordinateur en a besoin
+        const idxValides = (choix.pose || []).filter((t) => Number.isInteger(t.idx) && t.idx < choix.p.chevalets.joueur.length && choix.p.plateau[t.r]?.[t.c] === "");
+        avaitPartie.current = true;
+        setP(choix.p);
+        setPose(choix.p.tour === "joueur" ? idxValides : []);
+        setMessage(choix.p.tour === "fini" ? "" : duCompte ? "Partie reprise depuis ton compte." : "Partie reprise là où tu l'avais laissée.");
+      } catch (e) { setErreur(e.message || String(e)); }
       setRestauration(false);
-    }).catch((e) => { if (actif) { setErreur(e.message || String(e)); setRestauration(false); } });
+    })();
     return () => { actif = false; };
   }, []);
 
-  // ─── Sauvegarde à chaque changement (pas pendant la reprise, pour ne pas écraser) ───
+  // ─── Sauvegarde à chaque changement : locale tout de suite, compte après 1,2 s ───
+  const envoyerAuCompte = async () => {
+    const objet = enAttente.current;
+    enAttente.current = null;
+    if (!compteOk.current) return;
+    const r = objet ? await partiesJeuMotsAPI.sauvegarder(objet) : await partiesJeuMotsAPI.effacer();
+    if (r.indisponible) { compteOk.current = false; setSync(r.tableAbsente ? "absente" : "horsligne"); }
+    else setSync("compte");
+  };
   useEffect(() => {
     if (restauration) return;
-    ecrireSauvegarde(p, pose);
-  }, [p, pose, restauration]);
+    const objet = ecrireLocal(p, pose);
+    if (p) avaitPartie.current = true;
+    else if (!avaitPartie.current) return; // jamais eu de partie : ne rien effacer dans le compte
+    if (!compteOk.current) return;
+    enAttente.current = objet;
+    if (objet) setSync("attente");
+    clearTimeout(minuteur.current);
+    minuteur.current = setTimeout(() => { if (!p) avaitPartie.current = false; envoyerAuCompte(); }, objet ? 1200 : 0);
+    return () => clearTimeout(minuteur.current);
+  }, [p, pose, restauration]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Onglet masqué / fermé : envoi immédiat de ce qui attend encore (au mieux : la page peut se fermer avant la réponse).
+  useEffect(() => {
+    const vider = () => { if (enAttente.current) { clearTimeout(minuteur.current); envoyerAuCompte(); } };
+    const surVisibilite = () => { if (document.visibilityState === "hidden") vider(); };
+    document.addEventListener("visibilitychange", surVisibilite);
+    window.addEventListener("pagehide", vider);
+    return () => { document.removeEventListener("visibilitychange", surVisibilite); window.removeEventListener("pagehide", vider); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Nouvelle partie ───
   const nouvellePartie = async () => {
@@ -224,7 +284,7 @@ export default function JeuDeMots() {
   const posees = new Map(pose.map((t) => [cle(t.r, t.c), t]));
   const enJeu = p && p.tour !== "fini";
 
-  if (restauration) return <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Reprise de ta partie…</div>;
+  if (restauration) return <div style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>Recherche de ta partie sauvegardée…</div>;
 
   if (!p) {
     return (
@@ -324,6 +384,7 @@ export default function JeuDeMots() {
             {p.sac.length} tuile{p.sac.length > 1 ? "s" : ""} dans le sac · niveau {NIVEAUX[p.niveau].toLowerCase()}
             {p.passes > 0 && enJeu ? ` · ${p.passes} passe${p.passes > 1 ? "s" : ""} de suite (6 = fin)` : ""}
           </div>
+          <div style={{ fontSize: 11, marginTop: 4, color: sync === "compte" ? "#1D9E75" : "var(--color-text-secondary)" }}>{TEXTE_SYNC[sync]}</div>
         </div>
 
         {p.fin && (
