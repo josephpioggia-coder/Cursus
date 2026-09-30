@@ -32,6 +32,19 @@ const MODES = [
   { id: "modele", label: "Chercher un modèle complet (_ = une lettre, * = suite libre) :", champ: "modele", ph: "ex. C_R_US ou CUR*" },
 ];
 
+// Lien vers l'outil dCode (dictionnaire ODS9 officiel) — toujours dans un NOUVEL onglet
+// pour ne pas faire quitter Cursus (demande de Joseph, 30/09/2026). Simple lien : aucune
+// donnée de dCode n'est récupérée ni intégrée.
+const DCODE = { solveur: "https://www.dcode.fr/solveur-scrabble", dictionnaire: "https://www.dcode.fr/dictionnaire-scrabble" };
+function LienDCode({ vers, children }) {
+  return (
+    <a href={DCODE[vers]} target="_blank" rel="noopener noreferrer"
+       style={{ ...boutonClair, textDecoration: "none", display: "inline-block", color: "#1D9E75", borderColor: "#1D9E7566" }}>
+      {children} ↗
+    </a>
+  );
+}
+
 // Définition d'un mot (Wiktionnaire) — panneau sous le mot cliqué.
 function Definition({ mot }) {
   const [etat, setEtat] = useState({ chargement: true });
@@ -179,7 +192,10 @@ function SolveurMots({ chevaletInitial }) {
           ))}
         </div>
       </details>
-      <button style={bouton(!occupe)} disabled={occupe} onClick={lancer}>▶ Trouver les solutions</button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button style={bouton(!occupe)} disabled={occupe} onClick={lancer}>▶ Trouver les solutions</button>
+        <LienDCode vers="solveur">Comparer avec dCode (ODS9)</LienDCode>
+      </div>
       {erreur && <div style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>{erreur}</div>}
       {mode === "accrochables" && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>Pour chaque lettre A–Z : mots utilisant tout le tirage + cette lettre. Lettre libre : choisis la plus utile sur le plateau.</div>}
 
@@ -248,6 +264,7 @@ function Dictionnaire() {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input value={mot} onChange={(e) => setMot(e.target.value)} onKeyDown={(e) => e.key === "Enter" && verifier()} placeholder="Mot" style={{ ...champ, letterSpacing: 2, width: 220 }} />
         <button style={bouton(!!mot)} onClick={verifier}>Vérifier le mot</button>
+        <LienDCode vers="dictionnaire">Vérifier sur dCode (ODS9)</LienDCode>
       </div>
       {res && (
         <div style={{ marginTop: 10 }}>
@@ -255,7 +272,7 @@ function Dictionnaire() {
             {res.mot} : {res.valide ? `présent dans la liste (${res.points} points bruts)` : "absent de la liste"}
           </div>
           <div style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: "2px 0 8px" }}>
-            Liste libre proche du Scrabble, pas l'ODS9 officiel : en cas de litige, la vérification de référence reste l'ODS.
+            Liste libre proche du Scrabble, pas l'ODS9 officiel : en cas de doute, vérifie sur dCode (ODS9), qui s'ouvre dans un nouvel onglet.
           </div>
           <Definition mot={res.mot} />
         </div>
