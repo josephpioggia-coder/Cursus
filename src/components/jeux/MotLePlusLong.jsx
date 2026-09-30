@@ -8,6 +8,7 @@
 import { useState, useRef } from "react";
 import { tirageMotLePlusLong, motFormable } from "../../lib/jeuxDeMots.js";
 import { rechercher } from "../../lib/scrabbleMots.js";
+import { TuileCanvas } from "./dessin.jsx";
 import { carte, bouton, boutonClair, discret, EnTete, useCompteARebours, formatTemps, useClavier, lireStats, noterPartie } from "./commun.jsx";
 
 const DUREE = 60;
@@ -59,17 +60,16 @@ export default function MotLePlusLong({ donnees }) {
           <div style={{ ...discret, marginTop: 8 }}>{stats.jouees} partie{stats.jouees > 1 ? "s" : ""} · record : mot de {stats.record} lettres</div>
         </div>
       ) : (
-        <div style={{ maxWidth: 460 }}>
+        <div style={{ maxWidth: 460, minWidth: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
             <span style={{ color: enCours && reste <= 10 ? "#c0392b" : "inherit" }}>⏱ {formatTemps(enCours ? reste : 0)}</span>
             <span>Meilleur : {meilleur ? `${meilleur} (${meilleur.length})` : "—"}</span>
           </div>
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 10 }}>
             {t.lettres.map((l, i) => (
-              <button key={i} onClick={() => ajouter(i)} disabled={!enCours || compo.includes(i)} style={{
-                width: "min(17vw, 60px)", aspectRatio: "1", borderRadius: 8, border: "none", fontSize: 24, fontWeight: 700, fontFamily: "inherit",
-                background: "#f2b93b", color: "#111", opacity: compo.includes(i) ? 0.25 : 1, cursor: enCours && !compo.includes(i) ? "pointer" : "default", boxShadow: "0 2px 3px rgba(0,0,0,.25)",
-              }}>{l}</button>
+              <div key={i} style={{ width: "calc((100% - 20px) / 5)", maxWidth: 60, minWidth: 0 }}>
+                <TuileCanvas l={l} taille="100%" sansPoints etat={compo.includes(i) ? "gris" : "normal"} onClick={enCours && !compo.includes(i) ? () => ajouter(i) : undefined} />
+              </div>
             ))}
           </div>
           {enCours && (

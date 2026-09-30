@@ -8,6 +8,7 @@
  */
 import { useState } from "react";
 import { problemeEchelle, plusCourtChemin, unSeulChangement, norm } from "../../lib/jeuxDeMots.js";
+import { TuileCanvas } from "./dessin.jsx";
 import { carte, bouton, boutonClair, champ, discret, EnTete, lireStats, noterPartie } from "./commun.jsx";
 
 export default function EchelleDeMots({ donnees }) {
@@ -63,14 +64,12 @@ export default function EchelleDeMots({ donnees }) {
           <div style={{ ...discret, marginTop: 8 }}>{stats.jouees} échelle{stats.jouees > 1 ? "s" : ""} · {stats.gagnees} réussie{stats.gagnees > 1 ? "s" : ""}</div>
         </div>
       ) : (
-        <div style={{ maxWidth: 420 }}>
+        <div style={{ maxWidth: 420, minWidth: 0 }}>
           <div style={{ ...discret, marginBottom: 8 }}>Le plus court chemin fait <b>{par} étapes</b> (« par »). Tu en es à {etapes}.</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start", marginBottom: 10 }}>
             {chaine.map((m, i) => (
               <div key={m} style={{ display: "flex", gap: 3, alignItems: "center" }}>
-                {[...m].map((l, k) => (
-                  <div key={k} style={{ width: 36, height: 36, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 18, background: i > 0 && chaine[i - 1][k] !== l ? "#1D9E75" : "#f2b93b", color: i > 0 && chaine[i - 1][k] !== l ? "#fff" : "#111" }}>{l}</div>
-                ))}
+                {[...m].map((l, k) => <TuileCanvas key={k} l={l} taille={36} sansPoints etat={i > 0 && chaine[i - 1][k] !== l ? "chemin" : "normal"} />)}
                 {i === 0 && <span style={discret}>départ</span>}
               </div>
             ))}

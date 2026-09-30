@@ -8,6 +8,7 @@
  */
 import { useState, useRef } from "react";
 import { nouvelleGrilleBoggle, voisinsBoggle, scoreBoggle, norm } from "../../lib/jeuxDeMots.js";
+import { GrilleCanvas } from "./dessin.jsx";
 import { carte, bouton, boutonClair, champ, discret, EnTete, useCompteARebours, formatTemps, lireStats, noterPartie } from "./commun.jsx";
 
 const DUREE = 180;
@@ -60,18 +61,14 @@ export default function Boggle({ donnees }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
-          <div style={{ flex: "1 1 280px", maxWidth: 380 }}>
+          <div style={{ flex: "1 1 280px", maxWidth: 380, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
               <span style={{ color: enCours && reste <= 20 ? "#c0392b" : "inherit" }}>⏱ {formatTemps(enCours ? reste : 0)}</span>
               <span>{score} pt{score > 1 ? "s" : ""}</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, marginBottom: 10 }}>
-              {g.grille.map((l, i) => (
-                <button key={i} onClick={() => toucher(i)} style={{
-                  aspectRatio: "1", borderRadius: 10, border: "none", fontSize: "clamp(22px, 8vw, 34px)", fontWeight: 700, fontFamily: "inherit", cursor: enCours ? "pointer" : "default",
-                  background: dansChemin.has(i) ? (chemin[chemin.length - 1] === i ? "#1D9E75" : "#7ed37e") : "#f2b93b", color: "#111", boxShadow: "0 2px 3px rgba(0,0,0,.25)",
-                }}>{l}</button>
-              ))}
+            <div style={{ marginBottom: 10 }}>
+              <GrilleCanvas n={4} tuiles maxLargeur={380} onCase={enCours ? (i) => toucher(i) : undefined}
+                cellules={g.grille.map((l, i) => ({ l, etat: dansChemin.has(i) ? (chemin[chemin.length - 1] === i ? "fin" : "chemin") : "normal" }))} />
             </div>
             {enCours && (
               <>
@@ -94,7 +91,7 @@ export default function Boggle({ donnees }) {
               </div>
             )}
           </div>
-          <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>{enCours ? `Mots trouvés (${trouves.length})` : `Tous les mots de la grille (${tous.length})`}</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 360, overflowY: "auto" }}>
               {(enCours ? trouves.map((x) => x.mot) : tous).map((m) => {
