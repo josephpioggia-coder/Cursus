@@ -282,5 +282,18 @@ Deux causes, deux règles à garder :
    largeur minimale → boucle d'élargissement). Vérifié à 320/360/390 px : `scrollWidth <= innerWidth`
    pour tous les écrans de jeu. Mode « 🔍 Agrandir les cases » (cases de 44 px, cadre défilant)
    pour jouer confortablement au doigt.
-Non corrigé (hors demande, existait déjà) : la barre du haut de l'app dépasse la largeur d'un
-téléphone (~712 px) → la page est dézoomée sur mobile avec ou sans les jeux.
+**Cause racine du « dézoom » sur mobile, corrigée le 30/09/2026 (2e retour de Joseph : « toujours
+un problème de mise en page », capture avec le fond gris limité à la moitié gauche et le contenu
+sur fond noir) :** le shell d'`App.jsx` est une grille `1fr` (= `minmax(auto, 1fr)`). La barre du
+haut (`grid-column: 1 / -1`, 7 éléments : ☰, logo, compteurs, e-mail, Aide, Mode d'emploi,
+changement d'espace, Légal, Déconnexion) fait ~712 px de large minimum : la colonne s'élargissait
+à 712 px alors que le conteneur (donc son fond) restait à la largeur de l'écran (~360 px).
+Corrections : `minmax(0, 1fr)` (colonne figée à la largeur disponible, sur mobile ET bureau) ;
+sur mobile la barre du haut ne garde que ☰ · logo · changement d'espace, le reste (e-mail,
+compteurs, Aide, Mode d'emploi, Légal, Déconnexion) est dans le tiroir, section « Compte et aide »
+(le bureau n'a pas changé). Vérifié dans l'app complète (Supabase simulé) à 320/360/390 px et
+1280 px : `scrollWidth == innerWidth` et colonne principale == largeur de l'écran partout.
+**Règle** : ne plus ajouter d'éléments à la barre du haut sans regarder ce que ça donne à 360 px ;
+sur mobile, les mettre dans le tiroir. Piège de test : l'émulation mobile de Playwright
+(`isMobile: true`) ÉLARGIT la fenêtre au contenu et masque le problème ; tester avec une fenêtre
+fixe de 360 px (`isMobile: false`) et mesurer `scrollWidth` / la largeur de la colonne principale.
