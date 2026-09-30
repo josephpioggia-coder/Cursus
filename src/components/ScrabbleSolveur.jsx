@@ -28,6 +28,7 @@
 import { useState, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase.js";
 import OutilsMots from "./OutilsMots.jsx";
+import JeuDeMots from "./JeuDeMots.jsx";
 import {
   TAILLE, PRIMES, plateauVide, construireDico, genererCoups, notation,
   appliquerCoup, retirerDuChevalet, aligner, plateauDepuisLecture, pointsLettre,
@@ -213,7 +214,7 @@ export default function ScrabbleSolveur() {
         </p>
 
         <div style={{ display: "flex", gap: 6, marginBottom: 16, borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
-          {[["grille", "🎯 Grille — meilleurs coups"], ["outils", "🔤 Outils de mots"]].map(([id, label]) => (
+          {[["grille", "🎯 Grille — meilleurs coups"], ["outils", "🔤 Outils de mots"], ["jeu", "🎮 Jouer contre l'ordinateur"]].map(([id, label]) => (
             <button key={id} onClick={() => setOnglet(id)} style={{
               background: "transparent", border: "none", padding: "8px 14px", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
               fontWeight: onglet === id ? 600 : 400, color: onglet === id ? "#1D9E75" : "var(--color-text-secondary)",
@@ -223,6 +224,8 @@ export default function ScrabbleSolveur() {
         </div>
 
         {onglet === "outils" && <OutilsMots chevalet={chevalet} plateau={plateau} />}
+        {/* Toujours monté (masqué) : garde la partie en cours quand on change d'onglet. */}
+        <div style={{ display: onglet === "jeu" ? "block" : "none" }}><JeuDeMots /></div>
         <div style={{ display: onglet === "grille" ? "block" : "none" }}>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 12 }}>
