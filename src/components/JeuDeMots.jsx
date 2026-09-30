@@ -71,6 +71,11 @@ export default function JeuDeMots() {
   const [selection, setSelection] = useState(null); // index du chevalet
   const [pose, setPose] = useState([]);             // tuiles posées ce tour : [{r,c,idx,l,joker}]
   const [choixJoker, setChoixJoker] = useState(null);
+  const [glisse, setGlisse] = useState(null);   // tuile en cours de glissement : { idx?, l, joker, x, y }
+  const [cible, setCible] = useState(null);     // case survolée pendant le glissement
+  const zoneRef = useRef(null);                 // conteneur du plateau (pour retrouver la case sous le doigt)
+  const apresGlisse = useRef(false);            // évite qu'un lâcher sur le plateau soit pris pour un clic
+  const courant = useRef({});                   // dernières valeurs, lues par les écouteurs du glissement
   const [zoom, setZoom] = useState(false);
   const [echange, setEchange] = useState(null);     // null | Set d'index à échanger
   const [message, setMessage] = useState("");
@@ -212,7 +217,71 @@ export default function JeuDeMots() {
   const idxPoses = new Set(pose.map((t) => t.idx));
 
   // ─── Actions du joueur ───
+  // ─── Glisser-déposer (30/09/2026, demande de Joseph : « poser le doigt sur une lettre et la faire
+  // glisser vers la case ») — marche au doigt et à la souris (événements « pointer »). La tuile
+  // suit le doigt, décalée AU-DESSUS pour ne pas être cachée ; la case visée est cerclée d'or ; au
+  // relâchement, la tuile se pose si la case est libre, sinon elle revient. Un appui sans mouvement
+  // (< 8 px) reste un simple toucher (sélection puis case). On peut aussi déplacer une tuile déjà
+  // posée (verte) ou la lâcher hors du plateau pour la reprendre. Les écouteurs sont sur `window`
+  // (pas de capture de pointeur) et lisent `courant.current`, mis à jour à chaque rendu.
+  courant.current = { p, pose, chevalet, zoom };
+  const DECALAGE = 46, PAS = 8;
+  const celluleSous = (x, y) => {
+    const canvas = zoneRef.current?.querySelector('canvas[aria-label^="Plateau"]');
+    if (!canvas) return null;
+    const cadre = canvas.parentElement.getBoundingClientRect();
+    if (x < cadre.left || x > cadre.right || y < cadre.top || y > cadre.bottom) return null;
+    const rect = canvas.getBoundingClientRect(), pas = rect.width / 15;
+    const c = Math.floor((x - rect.left) / pas), r = Math.floor((y - rect.top) / pas);
+    return r >= 0 && r < 15 && c >= 0 && c < 15 ? { r, c } : null;
+  };
+  const caseLibre = (c, ignorer) => {
+    const cur = courant.current;
+    return !!c && cur.p.plateau[c.r][c.c] === "" && !cur.pose.some((t) => t !== ignorer && t.r === c.r && t.c === c.c);
+  };
+  const commencerGlisse = (e, source) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const dep = { x: e.clientX, y: e.clientY, deplace: false };
+    const bouger = (ev) => {
+      const cur = courant.current;
+      if (!dep.deplace) {
+        if (Math.hypot(ev.clientX - dep.x, ev.clientY - dep.y) < PAS) return;
+        dep.deplace = true;
+        if (source.type === "plateau") setPose(cur.pose.filter((t) => t !== source.tuile)); // la tuile quitte sa case
+        setSelection(null); setMessage("");
+      }
+      const l = source.type === "chevalet" ? cur.chevalet[source.idx] : source.tuile.l;
+      setGlisse({ idx: source.type === "chevalet" ? source.idx : undefined, l, joker: source.type === "plateau" && source.tuile.joker, x: ev.clientX, y: ev.clientY - DECALAGE });
+      const c = celluleSous(ev.clientX, ev.clientY - DECALAGE);
+      setCible(caseLibre(c, source.tuile) ? c : null);
+    };
+    const arreter = () => {
+      window.removeEventListener("pointermove", bouger);
+      window.removeEventListener("pointerup", relacher);
+      window.removeEventListener("pointercancel", annuler);
+    };
+    const annuler = () => { arreter(); if (dep.deplace) { setGlisse(null); setCible(null); } };
+    const relacher = (ev) => {
+      arreter();
+      if (!dep.deplace) return; // simple appui : le clic normal fait son travail
+      apresGlisse.current = true; setTimeout(() => { apresGlisse.current = false; }, 80);
+      setGlisse(null); setCible(null);
+      const cur = courant.current;
+      const c = celluleSous(ev.clientX, ev.clientY - DECALAGE);
+      if (!caseLibre(c, source.tuile)) return; // hors plateau ou case occupée : la tuile revient
+      const base = source.type === "plateau" ? cur.pose.filter((t) => t !== source.tuile) : cur.pose;
+      if (source.type === "plateau") { setPose([...base, { ...source.tuile, r: c.r, c: c.c }]); return; }
+      const l = cur.chevalet[source.idx];
+      if (l === "?") setChoixJoker({ r: c.r, c: c.c, idx: source.idx });
+      else setPose([...base, { r: c.r, c: c.c, idx: source.idx, l, joker: false }]);
+    };
+    window.addEventListener("pointermove", bouger);
+    window.addEventListener("pointerup", relacher);
+    window.addEventListener("pointercancel", annuler);
+  };
+
   const surCase = (r, c) => {
+    if (apresGlisse.current) return;
     if (!monTour || echange) return;
     const dejaPose = pose.find((t) => t.r === r && t.c === c);
     if (dejaPose) { setPose(pose.filter((t) => t !== dejaPose)); setMessage(""); return; }
@@ -304,7 +373,15 @@ export default function JeuDeMots() {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-start" }}>
       {/* ── Plateau et chevalet ── */}
       <div style={{ flex: "1 1 320px", maxWidth: 640, minWidth: 0 }}>
-        <PlateauCanvas plateau={p.plateau} posees={posees} derniers={p.derniers} zoom={zoom} centrer={centrer} onCase={surCase} />
+        <div ref={zoneRef} style={{ touchAction: !zoom && pose.length && monTour ? "none" : "auto" }}
+          onPointerDown={(e) => {
+            if (!monTour || echange || zoom) return;
+            const c = celluleSous(e.clientX, e.clientY);
+            const t = c && pose.find((x) => x.r === c.r && x.c === c.c);
+            if (t) commencerGlisse(e, { type: "plateau", tuile: t });
+          }}>
+          <PlateauCanvas plateau={p.plateau} posees={posees} derniers={p.derniers} selection={cible} zoom={zoom} centrer={centrer} onCase={surCase} />
+        </div>
         <div style={{ marginTop: 6 }}>
           <button style={boutonClair()} onClick={() => setZoom(!zoom)}>{zoom ? "🔍 Vue d'ensemble" : "🔍 Agrandir les cases"}</button>
         </div>
@@ -312,14 +389,16 @@ export default function JeuDeMots() {
         {/* Chevalet */}
         <div style={{ display: "flex", gap: 5, marginTop: 10, width: "100%", maxWidth: 7 * 54 + 30, alignItems: "center" }}>
           {chevalet.map((l, i) => (
-            <div key={i} style={{ flex: "1 1 0", maxWidth: 54, minWidth: 0 }}>
-              {idxPoses.has(i)
+            <div key={i} style={{ flex: "1 1 0", maxWidth: 54, minWidth: 0, touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+              onContextMenu={(e) => e.preventDefault()}
+              onPointerDown={(e) => { if (monTour && !echange && !idxPoses.has(i)) commencerGlisse(e, { type: "chevalet", idx: i }); }}>
+              {idxPoses.has(i) || glisse?.idx === i
                 ? <div style={{ aspectRatio: "1", borderRadius: 8, border: "1px dashed #bbb" }} />
                 : <TuileCanvas l={l} taille="100%" etat={echange?.has(i) ? "echange" : selection === i ? "sel" : "normal"} onClick={() => surTuile(i)} />}
             </div>
           ))}
         </div>
-        {enJeu && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>{echange ? "Touche les tuiles à échanger" : monTour ? "Touche une tuile, puis une case" : "L'ordinateur réfléchit…"}</div>}
+        {enJeu && <div style={{ fontSize: 11, color: "var(--color-text-secondary)", marginTop: 6 }}>{echange ? "Touche les tuiles à échanger" : monTour ? "Fais glisser une tuile sur le plateau (ou touche-la, puis une case)" : "L'ordinateur réfléchit…"}</div>}
 
         {/* Boutons */}
         {enJeu && (
@@ -376,6 +455,13 @@ export default function JeuDeMots() {
         </div>
         {enJeu && <button style={boutonClair()} onClick={() => { if (window.confirm("Abandonner la partie en cours ?")) setP(null); }}>Abandonner</button>}
       </div>
+
+      {/* Tuile qui suit le doigt pendant le glissement, posée 34 px AU-DESSUS de la case visée pour ne pas la cacher (anneau doré) */}
+      {glisse && (
+        <div style={{ position: "fixed", left: glisse.x - 27, top: glisse.y - 27 - 34, width: 54, height: 54, opacity: 0.92, pointerEvents: "none", zIndex: 3000, filter: "drop-shadow(0 6px 8px rgba(0,0,0,.45))" }}>
+          <TuileCanvas l={glisse.l} joker={glisse.joker} taille={54} etat="sel" />
+        </div>
+      )}
 
       {/* Choix de la lettre d'un joker */}
       {choixJoker && (
