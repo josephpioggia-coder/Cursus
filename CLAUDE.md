@@ -322,3 +322,27 @@ s'afficher ».
   ligne « ✔ MOT — N points » + pastille « +N » sur le plateau (`bulle` de `PlateauCanvas`) + bouton
   « Jouer ce coup (+N) » ; sinon la raison en gris (rien tant que « pas encore un mot »).
 - Vérifié avec de vrais événements tactiles (CDP `Input.dispatchTouchEvent`), pas seulement à la souris.
+
+### Partie : plein écran, dépôt sous la tuile, double-tap, zoom auto (30/09/2026, comparaison avec un autre Scrabble en ligne)
+
+Retour de Joseph avec captures de l'autre jeu (« aucun problème pour glisser la lettre dans la bonne case ;
+elle se dépose là où elle se trouve quand je lève le doigt ; double-tap = zoom ; une fois la lettre posée la
+grille est aussitôt agrandie sur la zone ; chez nous elle va toujours dans la cellule au-dessus ; il y a une
+couche d'infos en dessous qui n'existe pas chez l'autre »). Corrections :
+- **Ce qu'on voit = où ça se pose** : la case visée est celle SOUS la tuile fantôme (centre de la tuile = 30 px
+  au-dessus du doigt, `DECALAGE`), et la tuile fantôme y est dessinée CENTRÉE (halo doré `viseur` autour). Le bug
+  venait de mon dernier réglage (« descends la tuile ») : la tuile était dessinée 30 px plus haut que la case visée.
+  Ne JAMAIS décaler l'affichage de la tuile par rapport à la case de dépôt.
+- **Plein écran par défaut** dès qu'une partie est en cours (`plein`) : `position: fixed; inset: 0; 100dvh`, pas de
+  page qui défile : barre du haut (⤡ réduire · scores · 🎒 sac · 📜 journal), plateau (`cadre` = place mesurée
+  par ResizeObserver : carré du plus grand côté qui tient, ou cadre défilant w×h en zoom), ligne d'information
+  (points du mot, erreur, indice), chevalet, barre de 6 boutons orange (Rappel, Mélanger, Échanger, Passer,
+  Indice, Jouer +N). Le journal / abandon / état de sauvegarde sont dans un panneau (📜). Disposition normale
+  (page Cursus) toujours disponible via ⤡, avec une bande « glisse ici pour faire défiler la page »
+  (`touch-action: pan-y`) : le plateau et le chevalet captent le doigt, cette bande laisse la page défiler.
+- **Double-tap** sur le plateau = agrandir (centré sur la case tapée) / revenir à la vue d'ensemble ; seulement si
+  un tap sur cette case n'aurait aucun effet (sinon confusion avec poser/reprendre une tuile).
+- **Zoom automatique** sur la zone dès que la PREMIÈRE tuile est posée (`zoomerSurPremiere`, `focus`).
+- Tests : mêmes constantes que le code (`DECALAGE = 30`), chevalet plein écran = wrappers `max-width: 66px`
+  (normal : 54 px), boutons du bas = icône + libellé (`getByRole('button', { name: /Indice/ })`, pas `getByText`).
+  Vérifié à 320/360/390/412 px, événements tactiles réels (CDP), sombre forcé.
