@@ -48,6 +48,7 @@ import Image from "@tiptap/extension-image";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { lire, arrêterLecture, basculerPause, voixDisponible } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -1020,6 +1021,9 @@ export default function Editeur({
   const [formatRéférence, setFormatRéférence] = useState("a4");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
+  // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
+  // "arrêté" | "lecture" | "pause".
+  const [étatLecture, setÉtatLecture] = useState("arrêté");
   const [historique, setHistorique] = useState([]);
   const [chargementHistorique, setChargementHistorique] = useState(false);
   const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
@@ -1305,6 +1309,36 @@ export default function Editeur({
     setVoirHistorique(false);
   }, [editor]);
 
+  // Lecture à voix haute (01/10/2026) — lit la sélection en cours dans
+  // l'éditeur si elle n'est pas vide, sinon tout le texte du chapitre.
+  const obtenirTexteLecture = useCallback(() => {
+    if (!editor) return "";
+    const { from, to, empty } = editor.state.selection;
+    if (!empty) return editor.state.doc.textBetween(from, to, "\n");
+    return editor.getText();
+  }, [editor]);
+
+  const basculerLecture = useCallback(() => {
+    if (étatLecture === "arrêté") {
+      const texte = obtenirTexteLecture();
+      if (!texte.trim()) return;
+      lire(texte, { onDébut: () => setÉtatLecture("lecture"), onFin: () => setÉtatLecture("arrêté") });
+    } else if (étatLecture === "lecture") {
+      basculerPause();
+      setÉtatLecture("pause");
+    } else {
+      basculerPause();
+      setÉtatLecture("lecture");
+    }
+  }, [étatLecture, obtenirTexteLecture]);
+
+  // Changer de chapitre/scène (nœud) ou quitter l'éditeur en plein
+  // lecture ne doit pas laisser la voix continuer sur un texte qui n'est
+  // plus affiché.
+  useEffect(() => {
+    return () => { arrêterLecture(); setÉtatLecture("arrêté"); };
+  }, [nœud?.id]);
+
   if (!nœud) return (
     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#bbb", fontSize: 14 }}>
       Sélectionnez un chapitre ou une scène dans la structure pour commencer à écrire.
@@ -1363,6 +1397,33 @@ export default function Editeur({
           >
             {texteCopié ? "✓ Copié !" : "📋 Copier tout"}
           </button>
+          {voixDisponible() && (
+            <button
+              onClick={basculerLecture}
+              style={{
+                fontSize: 12, color: étatLecture !== "arrêté" ? "#7F77DD" : "#999",
+                background: étatLecture !== "arrêté" ? "#F5F4FD" : "none",
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Lit la sélection en cours, ou tout le texte si rien n'est sélectionné"
+            >
+              {étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
+            </button>
+          )}
+          {étatLecture !== "arrêté" && (
+            <button
+              onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); }}
+              style={{
+                fontSize: 12, color: "#999", background: "none",
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 6px", fontFamily: "inherit",
+              }}
+              title="Arrêter la lecture"
+            >
+              ⏹
+            </button>
+          )}
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
             style={{

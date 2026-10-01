@@ -20,3 +20,15 @@ disponibles pour toute réutilisation future) :
 
 Avant de demander une nouvelle version ou un nouveau recadrage de cette
 image, vérifier si l'un des deux fichiers ci-dessus convient déjà.
+
+## Lecture à voix haute
+
+`src/lib/lectureVoix.js` (01/10/2026) — fonctions indépendantes de l'UI
+(`lire`, `basculerPause`, `arrêterLecture`, `voixDisponible`) au-dessus
+du `window.speechSynthesis` natif du navigateur (gratuit, sans clé API,
+sans déploiement de fonction Supabase). Intégré pour l'instant dans
+CursEdit (`Editeur.jsx`, bouton "🔊 Lire à voix haute" dans l'en-tête :
+lit la sélection en cours, ou tout le texte si rien n'est sélectionné).
+Joseph a dit vouloir ce bouton "peut-être ailleurs" aussi — réutiliser
+ces mêmes fonctions plutôt qu'en réécrire avant d'ajouter la lecture à
+voix haute à une autre page (CursAudit, CursDecision...).
