@@ -44,7 +44,17 @@ export const VOIX_DISPONIBLES = [
 
 export const VITESSES_DISPONIBLES = [0.75, 1, 1.25, 1.5, 2];
 
-const TAILLE_MAX_TRANCHE = 3800; // marge sous la limite dure de 4096 d'OpenAI
+// CORRECTIF 01/10/2026 — signalé en usage réel : "presqu'une minute" avant
+// que la lecture ne démarre, et parfois rien ne se lance du tout. Cause du
+// premier point : une tranche de ~3800 caractères (plusieurs minutes de
+// parole) prend réellement ce temps-là à générer entièrement côté OpenAI
+// AVANT que le moindre son ne puisse être renvoyé — ce n'est pas un bug
+// réseau, `gpt-4o-mini-tts` ne renvoie l'audio qu'une fois la synthèse
+// complète. Tranches bien plus courtes désormais (≈ 20-30s de parole) pour
+// un premier son rapide, combinées à un PRÉCHARGEMENT de la tranche
+// suivante pendant la lecture de la courante (voir `lire()`) pour que les
+// tranches 2+ n'introduisent plus aucun silence audible.
+const TAILLE_MAX_TRANCHE = 700;
 
 // Découpe par paragraphes puis, si besoin, par phrases — pour que chaque
 // tranche s'arrête sur une frontière naturelle (silence audible propre)
@@ -139,19 +149,35 @@ export async function lire(texte, { voix = "nova", vitesse = 1, onDébut, onTran
   fileAttente = tranches;
   const audio = obtenirÉlémentAudio();
 
+  // Cache des récupérations en cours/terminées, par position dans
+  // `fileAttente` — `assurerRécupération(i+1)` est lancée dès que la
+  // tranche i commence à jouer (pas quand elle se termine), pour que la
+  // tranche suivante soit déjà prête (ou bien avancée) au moment où
+  // `onended` se déclenche. Masque la latence de génération pour toutes
+  // les tranches sauf la première.
+  const promesses = new Map();
+  const assurerRécupération = (i) => {
+    if (i >= fileAttente.length) return null;
+    if (!promesses.has(i)) {
+      onTranche?.(i + 1, fileAttente.length);
+      promesses.set(i, récupérerAudioTranche(fileAttente[i], voix, vitesse));
+    }
+    return promesses.get(i);
+  };
+
   const jouerTranche = async (i) => {
     if (maSession !== sessionId) return;
     if (i >= fileAttente.length) { onFin?.(); return; }
     try {
-      onTranche?.(i + 1, fileAttente.length);
-      const blob = await récupérerAudioTranche(fileAttente[i], voix, vitesse);
-      if (maSession !== sessionId) return;
+      const blob = await assurerRécupération(i);
+      if (maSession !== sessionId || !blob) return;
       libérerURL();
       urlObjetCourante = URL.createObjectURL(blob);
       audio.src = urlObjetCourante;
       audio.onended = () => jouerTranche(i + 1);
       await audio.play();
       if (i === 0) onDébut?.();
+      assurerRécupération(i + 1); // précharge la suivante PENDANT la lecture de celle-ci
     } catch (err) {
       if (maSession === sessionId) onErreur?.(err.message);
     }

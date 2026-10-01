@@ -361,16 +361,32 @@ par une vraie synthèse vocale serveur :
   (même vérification que `claude-prox`) : chaque appel a un coût réel.
   Limite dure d'OpenAI : 4096 caractères par appel — refusée avec un
   message clair, pas tronquée en silence.
-- `src/lib/lectureVoix.js` — découpe le texte en tranches ≤ 3800
-  caractères (marge sous la limite serveur) sur des frontières de
-  phrase/paragraphe, les récupère et les enchaîne via un seul `<audio>`
-  HTML réutilisé (pause/reprise natives). `VOIX_DISPONIBLES` (7 voix)
-  et `VITESSES_DISPONIBLES` (0.75× à 2×) exportées pour l'UI — à garder
-  synchronisées avec `VOIX_AUTORISEES` côté serveur si la liste change.
-  PAS de repli automatique vers la voix du navigateur en cas d'échec
-  (quota, réseau...) : Joseph voulait explicitement s'en éloigner, un
-  retour silencieux à cette voix-là aurait été trompeur — `onErreur`
-  remonte un message clair à la place.
+- `src/lib/lectureVoix.js` — découpe le texte en tranches, les récupère
+  et les enchaîne via un seul `<audio>` HTML réutilisé (pause/reprise
+  natives). `VOIX_DISPONIBLES` (7 voix) et `VITESSES_DISPONIBLES` (0.75×
+  à 2×) exportées pour l'UI — à garder synchronisées avec
+  `VOIX_AUTORISEES` côté serveur si la liste change. PAS de repli
+  automatique vers la voix du navigateur en cas d'échec (quota,
+  réseau...) : Joseph voulait explicitement s'en éloigner, un retour
+  silencieux à cette voix-là aurait été trompeur — `onErreur` remonte un
+  message clair à la place.
+- CORRECTIF 01/10/2026 (même jour, signalé en usage réel après premier
+  déploiement) — "presqu'une minute avant que la lecture ne se lance" et
+  "parfois elle ne se lance pas". Deux causes :
+  1. Tranches à 3800 caractères (quasi la limite dure d'OpenAI de 4096) :
+     `gpt-4o-mini-tts` ne renvoie l'audio qu'une fois la synthèse
+     ENTIÈREMENT générée — plusieurs minutes de parole à produire avant
+     le moindre son, pas un bug réseau. `TAILLE_MAX_TRANCHE` ramenée à
+     700 (≈ 20-30s de parole, premier son rapide) + préchargement de la
+     tranche suivante dès que la courante commence à jouer (pas quand
+     elle se termine), pour qu'aucune tranche après la première
+     n'introduise de silence audible.
+  2. Aucun retour visuel entre le clic et `onDébut` : un clic répété par
+     impatience pendant cette attente relançait `lire()` depuis zéro
+     (elle annule la tentative précédente) — d'où "parfois elle ne se
+     lance pas". État "chargement" affiché immédiatement (avant le
+     moindre appel réseau), bouton désactivé pendant cet état
+     (`Editeur.jsx`) : un second clic ne peut plus tout annuler.
 - Intégré pour l'instant dans CursEdit (`Editeur.jsx` : bouton + choix
   de voix/vitesse mémorisés par appareil dans l'en-tête de l'éditeur).
   Joseph a dit vouloir ce bouton "peut-être ailleurs" aussi — réutiliser

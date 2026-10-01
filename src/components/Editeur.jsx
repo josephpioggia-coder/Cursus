@@ -1333,6 +1333,18 @@ export default function Editeur({
       if (!texte.trim()) return;
       setErreurLecture(null);
       setProgressionLecture(null);
+      // CORRECTIF 01/10/2026 — signalé en usage réel : "presqu'une minute"
+      // avant que la lecture démarre, "parfois elle ne se lance pas". Deux
+      // causes distinctes : (a) la première tranche était trop longue à
+      // générer côté OpenAI (voir lectureVoix.js, tranches raccourcies +
+      // préchargement) ; (b) RIEN n'indiquait ici qu'un clic avait été pris
+      // en compte pendant cette attente — un clic répété par impatience
+      // relançait lire() depuis zéro (elle annule la tentative précédente),
+      // ce qui pouvait donner l'impression que "ça ne démarre jamais".
+      // État "chargement" distinct, affiché immédiatement, AVANT le moindre
+      // appel réseau — le bouton est désactivé pendant cet état (voir plus
+      // bas), un second clic ne peut donc plus relancer par-dessus.
+      setÉtatLecture("chargement");
       lire(texte, {
         voix: voixLecture,
         vitesse: vitesseLecture,
@@ -1344,7 +1356,7 @@ export default function Editeur({
     } else if (étatLecture === "lecture") {
       basculerPause();
       setÉtatLecture("pause");
-    } else {
+    } else if (étatLecture === "pause") {
       basculerPause();
       setÉtatLecture("lecture");
     }
@@ -1418,15 +1430,17 @@ export default function Editeur({
           {voixDisponible() && (
             <button
               onClick={basculerLecture}
+              disabled={étatLecture === "chargement"}
               style={{
                 fontSize: 12, color: étatLecture !== "arrêté" ? "#7F77DD" : "#999",
                 background: étatLecture !== "arrêté" ? "#F5F4FD" : "none",
-                border: "none", cursor: "pointer", borderRadius: 6,
+                border: "none", cursor: étatLecture === "chargement" ? "default" : "pointer", borderRadius: 6,
                 padding: "4px 8px", fontFamily: "inherit",
+                opacity: étatLecture === "chargement" ? 0.7 : 1,
               }}
               title="Lit la sélection en cours, ou tout le texte si rien n'est sélectionné"
             >
-              {étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
+              {étatLecture === "chargement" ? "⏳ Préparation…" : étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
               {progressionLecture ? ` (${progressionLecture})` : ""}
             </button>
           )}
