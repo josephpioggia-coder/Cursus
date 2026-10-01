@@ -48,7 +48,7 @@ import Image from "@tiptap/extension-image";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
-import { lire, arrêterLecture, basculerPause, voixDisponible } from "../lib/lectureVoix.js";
+import { lire, arrêterLecture, basculerPause, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -1024,6 +1024,15 @@ export default function Editeur({
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
+  const [erreurLecture, setErreurLecture] = useState(null);
+  const [progressionLecture, setProgressionLecture] = useState(null);
+  // Voix/vitesse "pro" (OpenAI) remplaçant la voix du navigateur, jugée
+  // "vraiment nulle" par Joseph — préférence mémorisée par appareil, pas
+  // besoin de la rechoisir à chaque session.
+  const [voixLecture, setVoixLecture] = useState(() => localStorage.getItem("cursus-voix-lecture") || "nova");
+  const [vitesseLecture, setVitesseLecture] = useState(() => Number(localStorage.getItem("cursus-vitesse-lecture")) || 1);
+  useEffect(() => { localStorage.setItem("cursus-voix-lecture", voixLecture); }, [voixLecture]);
+  useEffect(() => { localStorage.setItem("cursus-vitesse-lecture", String(vitesseLecture)); }, [vitesseLecture]);
   const [historique, setHistorique] = useState([]);
   const [chargementHistorique, setChargementHistorique] = useState(false);
   const [statutSauvegarde, setStatutSauvegarde] = useState("sauvegardé");
@@ -1322,7 +1331,16 @@ export default function Editeur({
     if (étatLecture === "arrêté") {
       const texte = obtenirTexteLecture();
       if (!texte.trim()) return;
-      lire(texte, { onDébut: () => setÉtatLecture("lecture"), onFin: () => setÉtatLecture("arrêté") });
+      setErreurLecture(null);
+      setProgressionLecture(null);
+      lire(texte, {
+        voix: voixLecture,
+        vitesse: vitesseLecture,
+        onDébut: () => setÉtatLecture("lecture"),
+        onTranche: (i, total) => setProgressionLecture(total > 1 ? `${i}/${total}` : null),
+        onFin: () => { setÉtatLecture("arrêté"); setProgressionLecture(null); },
+        onErreur: (message) => { setErreurLecture(message); setÉtatLecture("arrêté"); setProgressionLecture(null); },
+      });
     } else if (étatLecture === "lecture") {
       basculerPause();
       setÉtatLecture("pause");
@@ -1330,13 +1348,13 @@ export default function Editeur({
       basculerPause();
       setÉtatLecture("lecture");
     }
-  }, [étatLecture, obtenirTexteLecture]);
+  }, [étatLecture, obtenirTexteLecture, voixLecture, vitesseLecture]);
 
   // Changer de chapitre/scène (nœud) ou quitter l'éditeur en plein
   // lecture ne doit pas laisser la voix continuer sur un texte qui n'est
   // plus affiché.
   useEffect(() => {
-    return () => { arrêterLecture(); setÉtatLecture("arrêté"); };
+    return () => { arrêterLecture(); setÉtatLecture("arrêté"); setErreurLecture(null); setProgressionLecture(null); };
   }, [nœud?.id]);
 
   if (!nœud) return (
@@ -1409,11 +1427,32 @@ export default function Editeur({
               title="Lit la sélection en cours, ou tout le texte si rien n'est sélectionné"
             >
               {étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
+              {progressionLecture ? ` (${progressionLecture})` : ""}
             </button>
+          )}
+          {voixDisponible() && (
+            <>
+              <select
+                value={voixLecture}
+                onChange={(e) => setVoixLecture(e.target.value)}
+                title="Voix de lecture — le changement s'applique à la prochaine lecture lancée"
+                style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+              >
+                {VOIX_DISPONIBLES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+              </select>
+              <select
+                value={vitesseLecture}
+                onChange={(e) => setVitesseLecture(Number(e.target.value))}
+                title="Vitesse de lecture — le changement s'applique à la prochaine lecture lancée"
+                style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+              >
+                {VITESSES_DISPONIBLES.map((v) => <option key={v} value={v}>{v}×</option>)}
+              </select>
+            </>
           )}
           {étatLecture !== "arrêté" && (
             <button
-              onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); }}
+              onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); setProgressionLecture(null); }}
               style={{
                 fontSize: 12, color: "#999", background: "none",
                 border: "none", cursor: "pointer", borderRadius: 6,
@@ -1436,6 +1475,16 @@ export default function Editeur({
           >
             ↺ Historique ({historique.length})
           </button>
+        </div>
+      )}
+
+      {!modeFocus && erreurLecture && (
+        <div style={{
+          padding: "6px 20px", background: "#FBE9E9", color: "#A32D2D",
+          fontSize: 11.5, display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ flex: 1 }}>🔊 {erreurLecture}</span>
+          <button onClick={() => setErreurLecture(null)} style={{ background: "none", border: "none", color: "#A32D2D", cursor: "pointer", fontSize: 13, fontFamily: "inherit", padding: 0 }}>✕</button>
         </div>
       )}
 

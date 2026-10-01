@@ -1,63 +1,182 @@
 /**
- * CURSUS — Lecture à voix haute (01/10/2026)
+ * CURSUS — Lecture à voix haute "pro" (01/10/2026, réécriture)
  * ======================================================================
- * Demande de Joseph : pouvoir faire lire à voix haute le texte choisi
- * dans CursEdit, "ou peut-être partout ailleurs où on le désire" — ce
- * module expose donc des fonctions indépendantes de l'UI (pas de
- * composant bouton imposé), réutilisables depuis n'importe quelle page.
+ * Remplace la première version (window.speechSynthesis natif du
+ * navigateur) — retour direct de Joseph : "la voix choisie est vraiment
+ * nulle il faut quelque chose d'humain avec choix de voix de rapidité,
+ * ... un outil pro". Appelle maintenant l'Edge Function `lire-texte`
+ * (gpt-4o-mini-tts d'OpenAI, déjà utilisé pour la dictée vocale —
+ * aucun nouveau compte/service), qui renvoie du vrai audio (mp3) joué
+ * via un <audio> HTML plutôt que l'API de synthèse du navigateur.
  *
- * Web Speech API du navigateur (window.speechSynthesis) plutôt qu'un
- * service cloud (ElevenLabs, Google TTS...) : gratuite, aucune clé API,
- * aucun déploiement de fonction Supabase, fonctionne même hors-ligne.
- * Contrepartie assumée : la voix dépend du navigateur/OS de la
- * personne, pas de Cursus — qualité variable (Chrome/Edge ont en
- * général de meilleures voix françaises que Firefox).
+ * Écart assumé : contrairement à la V1 (gratuite, offline), chaque
+ * lecture a un coût réel (facturation OpenAI) — réservée aux comptes
+ * avec un abonnement actif (vérifié côté serveur). Pas de repli
+ * automatique et silencieux vers la voix du navigateur en cas d'échec
+ * (quota, réseau...) : Joseph voulait explicitement s'éloigner de cette
+ * voix-là, la réactiver en douce en cas d'erreur aurait été trompeur.
+ * L'appelant (ex. Editeur.jsx) reçoit un message d'erreur clair via
+ * `onErreur` et affiche ce qu'il veut.
+ *
+ * Découpage en tranches ≤ 4096 caractères (limite dure d'OpenAI pour
+ * /v1/audio/speech) côté client plutôt que côté serveur : permet
+ * d'enchaîner les tranches d'un chapitre entier, et d'arrêter/mettre en
+ * pause au milieu sans logique de session à maintenir côté serveur.
  */
 
-export function voixDisponible() {
-  return typeof window !== "undefined" && "speechSynthesis" in window;
+import { supabase } from "./supabase.js";
+
+const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/lire-texte";
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Doit rester synchronisé avec VOIX_AUTORISEES côté serveur
+// (supabase/functions/lire-texte/index.ts) — sous-ensemble des 11 voix de
+// gpt-4o-mini-tts jugé le plus adapté à de la lecture longue.
+export const VOIX_DISPONIBLES = [
+  { id: "nova", label: "Nova (féminine)" },
+  { id: "shimmer", label: "Shimmer (féminine, douce)" },
+  { id: "onyx", label: "Onyx (masculine, grave)" },
+  { id: "echo", label: "Echo (masculine)" },
+  { id: "fable", label: "Fable (narrative)" },
+  { id: "sage", label: "Sage (posée)" },
+  { id: "alloy", label: "Alloy (neutre)" },
+];
+
+export const VITESSES_DISPONIBLES = [0.75, 1, 1.25, 1.5, 2];
+
+const TAILLE_MAX_TRANCHE = 3800; // marge sous la limite dure de 4096 d'OpenAI
+
+// Découpe par paragraphes puis, si besoin, par phrases — pour que chaque
+// tranche s'arrête sur une frontière naturelle (silence audible propre)
+// plutôt qu'en plein milieu d'un mot ou d'une phrase.
+function découperTexteTTS(texte, tailleMax = TAILLE_MAX_TRANCHE) {
+  const paragraphes = texte.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const tranches = [];
+  let courant = "";
+  for (const p of paragraphes) {
+    const morceaux = p.length > tailleMax ? (p.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [p]) : [p];
+    for (const m of morceaux) {
+      const candidat = courant ? `${courant}\n${m}` : m;
+      if (candidat.length > tailleMax && courant) {
+        tranches.push(courant.trim());
+        courant = m;
+      } else {
+        courant = candidat;
+      }
+    }
+  }
+  if (courant.trim()) tranches.push(courant.trim());
+  return tranches;
 }
 
-function meilleureVoixFrançaise() {
-  const voix = window.speechSynthesis.getVoices();
-  return voix.find((v) => v.lang?.toLowerCase().startsWith("fr")) || voix[0] || null;
+let élémentAudio = null;
+function obtenirÉlémentAudio() {
+  if (!élémentAudio) {
+    élémentAudio = new Audio();
+    élémentAudio.preload = "auto";
+  }
+  return élémentAudio;
 }
 
-// `getVoices()` revient parfois vide au tout premier appel (chargement
-// asynchrone selon les navigateurs) — sans incidence bloquante ici
-// puisque `u.lang = "fr-FR"` suffit à obtenir une voix par défaut
-// correcte même si aucune voix explicite n'est trouvée.
-export function lire(texte, { onDébut, onFin, débit = 1 } = {}) {
-  if (!voixDisponible() || !texte?.trim()) return;
-  arrêterLecture();
-  const u = new SpeechSynthesisUtterance(texte);
-  const voix = meilleureVoixFrançaise();
-  if (voix) u.voice = voix;
-  u.lang = voix?.lang || "fr-FR";
-  u.rate = débit;
-  if (onDébut) u.onstart = onDébut;
-  u.onend = () => onFin?.();
-  u.onerror = () => onFin?.();
-  window.speechSynthesis.speak(u);
-}
-
-export function enPause() {
-  return voixDisponible() && window.speechSynthesis.paused;
-}
-
-export function enCours() {
-  return voixDisponible() && window.speechSynthesis.speaking;
-}
-
-export function basculerPause() {
-  if (!voixDisponible()) return;
-  if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-    window.speechSynthesis.pause();
-  } else if (window.speechSynthesis.paused) {
-    window.speechSynthesis.resume();
+let urlObjetCourante = null;
+function libérerURL() {
+  if (urlObjetCourante) {
+    URL.revokeObjectURL(urlObjetCourante);
+    urlObjetCourante = null;
   }
 }
 
+// Incrémenté à chaque lire()/arrêterLecture() : une requête ou un callback
+// `.then()` encore en vol d'une lecture précédente se reconnaît périmé en
+// comparant son `maSession` capturé à cette valeur, et ne touche plus à
+// l'<audio> partagé ni n'appelle les callbacks de la lecture abandonnée.
+let sessionId = 0;
+let fileAttente = [];
+
+async function récupérerAudioTranche(texte, voix, vitesse) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Session expirée — reconnectez-vous.");
+
+  const réponse = await fetch(EDGE_FUNCTION_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ texte, voix, vitesse }),
+  });
+
+  if (!réponse.ok) {
+    let message = `Erreur serveur (HTTP ${réponse.status}).`;
+    try {
+      const détail = await réponse.json();
+      message = détail?.message || détail?.error || message;
+    } catch { /* corps non-JSON (ne devrait pas arriver sur une erreur) */ }
+    throw new Error(message);
+  }
+  return réponse.blob();
+}
+
+/**
+ * Lit `texte` à voix haute. Options :
+ *  - voix : un id de VOIX_DISPONIBLES (défaut "nova")
+ *  - vitesse : 0.25 à 4 (défaut 1)
+ *  - onDébut() : la lecture démarre réellement (première tranche prête)
+ *  - onTranche(i, total) : avant la récupération de la tranche i/total
+ *    (permet d'afficher "Préparation 2/5…" pour un texte long)
+ *  - onFin() : toutes les tranches ont été lues jusqu'au bout
+ *  - onErreur(message) : échec (réseau, quota, abonnement...) — la
+ *    lecture s'arrête, AUCUN repli silencieux vers une autre voix
+ */
+export async function lire(texte, { voix = "nova", vitesse = 1, onDébut, onTranche, onFin, onErreur } = {}) {
+  arrêterLecture();
+  const tranches = découperTexteTTS(texte);
+  if (!tranches.length) return;
+
+  const maSession = ++sessionId;
+  fileAttente = tranches;
+  const audio = obtenirÉlémentAudio();
+
+  const jouerTranche = async (i) => {
+    if (maSession !== sessionId) return;
+    if (i >= fileAttente.length) { onFin?.(); return; }
+    try {
+      onTranche?.(i + 1, fileAttente.length);
+      const blob = await récupérerAudioTranche(fileAttente[i], voix, vitesse);
+      if (maSession !== sessionId) return;
+      libérerURL();
+      urlObjetCourante = URL.createObjectURL(blob);
+      audio.src = urlObjetCourante;
+      audio.onended = () => jouerTranche(i + 1);
+      await audio.play();
+      if (i === 0) onDébut?.();
+    } catch (err) {
+      if (maSession === sessionId) onErreur?.(err.message);
+    }
+  };
+
+  jouerTranche(0);
+}
+
+export function basculerPause() {
+  const audio = obtenirÉlémentAudio();
+  if (!audio.src) return;
+  if (audio.paused) audio.play(); else audio.pause();
+}
+
 export function arrêterLecture() {
-  if (voixDisponible()) window.speechSynthesis.cancel();
+  sessionId++; // périme toute tranche en cours de récupération/lecture
+  fileAttente = [];
+  if (élémentAudio) {
+    élémentAudio.pause();
+    élémentAudio.onended = null;
+    élémentAudio.removeAttribute("src");
+  }
+  libérerURL();
+}
+
+export function voixDisponible() {
+  return true; // lecture côté serveur, ne dépend plus du navigateur
 }

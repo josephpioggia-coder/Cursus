@@ -347,14 +347,35 @@ couche d'infos en dessous qui n'existe pas chez l'autre »). Corrections :
   (normal : 54 px), boutons du bas = icône + libellé (`getByRole('button', { name: /Indice/ })`, pas `getByText`).
   Vérifié à 320/360/390/412 px, événements tactiles réels (CDP), sombre forcé.
 
-## Lecture à voix haute (01/10/2026)
+## Lecture à voix haute (01/10/2026, réécrite le jour même)
 
-`src/lib/lectureVoix.js` — fonctions indépendantes de l'UI (`lire`,
-`basculerPause`, `arrêterLecture`, `voixDisponible`) au-dessus du
-`window.speechSynthesis` natif du navigateur (gratuit, sans clé API,
-sans déploiement de fonction Supabase). Intégré pour l'instant dans
-CursEdit (`Editeur.jsx`, bouton "🔊 Lire à voix haute" dans l'en-tête :
-lit la sélection en cours, ou tout le texte si rien n'est sélectionné).
-Joseph a dit vouloir ce bouton "peut-être ailleurs" aussi — réutiliser
-ces mêmes fonctions plutôt qu'en réécrire avant d'ajouter la lecture à
-voix haute à une autre page (CursAudit, CursDecision...).
+V1 au-dessus de `window.speechSynthesis` (navigateur) — retour direct de
+Joseph : "la voix choisie est vraiment nulle il faut quelque chose
+d'humain avec choix de voix de rapidité, ... un outil pro". Remplacée
+par une vraie synthèse vocale serveur :
+
+- `supabase/functions/lire-texte/index.ts` — appelle `gpt-4o-mini-tts`
+  d'OpenAI (voix nettement plus naturelles). Réutilise `OPENAI_API_KEY`,
+  déjà configurée pour `transcrire-audio` (dictée vocale) — AUCUN
+  nouveau compte/secret. Réservé aux comptes avec un abonnement actif
+  (même vérification que `claude-prox`) : chaque appel a un coût réel.
+  Limite dure d'OpenAI : 4096 caractères par appel — refusée avec un
+  message clair, pas tronquée en silence.
+- `src/lib/lectureVoix.js` — découpe le texte en tranches ≤ 3800
+  caractères (marge sous la limite serveur) sur des frontières de
+  phrase/paragraphe, les récupère et les enchaîne via un seul `<audio>`
+  HTML réutilisé (pause/reprise natives). `VOIX_DISPONIBLES` (7 voix)
+  et `VITESSES_DISPONIBLES` (0.75× à 2×) exportées pour l'UI — à garder
+  synchronisées avec `VOIX_AUTORISEES` côté serveur si la liste change.
+  PAS de repli automatique vers la voix du navigateur en cas d'échec
+  (quota, réseau...) : Joseph voulait explicitement s'en éloigner, un
+  retour silencieux à cette voix-là aurait été trompeur — `onErreur`
+  remonte un message clair à la place.
+- Intégré pour l'instant dans CursEdit (`Editeur.jsx` : bouton + choix
+  de voix/vitesse mémorisés par appareil dans l'en-tête de l'éditeur).
+  Joseph a dit vouloir ce bouton "peut-être ailleurs" aussi — réutiliser
+  `lectureVoix.js` plutôt qu'en réécrire avant de l'ajouter à CursAudit
+  ou CursDecision.
+- PAS de suivi de quota séparé par caractère consommé (seulement la
+  vérification "abonnement actif") — à ajouter si le volume le
+  justifie ; surveillable en attendant via platform.openai.com/usage.
