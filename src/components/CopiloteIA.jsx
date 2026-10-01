@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
 import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
+import { journaliserErreur } from "../lib/journalErreurs.js";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
 // la seule limite est ce que l'auteur choisit lui-même — la sélection
@@ -208,6 +209,22 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null,
   // final — content[0] n'est donc plus fiable pour l'extraire. On concatène
   // tous les blocs de type "text", dans l'ordre.
   const texte = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
+  // CORRECTIF 01/10/2026 — signalé en usage réel : un passage de 7885
+  // caractères (proche de la limite de 8000, mais en dessous) provoquait
+  // le message générique "le co-pilote n'a pas pu traiter ce passage",
+  // sans aucune piste sur la cause réelle. L'appel avait pourtant réussi
+  // (pas de data.error, réponse 200) : `texte` ressortait simplement
+  // vide, faute de bloc "text" dans data.content — parserJSON("") tombe
+  // alors sur son propre repli générique, indiscernable d'un vrai échec
+  // de parsing JSON. Journalisé ici (table journal_erreurs, consultable
+  // par Joseph) avec stop_reason et les types de blocs reçus, pour
+  // pouvoir diagnostiquer la PROCHAINE occurrence au lieu de deviner.
+  if (!texte) {
+    journaliserErreur(
+      "CopiloteIA:appelClaude",
+      `Réponse sans bloc texte exploitable — stop_reason=${data.stop_reason ?? "?"}, blocs=[${(data.content || []).map((b) => b.type).join(", ") || "aucun"}]`,
+    );
+  }
   if (!avecDétails) return texte;
   return { texte, tronqué: data.stop_reason === "max_tokens" };
 }

@@ -123,6 +123,32 @@ Deno.serve(async (req) => {
     });
     const data = await response.json();
 
+    // CORRECTIF 01/10/2026 — une erreur d'Anthropic (surcharge, requête
+    // invalide, limite de débit...) était renvoyée telle quelle avec un
+    // code 200 : `response.ok` de CET appel-ci (vers Anthropic) n'était
+    // jamais vérifié avant de relayer `data` au client. Le client
+    // (CopiloteIA.jsx → appelClaude) ne voit alors jamais sa branche
+    // `!response.ok` déjà prévue pour ce cas — juste un `data.error`
+    // brut, affiché tel quel (JSON.stringify) au lieu d'un message
+    // compréhensible. Trouvé en diagnostiquant un "le co-pilote n'a pas
+    // pu traiter ce passage" signalé en usage réel ; pas confirmé comme
+    // LA cause de cet incident précis (qui ressortait plutôt sans
+    // data.error du tout, voir le correctif côté client), mais un bug
+    // réel indépendamment de cette hypothèse.
+    if (!response.ok) {
+      console.error("[claude-prox] erreur Anthropic", response.status, JSON.stringify(data));
+      const type = data?.error?.type;
+      const messagesConnus: Record<string, string> = {
+        overloaded_error: "Le service Claude est temporairement surchargé. Réessayez dans quelques instants.",
+        rate_limit_error: "Trop de requêtes en peu de temps. Réessayez dans quelques instants.",
+        invalid_request_error: "La requête envoyée à Claude était invalide (texte ou image mal formés).",
+      };
+      return json(
+        { error: type || "erreur_anthropic", message: messagesConnus[type] || data?.error?.message || `Erreur Claude (HTTP ${response.status}).` },
+        response.status,
+      );
+    }
+
     // 6. ENREGISTREMENT des tokens réels
     // CORRECTIF 30/08/2026 (prompt caching) : quand le prompt système
     // utilise un breakpoint cache_control (voir systemAvecLangue côté
