@@ -38,6 +38,7 @@ import Bibliotheque from "./components/Bibliotheque.jsx";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "./components/PagesLegales.jsx";
 import ModeEmploi from "./components/ModeEmploi.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
+import SalleDesJeux from "./components/SalleDesJeux.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
@@ -2188,7 +2189,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: estMobile ? "1fr" : "220px 1fr",
+      // CORRECTIF MOBILE 30/09/2026 : "1fr" = minmax(auto, 1fr) — la colonne s'élargissait à la
+      // largeur MINIMALE de son contenu (la barre du haut, ~712 px), alors que le conteneur (et son
+      // fond) restait à la largeur de l'écran : contenu débordant sur fond noir, page dézoomée.
+      // minmax(0, 1fr) fige la colonne à la largeur disponible.
+      gridTemplateColumns: estMobile ? "minmax(0, 1fr)" : "220px minmax(0, 1fr)",
       gridTemplateRows: "48px minmax(0, 1fr)",
       // CORRECTIF TABLETTE 28/07/2026 : 100dvh (dynamic viewport height) au
       // lieu de 100vh. Sur les navigateurs mobiles/tablettes, 100vh est
@@ -2236,6 +2241,10 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           style={{ height: 30, width: 30, borderRadius: 6, flexShrink: 0 }}
         />
         <div style={{ flex: 1 }} />
+        {/* Sur mobile (30/09/2026) : ces éléments ne tiennent pas sur la largeur d'un téléphone ;
+            ils sont repris dans le tiroir (voir « Compte et aide » plus bas). */}
+        {!estMobile && (
+          <>
         {chargement ? (
           <span style={{ fontSize: 12, color: "var(--texte-tertiaire)" }}>{t("chargement")}</span>
         ) : (
@@ -2253,6 +2262,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           Mode d'emploi
         </button>
+          </>
+        )}
         <button onClick={onChangerEspace}
           title="Changer d'espace (CursEdit / CursAudit)"
           style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
@@ -2263,6 +2274,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           />
           {espaceActif === "cursaudit" ? "CursAudit" : "CursEdit"} ⇄
         </button>
+        {!estMobile && (
+          <>
         <button onClick={() => setVue("mentions")}
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           Légal
@@ -2271,6 +2284,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           style={{ fontSize: 11, color: "var(--texte-tertiaire)", background: "none", border: "0.5px solid var(--border)", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit" }}>
           {t("deconnexion")}
         </button>
+          </>
+        )}
       </div>
 
       {/* ── Fond assombri derrière le tiroir mobile — clic pour refermer ── */}
@@ -2308,6 +2323,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             { id: "editeur",      label: t("navigation.editeur"),        icone: "✍️" },
             { id: "bibliotheque", label: t("navigation.bibliotheque"),   icone: "📚" },
             { id: "carnet",       label: t("navigation.carnetIdees"),    icone: "💡" },
+            // Solveur Scrabble — 29/09/2026, demande de Joseph (jouer avec les
+            // lettres et les mots). Libellé en dur, comme "Mes audits".
+            { id: "scrabble",     label: "Jeux de mots",                  icone: "🔤" },
             // Précision "(CursEdit)" ajoutée le 22/08/2026 : cet onglet reste
             // visible même dans l'espace CursAudit (la navigation n'est pas
             // encore séparée par espace), et affiche exclusivement les
@@ -2440,10 +2458,34 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             </div>
           ))}
         </div>
+
+        {/* Compte et aide — mobile seulement (30/09/2026) : repris de la barre du haut, trop large
+            pour un téléphone. Mêmes actions que sur ordinateur. */}
+        {estMobile && (
+          <div style={{ padding: "8px 12px 16px", borderTop: "0.5px solid var(--border)" }}>
+            <div style={sectionLabelStyle}>Compte et aide</div>
+            <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", padding: "2px 8px 6px", wordBreak: "break-all" }}>
+              {user.email}
+              {!chargement && <div>{t("mots", { count: totalMots })} · {t("projets", { count: projets.length })}</div>}
+            </div>
+            {[
+              { label: t("aide.bouton"), icone: "❓", onClick: () => setAideOuverte(true) },
+              { label: "Mode d'emploi", icone: "📖", onClick: () => setVue("mode-emploi") },
+              { label: "Légal", icone: "⚖️", onClick: () => setVue("mentions") },
+              { label: t("deconnexion"), icone: "⏻", onClick: déconnecter },
+            ].map((item) => (
+              <div key={item.label} onClick={() => { setMenuMobileOuvert(false); item.onClick(); }}
+                style={{ ...navItemStyle(false), fontSize: 12, cursor: "pointer" }}>
+                <span>{item.icone}</span>
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Zone principale ── */}
-      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0 }}>
 
         {/* Vue : tableau de bord */}
         {vue === "tableau" && (
@@ -2457,6 +2499,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {vue === "carnet" && (
           <CarnetIdees projets={projets} />
         )}
+
+        {/* Vue : solveur Scrabble (29/09/2026) */}
+        {vue === "scrabble" && <SalleDesJeux />}
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (

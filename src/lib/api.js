@@ -1235,3 +1235,33 @@ export const misEnPageAPI = {
   },
 };
 
+
+// ─── PARTIE DU JEU DE MOTS (30/09/2026) ─────────────────────────────────
+// Voir 2026-09-30-parties-jeu-de-mots.sql. Une partie en cours par compte.
+// `indisponible: true` = la table n'existe pas encore (migration non
+// exécutée) ou le réseau/la session font défaut : l'appelant retombe sur la
+// sauvegarde locale (JeuDeMots.jsx), sans erreur bloquante.
+const tableAbsente = (error) =>
+  !!error && (["42P01", "PGRST205", "PGRST204"].includes(error.code) || /does not exist|schema cache|Could not find the table/i.test(error.message || ""));
+
+export const partiesJeuMotsAPI = {
+  async charger() {
+    const uid = await userId();
+    if (!uid) return { etat: null, indisponible: true };
+    const { data, error } = await supabase.from("parties_jeu_de_mots").select("etat").eq("user_id", uid).maybeSingle();
+    if (error) return { etat: null, indisponible: true, tableAbsente: tableAbsente(error), error };
+    return { etat: data?.etat ?? null, indisponible: false };
+  },
+  async sauvegarder(etat) {
+    const uid = await userId();
+    if (!uid) return { indisponible: true };
+    const { error } = await supabase.from("parties_jeu_de_mots").upsert([{ user_id: uid, etat }], { onConflict: "user_id" });
+    return error ? { indisponible: true, tableAbsente: tableAbsente(error), error } : { indisponible: false };
+  },
+  async effacer() {
+    const uid = await userId();
+    if (!uid) return { indisponible: true };
+    const { error } = await supabase.from("parties_jeu_de_mots").delete().eq("user_id", uid);
+    return error ? { indisponible: true, tableAbsente: tableAbsente(error), error } : { indisponible: false };
+  },
+};
