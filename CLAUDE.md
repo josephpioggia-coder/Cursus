@@ -395,3 +395,30 @@ par une vraie synthèse vocale serveur :
 - PAS de suivi de quota séparé par caractère consommé (seulement la
   vérification "abonnement actif") — à ajouter si le volume le
   justifie ; surveillable en attendant via platform.openai.com/usage.
+
+## Journal des erreurs — enfin consultable (01/10/2026)
+
+`journal_erreurs` (table créée le 15/07/2026, écrite depuis plusieurs
+endroits via `journaliserErreur()` — CopiloteIA, Editeur, ImportDocx...)
+n'avait jamais eu d'écran pour la LIRE : gap trouvé en diagnostiquant un
+"le co-pilote n'a pas pu traiter ce passage" récurrent ("toujours cette
+faiblesse") resté sans piste faute de pouvoir voir ce qui avait
+réellement été journalisé. Corrigé :
+- `supabase/functions/admin-journal-erreurs/index.ts` — liste les 300
+  lignes les plus récentes, en service_role (même principe que
+  `admin-supervision-cursaudit` : la RLS de `journal_erreurs` n'autorise
+  a priori chacun qu'à lire ses propres lignes, pas Joseph à lire celles
+  des autres comptes). Réservé à `joseph.pioggia@gmail.com`.
+- `src/components/JournalErreurs.jsx` — nouvelle entrée de menu
+  "Journal des erreurs" (visible seulement pour Joseph, à côté
+  d'Administration/Supervision dans `App.jsx`), liste filtrable par
+  contexte/message/e-mail.
+- Au passage : le chemin d'erreur spécifique à l'onglet Références de
+  CopiloteIA (réparation du JSON après un `web_search` — voir plus haut
+  "Le co-pilote n'a pas pu traiter ce passage") jetait son propre
+  `__ERREUR_GENERIQUE__` sans jamais rien journaliser, contrairement au
+  cas générique (déjà corrigé) dans `appelClaude`. Journalisé aussi
+  maintenant, avec le texte brut reçu — c'est cette tranche-là qui
+  manquait pour comprendre pourquoi l'onglet Références échoue plus
+  souvent que les autres (combine recherche web + JSON final dans le
+  même budget de tokens, plus susceptible d'être tronqué).

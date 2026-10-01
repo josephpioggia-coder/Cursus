@@ -48,6 +48,7 @@ import CursAuditListe from "./components/CursAuditListe.jsx";
 import CursAuditDetail from "./components/CursAuditDetail.jsx";
 import Administration from "./components/Administration.jsx";
 import Supervision from "./components/Supervision.jsx";
+import JournalErreurs from "./components/JournalErreurs.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -2348,6 +2349,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               ? [
                   { id: "administration", label: "Administration", icone: "⚙️" },
                   { id: "supervision", label: "Supervision", icone: "🛡️" },
+                  { id: "journal-erreurs", label: "Journal des erreurs", icone: "🪵" },
                 ]
               : []),
           ].map((item) => (
@@ -2578,6 +2580,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           <div style={{ flex: 1, overflowY: "auto" }}>
             <Supervision />
           </div>
+        )}
+
+        {/* Vue : Journal des erreurs — 01/10/2026 */}
+        {vue === "journal-erreurs" && user.email === "joseph.pioggia@gmail.com" && (
+          <JournalErreurs />
         )}
 
         {/* Vue : liste des projets */}

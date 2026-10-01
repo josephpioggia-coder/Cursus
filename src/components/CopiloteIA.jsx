@@ -1808,6 +1808,17 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             const partial = JSON.parse(`{${match[0]}}`);
             màjDonnées("références", partial.références || []);
           } catch {
+            // CORRECTIF 01/10/2026 — signalé en usage réel, "toujours cette
+            // faiblesse" : ce chemin-ci (réparation du JSON de l'onglet
+            // Références après échec de JSON.parse) jette le même message
+            // générique que le cas "réponse sans texte" déjà journalisé
+            // dans appelClaude, mais SANS jamais rien enregistrer — un
+            // JSON non vide mais irréparable (tronqué par max_tokens au
+            // milieu d'un résultat de recherche web, refus du modèle,
+            // etc.) ne laissait donc aucune trace exploitable. Journalisé
+            // ici aussi, avec le texte brut reçu (tronqué par
+            // journaliserErreur à 2000 caractères).
+            journaliserErreur("CopiloteIA:analyser:références", `JSON irréparable — reçu : ${résultat}`, projetId);
             throw new Error("__ERREUR_GENERIQUE__");
           }
         }
