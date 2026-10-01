@@ -653,12 +653,27 @@ function FicheActionAffichage({ titre, fiche, masquerResumeCourt = false }) {
   return (
     <div style={{ marginTop: 12, background: "#fff", border: "1px solid #1D9E7580", borderRadius: 8, padding: "12px 14px", display: "grid", gap: 8 }}>
       <div style={{ fontWeight: 600, color: "#1D9E75", fontSize: 12.5 }}>{titre}</div>
+      {/* Réponse à la question centrale (01/10/2026) — "la boussole de
+          l'audit" (voir CursAuditQuestionnaire.jsx) n'avait jusqu'ici aucun
+          canal de sortie réel : mise en avant ici en premier, avant même le
+          diagnostic, puisque c'est littéralement ce que l'auteur·ice a
+          demandé en priorité. Absente (chaîne vide) si aucune question
+          centrale n'a été posée pour cet audit, ou si rien de pertinent n'a
+          été trouvé. Masquée ici (masquerResumeCourt) quand la
+          FicheExecutive au-dessus l'affiche déjà — même règle que
+          diagnostic/risque_principal/action_immediate. */}
+      {!masquerResumeCourt && fiche.reponse_question_centrale && (
+        <div style={{ background: "#F5F4FD", border: "1px solid #7F77DD40", borderRadius: 6, padding: "8px 10px" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#7F77DD", marginBottom: 3 }}>🧭 Réponse à votre question centrale</div>
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.reponse_question_centrale}</div>
+        </div>
+      )}
       {!masquerResumeCourt && fiche.diagnostic && (
         <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>
       )}
       {masquerResumeCourt && (
         <div style={{ fontSize: 11, color: "var(--texte-tertiaire)", fontStyle: "italic" }}>
-          Diagnostic, risque principal et première action déjà résumés dans la fiche exécutive ci-dessus — détail complet ci-dessous.
+          Diagnostic, réponse à la question centrale, risque principal et première action déjà résumés dans la fiche exécutive ci-dessus — détail complet ci-dessous.
         </div>
       )}
       {fiche.forces?.length > 0 && (
@@ -754,6 +769,12 @@ function FicheExecutive({ fiche }) {
         {instantané && <div style={{ fontSize: 10.5, color: "var(--texte-tertiaire)", marginTop: 1 }}>{instantané}</div>}
       </div>
       {fiche.diagnostic && <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.diagnostic}</div>}
+      {fiche.reponse_question_centrale && (
+        <div style={{ background: "#fff", border: "1px solid #7F77DD40", borderRadius: 6, padding: "8px 10px" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#7F77DD", marginBottom: 3 }}>🧭 Réponse à votre question centrale</div>
+          <div style={{ fontSize: 13, lineHeight: 1.5 }}>{fiche.reponse_question_centrale}</div>
+        </div>
+      )}
       {troisPremièresPriorités.length > 0 && (
         <div>
           <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--texte-secondaire)", marginBottom: 3 }}>Priorités</div>

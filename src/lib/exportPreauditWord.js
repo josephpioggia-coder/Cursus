@@ -248,6 +248,16 @@ export async function exporterPreauditWord(audit, résultat) {
     contenu.push(paragraphe(résultat.resume_executif));
   }
 
+  // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale dans
+  // SCHEMA_PREAUDIT_APPROFONDI (supabase/functions/preaudit-approfondi-cursaudit) :
+  // la question centrale posée par l'auteur·ice n'avait aucun canal de
+  // sortie, nulle part, y compris dans ce document. En tête, juste après
+  // le résumé exécutif.
+  if (résultat.reponse_question_centrale) {
+    contenu.push(titre("Réponse à votre question centrale", HeadingLevel.HEADING_1));
+    contenu.push(paragraphe(résultat.reponse_question_centrale));
+  }
+
   if (résultat.fiche_synthese) {
     contenu.push(titre("Fiche de synthèse", HeadingLevel.HEADING_1));
     const f = résultat.fiche_synthese;

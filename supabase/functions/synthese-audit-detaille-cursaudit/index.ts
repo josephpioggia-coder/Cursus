@@ -145,8 +145,15 @@ const SCHEMA_FICHE_ACTION = {
     risque_principal: { type: "string", default: "" },
     action_immediate: { type: "string", default: "" },
     a_eviter: { type: "array", items: { type: "string" }, minItems: 1, default: [] },
+    // CORRECTIF 01/10/2026 — bug réel signalé en usage : la "question
+    // centrale" du contrat d'intention n'avait aucun canal de sortie dans
+    // ce document, alors qu'elle est présentée à l'auteur·ice comme "la
+    // boussole de l'audit". Chaîne vide par défaut (pas de question posée,
+    // ou rien de pertinent trouvé) plutôt qu'un champ absent — même schéma
+    // partagé avec fiche-action-preaudit-cursaudit, à garder synchronisé.
+    reponse_question_centrale: { type: "string", default: "" },
   },
-  required: ["diagnostic", "forces", "points_a_traiter", "priorites", "risque_principal", "action_immediate", "a_eviter"],
+  required: ["diagnostic", "forces", "points_a_traiter", "priorites", "risque_principal", "action_immediate", "a_eviter", "reponse_question_centrale"],
   additionalProperties: false,
 };
 const validerFicheAction = ajv.compile(SCHEMA_FICHE_ACTION);
@@ -158,7 +165,7 @@ function choisirPlafondMots(nombreMots: number): number {
   return Math.min(nombreMots || PLAFOND_COMMERCIAL_MOTS, PLAFOND_COMMERCIAL_MOTS);
 }
 
-interface DiagnosticCompact { ordre: number; categories: string[]; commentaire: string }
+interface DiagnosticCompact { ordre: number; categories: string[]; commentaire: string; reponse_question_centrale?: string }
 
 function échantillonner(diagnostics: DiagnosticCompact[]): DiagnosticCompact[] {
   if (diagnostics.length <= SEUIL_ECHANTILLON) return diagnostics;
@@ -177,7 +184,14 @@ function échantillonner(diagnostics: DiagnosticCompact[]): DiagnosticCompact[] 
 // (identique à chaque appel, donc mis en cache), les nombres regroupés à
 // la fin dans un second bloc, jamais mis en cache. Rien n'est supprimé —
 // juste déplacé en fin de prompt plutôt qu'inséré au milieu.
-function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyées: number, nombreMots: number, plafondMots: number): { statique: string; dynamique: string } {
+function construireSystemPrompt(
+  nombreUnitésTotal: number,
+  nombreUnitésEnvoyées: number,
+  nombreMots: number,
+  plafondMots: number,
+  questionCentrale: string | null,
+  réponsesUnitaires: { ordre: number; reponse: string }[],
+): { statique: string; dynamique: string } {
   const statique =
     "Tu reçois les diagnostics déjà produits, unité par unité, par l'audit détaillé d'un livre entier. Pour " +
     "chaque unité : ses catégories (recevable/à nuancer/à sourcer/à reformuler/à vérifier) et le commentaire " +
@@ -213,15 +227,29 @@ function construireSystemPrompt(nombreUnitésTotal: number, nombreUnitésEnvoyé
     "livre entier.\n" +
     "6. action_immediate : une seule action, tranchée, immédiatement applicable, expliquée en plusieurs " +
     "phrases — la toute première chose à faire.\n" +
-    "7. a_eviter : 3 à 6 fausses bonnes idées à éviter, chacune développée en une à deux phrases.";
+    "7. a_eviter : 3 à 6 fausses bonnes idées à éviter, chacune développée en une à deux phrases.\n" +
+    "8. reponse_question_centrale : si une question centrale et des réponses unité par unité te sont données " +
+    "plus bas, synthétise-les en UNE réponse claire, développée (plusieurs phrases, exemples concrets tirés " +
+    "des réponses reçues), qui répond VRAIMENT à la question posée — pas une liste recopiée des réponses " +
+    "unitaires. Si aucune question centrale n'a été posée, ou si aucune des réponses unitaires reçues n'était " +
+    "pertinente, laisse ce champ vide (\"\").";
 
   const noteÉchantillon = nombreUnitésEnvoyées < nombreUnitésTotal
     ? `Attention : tu reçois un échantillon de ${nombreUnitésEnvoyées} unités sur ${nombreUnitésTotal} au total (livre trop long pour tout envoyer en un seul appel), régulièrement réparti dans l'ordre du livre — traite-le comme représentatif, pas exhaustif.\n\n`
     : "";
+  // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale dans
+  // le schéma de sortie : la question et les réponses collectées unité par
+  // unité sont spécifiques à CET audit, donc dans la partie dynamique
+  // (jamais mise en cache), contrairement aux règles de production
+  // ci-dessus qui restent identiques d'un appel à l'autre.
+  const noteQuestionCentrale = questionCentrale && réponsesUnitaires.length > 0
+    ? `\n\nQuestion centrale posée par l'auteur·ice pour cet audit : "${questionCentrale}"\nRéponses collectées unité par unité (ordre dans le livre, réponse) :\n${réponsesUnitaires.map((r) => `- (unité ${r.ordre}) ${r.reponse}`).join("\n")}`
+    : "";
   const dynamique =
     noteÉchantillon +
     `Longueur cible : ce document doit se rapprocher autant que possible de ${plafondMots} mots au total ` +
-    `sans le dépasser (texte source : ${nombreMots} mots, ${nombreUnitésTotal} unités analysées).`;
+    `sans le dépasser (texte source : ${nombreMots} mots, ${nombreUnitésTotal} unités analysées).` +
+    noteQuestionCentrale;
 
   return { statique, dynamique };
 }
@@ -245,7 +273,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, statut, apercu_resultat")
+      .select("id, user_id, statut, apercu_resultat, question_libre")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -274,6 +302,11 @@ Deno.serve(async (req) => {
           ordre: s.ordre as number,
           categories: diagnosticPriorite?.valeur ?? [],
           commentaire: diagnosticPriorite?.commentaire ?? "",
+          // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale
+          // dans SCHEMA_FICHE_ACTION : seul champ qui donne enfin un chemin
+          // réel entre la question centrale posée par l'auteur·ice et ce
+          // document de synthèse.
+          reponse_question_centrale: (analyse.analyse?.reponse_question_centrale as string | undefined) ?? "",
         });
       }
       if (lot.length < TAILLE_PAGE) break;
@@ -283,9 +316,12 @@ Deno.serve(async (req) => {
     const diagnosticsEnvoyés = échantillonner(diagnostics);
     const nombreMots = (audit.apercu_resultat as { nombre_mots?: number } | null)?.nombre_mots ?? 0;
     const plafondMots = choisirPlafondMots(nombreMots);
+    const réponsesUnitaires = diagnosticsEnvoyés
+      .filter((d) => d.reponse_question_centrale && d.reponse_question_centrale.trim())
+      .map((d) => ({ ordre: d.ordre, reponse: d.reponse_question_centrale as string }));
 
     const { statique: systemStatique, dynamique: systemDynamique } =
-      construireSystemPrompt(diagnostics.length, diagnosticsEnvoyés.length, nombreMots, plafondMots);
+      construireSystemPrompt(diagnostics.length, diagnosticsEnvoyés.length, nombreMots, plafondMots, audit.question_libre, réponsesUnitaires);
     const réponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },

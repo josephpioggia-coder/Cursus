@@ -96,6 +96,16 @@ function sectionUnité(section) {
     bloc.push(ligneÉtiquette("Proposition", analyse.proposition));
   }
 
+  // CORRECTIF 01/10/2026 — chaîne simple comme `proposition`, même
+  // traitement à part (voir reponse_question_centrale dans
+  // orchestrer-audit-cursaudit/analyser-unite-cursaudit). Utile ICI en
+  // particulier : permet de retrouver quelle unité précise a contribué à
+  // la réponse synthétisée dans le rapport consolidé, comme Joseph l'avait
+  // fait à la main (relevé de §§ un par un) pour "À cœur retrouvé".
+  if (analyse.reponse_question_centrale) {
+    bloc.push(ligneÉtiquette("Réponse à la question centrale", analyse.reponse_question_centrale));
+  }
+
   return bloc;
 }
 

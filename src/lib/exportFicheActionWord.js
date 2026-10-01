@@ -82,6 +82,18 @@ export async function exporterFicheActionWord(audit, fiche, { titreDocument, pre
 
   const contenu = [];
 
+  // CORRECTIF 01/10/2026 — bug réel signalé en usage : la "question
+  // centrale" du contrat d'intention (ex. "quel particularité de la
+  // personnalité de l'auteure ressort à la lecture du livre") n'apparaissait
+  // nulle part dans les documents exportés, alors qu'elle est présentée à
+  // l'auteur·ice comme "la boussole de l'audit" — voir reponse_question_centrale
+  // dans SCHEMA_FICHE_ACTION. En tête de document, avant même le diagnostic,
+  // puisque c'est littéralement ce qui a été demandé en priorité.
+  if (fiche.reponse_question_centrale) {
+    contenu.push(titre("Réponse à votre question centrale"));
+    contenu.push(paragraphe(fiche.reponse_question_centrale, { bold: true }));
+  }
+
   if (fiche.diagnostic) {
     contenu.push(titre("Diagnostic"));
     contenu.push(paragraphe(fiche.diagnostic));

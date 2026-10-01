@@ -589,11 +589,19 @@ const SCHEMA_PREAUDIT_APPROFONDI = {
       required: ["contrat_annonce", "contrat_reel", "ecart_principal", "risque_lecteur", "recommandation", "priorite"],
       additionalProperties: false,
     },
+    // CORRECTIF 01/10/2026 — bug réel signalé en usage : la "question
+    // centrale" du contrat d'intention était transmise en contexte
+    // (construireContexteQualification) mais n'avait aucun champ de sortie
+    // dédié ici — ni dans preaudit_resultat, ni (en aval) dans la fiche
+    // d'action produite par fiche-action-preaudit-cursaudit. Chaîne vide
+    // par défaut (pas de question posée).
+    reponse_question_centrale: { type: "string", default: "" },
   },
   required: [
     "resume_executif", "nature_reelle", "promesse_affichee", "ecart_promesse_execution", "voies_editoriales",
     "recommandation_principale", "plan_intervention", "exemples_concrets",
     "a_preserver", "a_couper_ou_alleger", "prochaine_etape", "cartographie_contexte", "fiche_synthese",
+    "reponse_question_centrale",
   ],
   additionalProperties: false,
 };
@@ -638,8 +646,14 @@ const SCHEMA_LECTURE_CHAPITRE = {
     point_faible: { type: "string", default: "" },
     a_verifier: { type: "string", default: "" },
     a_approfondir_audit_final: { type: "string", default: "" },
+    // CORRECTIF 01/10/2026 — bug réel signalé en usage : la "question
+    // centrale" du contrat d'intention n'était même pas transmise à cette
+    // lecture chapitre par chapitre (ni le texte de la question dans le
+    // message, ni de champ pour y répondre) — structurellement impossible
+    // à retrouver dans le pré-audit, quelle que soit la question posée.
+    reponse_question_centrale: { type: "string", default: "" },
   },
-  required: ["fonction", "point_fort", "point_faible", "a_verifier", "a_approfondir_audit_final"],
+  required: ["fonction", "point_fort", "point_faible", "a_verifier", "a_approfondir_audit_final", "reponse_question_centrale"],
   additionalProperties: false,
 };
 const validerLectureChapitre = ajv.compile(SCHEMA_LECTURE_CHAPITRE);
@@ -859,7 +873,7 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     `Tension déjà repérée par l'aperçu : ${apercu?.tension_principale ?? "non disponible"}\n` +
     `Risques déjà repérés par l'aperçu : ${risques.length > 0 ? risques.join(" | ") : "aucun"}\n` +
     `Priorités déjà identifiées par l'aperçu : ${priorites.length > 0 ? priorites.join(" | ") : "aucune — identifie toi-même les priorités à partir du texte"}\n\n` +
-    "Produis les 13 éléments suivants :\n" +
+    "Produis les 14 éléments suivants :\n" +
     "- resume_executif : 6 à 8 lignes MAXIMUM, en langage simple pour l'auteur·ice — ce livre fonctionne-t-il, comment, et quelle voie tu recommandes. Doit pouvoir se lire seul, avant tout le reste (ex. \"Votre livre fonctionne. Mais il fonctionne mieux comme fable méditative que comme roman. La voie recommandée est l'hybride équilibré.\").\n" +
     "- nature_reelle : ce que le manuscrit est réellement en train de faire (ex. \"fable méditative dialoguée plutôt que roman initiatique pleinement incarné\").\n" +
     "- promesse_affichee : ce que le livre promet au lecteur (préface, quatrième de couverture, ouverture...).\n" +
@@ -882,7 +896,13 @@ function construireSystemPrompt(contexteQualification: string, apercu: Record<st
     "  - densite : en une ou deux phrases, l'équilibre entre dialogue/description/explication/sensoriel sur l'ensemble du livre.\n" +
     "  - valeur_ajoutee_audit_complet : ce que l'audit détaillé permettrait concrètement de vérifier et développer à partir de CETTE cartographie, à l'échelle des scènes et sur l'ensemble du livre — honnête (règle 5), pas un argumentaire commercial forcé, mais une description réelle de ce que l'ampleur du livre entier permet de creuser que cette cartographie compacte ne peut pas faire.\n" +
     "  Adapte ces catégories à la nature du texte : pour un roman, personnages/lieux prennent tout leur sens ; pour un texte non narratif (essai, manuel), remplace-les par ce qui est pertinent (ex. concepts-clés à la place de personnages).\n" +
-    "- fiche_synthese : une fiche COURTE en complément de tout ce qui précède, chaque champ en quelques mots seulement (PAS des phrases complètes, PAS de répétition mot pour mot du texte déjà écrit ailleurs) — contrat_annonce (ex. \"roman initiatique\"), contrat_reel (ex. \"conte philosophique dialogué\"), ecart_principal (ex. \"insuffisance de conflit narratif\"), risque_lecteur (ce que le lecteur risque de ressentir, ex. \"attente romanesque déçue\"), recommandation (ex. \"réécriture hybride moyenne\"), priorite (l'action la plus urgente, ex. \"renforcer Clara et opacifier Scalpa\")."
+    "- fiche_synthese : une fiche COURTE en complément de tout ce qui précède, chaque champ en quelques mots seulement (PAS des phrases complètes, PAS de répétition mot pour mot du texte déjà écrit ailleurs) — contrat_annonce (ex. \"roman initiatique\"), contrat_reel (ex. \"conte philosophique dialogué\"), ecart_principal (ex. \"insuffisance de conflit narratif\"), risque_lecteur (ce que le lecteur risque de ressentir, ex. \"attente romanesque déçue\"), recommandation (ex. \"réécriture hybride moyenne\"), priorite (l'action la plus urgente, ex. \"renforcer Clara et opacifier Scalpa\").\n" +
+    // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale
+    // dans SCHEMA_PREAUDIT_APPROFONDI. Si des lectures chapitre par
+    // chapitre sont fournies dans le contexte (passage de révision
+    // uniquement), elles portent déjà chacune leur propre
+    // reponse_question_centrale — à synthétiser plutôt qu'à ignorer.
+    "- reponse_question_centrale : si une question centrale a été posée par l'auteur·ice (rappelée ci-dessus), réponds-y en plusieurs phrases développées, à partir du manuscrit entier — et, si des lectures chapitre par chapitre te sont fournies dans le contexte (clé lectures_chapitres), synthétise aussi leurs propres réponses à cette question plutôt que de repartir de zéro. Chaîne vide (\"\") si aucune question centrale n'a été posée."
   );
 }
 
@@ -1085,15 +1105,22 @@ Deno.serve(async (req) => {
     // ex. 66 ici) sans jamais changer — voir le commentaire jumeau dans
     // orchestrer-audit-cursaudit/analyser-unite-cursaudit pour le contexte
     // complet (page "Mise en cache" de la console Anthropic restée vide).
-    const appelClaudeChapitre = async (titreChapitre: string, texteChapitre: string) => {
+    const appelClaudeChapitre = async (titreChapitre: string, texteChapitre: string, questionCentrale: string | null) => {
       if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
       const system =
         "Tu relis UN chapitre (ou équivalent : préface, partie, remerciements...) d'un livre déjà lu dans son " +
-        "ensemble par ailleurs. Reste BREF — 5 champs courts, ce n'est PAS une analyse complète (l'audit " +
+        "ensemble par ailleurs. Reste BREF — 6 champs courts, ce n'est PAS une analyse complète (l'audit " +
         "détaillé fera ce travail ligne par ligne si le client le commande). N'INVENTE aucune correction, " +
         "n'écris aucune proposition de réécriture ici — observe seulement ce qui est déjà là. " +
         "a_approfondir_audit_final doit être honnête : \"rien de particulier\" est une réponse acceptable si " +
-        "c'est vraiment le cas, pas un réflexe systématique.";
+        "c'est vraiment le cas, pas un réflexe systématique. Si une question centrale est donnée dans le " +
+        "message (rappelée avant le titre du chapitre), réponds-y dans reponse_question_centrale à partir de " +
+        "ce que CE chapitre montre concrètement — chaîne vide (\"\") si ce chapitre n'apporte rien de " +
+        "pertinent à cette question précise ; sinon (aucune question posée), reponse_question_centrale DOIT " +
+        "être vide.";
+      const messageQuestion = questionCentrale
+        ? `Question centrale posée par l'auteur·ice pour cet audit, à garder à l'esprit : "${questionCentrale}"\n\n`
+        : "";
       const réponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
@@ -1106,7 +1133,10 @@ Deno.serve(async (req) => {
           // d'appel particulièrement exposé si la réflexion s'engage.
           thinking: { type: "disabled" },
           system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-          messages: [{ role: "user", content: `Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
+          // CORRECTIF 01/10/2026 — la question centrale est spécifique à CET
+          // audit (jamais mise en cache, contrairement au `system`
+          // ci-dessus) : elle va dans le message, pas dans le system prompt.
+          messages: [{ role: "user", content: `${messageQuestion}Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
           // CORRECTIF 26/08/2026 — voir la note jumelle sur appelClaude() ci-dessus.
           tools: [{ name: "lecture_chapitre", description: "Lecture brève d'un chapitre : fonction, point fort, point faible, à vérifier, à approfondir dans l'audit final.", input_schema: SCHEMA_LECTURE_CHAPITRE, strict: true }],
           tool_choice: { type: "tool", name: "lecture_chapitre" },
@@ -1202,7 +1232,7 @@ Deno.serve(async (req) => {
             .filter((s) => (s as { chapitre_index?: number }).chapitre_index === i)
             .map((s) => s.texte_source)
             .join("\n\n");
-          entrée.lecture = await appelClaudeChapitre(chapitre.titre, texteChapitre || chapitre.titre);
+          entrée.lecture = await appelClaudeChapitre(chapitre.titre, texteChapitre || chapitre.titre, audit.question_libre);
           const { error: erreurMaj } = await admin
             .from("audits")
             .update({ preaudit_chapitres_resultats: résultatsChapitres, ia_echecs_consecutifs: 0 })

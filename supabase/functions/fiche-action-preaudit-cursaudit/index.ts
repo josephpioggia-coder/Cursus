@@ -147,8 +147,14 @@ const SCHEMA_FICHE_ACTION = {
     risque_principal: { type: "string", default: "" },
     action_immediate: { type: "string", default: "" },
     a_eviter: { type: "array", items: { type: "string" }, minItems: 1, default: [] },
+    // CORRECTIF 01/10/2026 — voir la note jumelle dans
+    // synthese-audit-detaille-cursaudit : la "question centrale" du contrat
+    // d'intention n'avait aucun canal de sortie jusqu'à preaudit_resultat
+    // (voir le correctif dans preaudit-approfondi-cursaudit) ni, en aval,
+    // dans cette fiche d'action. Même schéma de champ que son jumeau.
+    reponse_question_centrale: { type: "string", default: "" },
   },
-  required: ["diagnostic", "forces", "points_a_traiter", "priorites", "risque_principal", "action_immediate", "a_eviter"],
+  required: ["diagnostic", "forces", "points_a_traiter", "priorites", "risque_principal", "action_immediate", "a_eviter", "reponse_question_centrale"],
   additionalProperties: false,
 };
 const validerFicheAction = ajv.compile(SCHEMA_FICHE_ACTION);
@@ -170,7 +176,7 @@ function choisirPlafondMots(nombreMots: number): number {
 // (voir son commentaire complet) : les nombres regroupés à la fin plutôt
 // que mêlés en plein milieu du texte fixe, pour que le préfixe soit
 // identique d'un appel à l'autre et donc réutilisable en cache.
-function construireSystemPrompt(nombreMots: number, plafondMots: number): { statique: string; dynamique: string } {
+function construireSystemPrompt(nombreMots: number, plafondMots: number, questionCentrale: string | null, reponseDejaProduite: string): { statique: string; dynamique: string } {
   const statique =
     "Tu reçois un pré-audit déjà produit pour un texte. Tu ne relis pas le manuscrit. Tu ne refais pas " +
     "l'audit. Tu produis une fiche d'action éditoriale courte, lisible, priorisée et directement " +
@@ -196,11 +202,22 @@ function construireSystemPrompt(nombreMots: number, plafondMots: number): { stat
     "5. risque_principal : une phrase nette — ce qui se passe si rien ne change.\n" +
     "6. action_immediate : une seule action, tranchée, immédiatement applicable — la toute première chose " +
     "à faire.\n" +
-    "7. a_eviter : 1 à 3 fausses bonnes idées à éviter.";
+    "7. a_eviter : 1 à 3 fausses bonnes idées à éviter.\n" +
+    "8. reponse_question_centrale : si une question centrale et une réponse déjà produite par le pré-audit " +
+    "te sont données plus bas, reformule-la en une réponse claire et directement lisible pour l'auteur·ice " +
+    "(tu peux la condenser, jamais inventer au-delà). Si rien n'est donné, laisse ce champ vide (\"\").";
 
+  // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale dans
+  // le schéma de sortie. Spécifique à CET audit, donc dans la partie
+  // dynamique (jamais mise en cache), contrairement aux règles fixes
+  // ci-dessus.
+  const noteQuestionCentrale = questionCentrale && reponseDejaProduite
+    ? `\n\nQuestion centrale posée par l'auteur·ice pour cet audit : "${questionCentrale}"\nRéponse déjà produite par le pré-audit : ${reponseDejaProduite}`
+    : "";
   const dynamique =
     `Longueur cible : ce document ne doit JAMAIS dépasser environ ${plafondMots} mots au total ` +
-    `(texte source : ${nombreMots} mots).`;
+    `(texte source : ${nombreMots} mots).` +
+    noteQuestionCentrale;
 
   return { statique, dynamique };
 }
@@ -224,7 +241,7 @@ Deno.serve(async (req) => {
 
     const { data: audit } = await admin
       .from("audits")
-      .select("id, user_id, preaudit_statut, preaudit_resultat, apercu_resultat")
+      .select("id, user_id, preaudit_statut, preaudit_resultat, apercu_resultat, question_libre")
       .eq("id", auditId)
       .maybeSingle();
     if (!audit || audit.user_id !== userId) return json({ error: "Audit introuvable." }, 404);
@@ -234,8 +251,12 @@ Deno.serve(async (req) => {
 
     const nombreMots = (audit.apercu_resultat as { nombre_mots?: number } | null)?.nombre_mots ?? 0;
     const plafondMots = choisirPlafondMots(nombreMots || 2000);
+    // CORRECTIF 01/10/2026 — voir la note sur reponse_question_centrale
+    // dans le schéma de sortie : déjà produite par preaudit-approfondi-cursaudit,
+    // reprise ici plutôt que recalculée.
+    const reponseDejaProduite = (audit.preaudit_resultat as { reponse_question_centrale?: string } | null)?.reponse_question_centrale ?? "";
 
-    const { statique: systemStatique, dynamique: systemDynamique } = construireSystemPrompt(nombreMots, plafondMots);
+    const { statique: systemStatique, dynamique: systemDynamique } = construireSystemPrompt(nombreMots, plafondMots, audit.question_libre, reponseDejaProduite);
     const réponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },

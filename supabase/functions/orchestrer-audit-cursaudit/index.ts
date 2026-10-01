@@ -537,7 +537,17 @@ const ACTIONS_RECOMMANDEES = [
   "couper", "sourcer", "reformuler", "reecrire", "expertiser",
 ];
 
-function construireSchemaSyntheseEditoriale(autoriserProposition: boolean): Record<string, unknown> {
+// CORRECTIF 01/10/2026 — bug réel signalé en usage : une question centrale
+// ("quel particularité de la personnalité de l'auteure ressort à la lecture
+// du livre") était bien enregistrée et transmise ("à garder à l'esprit"),
+// mais n'avait AUCUN champ de sortie dédié — ni ici, ni dans la synthèse
+// finale, qui ne lit de toute façon que diagnostic_priorite (voir
+// synthese-audit-detaille-cursaudit). La question ne pouvait donc
+// structurellement jamais apparaître dans le résultat, quelle que soit sa
+// formulation. `reponse_question_centrale` lui donne enfin un canal : une
+// réponse par unité, propagée jusqu'à la synthèse (voir ce fichier plus bas
+// et synthese-audit-detaille-cursaudit).
+function construireSchemaSyntheseEditoriale(autoriserProposition: boolean, questionCentraleActive: boolean): Record<string, unknown> {
   return {
     type: "object",
     properties: {
@@ -566,22 +576,27 @@ function construireSchemaSyntheseEditoriale(autoriserProposition: boolean): Reco
         additionalProperties: false,
       },
       proposition: autoriserProposition ? { type: "string" } : { type: "null" },
+      reponse_question_centrale: questionCentraleActive ? { type: "string" } : { type: "null" },
     },
-    required: ["effet_lecteur", "geste_editorial", "action_recommandee", "proposition"],
+    required: ["effet_lecteur", "geste_editorial", "action_recommandee", "proposition", "reponse_question_centrale"],
     additionalProperties: false,
   };
 }
 
-function construireConsigneSyntheseEditoriale(autoriserProposition: boolean): string {
+function construireConsigneSyntheseEditoriale(autoriserProposition: boolean, questionCentrale: string | null): string {
   const consigneProposition = autoriserProposition
     ? `- proposition : une suggestion concrète et actionnable (reformulation, piste de correction), en respectant strictement le degré d'intervention autorisé ci-dessus — jamais au-delà.`
     : `- proposition : DOIT être null. Le degré d'intervention choisi (ou son absence) n'autorise aucune proposition de correction — diagnostique et oriente (geste_editorial) sans jamais rédiger à la place de l'auteur·ice.`;
+  const consigneQuestionCentrale = questionCentrale
+    ? `- reponse_question_centrale : réponds SPÉCIFIQUEMENT à la question centrale rappelée plus haut ("${questionCentrale}"), uniquement à partir de ce que CETTE unité montre concrètement — une observation ancrée dans le texte fourni, jamais une supposition. Chaîne vide ("") si cette unité n'apporte rien de pertinent à cette question précise, jamais un remplissage artificiel.`
+    : `- reponse_question_centrale : DOIT être null. Aucune question centrale n'a été posée pour cet audit.`;
   return (
     "En plus de l'évaluation critère par critère, produis une synthèse éditoriale globale pour cette unité :\n" +
     `- effet_lecteur : un tableau d'une ou plusieurs de ces catégories exactes : ${EFFETS_LECTEUR.join(", ")} — l'effet que ce passage produirait chez un lecteur, pas s'il est vrai ou prouvé.\n` +
     `- geste_editorial : une direction de travail concrète mais non rédigée (ex. "ramener l'énoncé vers le vécu de l'auteur·ice plutôt que vers une généralisation").\n` +
     `- action_recommandee : une seule de ces catégories exactes : ${ACTIONS_RECOMMANDEES.join(", ")}.\n` +
-    consigneProposition
+    consigneProposition + "\n" +
+    consigneQuestionCentrale
   );
 }
 
@@ -785,9 +800,9 @@ Deno.serve(async (req) => {
     const autoriserProposition =
       DEGRES_AUTORISANT_PROPOSITION.has(audit.degre_intervention ?? "") &&
       !AUTORISATION_IA_INCERTAINE_OU_REFUSEE.has(audit.contraintes_academiques?.autorisationIA ?? "");
-    const schema = fusionnerSchemas(construireSchemaAnalyse(criteres), construireSchemaSyntheseEditoriale(autoriserProposition));
+    const schema = fusionnerSchemas(construireSchemaAnalyse(criteres), construireSchemaSyntheseEditoriale(autoriserProposition, !!audit.question_libre));
     const consigneCriteres = construireConsigneCriteres(criteres);
-    const consigneSyntheseEditoriale = construireConsigneSyntheseEditoriale(autoriserProposition);
+    const consigneSyntheseEditoriale = construireConsigneSyntheseEditoriale(autoriserProposition, audit.question_libre);
     const contexteQualification =
       construireContexteQualification(audit, profilAuteurEffectif(audit, profilAuteur)) +
       construireContextePreaudit(audit.preaudit_resultat as Record<string, unknown> | null);

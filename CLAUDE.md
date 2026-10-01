@@ -463,3 +463,68 @@ erreurs si un problème de ce type y est un jour suspecté.
 `claude-prox` (le relais utilisé par CopiloteIA) n'a pas été touché :
 il transmet le corps de la requête tel quel, le `thinking: disabled`
 envoyé par le client suffit, pas besoin de le dupliquer côté relais.
+
+## Question centrale CursAudit : enfin un vrai canal de sortie (01/10/2026)
+
+Cas réel qui a révélé le bug : Joseph a lui-même produit, hors Cursus, un
+relevé serré des marqueurs narcissiques d'"À cœur retrouvé" (427
+paragraphes criblés sur 1549) en quelques minutes. Son contrat d'intention
+pour cet audit posait pourtant déjà cette question exacte comme "question
+centrale validée" : *"quel particularité de la personnalité de l'auteure
+ressort à la lecture du livre"*. Aucun des trois documents produits
+(pré-audit, audit détaillé, synthèse) n'en disait un mot.
+
+**Cause confirmée par lecture directe du code, pas une hypothèse** :
+`question_libre` était bien enregistrée et transmise en contexte ("à
+garder à l'esprit") à chaque étape, mais AUCUN schéma de sortie, nulle
+part dans le pipeline, n'avait de champ pour y répondre — et la synthèse
+finale (détaillée comme pré-audit) ne relit jamais le texte source, donc
+ne pouvait de toute façon rien retrouver après coup. La question était
+structurellement condamnée à disparaître, quelle que soit sa formulation.
+
+**Corrigé de bout en bout** — un champ `reponse_question_centrale` ajouté
+à CHAQUE étage du pipeline, propagé jusqu'au document final, dans les 5
+fonctions Edge + le rendu client + les 3 exports Word :
+- Par unité (`orchestrer-audit-cursaudit`, `analyser-unite-cursaudit`) :
+  réponse à partir de CE que CETTE unité montre, chaîne vide si rien de
+  pertinent.
+- Par chapitre (`preaudit-approfondi-cursaudit`, `SCHEMA_LECTURE_CHAPITRE`) :
+  même principe — la question n'était même pas transmise à cette étape
+  avant ce correctif (ni le texte de la question, ni de champ pour y
+  répondre).
+- Synthèse globale du pré-audit (même fichier, `SCHEMA_PREAUDIT_APPROFONDI`,
+  champ 14/14) : synthétise le manuscrit entier + les réponses par
+  chapitre quand elles sont fournies (passage de révision).
+- Synthèse de l'audit détaillé (`synthese-audit-detaille-cursaudit`) :
+  collecte les réponses non vides de chaque unité, les synthétise en UNE
+  réponse développée.
+- Fiche d'action du pré-audit (`fiche-action-preaudit-cursaudit`) : reprend
+  la réponse déjà produite par le pré-audit, la reformule pour
+  l'auteur·ice.
+- Client (`CursAuditDetail.jsx`, `FicheExecutive` + `FicheActionAffichage`,
+  schéma partagé) : encadré "🧭 Réponse à votre question centrale", affiché
+  EN PREMIER (avant même le diagnostic) — c'est littéralement ce qui a été
+  demandé en priorité. Même règle `masquerResumeCourt` que les autres
+  champs pour éviter la redite entre les deux composants.
+- Les 3 exports Word (`exportFicheActionWord.js`, `exportPreauditWord.js`,
+  `exportAuditDetailleWord.js`) — Joseph travaille surtout depuis les
+  .docx exportés, pas seulement à l'écran : sans ce correctif-là, le
+  champ aurait existé en base sans jamais lui être visible. Dans
+  `exportAuditDetailleWord.js` (dump brut par unité), gardé AUSSI au
+  niveau unité (pas seulement la synthèse) : permet de retrouver quelle
+  unité précise a contribué à la réponse, comme le relevé manuel de
+  Joseph (§§ un par un) l'avait fait.
+
+**Limite assumée** : seuls les NOUVEAUX audits (ou pré-audits/synthèses
+relancés après déploiement) auront ce champ rempli — un audit déjà
+terminé avant ce correctif n'a pas rétroactivement de
+`reponse_question_centrale` dans ses résultats déjà enregistrés.
+
+**Idée produit distincte, à construire plus tard** (décision de Joseph,
+01/10/2026) : un "mini-audit par axe" — poser une question précise APRÈS
+coup, sans relancer tout l'audit, pour quelques euros et quelques
+minutes. Positionné au moment où on revient de CursAudit vers CursEdit
+(pas encore décidé plus précisément que ça). Complémentaire du correctif
+ci-dessus, pas un remplacement : celui-ci répare ce qui est déjà vendu
+comme fonctionnant ; le mini-audit par axe serait une nouvelle
+fonctionnalité, à concevoir séparément.
