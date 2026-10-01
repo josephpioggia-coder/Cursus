@@ -129,6 +129,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 1024,
+        // CORRECTIF 01/10/2026 — même cause que celle trouvée côté
+        // CopiloteIA (Journal des erreurs : stop_reason="max_tokens",
+        // blocs=[thinking]) — un budget aussi réduit (1024) rend ce point
+        // d'appel particulièrement exposé si la réflexion s'engage.
+        thinking: { type: "disabled" },
         // Mise en cache (12/09/2026) — voir le commentaire complet dans
         // orchestrer-audit-cursaudit/analyser-unite-cursaudit.
         system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],

@@ -424,6 +424,11 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     body: JSON.stringify({
       model: params.modele,
       max_tokens: params.max_tokens ?? 4096,
+      // CORRECTIF 01/10/2026 — même cause que celle trouvée côté CopiloteIA
+      // (Journal des erreurs : stop_reason="max_tokens", blocs=[thinking]) :
+      // désactivé partout où Claude est appelé directement par Cursus, par
+      // précaution.
+      thinking: { type: "disabled" },
       system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
       tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],

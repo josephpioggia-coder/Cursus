@@ -181,6 +181,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 400,
+        // CORRECTIF 01/10/2026 — même cause que celle trouvée côté
+        // CopiloteIA (Journal des erreurs : stop_reason="max_tokens",
+        // blocs=[thinking]) — un budget aussi réduit (400) rend ce point
+        // d'appel particulièrement exposé si la réflexion s'engage.
+        thinking: { type: "disabled" },
         // Mise en cache (12/09/2026) — SYSTEM_PROMPT est une constante fixe,
         // identique à chaque appel ; voir le commentaire complet dans
         // orchestrer-audit-cursaudit/analyser-unite-cursaudit.

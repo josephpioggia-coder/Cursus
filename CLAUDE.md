@@ -422,3 +422,44 @@ réellement été journalisé. Corrigé :
   manquait pour comprendre pourquoi l'onglet Références échoue plus
   souvent que les autres (combine recherche web + JSON final dans le
   même budget de tokens, plus susceptible d'être tronqué).
+
+## Cause RÉELLE trouvée (01/10/2026, via le Journal des erreurs) : "thinking" mangeait tout le budget
+
+Première ligne jamais lue dans `journal_erreurs`, et elle a immédiatement
+payé : `CopiloteIA:appelClaude — Réponse sans bloc texte exploitable —
+stop_reason=max_tokens, blocs=[thinking]`. Autrement dit : le modèle
+avait dépensé la TOTALITÉ de `max_tokens` en raisonnement interne
+(bloc "thinking") sans jamais produire de bloc "text" ni "tool_use" —
+alors qu'AUCUN appel Claude de Cursus ne demande explicitement la
+réflexion étendue (pas de paramètre `thinking` envoyé nulle part avant
+ce correctif). Tout porte à croire que `claude-sonnet-5` l'engage par
+défaut dans certains cas, à la différence des générations précédentes.
+
+Corrigé partout où Cursus appelle Claude directement — `thinking: {
+type: "disabled" }` ajouté au corps de la requête dans LES DIX points
+d'appel du dépôt (aucun n'a besoin du contenu d'un bloc "thinking",
+seuls "text"/"tool_use" sont jamais lus) :
+- Client : `CopiloteIA.jsx` → `appelClaude()` (suggestions,
+  personnages, références, cohérence, recomposition — tous les onglets
+  du Co-pilote passent par cette seule fonction).
+- Serveur (CursAudit + vérification) : `analyser-unite-cursaudit`,
+  `orchestrer-audit-cursaudit`, `preaudit-approfondi-cursaudit` (2
+  points d'appel), `preaudit-global-cursaudit`,
+  `synthese-audit-detaille-cursaudit`, `synthetiser-question-cursaudit`,
+  `fiche-action-preaudit-cursaudit`, `extraire-profil-cursus`,
+  `verification-deux-ia`.
+
+PAS confirmé que cette cause s'est RÉELLEMENT déjà produite sur ces 9
+fonctions serveur (seul le cas CopiloteIA est confirmé par un vrai
+journal) — corrigé par précaution partout où le même gap existait
+(aucune n'envoyait `thinking` non plus), vu la gravité potentielle :
+ce sont les fonctions du cœur payant de CursAudit. Si un échec du même
+genre s'y reproduit malgré ça, ces 9 fonctions n'ont PAS encore leur
+propre `journaliserErreur()` (elles journalisent dans leurs propres
+tables d'audit, pas dans `journal_erreurs`) — à vérifier au cas par cas
+dans les tables d'audit concernées plutôt que dans le Journal des
+erreurs si un problème de ce type y est un jour suspecté.
+
+`claude-prox` (le relais utilisé par CopiloteIA) n'a pas été touché :
+il transmet le corps de la requête tel quel, le `thinking: disabled`
+envoyé par le client suffit, pas besoin de le dupliquer côté relais.

@@ -152,6 +152,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 8192,
+        // CORRECTIF 01/10/2026 — même cause que celle trouvée côté
+        // CopiloteIA (Journal des erreurs : stop_reason="max_tokens",
+        // blocs=[thinking]) : désactivé partout où Claude est appelé
+        // directement par Cursus, par précaution.
+        thinking: { type: "disabled" },
         // Mise en cache (12/09/2026) — SYSTEM_PREAUDIT est une constante
         // fixe ; voir le commentaire complet dans orchestrer-audit-cursaudit
         // /analyser-unite-cursaudit. Un seul appel par aperçu (pas de boucle

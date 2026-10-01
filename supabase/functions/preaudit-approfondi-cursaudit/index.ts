@@ -1042,6 +1042,12 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: MODELE_CLAUDE,
           max_tokens: 24000,
+          // CORRECTIF 01/10/2026 — même cause que celle trouvée côté
+          // CopiloteIA (Journal des erreurs : stop_reason="max_tokens",
+          // blocs=[thinking], aucun bloc "text" ni "tool_use") : désactivé
+          // partout où Claude est appelé directement par Cursus, par
+          // précaution — seuls les blocs "text"/"tool_use" sont lus ici.
+          thinking: { type: "disabled" },
           system,
           messages: [{ role: "user", content: contexte }],
           // CORRECTIF 26/08/2026 — vraie cure plutôt qu'un simple garde-fou
@@ -1094,6 +1100,11 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: MODELE_CLAUDE,
           max_tokens: 2000,
+          // CORRECTIF 01/10/2026 — voir la note jumelle sur appelClaude()
+          // ci-dessus (Journal des erreurs, stop_reason="max_tokens",
+          // blocs=[thinking]) — un budget aussi réduit (2000) rend ce point
+          // d'appel particulièrement exposé si la réflexion s'engage.
+          thinking: { type: "disabled" },
           system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: `Titre de ce chapitre : "${titreChapitre}"\n\nTexte du chapitre :\n\n${texteChapitre}` }],
           // CORRECTIF 26/08/2026 — voir la note jumelle sur appelClaude() ci-dessus.

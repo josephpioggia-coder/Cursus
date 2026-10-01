@@ -242,6 +242,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODELE_CLAUDE,
         max_tokens: 4096,
+        // CORRECTIF 01/10/2026 — même cause que celle trouvée côté
+        // CopiloteIA (Journal des erreurs : stop_reason="max_tokens",
+        // blocs=[thinking]) : désactivé partout où Claude est appelé
+        // directement par Cursus, par précaution.
+        thinking: { type: "disabled" },
         system: [
           { type: "text", text: systemStatique, cache_control: { type: "ephemeral" } },
           { type: "text", text: systemDynamique },

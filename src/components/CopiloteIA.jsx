@@ -175,6 +175,18 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null,
     // utilise déjà claude-sonnet-5 par défaut, voir MODELE_CLAUDE).
     model: "claude-sonnet-5",
     max_tokens: maxTokens,
+    // CORRECTIF 01/10/2026 — cause réelle du "le co-pilote n'a pas pu
+    // traiter ce passage" trouvée via le Journal des erreurs (nouvellement
+    // consultable) : stop_reason="max_tokens", blocs=[thinking] — le
+    // modèle avait dépensé TOUT son budget en raisonnement interne
+    // (réflexion étendue) sans jamais produire le moindre bloc "text",
+    // alors qu'aucun paramètre `thinking` n'était envoyé ici. Désactivé
+    // explicitement : ces appels ne sont que de la génération JSON
+    // structurée assez directe (3 suggestions, liste de personnages...),
+    // le contenu d'un bloc "thinking" n'est de toute façon jamais lu
+    // (seuls les blocs "text" sont extraits plus bas) — l'activer ne
+    // coûtait donc que des tokens, sans jamais aider la réponse visible.
+    thinking: { type: "disabled" },
     // `system` peut être une chaîne simple ou un tableau de blocs avec
     // cache_control (voir systemAvecLangue) — transmis tel quel, l'API
     // Anthropic accepte les deux formes.
