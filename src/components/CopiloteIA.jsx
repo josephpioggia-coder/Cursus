@@ -238,7 +238,27 @@ async function appelClaude(system, user, signal, maxTokens = 1000, tools = null,
     );
   }
   if (!avecDétails) return texte;
-  return { texte, tronqué: data.stop_reason === "max_tokens" };
+  // CORRECTIF 03/10/2026 — point "Références" du GO/NO-GO sur la fiabilité
+  // des IA (voir CLAUDE.md) : jusqu'ici, les blocs "web_search_tool_result"
+  // (les résultats RÉELLEMENT renvoyés par la recherche web) étaient purement
+  // et simplement jetés — seul le texte final, rédigé par le modèle, était
+  // gardé. Un statut "vérifié" autodéclaré par le modèle n'avait donc AUCUNE
+  // preuve récupérable pour le contredire. Exposés ici pour que l'appelant
+  // puisse recouper mécaniquement (pas une seconde IA, du code) chaque
+  // référence revendiquée "vérifiée" contre ce qui a réellement été trouvé.
+  // `url`/`title` sont en clair dans la réponse Anthropic ; seul
+  // `encrypted_content` (le texte de la page utilisé en interne par le
+  // modèle) est chiffré et illisible côté client — la correspondance
+  // possible ici reste donc "cette URL a-t-elle réellement été renvoyée par
+  // la recherche", pas encore "le passage cité y figure-t-il mot pour mot"
+  // (ça demanderait de rouvrir nous-mêmes chaque URL, pas fait dans cette
+  // première étape).
+  const résultatsRecherche = (data.content || [])
+    .filter((b) => b.type === "web_search_tool_result")
+    .flatMap((b) => (Array.isArray(b.content) ? b.content : []))
+    .filter((r) => r?.type === "web_search_result" && r.url)
+    .map((r) => ({ url: r.url, titre: r.title || "" }));
+  return { texte, tronqué: data.stop_reason === "max_tokens", résultatsRecherche };
 }
 
 // ─── Vérification approfondie à deux IA (protocole 60805-06) ──────────────────
@@ -309,6 +329,41 @@ function parserJSON(résultat) {
   }
 }
 
+// ─── Recoupement mécanique des références (03/10/2026) ─────────────────────────
+// Voir CLAUDE.md, point "Références" du GO/NO-GO sur la fiabilité des IA :
+// un statut "vérifié" déclaré par le modèle n'est que sa propre parole tant
+// que rien ne le recoupe contre une preuve EXTÉRIEURE à lui — et une
+// seconde IA qui serait "d'accord" ne compterait toujours pas comme preuve
+// indépendante (c'est exactement le risque documenté). Ici, aucun appel
+// IA : une simple comparaison de chaînes contre les résultats RÉELLEMENT
+// renvoyés par l'outil de recherche web pendant CET appel précis (voir
+// `résultatsRecherche` dans appelClaude). Un statut ne peut être
+// RÉTROGRADÉ ici, jamais remonté — Cursus ne fait jamais plus confiant le
+// modèle que lui-même ne l'a été.
+function normaliserURL(url) {
+  if (!url) return "";
+  try {
+    const u = new URL(url);
+    return (u.hostname + u.pathname).toLowerCase().replace(/\/+$/, "").replace(/^www\./, "");
+  } catch {
+    return String(url).toLowerCase().trim();
+  }
+}
+
+function recouperRéférencesAvecRecherche(références, résultatsRecherche) {
+  const urlsRéelles = new Set((résultatsRecherche || []).map((r) => normaliserURL(r.url)).filter(Boolean));
+  return (références || []).map((r) => {
+    if (r.statut !== "vérifié" && r.statut !== "détail_non_confirmé") return r;
+    const urlNormalisée = normaliserURL(r.url_verification);
+    const confirmée = !!urlNormalisée && urlsRéelles.has(urlNormalisée);
+    if (confirmée) return { ...r, recherche_confirmée: true };
+    // L'IA revendiquait un statut "vérifié"/"détail_non_confirmé" sans URL
+    // correspondant à un résultat de recherche réellement obtenu — rétrogradé
+    // ici, quoi que le modèle ait écrit par ailleurs dans "pertinence".
+    return { ...r, statut: "à_vérifier", recherche_confirmée: false, statut_revendiqué_par_l_ia: r.statut };
+  });
+}
+
 const INSTRUCTION_LANGUE = {
   fr: "Réponds en français.",
   en: "Respond in English.",
@@ -342,14 +397,16 @@ Avant de proposer toute référence (livre, article, auteur), tu dois d'abord la
 
 Procédure, dans l'ordre, pour CHAQUE concept qui appelle une référence :
 1. Recherche obligatoire (titre + auteur pressenti, ou thème + mots-clés si tu n'as pas de titre précis en tête). Ne saute jamais cette étape.
-2. Si la recherche confirme la référence : cite-la normalement avec les détails confirmés. statut = "vérifié".
-3. Si la recherche confirme l'ouvrage mais pas un détail précis (page, chapitre, édition) : cite l'ouvrage SANS ce détail — n'invente jamais un numéro pour "compléter" une citation qui semblerait incomplète. statut = "détail_non_confirmé", champ "page" laissé vide.
-4. Si la recherche ne confirme rien : ne fabrique aucune référence de remplacement. statut = "non_trouvé", champ "apa" laissé vide, champ "pertinence" limité à une piste thématique générale SANS nom d'auteur ni titre précis (ex. "des travaux en thérapie systémique traitent de ce mécanisme, référence à identifier").
+2. Si la recherche confirme la référence : cite-la normalement avec les détails confirmés. statut = "vérifié", ET copie dans "url_verification" l'URL EXACTE (telle que renvoyée par l'outil de recherche, jamais reconstruite ou devinée) de la page qui confirme cette référence.
+3. Si la recherche confirme l'ouvrage mais pas un détail précis (page, chapitre, édition) : cite l'ouvrage SANS ce détail — n'invente jamais un numéro pour "compléter" une citation qui semblerait incomplète. statut = "détail_non_confirmé", champ "page" laissé vide, "url_verification" rempli quand même si une page a confirmé l'ouvrage.
+4. Si la recherche ne confirme rien : ne fabrique aucune référence de remplacement. statut = "non_trouvé", champ "apa" laissé vide, "url_verification" vide, champ "pertinence" limité à une piste thématique générale SANS nom d'auteur ni titre précis (ex. "des travaux en thérapie systémique traitent de ce mécanisme, référence à identifier").
 5. Ne mélange jamais, dans la même liste, un statut "vérifié" et une référence non vérifiée présentés avec le même niveau de détail — le statut doit toujours accompagner la référence, jamais être omis.
 6. En cas de nom d'auteur proche d'un autre auteur du même champ, vérifie spécifiquement que le nom ET le titre vont ensemble — un auteur réel associé à un titre qui n'est pas le sien est aussi grave qu'une référence entièrement inventée.
 
+IMPORTANT — "url_verification" est recoupé MÉCANIQUEMENT après coup avec les résultats réellement renvoyés par l'outil de recherche pendant cet appel : un statut "vérifié" sans URL correspondant à un résultat réel sera automatiquement rétrogradé, quoi que tu écrives ici. N'invente donc jamais une URL plausible — recopie-la exactement depuis un résultat de recherche obtenu, ou laisse "url_verification" vide.
+
 Réponds UNIQUEMENT en JSON valide :
-{"références":[{"concept":"...","apa":"...","statut":"vérifié","page":"...","pertinence":"..."}]}
+{"références":[{"concept":"...","apa":"...","statut":"vérifié","page":"...","pertinence":"...","url_verification":"..."}]}
 Le champ "statut" vaut exactement "vérifié", "détail_non_confirmé" ou "non_trouvé".`;
   },
 
@@ -1014,9 +1071,16 @@ function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQu
 // chantier) retombe sur "non vérifié" plutôt que d'être traité comme fiable
 // par défaut.
 const STATUT_RÉFÉRENCE = {
-  vérifié: { c: "#1D9E75", bg: "#E1F5EE", label: "✓ Vérifié" },
+  vérifié: { c: "#1D9E75", bg: "#E1F5EE", label: "✓ Vérifié — URL de recherche confirmée" },
   détail_non_confirmé: { c: "#BA7517", bg: "#FAEEDA", label: "◐ Ouvrage vérifié, détail non confirmé" },
   non_trouvé: { c: "#A32D2D", bg: "#FCEBEB", label: "✕ Non trouvé — piste seulement" },
+  // CORRECTIF 03/10/2026 — voir recouperRéférencesAvecRecherche : statut
+  // imposé MÉCANIQUEMENT (pas par le modèle) quand il revendiquait
+  // "vérifié"/"détail_non_confirmé" sans URL correspondant à un résultat de
+  // recherche réellement obtenu pendant cet appel. Couleur volontairement
+  // proche de "non_trouvé" (rouge), pas de "détail_non_confirmé" (orange) :
+  // la défiance par défaut doit être le réflexe, pas la nuance.
+  à_vérifier: { c: "#A32D2D", bg: "#FCEBEB", label: "⚠ IA affirme « vérifié » — non confirmé par Cursus" },
 };
 const STATUT_PAR_DÉFAUT = { c: "#888", bg: "#f0f0f0", label: "? Non vérifié" };
 
@@ -1031,13 +1095,39 @@ function CarteRéférence({ r }) {
         <span style={{ fontSize: 11, fontWeight: 600, color: "#185FA5", textTransform: "uppercase" }}>{r.concept}</span>
         <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: s.bg, color: s.c, whiteSpace: "nowrap" }}>{s.label}</span>
       </div>
+      {/* CORRECTIF 03/10/2026 — ce statut existait déjà avant l'IA (voir
+          "statut_revendiqué_par_l_ia") : dit explicitement ce que le modèle
+          prétendait, pour que la rétrogradation ne ressemble pas à une
+          anomalie opaque. */}
+      {r.statut === "à_vérifier" && r.statut_revendiqué_par_l_ia && (
+        <div style={{ fontSize: 10.5, color: "#A32D2D", marginBottom: 6, fontStyle: "italic" }}>
+          Le modèle avait répondu « {r.statut_revendiqué_par_l_ia === "vérifié" ? "vérifié" : "ouvrage vérifié, détail non confirmé"} », mais aucune URL de recherche correspondante n'a été retrouvée — vérifiez cette référence vous-même avant de vous y fier.
+        </div>
+      )}
       {!nonTrouvée && r.apa && (
         <div style={{ background: "#E6F1FB", borderRadius: 6, padding: "8px 10px", marginBottom: 6, fontSize: 12, color: "#0C447C", fontFamily: "Georgia, serif", lineHeight: 1.6 }}>{r.apa}</div>
       )}
       {r.statut === "vérifié" && r.page && <div style={{ fontSize: 11, color: "#185FA5", marginBottom: 4 }}>{t("references.pageSuggeree", { page: r.page })}</div>}
+      {/* CORRECTIF 03/10/2026 — l'URL réelle qui a servi à la vérification,
+          cliquable : permet à l'auteur·ice de faire elle-même/lui-même le
+          dernier maillon qu'aucune machine ne peut garantir (est-ce que la
+          page confirme vraiment ce qui est affirmé ?), en un clic plutôt
+          qu'en reconstruisant une recherche de zéro. */}
+      {r.recherche_confirmée && r.url_verification && (
+        <a href={r.url_verification} target="_blank" rel="noopener noreferrer"
+          style={{ display: "block", fontSize: 10.5, color: "#1D9E75", marginBottom: 6, wordBreak: "break-all" }}>
+          🔗 Source trouvée par la recherche — {r.url_verification}
+        </a>
+      )}
       <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>{r.pertinence}</div>
       {!nonTrouvée && r.apa && (
-        <button onClick={() => { navigator.clipboard?.writeText(r.apa); setCopié(true); setTimeout(() => setCopié(false), 2000); }}
+        <button onClick={() => {
+          // CORRECTIF 03/10/2026 — une citation copiée perd son badge à
+          // l'écran : si elle n'a pas été confirmée mécaniquement, l'avertissement
+          // doit voyager AVEC le texte copié, pas rester affiché seulement ici.
+          const texte = r.statut === "à_vérifier" ? `${r.apa} [NON CONFIRMÉ — à vérifier avant usage]` : r.apa;
+          navigator.clipboard?.writeText(texte); setCopié(true); setTimeout(() => setCopié(false), 2000);
+        }}
           style={{ fontSize: 11, color: copié ? "#1D9E75" : "#185FA5", background: copié ? "#E1F5EE" : "#E6F1FB", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "inherit" }}>
           {copié ? t("references.copie") : t("references.copier")}
         </button>
@@ -1800,13 +1890,20 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         // maxTokens relevé 4096 → 6144 : les blocs de résultats de recherche
         // web (server_tool_use / web_search_tool_result) consomment de la
         // place dans la réponse en plus du JSON final attendu.
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}${noteImages}`, sig, 6144, OUTIL_RECHERCHE_WEB, false, images);
+        // CORRECTIF 03/10/2026 — avecDétails=true pour récupérer
+        // résultatsRecherche (voir appelClaude) : nécessaire pour recouper
+        // mécaniquement chaque référence "vérifiée" contre ce que la
+        // recherche web a RÉELLEMENT renvoyé, pas seulement la parole du
+        // modèle. Voir CLAUDE.md, point "Références" du GO/NO-GO.
+        const réponseAppel = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}${noteImages}`, sig, 6144, OUTIL_RECHERCHE_WEB, true, images);
+        résultat = réponseAppel.texte;
+        const résultatsRecherche = réponseAppel.résultatsRecherche || [];
         // Répare le JSON potentiellement tronqué
         let jsonStr = résultat.replace(/```json|```/g, "").trim();
         if (!jsonStr.endsWith("}")) jsonStr = jsonStr + ']}';
         try {
           const p = JSON.parse(jsonStr);
-          màjDonnées("références", p.références || []);
+          màjDonnées("références", recouperRéférencesAvecRecherche(p.références || [], résultatsRecherche));
         } catch {
           // CORRECTIF 30/08/2026 : cette tentative de réparation pouvait
           // elle-même échouer (JSON toujours mal formé après extraction),
@@ -1818,7 +1915,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           try {
             if (!match) throw new Error();
             const partial = JSON.parse(`{${match[0]}}`);
-            màjDonnées("références", partial.références || []);
+            màjDonnées("références", recouperRéférencesAvecRecherche(partial.références || [], résultatsRecherche));
           } catch {
             // CORRECTIF 01/10/2026 — signalé en usage réel, "toujours cette
             // faiblesse" : ce chemin-ci (réparation du JSON de l'onglet

@@ -528,3 +528,88 @@ minutes. Positionné au moment où on revient de CursAudit vers CursEdit
 ci-dessus, pas un remplacement : celui-ci répare ce qui est déjà vendu
 comme fonctionnant ; le mini-audit par axe serait une nouvelle
 fonctionnalité, à concevoir séparément.
+
+## GO/NO-GO fiabilité des IA (03/10/2026) — note de décision de Joseph
+
+Incident déclencheur : ChatGPT a affirmé "preuves à l'appui" (nom,
+adresse, date, prix) une information entièrement inventée, à dix
+demandes de vérification distinctes, avant d'admettre s'être montré
+"complaisant" et avoir menti. Joseph a soumis une note de décision
+formelle (GO/NO-GO) demandant d'évaluer honnêtement si Cursus peut
+encore reposer sur des IA génératives, sans complaisance.
+
+**Diagnostic rendu, fondé sur une lecture réelle du code (pas une
+réponse de principe)** : Cursus n'est pas uniforme face à ce risque.
+- Famille A (grounded) : l'essentiel de CursAudit/CopiloteIA (cohérence,
+  structure, diagnostic) lit LE TEXTE FOURNI PAR L'AUTEUR·ICE, présent
+  intégralement dans le prompt — pas une invention ex nihilo, le risque
+  structurel est différent.
+- Famille B (exposée), deux points identifiés précisément :
+  1. L'onglet "Références" de CopiloteIA — recherche web réelle, mais
+     les résultats bruts (`web_search_tool_result`) étaient JETÉS après
+     coup, seul le texte final du modèle gardé. Un statut "vérifié"
+     autodéclaré n'avait donc aucune preuve récupérable pour le
+     contredire.
+  2. `verification-deux-ia` — conçu et testé EN DIRECT sur "À cœur
+     retrouvé" (voir `docs/protocole-verification-approfondie-deux-ia.md`) :
+     un vrai dialogue contradictoire Claude/GPT, mais sans accès à une
+     source externe pendant ce dialogue pour toute "affirmation
+     théorique/factuelle" (ex. attribution correcte d'une idée à Jung) —
+     deux IA qui se valident l'une l'autre, pas une preuve indépendante,
+     pour ce sous-cas précis (le protocole reste solide pour juger la
+     cohérence d'un passage avec le reste du manuscrit, lui bien
+     accessible).
+
+**Verdict rendu : GO conditionnel, pas NO-GO** — à condition de traiter
+ces deux points, pas de les ignorer. Voir section suivante pour le
+premier corrigé (Références).
+
+## Références CopiloteIA : vérification mécanique, pas auto-déclarée (03/10/2026)
+
+Premier chantier du GO conditionnel ci-dessus, demandé explicitement par
+Joseph ("commence par le point Références"). Principe : un statut
+"vérifié" écrit par le modèle n'est que sa propre parole tant que rien
+d'EXTÉRIEUR à lui ne le recoupe — et une seconde IA d'accord ne compte
+toujours pas comme preuve indépendante (c'est le risque même de
+`verification-deux-ia` ci-dessus). Le recoupement ajouté ici est
+entièrement mécanique : aucun appel IA.
+
+- `appelClaude()` (`CopiloteIA.jsx`) expose désormais `résultatsRecherche`
+  quand `avecDétails=true` : les blocs `web_search_tool_result` RÉELLEMENT
+  renvoyés par l'outil de recherche pendant cet appel (`url`/`title`,
+  en clair dans la réponse Anthropic), au lieu d'être jetés comme avant.
+  Limite assumée et documentée dans le code : `encrypted_content` (le
+  texte de la page utilisé en interne par le modèle) reste chiffré,
+  illisible côté client — on peut donc confirmer mécaniquement "cette
+  URL a-t-elle réellement été renvoyée par la recherche", pas encore
+  "le passage cité y figure-t-il mot pour mot" (demanderait de rouvrir
+  nous-mêmes chaque URL — PAS fait dans cette première étape, prochaine
+  si besoin).
+- `PROMPTS.références` exige maintenant un champ `url_verification` par
+  référence (l'URL exacte du résultat de recherche qui confirme la
+  référence), avec consigne explicite que ce champ sera recoupé
+  mécaniquement après coup — ne pas inventer d'URL plausible.
+- `recouperRéférencesAvecRecherche()` (nouvelle fonction, pure, sans
+  appel réseau) : compare chaque `url_verification` revendiquée aux URLs
+  réellement obtenues. Si absente ou non trouvée → le statut est
+  RÉTROGRADÉ mécaniquement vers `à_vérifier`, quoi que le modèle ait
+  écrit. Ne peut JAMAIS remonter un statut — seulement le dégrader.
+- UI (`CarteRéférence`) : nouveau badge rouge "⚠ IA affirme « vérifié »
+  — non confirmé par Cursus" distinct du badge vert habituel, avec la
+  mention explicite de ce que le modèle avait prétendu. Pour les
+  références réellement confirmées, l'URL devient un lien cliquable
+  ("🔗 Source trouvée par la recherche") — ferme la boucle "montrer
+  l'extrait brut pour que l'humain tranche le dernier maillon" de la
+  note de décision. Le warning voyage aussi dans le texte copié
+  (presse-papiers), pas seulement affiché à l'écran.
+
+**Pas fait dans cette étape, assumé** : pas de stockage persistant de
+la liste complète des résultats de recherche bruts (au-delà de l'URL
+par référence déjà sauvegardée) — un vrai journal d'audit complet
+(URL + contenu + horodatage pour CHAQUE recherche, pas seulement les
+références retenues) resterait à construire si le besoin se confirme.
+Pas de Layer 2 (récupérer nous-mêmes la page et vérifier que la citation
+exacte y figure) — seule l'existence réelle de l'URL est confirmée pour
+l'instant, pas le contenu exact de la page. `verification-deux-ia`
+n'a pas été touché dans cette passe — reste le chantier suivant si
+Joseph le confirme.
