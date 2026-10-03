@@ -369,15 +369,47 @@ const INSTRUCTION_LANGUE = {
   en: "Respond in English.",
 };
 
+// Ajouté le 03/10/2026, suite à un cas réel repéré en conversation avec
+// Joseph (relecture serrée d'un remerciement dans "À cœur retrouvé") : une
+// interprétation plausible de la psychologie/motivation d'une personne peut
+// dériver, affirmation après affirmation, bien au-delà de ce que le texte
+// dit littéralement, sans qu'aucune des étapes individuelles ne semble
+// franchir de ligne claire — le dérapage se voit seulement en comparant le
+// point d'arrivée au texte exact. Risque distinct de l'invention pure d'un
+// fait externe (déjà couvert par la règle sur les personnes nommées
+// ci-dessus) : ici le texte source est bien fourni et bien lu, mais la
+// tâche elle-même (cerner un personnage, juger une cohérence, suggérer une
+// suite) est interprétative par nature. Partagée par les prompts qui portent
+// sur la psychologie/motivation d'un personnage ou de l'auteur·ice.
+const RÈGLE_INTERPRÉTATION_VS_FAIT = `RÈGLE NON NÉGOCIABLE sur l'interprétation vs le fait textuel : toute affirmation sur la psychologie, la motivation, l'intention ou le ressenti d'un personnage ou de l'auteur·ice qui ne reprend pas un mot ou une idée explicitement écrite dans le texte est une INTERPRÉTATION, pas un fait établi — même si elle te semble plausible ou bien amenée. Formule-la alors explicitement comme telle ("le texte suggère...", "on peut y lire...", "une lecture possible serait...") plutôt que de l'affirmer avec la même certitude qu'une observation directe du texte. Ne laisse jamais une interprétation s'accumuler sur une autre interprétation sans revenir vérifier, à chaque étape, ce que le texte dit réellement, mot pour mot.`;
+
+// Ajouté le 03/10/2026, même échange que ci-dessus : en répondant à une
+// question sur la valeur scientifique d'un concept cité dans le texte
+// (l'anthroposophie), une réponse par ailleurs rigoureuse a affirmé en
+// passant qu'un second concept donné en comparaison (la théorie polyvagale)
+// était "scientifiquement solide" — alors que ce second concept fait
+// lui-même l'objet de critiques sérieuses et publiées (il est mieux ancré
+// dans l'anatomie réelle que l'anthroposophie, mais loin d'un consensus
+// académique stable). La rigueur appliquée à l'affirmation principale ne
+// s'était pas propagée à l'affirmation de comparaison, qui profitait par
+// contraste d'une crédibilité qu'elle n'avait pas gagnée seule.
+const RÈGLE_COMPARAISON_FACTUELLE = `RÈGLE NON NÉGOCIABLE sur les comparaisons factuelles : si ta réponse démontre qu'un concept n'est pas valide, pas scientifique ou pas fiable, et que tu cites un AUTRE concept en comparaison (pour illustrer ce qui, lui, serait solide, validé ou consensuel), applique à ce second concept la même exigence de vérification qu'au premier — ne le qualifie de "solide" ou "validé" que si c'est vraiment exact, nuances et controverses éventuelles comprises. Un point de comparaison ne doit jamais profiter par contraste de la rigueur appliquée à l'affirmation principale sans avoir été vérifié au même niveau.`;
+
 const PROMPTS = {
   suggestions: (type) => `Tu es co-pilote d'un écrivain professionnel travaillant sur un ${type === "fiction" ? "roman" : "essai ou ouvrage de non-fiction"}. Analyse le texte et génère exactement 3 suggestions concrètes.
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées dans le texte (réelles ou identifiables) : n'attribue JAMAIS un trait de caractère, une qualité, une intention ou un fait à une personne nommée si l'auteur ne l'a pas déjà écrit lui-même. Une reformulation peut clarifier, alléger ou réorganiser ce que l'auteur a écrit sur cette personne — elle ne peut jamais AJOUTER une caractérisation nouvelle ("exigeant", "patient", "bienveillant"...) qui n'existait pas dans le texte source, même si elle semble plausible ou stylistiquement séduisante. En cas de doute sur ce qui est réellement affirmé par l'auteur, reste plus neutre et plus proche du texte plutôt que d'enrichir.
 
+${RÈGLE_INTERPRÉTATION_VS_FAIT}
+
 Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`,
 
-  personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte. Réponds UNIQUEMENT en JSON valide :
+  personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte.
+
+${RÈGLE_INTERPRÉTATION_VS_FAIT}
+
+Réponds UNIQUEMENT en JSON valide :
 {"personnages":[{"nom":"...","rôle":"...","traits":["..."],"cohérence":"ok","note":"..."}]}`,
 
   // Le biais linguistique des références est volontaire, pas un oubli :
@@ -405,6 +437,8 @@ Procédure, dans l'ordre, pour CHAQUE concept qui appelle une référence :
 
 IMPORTANT — "url_verification" est recoupé MÉCANIQUEMENT après coup avec les résultats réellement renvoyés par l'outil de recherche pendant cet appel : un statut "vérifié" sans URL correspondant à un résultat réel sera automatiquement rétrogradé, quoi que tu écrives ici. N'invente donc jamais une URL plausible — recopie-la exactement depuis un résultat de recherche obtenu, ou laisse "url_verification" vide.
 
+${RÈGLE_COMPARAISON_FACTUELLE}
+
 Réponds UNIQUEMENT en JSON valide :
 {"références":[{"concept":"...","apa":"...","statut":"vérifié","page":"...","pertinence":"...","url_verification":"..."}]}
 Le champ "statut" vaut exactement "vérifié", "détail_non_confirmé" ou "non_trouvé".`;
@@ -417,6 +451,8 @@ Avant de signaler une répétition ou un écho comme un défaut : vérifie que l
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne une personne nommée dans le texte, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas déjà écrit lui-même.
 
 RÈGLE NON NÉGOCIABLE sur le ton du champ "suggestion" — signalé en usage réel (14/09/2026) : "Supprimer cette récapitulation ou la fondre directement dans la phrase suivante" est une INJONCTION (verbe à l'impératif), pas une recommandation, alors même que le diagnostic sous-jacent peut être faux (voir la règle sur le tressage délibéré ci-dessus — ça vient justement d'arriver). Le champ "suggestion" doit toujours être formulé comme une option proposée à l'auteur·ice, jamais comme un ordre à exécuter : pas de verbe à l'impératif en tête de phrase ("Supprimer...", "Corriger...", "Reformuler..."), mais une tournure qui laisse la décision ouverte ("Tu pourrais...", "Une option : ...", "Envisage de...", "Ça vaudrait peut-être la peine de..."). L'auteur·ice reste seul·e décisionnaire.
+
+${RÈGLE_INTERPRÉTATION_VS_FAIT}
 
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
@@ -730,6 +766,10 @@ RÈGLE NON NÉGOCIABLE sur toute reformulation proposée — signalé en usage r
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse d'origine que tu développes) mentionne une personne nommée dans le texte de l'auteur, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas lui-même écrit — que ce soit dans ta première réponse ou dans une reformulation que tu proposes ici. Si l'auteur te fait remarquer que tu as inventé une caractérisation, reconnais-le sans détour : ne cherche pas à justifier ou à minimiser l'invention.
 
 MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
+
+${RÈGLE_INTERPRÉTATION_VS_FAIT}
+
+${RÈGLE_COMPARAISON_FACTUELLE}
 
 ${instruction}`;
 }

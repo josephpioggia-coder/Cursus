@@ -613,3 +613,57 @@ exacte y figure) — seule l'existence réelle de l'URL est confirmée pour
 l'instant, pas le contenu exact de la page. `verification-deux-ia`
 n'a pas été touché dans cette passe — reste le chantier suivant si
 Joseph le confirme.
+
+## Dérive interprétative : cas vécu, deux garde-fous de prompt (03/10/2026)
+
+Suite directe du GO/NO-GO : Joseph a testé l'impartialité de Claude Code
+(hors Cursus, en conversation directe) sur une lecture serrée d'un
+remerciement dans un livre réel ("À cœur retrouvé"), en poussant
+plusieurs tours de correction successifs. Deux dérives réelles, observées
+en direct, pas hypothétiques :
+
+1. **L'interprétation psychologique s'accumule au-delà du texte sans
+   qu'aucune étape individuelle ne semble franchir de ligne claire** —
+   le dérapage ne se voit qu'en comparant le point d'arrivée au texte
+   exact, repris mot pour mot. Contrairement au risque déjà couvert par
+   la règle sur les personnes nommées (inventer un fait ABSENT du
+   texte), ici le texte source était bien fourni et bien lu — la dérive
+   vient de la nature interprétative de la tâche elle-même (cerner une
+   psychologie, une intention) plutôt que d'une invention pure.
+2. **Une comparaison factuelle non vérifiée profite de la rigueur
+   appliquée à l'affirmation principale** — en répondant (via le fil de
+   dialogue du Co-pilote, hors de ce test) sur la valeur scientifique de
+   l'anthroposophie citée dans un livre, une réponse par ailleurs
+   rigoureuse a qualifié en passant la théorie polyvagale de "solide"
+   par contraste, alors qu'elle fait elle-même l'objet de critiques
+   publiées sérieuses — une affirmation secondaire qui n'avait pas reçu
+   le même niveau de vérification que l'affirmation principale.
+
+Corrigé par deux nouvelles règles de prompt partagées, dans
+`CopiloteIA.jsx` :
+- `RÈGLE_INTERPRÉTATION_VS_FAIT` — exige que toute affirmation sur la
+  psychologie/motivation/intention non explicitement écrite dans le
+  texte soit formulée comme interprétation ("le texte suggère...") et
+  non comme un fait, et impose de revérifier le texte exact à chaque
+  étape plutôt que de laisser une interprétation s'empiler sur une
+  autre. Injectée dans `suggestions`, `personnages`, `cohérence` et
+  `promptDialogue` (le fil de suivi par carte, tous onglets confondus).
+- `RÈGLE_COMPARAISON_FACTUELLE` — exige la même rigueur de vérification
+  pour une affirmation de comparaison que pour l'affirmation principale
+  qu'elle accompagne. Injectée dans `PROMPTS.références` et
+  `promptDialogue`.
+
+**Limite assumée, pas corrigée ici** : les étapes de synthèse de
+CursAudit (pré-audit global, synthèse de l'audit détaillé, fiche
+d'action) ne relisent jamais le texte source du manuscrit — connu
+depuis le correctif de la "question centrale" (01/10/2026), mais
+jusqu'ici documenté comme une limite d'architecture, pas comme un
+facteur de risque d'interprétation en soi. Ce cas en est la
+démonstration concrète : la même dérive progressive (plausible à
+chaque étape, visible seulement en revenant à la source exacte) s'est
+produite alors que le texte était bien fourni — elle ne peut donc
+qu'être pire pour une étape qui travaille déjà sur du JSON condensé
+plutôt que sur le texte intégral. Si un signalement laisse penser
+qu'une synthèse CursAudit a sur-interprété, ne pas se contenter de
+relire le JSON intermédiaire : remonter jusqu'au texte source de
+l'unité concernée.
