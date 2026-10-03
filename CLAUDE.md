@@ -667,3 +667,26 @@ plutôt que sur le texte intégral. Si un signalement laisse penser
 qu'une synthèse CursAudit a sur-interprété, ne pas se contenter de
 relire le JSON intermédiaire : remonter jusqu'au texte source de
 l'unité concernée.
+
+**CORRECTIF le jour même** : la première version de
+`RÈGLE_INTERPRÉTATION_VS_FAIT` était unique, sans distinction
+fiction/non-fiction — Joseph a fait remarquer qu'en fiction, inférer la
+psychologie d'un PERSONNAGE à partir de ses actes est le cœur même du
+travail d'analyse littéraire, pas une dérive à corriger ; imposer le
+même hedging qu'au cas réel ("À cœur retrouvé") aurait rendu l'onglet
+Personnages inutilement timide pour son usage normal en fiction. Autre
+chose repérée au passage : l'onglet "Personnages" tourne aussi bien sur
+des romans que sur des essais/mémoires (`onglets`, aucun filtre par
+type de projet) — son prompt affirmait pourtant "spécialisé en fiction"
+même quand il tournait sur un essai, exactement le cas exposé au risque
+qui a motivé cette règle (des personnes réelles nommées dans le texte).
+`RÈGLE_INTERPRÉTATION_VS_FAIT` est maintenant une fonction de `type` :
+en fiction, la prudence ne porte que sur l'auteur·ice elle-même
+(personne réelle) — les personnages inventés peuvent être interprétés
+librement, tant que ça reste ancré dans le texte ; en non-fiction, elle
+porte sur toute personne nommée, personnages compris, puisque ce sont
+des personnes réelles. `PROMPTS.personnages` devient lui aussi une
+fonction de `type`, avec un texte d'intro qui ne prétend plus "fiction"
+sur un essai. `type`/`typeProjet` propagé jusqu'à `promptDialogue`
+(ajout d'un second paramètre) pour que le fil de suivi par carte
+applique la bonne variante lui aussi.

@@ -381,7 +381,23 @@ const INSTRUCTION_LANGUE = {
 // tâche elle-même (cerner un personnage, juger une cohérence, suggérer une
 // suite) est interprétative par nature. Partagée par les prompts qui portent
 // sur la psychologie/motivation d'un personnage ou de l'auteur·ice.
-const RÈGLE_INTERPRÉTATION_VS_FAIT = `RÈGLE NON NÉGOCIABLE sur l'interprétation vs le fait textuel : toute affirmation sur la psychologie, la motivation, l'intention ou le ressenti d'un personnage ou de l'auteur·ice qui ne reprend pas un mot ou une idée explicitement écrite dans le texte est une INTERPRÉTATION, pas un fait établi — même si elle te semble plausible ou bien amenée. Formule-la alors explicitement comme telle ("le texte suggère...", "on peut y lire...", "une lecture possible serait...") plutôt que de l'affirmer avec la même certitude qu'une observation directe du texte. Ne laisse jamais une interprétation s'accumuler sur une autre interprétation sans revenir vérifier, à chaque étape, ce que le texte dit réellement, mot pour mot.`;
+//
+// CORRECTIF le jour même, repéré par Joseph : la version initiale, unique,
+// imposait ce même hedging aux PERSONNAGES DE FICTION — alors qu'inférer la
+// motivation d'un personnage inventé à partir de ses actes est le cœur même
+// du travail d'analyse littéraire, pas une dérive à corriger ; sur-hedger
+// chaque trait de caractère ("le texte suggère peut-être que...") aurait
+// rendu l'onglet Personnages inutilement timide pour son usage normal en
+// fiction. À l'inverse, l'onglet Personnages tourne aussi sur des essais/
+// mémoires (voir `onglets`, pas de filtre par type de projet) — où les
+// "personnages" sont des personnes RÉELLES, le cas exact qui a motivé cette
+// règle. D'où deux variantes : en fiction, la prudence ne porte que sur
+// l'auteur·ice elle-même (personne réelle), pas sur ses personnages
+// inventés ; en non-fiction, elle porte sur les deux, puisque les "personnages"
+// y sont le plus souvent des personnes réelles nommées.
+const RÈGLE_INTERPRÉTATION_VS_FAIT = (type) => type === "fiction"
+  ? `RÈGLE NON NÉGOCIABLE sur l'interprétation vs le fait textuel : les PERSONNAGES de ce texte sont des personnages de fiction — inférer leur psychologie, leur motivation ou leur ressenti à partir de leurs actes, dialogues et choix est le cœur même de l'analyse de personnage, pas une dérive à éviter ; reste simplement ancré dans ce que le texte montre, sans contredire ce qui y est explicitement écrit. En revanche, si une affirmation porte sur l'AUTEUR·ICE elle-même (la personne réelle qui a écrit ce texte, pas un de ses personnages) — sa psychologie, ses intentions, son vécu — applique la plus grande prudence : toute affirmation qui ne reprend pas un mot ou une idée que l'auteur·ice a explicitement écrit sur elle-même est une interprétation, à formuler comme telle ("le texte suggère...", "on peut y lire...") et jamais comme un fait établi. Ne laisse jamais une interprétation sur l'auteur·ice s'accumuler sur une autre sans revenir vérifier le texte exact.`
+  : `RÈGLE NON NÉGOCIABLE sur l'interprétation vs le fait textuel : ce texte est un ouvrage de non-fiction — les personnes qui y sont nommées, l'auteur·ice y compris, sont des personnes RÉELLES, pas des personnages inventés. Toute affirmation sur la psychologie, la motivation, l'intention ou le ressenti de l'une d'elles qui ne reprend pas un mot ou une idée explicitement écrite dans le texte est une INTERPRÉTATION, pas un fait établi — même si elle te semble plausible ou bien amenée. Formule-la alors explicitement comme telle ("le texte suggère...", "on peut y lire...", "une lecture possible serait...") plutôt que de l'affirmer avec la même certitude qu'une observation directe du texte. Ne laisse jamais une interprétation s'accumuler sur une autre interprétation sans revenir vérifier, à chaque étape, ce que le texte dit réellement, mot pour mot.`;
 
 // Ajouté le 03/10/2026, même échange que ci-dessus : en répondant à une
 // question sur la valeur scientifique d'un concept cité dans le texte
@@ -400,14 +416,19 @@ const PROMPTS = {
 
 RÈGLE NON NÉGOCIABLE sur les personnes nommées dans le texte (réelles ou identifiables) : n'attribue JAMAIS un trait de caractère, une qualité, une intention ou un fait à une personne nommée si l'auteur ne l'a pas déjà écrit lui-même. Une reformulation peut clarifier, alléger ou réorganiser ce que l'auteur a écrit sur cette personne — elle ne peut jamais AJOUTER une caractérisation nouvelle ("exigeant", "patient", "bienveillant"...) qui n'existait pas dans le texte source, même si elle semble plausible ou stylistiquement séduisante. En cas de doute sur ce qui est réellement affirmé par l'auteur, reste plus neutre et plus proche du texte plutôt que d'enrichir.
 
-${RÈGLE_INTERPRÉTATION_VS_FAIT}
+${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
 
 Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`,
 
-  personnages: `Tu es assistant littéraire spécialisé en fiction. Extrait les personnages du texte.
+  // CORRECTIF 03/10/2026 : devient une fonction de `type` — cet onglet tourne
+  // aussi bien sur des romans (personnages inventés) que sur des essais/
+  // mémoires (où les "personnages" extraits sont des personnes réelles
+  // nommées dans le texte, voir RÈGLE_INTERPRÉTATION_VS_FAIT ci-dessus).
+  // L'ancienne version affirmait "spécialisé en fiction" même sur un essai.
+  personnages: (type) => `Tu es assistant littéraire${type === "fiction" ? " spécialisé en fiction" : ""}. Extrait les ${type === "fiction" ? "personnages" : "personnes réellement nommées dans ce texte (ce n'est pas une fiction)"} du texte.
 
-${RÈGLE_INTERPRÉTATION_VS_FAIT}
+${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
 
 Réponds UNIQUEMENT en JSON valide :
 {"personnages":[{"nom":"...","rôle":"...","traits":["..."],"cohérence":"ok","note":"..."}]}`,
@@ -452,7 +473,7 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne 
 
 RÈGLE NON NÉGOCIABLE sur le ton du champ "suggestion" — signalé en usage réel (14/09/2026) : "Supprimer cette récapitulation ou la fondre directement dans la phrase suivante" est une INJONCTION (verbe à l'impératif), pas une recommandation, alors même que le diagnostic sous-jacent peut être faux (voir la règle sur le tressage délibéré ci-dessus — ça vient justement d'arriver). Le champ "suggestion" doit toujours être formulé comme une option proposée à l'auteur·ice, jamais comme un ordre à exécuter : pas de verbe à l'impératif en tête de phrase ("Supprimer...", "Corriger...", "Reformuler..."), mais une tournure qui laisse la décision ouverte ("Tu pourrais...", "Une option : ...", "Envisage de...", "Ça vaudrait peut-être la peine de..."). L'auteur·ice reste seul·e décisionnaire.
 
-${RÈGLE_INTERPRÉTATION_VS_FAIT}
+${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
 
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
@@ -757,7 +778,7 @@ function BoutonCopier({ texte, couleur = "#888" }) {
 // cas où la limite est quand même atteinte.
 const DIALOGUE_MAX_TOKENS = 2048;
 
-function promptDialogue(langueProjet) {
+function promptDialogue(langueProjet, typeProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
   return `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement.
 
@@ -767,7 +788,7 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse
 
 MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
 
-${RÈGLE_INTERPRÉTATION_VS_FAIT}
+${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
 
 ${RÈGLE_COMPARAISON_FACTUELLE}
 
@@ -1618,7 +1639,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
-        promptDialogue(langueProjet),
+        promptDialogue(langueProjet, typeProjet),
         userContent,
         null,
         DIALOGUE_MAX_TOKENS,
@@ -1923,7 +1944,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         const p = parserJSON(résultat);
         màjDonnées("suggestions", p.suggestions || []);
       } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages, langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("personnages", p.personnages || []);
       } else if (ongletCible === "références") {
