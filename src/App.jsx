@@ -1868,6 +1868,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
   const [largeurPanneau, setLargeurPanneau] = useState(280);
+  // Mobile (04/10/2026) : l'éditeur occupe toute la largeur, le Co-pilote s'ouvre par-dessus (bouton flottant).
+  const [copiloteMobileOuvert, setCopiloteMobileOuvert] = useState(false);
   const [texteSélectionné, setTexteSélectionné] = useState("");
   const redimensionnementActif = useRef(false);
   const positionDépart = useRef({ x: 0, largeur: 280 });
@@ -2865,7 +2867,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 </button>
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: `minmax(0, 1fr) ${largeurPanneau}px`, flex: 1, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: estMobile ? "minmax(0, 1fr)" : `minmax(0, 1fr) ${largeurPanneau}px`, flex: 1, overflow: "hidden", minWidth: 0 }}>
             {/* Éditeur central */}
             <Editeur
               nœud={nœudActif}
@@ -2878,22 +2880,41 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               lectureSeule={!!(accèsCursEdit && !accèsCursEdit.peutÉcrire)}
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}
-            <div style={{
+            {estMobile && !copiloteMobileOuvert && (
+              <button onClick={() => setCopiloteMobileOuvert(true)} style={{
+                position: "fixed", right: 14, bottom: 64, zIndex: 50,
+                background: "#1D9E75", color: "#fff", border: "none", borderRadius: 24,
+                padding: "11px 16px", fontSize: 14, fontWeight: 500, fontFamily: "inherit",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.3)", cursor: "pointer",
+              }}>🤖 Co-pilote</button>
+            )}
+            <div style={estMobile ? {
+              display: copiloteMobileOuvert ? "flex" : "none", flexDirection: "column",
+              position: "fixed", left: 0, right: 0, bottom: 0, top: 48, zIndex: 60,
+              minHeight: 0, overflow: "hidden", background: "#fafafa",
+            } : {
               position: "relative",
               borderLeft: "0.5px solid #e5e5e5",
               display: "flex", flexDirection: "column",
               minHeight: 0,
               overflow: "hidden", background: "#fafafa",
             }}>
+              {estMobile && (
+                <button onClick={() => setCopiloteMobileOuvert(false)} style={{
+                  flexShrink: 0, textAlign: "left", background: "#fff", border: "none",
+                  borderBottom: "0.5px solid #e5e5e5", padding: "12px 16px", fontSize: 14,
+                  color: "#1D9E75", fontFamily: "inherit", cursor: "pointer",
+                }}>← Retour au texte</button>
+              )}
               {/* Poignée de redimensionnement */}
-              <div
+              {!estMobile && <div
                 onMouseDown={démarrerRedimensionnement}
                 title="Glisser pour redimensionner le panneau"
                 style={{
                   position: "absolute", left: -4, top: 0, bottom: 0, width: 8,
                   cursor: "col-resize", zIndex: 20,
                 }}
-              />
+              />}
               <CopiloteIA
                 texteActif={nœudActif.texte || ""}
                 texteSélectionné={texteSélectionné}

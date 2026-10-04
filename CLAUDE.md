@@ -720,3 +720,19 @@ Demande de Joseph : « autres jeux de mots comme mots croisés ou mots fléchés
   (le lien passe par la connexion) ; l'ajouter en favori / écran d'accueil du mobile. Testé sur SalleDesJeux seule
   (croises, codes, salle, id inconnu) ; PAS testé dans l'app complète connectée (Supabase indisponible en dev).
   Piège d'outillage : ne jamais tuer un serveur par `pgrep -f`/`grep` sur sa ligne de commande depuis Bash (le shell se tue lui-même).
+
+## Éditeur de texte sur mobile (04/10/2026)
+
+Retour de Joseph (GSM, après avoir mis une icône Cursus sur son écran d'accueil) : « la mise en page a été complètement
+chamboulée, la partie centrale est escamotée, les icônes de mise en page sont à la verticale et le co-pilote prend les
+2/3 de la page ». **Cause : mon correctif de mise en page mobile du 30/09/2026 (`minmax(0, 1fr)`)** — l'éditeur n'avait
+JAMAIS été conçu pour mobile (grille `minmax(0,1fr) 280px` : texte | Co-pilote). Avant, la colonne s'élargissait et le
+navigateur dézoomait toute la page, ce qui masquait le problème ; une fois la colonne figée à 360 px, le texte ne
+gardait que ~80 px. Corrigé : sur mobile (`estMobile`) l'éditeur prend toute la largeur ; le Co-pilote devient un panneau
+plein écran (`position: fixed`, sous la barre de 48 px) ouvert par un bouton flottant « 🤖 Co-pilote » (bas droite,
+`bottom: 64` pour laisser la barre de statut), avec « ← Retour au texte ». Le panneau reste MONTÉ (`display: none`)
+fermé : l'état du Co-pilote est conservé. En-tête de l'éditeur : `flexWrap: wrap`. Bureau inchangé (vérifié à 1280 px).
+**Règle** : toute vue à plusieurs colonnes fixes doit avoir sa variante `estMobile` — la colonne principale ne s'élargit
+plus (cf. section mise en page mobile). Vérifié à 360 px dans l'app complète (Supabase simulé : session `sb-x-auth-token`
+en localStorage + routes `**/rest/v1/**`, abonnement actif sinon « accès retiré ») ; autres vues multi-colonnes
+(Bibliothèque, CursAudit, CursDecision…) NON revérifiées sur mobile.
