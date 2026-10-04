@@ -736,3 +736,18 @@ fermé : l'état du Co-pilote est conservé. En-tête de l'éditeur : `flexWrap:
 plus (cf. section mise en page mobile). Vérifié à 360 px dans l'app complète (Supabase simulé : session `sb-x-auth-token`
 en localStorage + routes `**/rest/v1/**`, abonnement actif sinon « accès retiré ») ; autres vues multi-colonnes
 (Bibliothèque, CursAudit, CursDecision…) NON revérifiées sur mobile.
+
+## Page de garde à chaque nouvelle visite (04/10/2026)
+
+Retour de l'auteur (mobile) : « quand je clique sur cursus.pro j'arrive dans CursAudit ; je veux revenir à la page de
+garde ». Cause : le choix d'espace (CursEdit/CursAudit) était mémorisé en `localStorage` (permanent) — décision du
+07/09/2026, prise parce que l'auteur se plaignait alors de l'inverse (« se reconnecter renvoie toujours à l'écran de
+choix »). **Les deux demandes sont contradictoires** : compromis retenu — mémoire en `sessionStorage` (`lireEspace` /
+`ecrireEspace` / `effacerEspace`, App.jsx) : l'espace est retenu tant que l'ONGLET reste ouvert (F5, retour de paiement
+Stripe), mais une nouvelle visite (nouvel onglet, navigateur rouvert, clic sur cursus.pro) affiche l'écran de choix.
+L'ancienne clé `localStorage` est supprimée au chargement. Si l'auteur redemande « rouvrir directement le dernier
+espace » : remplacer `sessionStorage` par `localStorage` dans ces trois fonctions (et retirer la purge).
+Au passage, `EcranChoixEspace.jsx` (écran désormais vu à CHAQUE visite) débordait à 360 px (bandeau `width: 620`, cartes
+`width: 300` fixes → texte coupé des deux côtés) : `width: 100%` + `maxWidth`, marge haute sur mobile pour ne pas passer sous
+« Mode d'emploi / Se déconnecter ». Vérifié à 360 et 1280 px (`scrollWidth == innerWidth`). Les liens `?jeu=` ne sont pas
+touchés. Deux adresses coexistent (www.cursus.pro et cursus-seven.vercel.app) : mémoire propre à chacune.

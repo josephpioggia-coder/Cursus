@@ -1698,6 +1698,18 @@ const btnSecondaryStyle = {
 
 // ─── Composant principal : App ────────────────────────────────────────────────────
 
+// Mémoire de l'espace choisi (04/10/2026, demande de l'auteur : « quand je clique sur cursus.pro je veux revenir à la
+// page de garde, pas être renvoyé dans CursAudit »). Repassé en sessionStorage : l'espace est retenu tant que
+// l'onglet reste ouvert (un F5, un aller-retour de paiement ne renvoient pas au choix) mais une NOUVELLE visite
+// (nouvel onglet, navigateur rouvert, clic sur cursus.pro) affiche l'écran de choix. Contrepartie assumée : se
+// reconnecter dans un nouvel onglet redemande le choix (c'est le défaut corrigé le 07/09/2026 par le passage en
+// localStorage — à rétablir si l'auteur le redemande : remplacer sessionStorage par localStorage ci-dessous).
+// L'ancienne clé localStorage est supprimée au chargement (sinon elle renverrait encore dans l'ancien espace).
+const lireEspace = () => { try { return sessionStorage.getItem("cursus_espace") || null; } catch { return null; } };
+const ecrireEspace = (id) => { try { sessionStorage.setItem("cursus_espace", id); } catch { /* stockage indisponible */ } };
+const effacerEspace = () => { try { sessionStorage.removeItem("cursus_espace"); } catch { /* idem */ } };
+try { localStorage.removeItem("cursus_espace"); } catch { /* idem */ }
+
 export default function App() {
   const { t } = useTranslation("common");
   const { user, chargement: authChargement, déconnecter } = useAuth();
@@ -1722,7 +1734,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.has("abonnement") || params.has("audit")) {
       const espaceRetour = params.has("audit") ? "cursaudit" : "cursedit";
-      localStorage.setItem("cursus_espace", espaceRetour);
+      ecrireEspace(espaceRetour);
       // Nettoie l'URL pour qu'un rechargement ultérieur (favori, F5) ne
       // re-déclenche pas ce comportement indéfiniment sur une URL de succès
       // devenue obsolète.
@@ -1730,16 +1742,16 @@ export default function App() {
       return espaceRetour;
     }
     // Lien direct vers un jeu : sans espace déjà choisi, on ouvre CursEdit (pas d'écran de choix en travers).
-    if (JEU_PAR_LIEN && !localStorage.getItem("cursus_espace")) { localStorage.setItem("cursus_espace", "cursedit"); return "cursedit"; }
-    return localStorage.getItem("cursus_espace") || null;
+    if (JEU_PAR_LIEN && !lireEspace()) { ecrireEspace("cursedit"); return "cursedit"; }
+    return lireEspace();
   });
 
   const choisirEspace = (id) => {
-    localStorage.setItem("cursus_espace", id);
+    ecrireEspace(id);
     setEspace(id);
   };
   const changerEspace = () => {
-    localStorage.removeItem("cursus_espace");
+    effacerEspace();
     setEspace(null);
   };
 
