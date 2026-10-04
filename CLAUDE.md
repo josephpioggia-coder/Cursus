@@ -707,3 +707,9 @@ Demande de Joseph : « autres jeux de mots comme mots croisés ou mots fléchés
   l'applique à toutes les cases du numéro et la retire d'un autre numéro.
 - Vérifié le 04/10/2026 à 360 px (sombre forcé, `scrollWidth <= innerWidth`) : rendu des 3 jeux, grilles terminées
   via « le mot » / « une lettre » (détection de fin + statistiques). Pas testé : saisie au clavier physique, double-sens.
+- **Niveau difficile (04/10/2026, demande « difficile mais pas impossible »)** : `public/jeux/mots-croises-difficiles.txt`
+  (313 entrées : vocabulaire savant — figures de style, histoire, mythologie, architecture, musique — avec des
+  définitions plus allusives). Chargé avec l'autre liste (`chargerMotsCroises`, entrées marquées `dur`) ; facile et
+  moyen n'utilisent QUE les mots courants ; difficile (`entreesDuNiveau`) = mots durs ×3 + 40 % des mots courants, pour
+  qu'il reste des croisements possibles (≈ 43 % de mots durs par grille de croisés, ≈ 40 % en fléchés ; les mots
+  courants servent de points d'appui). Le vérificateur contrôle les deux fichiers (doublons entre eux inclus).

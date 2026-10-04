@@ -1,0 +1,314 @@
+ABSINTHE|Liqueur verte qu'on dit fée
+ABSCISSE|Coordonnée horizontale
+ACCOLADE|Signe { ou embrassade solennelle
+ACROSTICHE|Poème dont les initiales forment un mot
+ADAGE|Maxime ancienne
+AEDE|Poète grec antique
+AGAPE|Repas fraternel des premiers chrétiens
+AGORA|Place publique d'Athènes
+ALAMBIC|Appareil du distillateur
+ALCOVE|Renfoncement qui abrite un lit
+ALEXANDRIN|Vers de douze syllabes
+ALIBI|Preuve qu'on était ailleurs
+ALLEGORIE|Image qui représente une idée abstraite
+ALMANACH|Calendrier annuel illustré
+ALTRUISME|Souci désintéressé des autres
+AMBROISIE|Nourriture des dieux
+AMPHORE|Vase antique à deux anses
+ANACHRONISME|Erreur de date dans un récit
+ANAGRAMME|Mot formé des lettres d'un autre
+ANAPHORE|Répétition de mots en début de phrases
+ANECDOTE|Petit fait amusant
+ANTHOLOGIE|Recueil de beaux textes choisis
+ANTIPHRASE|Dire le contraire de ce qu'on pense
+APOGEE|Point culminant
+APOLOGUE|Court récit à valeur de leçon
+AQUEDUC|Pont portant un canal romain
+ARCHAISME|Mot ou tour vieilli
+ARCHIPEL|Groupe d'îles
+ARDOISE|Pierre grise des toits bretons
+ARGOT|Langage d'un milieu
+ARPENTER|Parcourir à grands pas
+ASTROLABE|Instrument ancien de navigation
+ATELIER|Lieu de travail de l'artiste
+AUBADE|Concert du matin sous une fenêtre
+AUGURE|Présage
+AURIFERE|Qui contient de l'or
+AUTOMATE|Machine qui imite le vivant
+AVATAR|Transformation d'une divinité hindoue
+BACCHANTE|Femme ivre et folle de Dionysos
+BALLADE|Poème à forme fixe médiévale
+BALUSTRADE|Rampe à petits piliers
+BARCAROLLE|Chant des gondoliers
+BASILIQUE|Grande église romaine
+BASTION|Ouvrage avancé d'une forteresse
+BELVEDERE|Pavillon d'où l'on voit au loin
+BESTIAIRE|Recueil d'animaux réels ou fabuleux
+BIBELOT|Petit objet décoratif
+BIBLIOPHILE|Amateur de beaux livres
+BLASON|Armoiries
+BOUCANIER|Chasseur ou pirate des Antilles
+BRAISE|Charbon ardent
+BRETELLE|Bande qui tient le pantalon
+BUCOLIQUE|Qui chante la vie des champs
+BURETTE|Petit flacon d'église ou de garagiste
+CABALE|Complot ou doctrine mystique juive
+CACOPHONIE|Mélange de sons discordants
+CADASTRE|Plan des propriétés foncières
+CAIRN|Tas de pierres de montagne
+CALEMBOUR|Jeu de mots sur les sonorités
+CALLIGRAPHIE|Art de la belle écriture
+CANTIQUE|Chant religieux
+CAPHARNAUM|Lieu en désordre
+CARILLON|Clochettes qui jouent un air
+CARMIN|Rouge vif
+CARTOUCHE|Encadré ovale des noms de pharaons
+CASSANDRE|Prophétesse qu'on ne croit pas
+CATACOMBES|Cimetières souterrains de Rome ou de Paris
+CATHARSIS|Purification par le théâtre
+CELESTE|Qui est du ciel
+CENOTAPHE|Tombeau sans corps
+CENTAURE|Mi-homme mi-cheval
+CERBERE|Chien des Enfers
+CHAMADE|Roulement de tambour de capitulation
+CHARIVARI|Tapage
+CHIMERE|Monstre ou vaine illusion
+CHRONIQUE|Récit des faits dans l'ordre du temps
+CLEPSYDRE|Horloge à eau
+CLOITRE|Galerie couverte d'un monastère
+COLOPHON|Mention finale d'un livre ancien
+COLPORTEUR|Marchand ambulant
+COMPLAINTE|Chanson triste et populaire
+CONCLAVE|Assemblée qui élit le pape
+CONFRERIE|Association pieuse ou de métier
+CORNEMUSE|Instrument à outre
+COROLLE|Ensemble des pétales
+CORSAIRE|Pirate officiel d'un roi
+CORTEGE|Défilé solennel
+COUPOLE|Voûte en demi-sphère
+CRESCENDO|Qui augmente peu à peu
+CRYPTE|Chapelle souterraine
+CULOTTE|Pantalon court de l'Ancien Régime
+CYCLOPE|Géant à un seul oeil
+DEDALE|Labyrinthe
+DEMIURGE|Créateur du monde chez Platon
+DENOUEMENT|Fin d'une intrigue
+DIAPASON|Il donne le la
+DIATRIBE|Discours violent contre quelqu'un
+DILEMME|Choix entre deux solutions pénibles
+DITHYRAMBE|Éloge enthousiaste
+DOLMEN|Table de pierre préhistorique
+DOUBLET|Mot de même origine qu'un autre
+DRAMATURGE|Auteur de pièces de théâtre
+ECHAFAUD|Estrade des exécutions
+ECLIPSE|Disparition d'un astre derrière un autre
+ECUEIL|Rocher à fleur d'eau
+EDEN|Paradis terrestre
+EFFIGIE|Portrait sur une monnaie
+EGERIE|Conseillère inspiratrice
+ELEGIE|Poème plaintif
+ELIXIR|Breuvage magique
+ELLIPSE|Courbe ovale ou omission de mots
+EMBLEME|Figure symbolique
+EMPYREE|Séjour des dieux
+EPERON|Pointe du cavalier
+EPHEMERE|Qui ne dure qu'un jour
+EPIGRAMME|Court poème satirique
+EPIGRAPHE|Citation en tête d'un livre
+EPITAPHE|Inscription funéraire
+EPITHETE|Adjectif accolé au nom
+EPOPEE|Long poème héroïque
+ERMITAGE|Retraite solitaire
+ESCARMOUCHE|Petit combat
+ESQUIF|Petite embarcation
+ESTAMPE|Image imprimée
+ETENDARD|Drapeau de guerre
+EXODE|Départ massif d'un peuple
+FANFARE|Orchestre de cuivres
+FARANDOLE|Danse provençale en chaîne
+FAUBOURG|Quartier hors des anciens remparts
+FELON|Vassal déloyal
+FIEF|Terre tenue d'un seigneur
+FLORILEGE|Recueil de belles pages
+FOLKLORE|Traditions populaires d'un pays
+FRISE|Bande décorative sculptée
+FRONTISPICE|Illustration en face du titre
+FUSAIN|Charbon de dessin
+GALIMATIAS|Discours obscur et confus
+GARGOUILLE|Gouttière sculptée des cathédrales
+GENESE|Origine ou premier livre de la Bible
+GHETTO|Quartier où l'on isole une communauté
+GLOSE|Note explicative
+GNOME|Petit génie de la terre
+GOELAND|Grand oiseau de mer blanc et gris
+GONDOLE|Barque de Venise
+GRIMOIRE|Livre de magie
+GRIOT|Conteur d'Afrique de l'Ouest
+HALLEBARDE|Arme à fer pointu et hache
+HARANGUE|Discours solennel à la foule
+HARPAGON|Avare de Molière
+HELIOTROPE|Plante qui tourne vers le soleil
+HEMISTICHE|Moitié d'un alexandrin
+HERALDIQUE|Science des blasons
+HERMETIQUE|Fermé ou difficile à comprendre
+HEXAGONE|Figure à six côtés
+HIERARCHIE|Ordre des rangs
+HOMERIQUE|Qui rappelle l'Iliade
+HOMONYME|Mot de même son mais de sens différent
+HORIZON|Ligne où ciel et terre se rejoignent
+HYMNE|Chant solennel
+HYPERBOLE|Exagération voulue
+IDYLLE|Amour paisible
+IMBROGLIO|Situation embrouillée
+INCIPIT|Première phrase d'un roman
+INDIGO|Bleu profond
+INTRIGANT|Qui manoeuvre en secret
+IRONIE|Moquerie qui dit le contraire
+ITINERAIRE|Chemin à suivre
+JADE|Pierre verte chère aux Chinois
+JOUTE|Combat de deux chevaliers
+JUBILE|Fête ou année sainte
+KERMESSE|Fête villageoise en plein air
+LABYRINTHE|Lieu aux chemins qui s'embrouillent
+LAMENTO|Plainte chantée
+LANTERNE|Elle éclaire dans un cadre de verre
+LEGENDAIRE|Qui appartient à la légende
+LEITMOTIV|Thème qui revient sans cesse
+LEXIQUE|Petit dictionnaire
+LIBELLE|Écrit diffamatoire
+LIGNEE|Descendance
+LIMBES|Séjour des âmes sans baptême
+LITANIE|Longue suite de prières ou de plaintes
+LITOTE|Dire moins pour faire entendre plus
+LOGORRHEE|Flot de paroles
+LUTRIN|Pupitre d'église
+MADRIGAL|Petit poème galant
+MAELSTROM|Gouffre tourbillonnant
+MALICE|Espièglerie
+MANDRAGORE|Plante magique à racine humaine
+MANTILLE|Voile de dentelle espagnol
+MARIVAUDAGE|Badinage raffiné en amour
+MASCARADE|Défilé de masques
+MECENE|Protecteur des arts
+MELANCOLIE|Tristesse rêveuse
+MENESTREL|Poète musicien du Moyen Âge
+MENHIR|Pierre dressée
+MERIDIEN|Cercle passant par les pôles
+METAPHORE|Comparaison sans mot de liaison
+METONYMIE|Figure qui remplace le tout par la partie
+MINARET|Tour de mosquée
+MIRAGE|Illusion du désert
+MISERERE|Psaume de pénitence
+MNEMONIQUE|Qui aide la mémoire
+MODILLON|Support sous une corniche
+MOSAIQUE|Assemblage de petits carreaux colorés
+MUEZZIN|Il appelle à la prière du haut du minaret
+MYOSOTIS|Fleur bleue du souvenir
+NADIR|Point opposé au zénith
+NARCISSE|Beau jeune homme amoureux de son reflet
+NECROPOLE|Cité des morts
+NEMESIS|Déesse de la vengeance
+NENUPHAR|Fleur flottante des étangs
+NEOLOGISME|Mot nouveau
+NIRVANA|Paix suprême du bouddhisme
+NOCTAMBULE|Il vit la nuit
+NOMADE|Qui n'a pas de domicile fixe
+NOSTALGIE|Regret du passé
+NOVICE|Débutant en religion
+OBELISQUE|Pierre dressée d'Égypte
+OBOLE|Petite offrande
+ODYSSEE|Long voyage plein d'aventures
+OEDIPE|Roi de Thèbes au destin tragique
+OLIFANT|Cor de Roland
+OLYMPE|Montagne des dieux grecs
+ONOMATOPEE|Mot qui imite un bruit
+ORACLE|Réponse d'un dieu
+ORIFLAMME|Bannière des rois de France
+ORPHELIN|Enfant sans parents
+OXYMORE|Alliance de mots contraires
+PALIMPSESTE|Parchemin gratté et réécrit
+PALINODIE|Rétractation de ce qu'on a dit
+PALMARES|Liste des vainqueurs
+PANACEE|Remède à tous les maux
+PANTHEON|Temple de tous les dieux
+PARABOLE|Récit imagé à sens moral
+PARADIGME|Modèle
+PARCHEMIN|Peau préparée pour écrire
+PARNASSE|Montagne des muses
+PARODIE|Imitation moqueuse
+PAROXYSME|Plus haut degré
+PASTICHE|Imitation du style d'un auteur
+PELERIN|Voyageur vers un lieu saint
+PERIPLE|Voyage autour d'une mer
+PERISTYLE|Colonnade autour d'une cour
+PHALANGE|Os du doigt ou troupe grecque
+PHENIX|Oiseau qui renaît de ses cendres
+PHILTRE|Boisson d'amour
+PIETA|Vierge portant son fils mort
+PILORI|Poteau d'exposition publique
+PLEIADE|Groupe de poètes du XVIe siècle
+POLYPHONIE|Musique à plusieurs voix
+PORTIQUE|Galerie à colonnes
+PREAMBULE|Avant-propos
+PRESAGE|Signe annonciateur
+PROMETHEE|Titan qui vola le feu
+PROSODIE|Étude de la versification
+PSALMODIE|Chant monotone des psaumes
+PSYCHE|Grand miroir mobile ou âme
+PYGMALION|Sculpteur amoureux de sa statue
+PYRAMIDE|Tombeau de pharaon
+QUATRAIN|Strophe de quatre vers
+QUENOUILLE|Bâton où l'on enroule la laine à filer
+QUINCONCE|Disposition en damier d'arbres
+QUINTESSENCE|Essence la plus pure
+REFRAIN|Couplet qui revient dans la chanson
+REQUIEM|Messe des morts
+RESILIENCE|Capacité à surmonter les chocs
+RHAPSODIE|Pièce musicale libre
+RHETORIQUE|Art de bien parler
+RONDEAU|Poème à refrain
+ROSACE|Grand vitrail circulaire
+RUBICON|Fleuve franchi par César
+SARABANDE|Danse lente espagnole
+SARCOPHAGE|Cercueil de pierre
+SARCASME|Raillerie amère
+SATIRE|Oeuvre qui se moque des travers
+SCEPTIQUE|Qui doute de tout
+SCHISME|Rupture dans une Église
+SENTENCE|Jugement ou maxime
+SERAIL|Palais du sultan
+SIBYLLE|Prophétesse antique
+SIRENE|Créature mi-femme mi-poisson
+SOLSTICE|Jour le plus long ou le plus court
+SOMPTUEUX|D'un grand luxe
+SONATE|Pièce de musique instrumentale
+SOUBRETTE|Servante de comédie
+SPHINX|Monstre à énigme
+STALACTITE|Pointe calcaire suspendue
+STALAGMITE|Pointe calcaire dressée du sol
+STANCE|Strophe lyrique
+SYMPHONIE|Grande oeuvre pour orchestre
+SYNECDOQUE|Figure : la partie pour le tout
+TABERNACLE|Armoire sacrée des hosties
+TALISMAN|Objet porte-bonheur
+TAPISSERIE|Tissu mural décoré d'un sujet
+TERCET|Strophe de trois vers
+TESTAMENT|Dernières volontés
+THEOREME|Proposition démontrée
+TIMBALE|Tambour d'orchestre en forme de bassin
+TOCSIN|Cloche d'alarme
+TRIPTYQUE|Tableau en trois volets
+TRITON|Dieu marin à queue de poisson
+TROUBADOUR|Poète de langue d'oc
+UBIQUITE|Don d'être partout à la fois
+UTOPIE|Pays imaginaire parfait
+VASSAL|Homme lié à un seigneur
+VELLEITE|Désir faible qui n'agit pas
+VESTIGE|Reste d'un temps ancien
+VIATIQUE|Provisions du voyageur
+VIGIE|Veilleur en haut du mât
+VILLANELLE|Poème de forme fixe à refrains
+VITRAIL|Verre coloré d'église
+VOLUTE|Enroulement en spirale
+ZENITH|Point du ciel à la verticale
+ZEPHYR|Vent doux et léger

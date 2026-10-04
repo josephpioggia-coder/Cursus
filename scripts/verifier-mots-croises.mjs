@@ -4,10 +4,10 @@
 import fs from "node:fs";
 const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/œ/g, "oe").toUpperCase();
 const dico = new Set(fs.readFileSync("public/scrabble/mots-fr.txt", "utf8").split("\n"));
-const lignes = fs.readFileSync("public/jeux/mots-croises.txt", "utf8").split("\n").filter(Boolean);
+const lignes = ["public/jeux/mots-croises.txt", "public/jeux/mots-croises-difficiles.txt"].flatMap((f) => fs.readFileSync(f, "utf8").split("\n").filter(Boolean));
 const vus = new Map(); const pb = [];
 // Noms propres volontaires : absents du dictionnaire (qui n'en contient pas), c'est normal.
-const NOMS_PROPRES = new Set(["ASIE","FRANCE","ROME","MADRID","BERLIN","LISBONNE","BRUXELLES","ATHENES","OSLO","LYON","MARSEILLE","NICE","NANTES","LILLE","STRASBOURG","TOULOUSE","ROUEN","DIJON","METZ","REIMS","ARLES","AVIGNON","BREST","CAEN","NIMES","ALBI","LOIRE","RHONE","GARONNE","RHIN","MEUSE","NIL","DANUBE","VOLGA","VOSGES","PYRENEES","ETNA","VESUVE","MONTBLANC","ITALIE","ESPAGNE","ALLEMAGNE","BELGIQUE","PORTUGAL","GRECE","NORVEGE","FINLANDE","POLOGNE","RUSSIE","EGYPTE","MAROC","TUNISIE","ALGERIE","SENEGAL","PEROU","MEXIQUE","IRLANDE","AFRIQUE","EUROPE","AMERIQUE","OCEANIE","SICILE","BRETAGNE","ALSACE","NORMANDIE","PROVENCE","AUVERGNE","SAVOIE","JUPITER"]);
+const NOMS_PROPRES = new Set(["CASSANDRE","NEMESIS","PROMETHEE","PYGMALION","RUBICON","ASIE","FRANCE","ROME","MADRID","BERLIN","LISBONNE","BRUXELLES","ATHENES","OSLO","LYON","MARSEILLE","NICE","NANTES","LILLE","STRASBOURG","TOULOUSE","ROUEN","DIJON","METZ","REIMS","ARLES","AVIGNON","BREST","CAEN","NIMES","ALBI","LOIRE","RHONE","GARONNE","RHIN","MEUSE","NIL","DANUBE","VOLGA","VOSGES","PYRENEES","ETNA","VESUVE","MONTBLANC","ITALIE","ESPAGNE","ALLEMAGNE","BELGIQUE","PORTUGAL","GRECE","NORVEGE","FINLANDE","POLOGNE","RUSSIE","EGYPTE","MAROC","TUNISIE","ALGERIE","SENEGAL","PEROU","MEXIQUE","IRLANDE","AFRIQUE","EUROPE","AMERIQUE","OCEANIE","SICILE","BRETAGNE","ALSACE","NORMANDIE","PROVENCE","AUVERGNE","SAVOIE","JUPITER"]);
 lignes.forEach((l, i) => {
   const [mot, ...r] = l.split("|"); const indice = r.join("|");
   if (!/^[A-Z]{3,12}$/.test(mot)) pb.push(`ligne ${i + 1}: mot invalide « ${mot} »`);
