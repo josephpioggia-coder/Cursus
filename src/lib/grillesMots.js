@@ -17,13 +17,26 @@
 import { norm } from "./jeuxDeMots.js";
 
 let croisesEnCache = null;
-/** @returns {{ mot:string, indice:string }[]} */
+/** @returns {{ mot:string, indice:string, dur?:boolean }[]} — `dur` : entrée réservée au niveau difficile */
 export async function chargerMotsCroises() {
   if (croisesEnCache) return croisesEnCache;
-  const rep = await fetch("/jeux/mots-croises.txt");
-  if (!rep.ok) throw new Error("Liste des indices introuvable (HTTP " + rep.status + ").");
-  croisesEnCache = parserMotsCroises(await rep.text());
+  const [a, b] = await Promise.all(["/jeux/mots-croises.txt", "/jeux/mots-croises-difficiles.txt"].map(async (u) => {
+    const rep = await fetch(u);
+    if (!rep.ok) throw new Error("Liste des indices introuvable (HTTP " + rep.status + ").");
+    return parserMotsCroises(await rep.text());
+  }));
+  croisesEnCache = a.concat(b.map((e) => ({ ...e, dur: true })));
   return croisesEnCache;
+}
+/**
+ * Entrées utilisées selon le niveau : facile et moyen = mots courants ; difficile = mots rares et définitions
+ * plus savantes (répétés pour qu'ils dominent) + 40 % des mots courants pour garder des croisements possibles.
+ */
+export function entreesDuNiveau(entrees, niveau, rng = Math.random) {
+  const courantes = entrees.filter((e) => !e.dur);
+  if (niveau !== "difficile") return courantes;
+  const dures = entrees.filter((e) => e.dur);
+  return dures.concat(dures, dures, dures, courantes.filter(() => rng() < 0.4));
 }
 export function parserMotsCroises(texte) {
   return texte.split(/\r?\n/).filter(Boolean).map((l) => { const i = l.indexOf("|"); return { mot: l.slice(0, i), indice: l.slice(i + 1) }; });

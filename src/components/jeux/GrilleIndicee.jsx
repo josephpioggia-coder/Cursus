@@ -6,7 +6,7 @@
  * lettres se saisissent au clavier de l'écran (ou au clavier physique).
  */
 import { useState, useMemo, useEffect } from "react";
-import { genererCroises, genererFleches, cellulesDuMot, NIVEAUX_CROISES } from "../../lib/grillesMots.js";
+import { genererCroises, genererFleches, cellulesDuMot, entreesDuNiveau, NIVEAUX_CROISES } from "../../lib/grillesMots.js";
 import { GrilleMotsCanvas } from "./dessin.jsx";
 import { carte, bouton, boutonClair, champ, discret, ClavierAzerty, useClavier, EnTete, useChrono, formatTemps, lireStats, noterPartie } from "./commun.jsx";
 
@@ -29,7 +29,8 @@ export default function GrilleIndicee({ donnees, mode, titre, sous, statKey }) {
   const temps = useChrono(!!g && !fini, g);
 
   const nouvelle = () => {
-    const puzzle = fleches ? genererFleches(donnees.croises, niveau) : genererCroises(donnees.croises, niveau);
+    const pool = entreesDuNiveau(donnees.croises, niveau);
+    const puzzle = fleches ? genererFleches(pool, niveau) : genererCroises(pool, niveau);
     setG(puzzle); setSaisie({}); setRevelees(new Set()); setVerif(false); setFini(null); setMessage(""); setAides(0);
     const premier = puzzle.mots[0];
     setDir(premier.dir); setSel({ r: premier.r, c: premier.c });
