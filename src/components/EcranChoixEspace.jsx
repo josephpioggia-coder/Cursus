@@ -329,7 +329,7 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
           04/09/2026 — repositionné autour de "Cursus Essentiel" : l'offre
           d'accès global remplace la simple accroche produit. */}
       <div id="offre-cursus-essentiel" style={{
-        width: 620, boxSizing: "border-box",
+        width: "100%", maxWidth: 620, boxSizing: "border-box", marginTop: window.innerWidth < 640 ? 44 : 0,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         padding: "22px 24px", borderRadius: 14,
         border: "0.5px solid #C4973A80", background: "#fff",
@@ -388,7 +388,7 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
             key={`cartouche-${e.id}`}
             onClick={() => (e.info ? setInfoOuverte(e) : setPageDécisionOuverte(true))}
             style={{
-              width: 300, padding: "14px 0", borderRadius: 24, cursor: "pointer",
+              width: "100%", maxWidth: 300, padding: "14px 0", borderRadius: 24, cursor: "pointer",
               background: "#fff", color: e.couleur, fontSize: 15, fontWeight: 700,
               fontFamily: "inherit", border: `2px solid ${e.couleur}`, boxSizing: "border-box",
             }}
@@ -406,7 +406,7 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
           <div
             key={e.id}
             style={{
-              width: 300, textAlign: "left", padding: "28px 24px", borderRadius: 14,
+              width: "100%", maxWidth: 300, textAlign: "left", padding: "28px 24px", borderRadius: 14,
               border: `0.5px solid ${e.couleur}30`, background: "#fff",
               boxShadow: "0 1px 4px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column",
             }}
