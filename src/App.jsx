@@ -1729,6 +1729,8 @@ export default function App() {
       window.history.replaceState({}, "", window.location.pathname);
       return espaceRetour;
     }
+    // Lien direct vers un jeu : sans espace déjà choisi, on ouvre CursEdit (pas d'écran de choix en travers).
+    if (JEU_PAR_LIEN && !localStorage.getItem("cursus_espace")) { localStorage.setItem("cursus_espace", "cursedit"); return "cursedit"; }
     return localStorage.getItem("cursus_espace") || null;
   });
 
@@ -1759,11 +1761,18 @@ export default function App() {
 
 // ─── Composant : App connectée (après auth) ───────────────────────────────────
 
+// Lien direct vers un jeu (04/10/2026) : « cursus.pro/?jeu=croises » (ou fleches, codes, motus, boggle, long,
+// pendu, echelle, meles, grille ; « ?jeu=salle » = la liste des jeux). Lu UNE fois au chargement de la page ;
+// remis à null au premier montage de l'app connectée pour qu'un changement d'espace ne rouvre pas le jeu.
+let JEU_PAR_LIEN = (() => { try { return new URLSearchParams(window.location.search).get("jeu"); } catch { return null; } })();
+
 function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const { t, i18n } = useTranslation("common");
   const [projets, setProjets]   = useState([]);
   const [chargement, setChargement] = useState(true);
-  const [vue, setVue]           = useState(espaceActif === "cursaudit" ? "cursaudit" : "tableau");
+  const [jeuParLien] = useState(JEU_PAR_LIEN);
+  useEffect(() => { JEU_PAR_LIEN = null; }, []);
+  const [vue, setVue]           = useState(jeuParLien ? "scrabble" : espaceActif === "cursaudit" ? "cursaudit" : "tableau");
   const [projetActifId, setProjetActifId] = useState(null);
   const [auditActifId, setAuditActifId] = useState(null);
   // Retour vers CursAudit depuis l'éditeur (12/09/2026) — demandé par
@@ -2503,7 +2512,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         )}
 
         {/* Vue : solveur Scrabble (29/09/2026) */}
-        {vue === "scrabble" && <SalleDesJeux />}
+        {vue === "scrabble" && <SalleDesJeux jeuInitial={jeuParLien} />}
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (
