@@ -696,7 +696,7 @@ applique la bonne variante lui aussi.
 Demande de Joseph : « autres jeux de mots comme mots croisés ou mots fléchés… ». Trois jeux ajoutés à la Salle
 (`MotsCroises.jsx`, `MotsFleches.jsx` → interface commune `GrilleIndicee.jsx` ; `MotsCodes.jsx`), moteur pur
 `src/lib/grillesMots.js`, dessin `GrilleMotsCanvas` (dessin.jsx, canvas : règle du mode sombre forcé).
-- **Indices** : `public/jeux/mots-croises.txt`, 704 lignes `MOT|indice`, ÉCRITES par Claude (originales, sans
+- **Indices** : `public/jeux/mots-croises.txt`, 1591 lignes (704 le 04/10 matin, +887 le soir : animaux, cuisine, corps, maison, métiers, géographie avec noms propres autorisés dans le vérificateur, littérature/arts, météo, sentiments, verbes, adjectifs, sciences, sport) `MOT|indice`, ÉCRITES par Claude (originales, sans
   copie : Wiktionnaire & co. inaccessibles depuis l'environnement de dev). Réponses sans accents (`COEUR`, `OEUF`).
   Contrôle : `node scripts/verifier-mots-croises.mjs` (format, doublons, présence au dictionnaire, indice ne contenant
   pas la réponse, longueur ≤ 46). À relancer après tout ajout. Vocabulaire limité : agrandir la liste = plus de variété.
