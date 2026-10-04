@@ -267,3 +267,99 @@ export function GrilleCanvas({ n, cellules, onCase, marque, tuiles = false, maxL
     </div>
   );
 }
+
+// Coupe un texte en lignes de largeur maxi `largeur` (au plus `maxLignes`, « … » si ça dépasse).
+function decouper(ctx, texte, largeur, maxLignes) {
+  const mots = texte.split(" "), lignes = [];
+  let cur = "";
+  for (const m of mots) {
+    const essai = cur ? cur + " " + m : m;
+    if (ctx.measureText(essai).width <= largeur || !cur) cur = essai; else { lignes.push(cur); cur = m; }
+  }
+  if (cur) lignes.push(cur);
+  if (lignes.length > maxLignes) {
+    const garde = lignes.slice(0, maxLignes);
+    let der = garde[maxLignes - 1];
+    while (der.length > 1 && ctx.measureText(der + "…").width > largeur) der = der.slice(0, -1);
+    garde[maxLignes - 1] = der + "…";
+    return garde;
+  }
+  return lignes;
+}
+
+/**
+ * Grille de mots (croisés, fléchés, codés) — 04/10/2026. Sur canvas pour la même raison que le plateau
+ * (mode sombre forcé du navigateur). `cellules` : tableau lignes × colonnes de
+ *   null                                  → case noire
+ *   { t: "L", lettre?, num?, code?, fond?, erreur?, revele? }   → case de lettre (num = numéro de mot croisé,
+ *                                           code = numéro d'un mot codé, lettre = ce que le joueur a saisi)
+ *   { t: "C", h?: {texte}, v?: {texte}, actif? } → case d'indice de mots fléchés (h : mot vers la droite,
+ *                                           v : mot vers le bas ; flèche dessinée sur le bord correspondant)
+ * onCase(r, c). La taille de case suit la largeur du conteneur (jamais celle de la fenêtre).
+ */
+export function GrilleMotsCanvas({ lignes, colonnes, cellules, onCase, maxCase = 48 }) {
+  const [refBoite, largeur] = useLargeur();
+  const refCanvas = useRef(null);
+  const cellule = Math.max(14, Math.min(maxCase, Math.floor((largeur || 300) / colonnes)));
+  const W = cellule * colonnes, H = cellule * lignes;
+  useEffect(() => {
+    const canvas = refCanvas.current;
+    if (!canvas) return;
+    const ctx = preparer(canvas, W, H);
+    ctx.fillStyle = "#1b1b1b"; ctx.fillRect(0, 0, W, H);
+    const m = 1;
+    for (let r = 0; r < lignes; r++) for (let c = 0; c < colonnes; c++) {
+      const x = c * cellule, y = r * cellule, cell = cellules[r][c];
+      if (!cell) { ctx.fillStyle = "#2b3038"; ctx.fillRect(x + m, y + m, cellule - 2 * m, cellule - 2 * m); continue; }
+      if (cell.t === "L") {
+        ctx.fillStyle = cell.fond || "#ffffff"; ctx.fillRect(x + m, y + m, cellule - 2 * m, cellule - 2 * m);
+        ctx.textBaseline = "alphabetic";
+        if (cell.num || cell.code) {
+          ctx.font = `${cell.code ? 700 : 500} ${Math.max(8, cellule * (cell.code ? 0.27 : 0.25))}px ${POLICE}`;
+          ctx.fillStyle = cell.code ? "#1a6a8f" : "#555"; ctx.textAlign = "left";
+          ctx.fillText(String(cell.num || cell.code), x + 3, y + Math.max(9, cellule * 0.27));
+        }
+        if (cell.lettre) {
+          ctx.font = `700 ${cellule * 0.58}px ${POLICE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillStyle = cell.erreur ? "#c0392b" : cell.revele ? "#1a6fb3" : "#111";
+          ctx.fillText(cell.lettre, x + cellule / 2, y + cellule * (cell.num || cell.code ? 0.6 : 0.54));
+        }
+      } else {
+        ctx.fillStyle = cell.actif ? "#ffe9a8" : "#cfe3f2"; ctx.fillRect(x + m, y + m, cellule - 2 * m, cellule - 2 * m);
+        const deux = cell.h && cell.v;
+        const police = Math.max(7, Math.min(11, cellule * 0.2));
+        ctx.font = `600 ${police}px ${POLICE}`; ctx.fillStyle = "#1c3b57"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+        const zone = (clue, y0, h) => {
+          const interligne = police * 1.12, max = Math.max(1, Math.floor((h - 2) / interligne));
+          const ls = decouper(ctx, clue.texte, cellule - 9, max);
+          const total = ls.length * interligne, hautDepart = y0 + Math.max(1, (h - total) / 2);
+          ls.forEach((l, i) => ctx.fillText(l, x + (cellule - 3) / 2, hautDepart + i * interligne));
+        };
+        const haut = deux ? (cellule - 2) / 2 : cellule - 2;
+        if (cell.h) zone(cell.h, y + 1, haut);
+        if (cell.v) zone(cell.v, y + 1 + (cell.h ? haut : 0), haut);
+        ctx.fillStyle = "#d2691e";
+        const t = Math.max(4, cellule * 0.13);
+        if (cell.h) { // flèche → au milieu du bord droit
+          const cy = y + (deux ? cellule * 0.27 : cellule / 2);
+          ctx.beginPath(); ctx.moveTo(x + cellule - 1, cy); ctx.lineTo(x + cellule - 1 - t, cy - t * 0.9); ctx.lineTo(x + cellule - 1 - t, cy + t * 0.9); ctx.fill();
+        }
+        if (cell.v) { // flèche ↓ au milieu du bord bas
+          const cx = x + cellule / 2;
+          ctx.beginPath(); ctx.moveTo(cx, y + cellule - 1); ctx.lineTo(cx - t * 0.9, y + cellule - 1 - t); ctx.lineTo(cx + t * 0.9, y + cellule - 1 - t); ctx.fill();
+        }
+      }
+    }
+  }, [lignes, colonnes, cellules, cellule, W, H]);
+  const clic = (e) => {
+    const rect = refCanvas.current.getBoundingClientRect(), pas = rect.width / colonnes;
+    const c = Math.floor((e.clientX - rect.left) / pas), r = Math.floor((e.clientY - rect.top) / (rect.height / lignes));
+    if (r >= 0 && r < lignes && c >= 0 && c < colonnes) onCase?.(r, c);
+  };
+  return (
+    <div ref={refBoite} style={{ position: "relative", width: "100%", maxWidth: colonnes * maxCase, minWidth: 0, aspectRatio: `${colonnes} / ${lignes}`, overflow: "hidden", borderRadius: 6, background: "#1b1b1b" }}>
+      <canvas ref={refCanvas} onClick={clic} role="img" aria-label={`Grille de ${lignes} lignes et ${colonnes} colonnes`}
+        style={{ position: "absolute", left: 0, top: 0, touchAction: "manipulation", cursor: onCase ? "pointer" : "default" }} />
+    </div>
+  );
+}

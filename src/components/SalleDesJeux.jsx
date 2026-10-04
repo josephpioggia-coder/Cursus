@@ -20,6 +20,10 @@ import Boggle from "./jeux/Boggle.jsx";
 import MotLePlusLong from "./jeux/MotLePlusLong.jsx";
 import EchelleDeMots from "./jeux/EchelleDeMots.jsx";
 import MotsMeles from "./jeux/MotsMeles.jsx";
+import MotsCroises from "./jeux/MotsCroises.jsx";
+import MotsFleches from "./jeux/MotsFleches.jsx";
+import MotsCodes from "./jeux/MotsCodes.jsx";
+import { chargerMotsCroises } from "../lib/grillesMots.js";
 import { chargerMoteur } from "../lib/jeuMots.js";
 import { chargerListe, chargerMotsCourants } from "../lib/jeuxDeMots.js";
 
@@ -31,13 +35,16 @@ const JEUX = [
   { id: "pendu", icone: "🪢", titre: "Pendu", resume: "Devine le mot lettre par lettre avant la dernière erreur.", Composant: Pendu },
   { id: "echelle", icone: "🪜", titre: "Échelle de mots", resume: "Change une lettre à la fois pour passer d'un mot à un autre.", Composant: EchelleDeMots },
   { id: "meles", icone: "🔎", titre: "Mots mêlés", resume: "Retrouve les mots cachés dans la grille.", Composant: MotsMeles },
+  { id: "croises", icone: "✏️", titre: "Mots croisés", resume: "Une grille, des définitions : trois niveaux.", Composant: MotsCroises },
+  { id: "fleches", icone: "➡️", titre: "Mots fléchés", resume: "Les définitions sont dans la grille, les flèches montrent le sens.", Composant: MotsFleches },
+  { id: "codes", icone: "🔢", titre: "Mots codés", resume: "Chaque numéro cache une lettre : déchiffre la grille.", Composant: MotsCodes },
 ];
 
 let donneesEnCache = null;
 async function chargerDonnees() {
   if (donneesEnCache) return donneesEnCache;
-  const [moteur, liste, courants] = await Promise.all([chargerMoteur(), chargerListe(), chargerMotsCourants()]);
-  donneesEnCache = { trie: moteur.trie, ensemble: moteur.ensemble, mots: liste.mots, courants };
+  const [moteur, liste, courants, croises] = await Promise.all([chargerMoteur(), chargerListe(), chargerMotsCourants(), chargerMotsCroises()]);
+  donneesEnCache = { trie: moteur.trie, ensemble: moteur.ensemble, mots: liste.mots, courants, croises };
   return donneesEnCache;
 }
 
