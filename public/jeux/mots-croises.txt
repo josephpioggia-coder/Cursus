@@ -702,3 +702,890 @@ VOITURE|Automobile
 VOLEUR|Il dérobe
 VOYAGE|Déplacement lointain
 ZEBRE|Cheval rayé
+ARA|Grand perroquet coloré
+BAR|Poisson de la Méditerranée aussi appelé loup
+BREBIS|Femelle du mouton
+BELIER|Mâle du mouton à cornes enroulées
+BICHE|Femelle du cerf
+CABRI|Petit de la chèvre
+CAILLE|Petit oiseau coureur des champs
+CAMELEON|Reptile qui change de couleur
+CARPE|Poisson d'étang à barbillons
+CASTOR|Rongeur bâtisseur de barrages
+CHOUETTE|Rapace de nuit sans aigrettes
+CIGALE|Elle chante tout l'été
+CIGOGNE|Échassier qui niche sur les toits d'Alsace
+COBRA|Serpent à capuchon
+COLIBRI|Le plus petit oiseau du monde
+CRABE|Il marche de travers
+CRAPAUD|Batracien à peau verruqueuse
+CROCODILE|Reptile aux larmes proverbiales
+CYGNE|Oiseau blanc au long cou
+DAUPHIN|Mammifère marin joueur
+DINDE|Volaille de Noël
+ELAN|Grand cervidé du Nord
+ESCARGOT|Il porte sa maison sur le dos
+FAUCON|Rapace dressé pour la chasse
+GAZELLE|Antilope gracile
+GUEPE|Insecte rayé qui pique
+HIRONDELLE|Elle ne fait pas le printemps seule
+HUITRE|Mollusque à perle
+JAGUAR|Félin tacheté d'Amérique
+KOALA|Marsupial qui mange de l'eucalyptus
+LEZARD|Reptile qui perd sa queue
+LIBELLULE|Insecte aux quatre ailes transparentes
+LICORNE|Cheval fabuleux à corne
+LYNX|Félin aux oreilles à pinceaux
+MARMOTTE|Elle hiberne dans les Alpes
+MERLE|Oiseau noir au bec orangé
+MOUETTE|Oiseau de mer criard
+MULET|Hybride de l'âne et de la jument
+PAON|Il fait la roue
+PANDA|Ours noir et blanc de Chine
+PANTHERE|Grand félin noir
+PELICAN|Oiseau à grand bec-poche
+PERDRIX|Gibier à plumes des champs
+PINGOUIN|Oiseau marin des régions arctiques
+PIEUVRE|Mollusque à huit bras
+POULPE|Autre nom de la pieuvre
+RAIE|Poisson plat à longue queue
+REQUIN|Poisson aux dents redoutées
+RHINOCEROS|Animal à corne sur le nez
+ROSSIGNOL|Oiseau au chant mélodieux
+SANGLIER|Cochon sauvage
+SARDINE|Petit poisson en boîte
+TAUPE|Elle creuse des galeries sous terre
+TAUREAU|Mâle de la vache
+THON|Gros poisson de mer
+VAUTOUR|Rapace charognard
+VIPERE|Serpent venimeux
+ZEBU|Bovin à bosse
+AIGLE|Roi des oiseaux
+ALOUETTE|Oiseau de la chanson qu'on plume
+ANGUILLE|Poisson en forme de serpent
+BALEINE|Plus gros mammifère marin
+BEBETE|Petit animal tendre
+BISON|Bovidé d'Amérique à bosse
+BOEUF|Bovin adulte castré
+BRAQUE|Chien de chasse à poil ras
+CAFARD|Insecte noir de cuisine
+CALAMAR|Mollusque à dix bras
+CANARI|Petit oiseau jaune en cage
+CHACAL|Charognard proche du loup
+CHAMEAU|Animal à deux bosses
+CHAMOIS|Antilope des Alpes
+CHENILLE|Elle devient papillon
+CHIOT|Jeune chien
+COCCINELLE|Bête à bon Dieu
+CRIQUET|Insecte sauteur dévastateur
+DROMADAIRE|Camélidé à une bosse
+EPERVIER|Petit rapace chasseur d'oiseaux
+FLAMANT|Échassier rose
+FOULQUE|Oiseau d'eau à plaque blanche
+FRELON|Grosse guêpe
+GECKO|Petit lézard grimpeur
+GORILLE|Grand singe d'Afrique
+GOUJON|Petit poisson de rivière
+HAMSTER|Rongeur domestique qui court dans une roue
+HERON|Échassier gris pêcheur
+HYENE|Charognard au rire sinistre
+IGUANE|Grand lézard vert
+JUMENT|Femelle du cheval
+LAMA|Camélidé des Andes
+LEOPARD|Félin à taches en rosettes
+LOUTRE|Mustélidé nageur
+MAQUEREAU|Poisson bleu rayé
+MOULE|Mollusque des marmites
+MOUSTIQUE|Insecte piqueur des soirs d'été
+NARVAL|Cétacé à longue défense
+OUISTITI|Petit singe d'Amérique du Sud
+PANGOLIN|Mammifère couvert d'écailles
+PIVERT|Oiseau qui frappe les troncs
+PYTHON|Gros serpent étrangleur
+RENNE|Cervidé du Père Noël
+SANGSUE|Ver suceur de sang
+SCARABEE|Coléoptère sacré des Égyptiens
+SCORPION|Arachnide à dard
+SEICHE|Mollusque qui lance de l'encre
+TERMITE|Insecte rongeur de bois
+TOUCAN|Oiseau au bec énorme
+VEAU|Petit de la vache
+VER|Il se tortille dans la terre
+ACAJOU|Bois précieux rougeâtre
+ANANAS|Fruit tropical à couronne
+CASSIS|Petite baie noire
+CLEMENTINE|Petite mandarine sans pépins
+COING|Fruit dur dont on fait la gelée
+DATTE|Fruit du palmier
+FIGUE|Fruit sucré à pépins minuscules
+FRAMBOISE|Baie rouge parfumée
+GOYAVE|Fruit tropical rosé
+GROSEILLE|Petite baie rouge en grappes
+KIWI|Fruit à chair verte et poils bruns
+LITCHI|Fruit asiatique à peau rugueuse
+MANGUE|Fruit exotique juteux
+MURE|Baie noire des ronces
+MYRTILLE|Baie bleue des sous-bois
+NOIX|Fruit sec à coque dure
+PAMPLEMOUSSE|Gros agrume amer
+PASTEQUE|Gros fruit rouge à pépins noirs
+PRUNEAU|Fruit séché d'Agen
+RHUBARBE|Tiges rosées pour les tartes
+ARTICHAUT|Légume au coeur tendre et aux feuilles
+ASPERGE|Pousse blanche ou verte au printemps
+AUBERGINE|Légume violet de la ratatouille
+BETTERAVE|Racine rouge
+BROCOLI|Chou vert en petits arbres
+CELERI|Légume en branches ou en rave
+CHAMPIGNON|Il pousse à l'ombre des bois
+CHICOREE|Salade amère
+CHOU|Légume en boule feuillue
+COURGE|Grosse cucurbite
+COURGETTE|Cucurbite verte allongée
+CONCOMBRE|Légume vert du tzatziki
+CRESSON|Salade des ruisseaux
+ECHALOTE|Petit bulbe fin du beurre blanc
+FENOUIL|Légume anisé
+LAITUE|Salade en pomme
+LENTILLE|Légumineuse du Puy
+MAIS|Céréale aux grains jaunes en épi
+NAVET|Racine blanche du pot-au-feu
+PANAIS|Racine blanche ancienne
+PERSIL|Herbe hachée verte
+POIREAU|Légume de la soupe aux oignons blancs
+POIVRON|Légume rouge, jaune ou vert creux
+POTIRON|Courge orange d'Halloween
+RADIS|Racine rose croquante
+BASILIC|Herbe du pistou
+CANNELLE|Épice en bâtons roulés
+CERFEUIL|Herbe fine
+CIBOULETTE|Herbe fine à tiges creuses
+CLOU|Bouton de girofle
+CUMIN|Épice des couscous
+CURRY|Mélange d'épices indien
+ESTRAGON|Aromate de la sauce béarnaise
+GINGEMBRE|Racine piquante asiatique
+LAURIER|Feuille du bouquet garni
+MENTHE|Plante du thé marocain
+MUSCADE|Noix râpée sur le gratin
+ORIGAN|Aromate des pizzas
+PAPRIKA|Poudre de piment doux
+ROMARIN|Aromate des garrigues
+SAFRAN|Épice la plus chère
+SAUGE|Plante aromatique argentée
+THYM|Petite herbe de Provence
+VANILLE|Gousse parfumée des desserts
+AUTEUR|Il écrit des livres
+AUTEURE|Celle qui signe un roman
+ROMANCIER|Écrivain de fiction
+POETE|Il écrit des vers
+POESIE|Art des vers
+STROPHE|Groupe de vers
+VERS|Ligne d'un poème
+RIME|Retour du même son en fin de vers
+SONNET|Poème de quatorze vers
+FABLE|Court récit à morale
+CONTE|Récit imaginaire pour enfants
+NOUVELLE|Récit bref en prose
+RECIT|Histoire racontée
+ESSAI|Ouvrage de réflexion personnelle
+PIECE|Oeuvre jouée sur scène
+ACTE|Grande division d'une pièce de théâtre
+DRAME|Pièce au dénouement tragique
+COMEDIE|Pièce pour faire rire
+TRAGEDIE|Pièce de Racine
+INTRIGUE|Enchaînement des actions d'un récit
+CHAPITRE|Division d'un livre
+TOME|Volume d'un ouvrage
+VOLUME|Tome d'une collection
+PREFACE|Texte placé avant le livre
+EPILOGUE|Conclusion d'un récit
+PROLOGUE|Début avant l'histoire
+TITRE|Nom d'un livre
+COUVERTURE|Elle protège le livre
+EDITEUR|Il publie les livres
+EDITION|Tirage d'un livre
+LIBRAIRE|Il vend des livres
+LIBRAIRIE|Boutique de livres
+LECTEUR|Il lit
+LECTURE|Plaisir des yeux sur la page
+CRITIQUE|Avis sur une oeuvre
+MANUSCRIT|Texte écrit à la main avant publication
+BROUILLON|Premier jet raturé
+RATURE|Mot barré
+STYLE|Manière d'écrire
+VERBE|Mot qui exprime l'action
+ADJECTIF|Il qualifie le nom
+ADVERBE|Mot invariable qui modifie le verbe
+PHRASE|Suite de mots avec un sens
+SYLLABE|Groupe de sons prononcés d'un coup
+VOYELLE|A, E, I, O, U ou Y
+ACCENT|Signe sur une voyelle
+TRAIT|Signe d'union entre deux mots
+VIRGULE|Petite pause écrite
+POINT|Il termine la phrase
+GUILLEMET|Il encadre une citation
+APOSTROPHE|Signe d'élision
+SUJET|Il fait l'action du verbe
+SENS|Signification d'un mot
+SYNONYME|Mot de même sens
+ANTONYME|Mot de sens contraire
+ALPHABET|Suite de lettres de A à Z
+DICTIONNAIRE|Recueil de mots classés
+GRAMMAIRE|Règles de la langue
+ORTHOGRAPHE|Façon correcte d'écrire les mots
+DICTEE|Exercice d'écriture sous la voix du maître
+LANGAGE|Faculté de s'exprimer
+TEXTE|Ensemble de mots écrits
+CITATION|Passage cité d'un auteur
+PROVERBE|Maxime populaire
+DEVISE|Courte formule qui résume un idéal
+MAXIME|Règle de conduite en une phrase
+ENIGME|Question à deviner
+RIMEUR|Faiseur de vers
+BARDE|Poète celte
+LYRE|Instrument des poètes antiques
+MUSE|Inspiratrice des artistes
+MYTHE|Récit des temps fabuleux
+LEGENDE|Récit transmis par la tradition
+HEROINE|Personnage principal féminin
+PERSONNAGE|Être imaginaire dans un récit
+NARRATEUR|Celui qui raconte l'histoire
+DIALOGUE|Conversation entre personnages
+DECOR|Cadre d'un spectacle
+ACTRICE|Elle joue au cinéma
+REALISATEUR|Il dirige un film
+PEINTURE|Art des couleurs sur toile
+PALETTE|Elle porte les couleurs du peintre
+PAYSAGE|Vue d'un site naturel
+STATUE|Figure de pierre ou de bronze
+GALERIE|Lieu d'exposition privé
+ESQUISSE|Premier croquis
+CROQUIS|Dessin rapide
+FRESQUE|Peinture murale
+ARTISTE|Il crée des oeuvres
+MELODIE|Suite de notes agréable
+CHANTEUR|Il interprète des chansons
+CHORALE|Groupe de chanteurs
+OPERA|Drame chanté
+FLUTE|Instrument à vent traversier
+HARPE|Instrument à cordes pincées
+TROMPETTE|Cuivre à pistons
+ACCORD|Plusieurs notes jouées ensemble
+GAMME|Suite de notes
+RYTHME|Cadence de la musique
+ORCHESTRE|Ensemble de musiciens
+MUSICIEN|Il joue d'un instrument
+VALSE|Danse à trois temps
+BALLET|Danse de scène
+TANGO|Danse argentine
+ENCORE|Cri du public qui réclame un rappel
+PARIS|Capitale de la France
+ROME|Capitale de l'Italie
+LONDRES|Capitale du Royaume-Uni
+MADRID|Capitale de l'Espagne
+BERLIN|Capitale allemande
+LISBONNE|Capitale du Portugal
+BRUXELLES|Capitale de la Belgique
+VIENNE|Capitale autrichienne
+ATHENES|Capitale de la Grèce
+OSLO|Capitale de la Norvège
+BERNE|Capitale de la Suisse
+LYON|Ville des traboules
+MARSEILLE|Cité phocéenne
+NICE|Ville de la Promenade des Anglais
+NANTES|Ville des ducs de Bretagne
+LILLE|Capitale des Flandres françaises
+STRASBOURG|Siège du Parlement européen
+BORDEAUX|Capitale du vin
+TOULOUSE|Ville rose
+RENNES|Capitale de la Bretagne
+ROUEN|Ville aux cent clochers
+DIJON|Ville de la moutarde
+METZ|Ville de Lorraine
+REIMS|Ville du sacre des rois
+ARLES|Ville de Van Gogh
+AVIGNON|Ville des papes
+CANNES|Ville du festival de cinéma
+BREST|Port du Finistère
+CAEN|Ville de Guillaume le Conquérant
+TOURS|Ville de la Loire et de Saint Martin
+NIMES|Ville des arènes du Gard
+ALBI|Ville de Toulouse-Lautrec
+SEINE|Fleuve de Paris
+LOIRE|Plus long fleuve de France
+RHONE|Fleuve de Lyon et d'Arles
+GARONNE|Fleuve de Toulouse et Bordeaux
+RHIN|Fleuve frontalier de l'Est
+MEUSE|Fleuve du Nord-Est
+MARNE|Rivière de la Champagne
+SOMME|Fleuve du Nord
+NIL|Fleuve des pharaons
+AMAZONE|Plus grand fleuve du monde par le débit
+DANUBE|Fleuve bleu de Vienne
+TAMISE|Fleuve de Londres
+VOLGA|Grand fleuve russe
+ALPES|Chaîne qui porte le mont Blanc
+JURA|Massif entre la France et la Suisse
+VOSGES|Massif de l'Est de la France
+PYRENEES|Montagnes entre France et Espagne
+ETNA|Volcan de Sicile
+VESUVE|Volcan de Pompéi
+MONTBLANC|Toit de l'Europe occidentale
+ITALIE|Pays en forme de botte
+ESPAGNE|Pays de la corrida
+ALLEMAGNE|Pays de Goethe
+BELGIQUE|Pays des frites et du chocolat
+SUISSE|Pays du chocolat et des banques
+PORTUGAL|Pays de Lisbonne
+GRECE|Pays du Parthénon
+NORVEGE|Pays des fjords
+SUEDE|Pays des Vikings du Sud
+FINLANDE|Pays des mille lacs
+POLOGNE|Pays de Chopin
+RUSSIE|Plus vaste pays du monde
+CHINE|Pays de la Grande Muraille
+JAPON|Pays du Soleil-Levant
+INDE|Pays du Gange
+EGYPTE|Pays des pyramides
+MAROC|Pays de Marrakech
+TUNISIE|Pays de Carthage
+ALGERIE|Pays du Maghreb, voisin de la Tunisie
+SENEGAL|Pays de Dakar
+MALI|Pays de Tombouctou
+CANADA|Pays de la feuille d'érable
+BRESIL|Pays du carnaval de Rio
+PEROU|Pays du Machu Picchu
+CUBA|Île des Caraïbes
+MEXIQUE|Pays des Aztèques
+CHILI|Pays tout en longueur
+IRLANDE|Île verte
+ECOSSE|Pays du kilt
+AFRIQUE|Continent du Sahara
+EUROPE|Continent de la France
+AMERIQUE|Continent de Christophe Colomb
+OCEANIE|Continent des îles du Pacifique
+ARCTIQUE|Région du pôle Nord
+CORSE|Île de Beauté
+CRETE|Île grecque du Minotaure
+SICILE|Plus grande île de Méditerranée
+MALTE|Petit pays insulaire
+BRETAGNE|Région des menhirs
+ALSACE|Région des cigognes
+NORMANDIE|Région du Mont Saint-Michel
+PROVENCE|Région des cigales
+AUVERGNE|Région des volcans éteints
+SAVOIE|Région des Alpes françaises
+ATLANTIQUE|Océan entre l'Europe et l'Amérique
+PACIFIQUE|Plus vaste océan
+INDIEN|Océan de Madagascar
+ETANG|Petit lac peu profond
+RUISSEAU|Tout petit cours d'eau
+TORRENT|Cours d'eau de montagne impétueux
+CASCADE|Chute d'eau
+GLACIER|Fleuve de glace
+VOLCAN|Montagne qui crache du feu
+COLLINE|Petite hauteur arrondie
+PLATEAU|Terrain plat en altitude
+OASIS|Point d'eau du désert
+DUNE|Colline de sable
+JUNGLE|Forêt dense tropicale
+LANDE|Terre à bruyères
+ILOT|Petite île
+RIVAGE|Bord de mer
+FALAISE|Paroi abrupte au bord de la mer
+GOUFFRE|Abîme profond
+BAIE|Large échancrure de la côte
+GOLFE|Grande baie
+CERVEAU|Siège de la pensée
+CHEVILLE|Articulation du pied
+COU|Il relie la tête au tronc
+CRANE|Os de la tête
+ESTOMAC|Il digère les aliments
+FOIE|Organe de la bile
+HANCHE|Articulation du bassin
+JOUE|Partie ronde du visage
+MENTON|Bas du visage
+MUSCLE|Il permet le mouvement
+NARINE|Orifice du nez
+NUQUE|Arrière du cou
+OEIL|Organe de la vue
+ONGLE|Il pousse au bout du doigt
+PAUME|Intérieur de la main
+PAUPIERE|Elle recouvre l'oeil
+POIGNET|Il relie la main à l'avant-bras
+POING|Main fermée
+POITRINE|Torse
+POUMON|Organe de la respiration
+RATE|Organe voisin de l'estomac
+REIN|Organe qui filtre le sang
+SOURCIL|Poils au-dessus de l'oeil
+TALON|Arrière du pied
+TORSE|Tronc sans les membres
+VEINE|Elle ramène le sang au coeur
+YEUX|On les ferme pour dormir
+SQUELETTE|Charpente osseuse
+TENDON|Il attache le muscle à l'os
+ARTERE|Vaisseau qui part du coeur
+RETINE|Fond de l'oeil
+PUPILLE|Centre noir de l'iris
+CILS|Poils des paupières
+MOUSTACHE|Poils sous le nez
+RIDE|Pli de la peau
+SUEUR|Eau salée de la peau
+FATIGUE|Besoin de repos
+MALADIE|Dérèglement de la santé
+FIEVRE|Température trop haute
+TOUX|Elle irrite la gorge
+RHUME|Il fait éternuer
+DOULEUR|Souffrance physique
+REMEDE|Il guérit
+INFIRMIERE|Elle soigne à l'hôpital
+PHARMACIE|Boutique de médicaments
+PILULE|Comprimé
+SIROP|Médicament liquide sucré
+PLANCHER|Sol en bois
+CHEMINEE|Foyer et conduit
+VOLET|Il ferme la fenêtre
+SERRURE|Elle reçoit la clef
+VERROU|Fermeture à glissière
+TERRASSE|Plate-forme extérieure
+CLOTURE|Elle entoure le jardin
+PORTAIL|Grande porte du jardin
+CANAPE|Siège pour plusieurs
+COMMODE|Meuble à tiroirs
+ETAGERE|Planche à livres
+RIDEAUX|Tissus aux fenêtres
+COUSSIN|Petit oreiller du fauteuil
+OREILLER|Il soutient la tête au lit
+VASE|Récipient pour fleurs
+ASSIETTE|On y mange
+CUILLERE|Elle prend la soupe
+BOL|Récipient creux du petit-déjeuner
+POELE|Ustensile à frire
+MARMITE|Grosse casserole
+FOUR|Il cuit les gâteaux
+THEIERE|Elle sert le thé
+CAFETIERE|Elle prépare le café
+EVIER|Bac de la cuisine
+ROBINET|Il laisse couler l'eau
+BALAI|Il enlève la poussière
+SERPILLIERE|Chiffon à laver le sol
+BAIGNOIRE|On y prend un bain
+DOUCHE|Jet d'eau sur le corps
+SERVIETTE|Linge de toilette
+PEIGNE|Il démêle
+BROSSE|Elle nettoie les dents
+RASOIR|Il coupe la barbe
+PARFUM|Odeur de flacon
+LUNETTES|Elles corrigent la vue
+BAGUE|Bijou du doigt
+BRACELET|Bijou du poignet
+CASQUETTE|Chapeau à visière
+BONNET|Coiffure de laine
+PULL|Tricot
+SHORT|Pantalon court
+CHAUSSETTE|Elle enveloppe le pied dans la chaussure
+CRAVATE|Elle se noue autour du col
+BOUTON|Il ferme la chemise
+FERMETURE|Elle se glisse pour fermer
+LIN|Fibre de la plante bleue
+AIGUILLE|Elle coud
+BOUCHER|Il vend la viande
+PATISSIER|Il fait les gâteaux
+CUISINIER|Il prépare les repas
+SERVEUR|Il apporte les plats
+PAYSAN|Homme des champs
+PECHEUR|Il lance sa ligne
+MARIN|Homme de mer
+CHAUFFEUR|Il conduit un véhicule
+MECANICIEN|Il répare les moteurs
+MACON|Il construit des murs
+PLOMBIER|Il répare les tuyaux
+ELECTRICIEN|Il pose les fils
+MENUISIER|Il travaille le bois
+CHARPENTIER|Il assemble la structure d'un toit
+FORGERON|Il bat le fer
+TAILLEUR|Il coud des costumes
+COUTURIERE|Elle crée des robes
+MAITRE|Il enseigne à l'école
+INSTITUTEUR|Enseignant du primaire
+ELEVE|Il apprend
+ETUDIANT|Jeune de l'université
+AVOCAT|Il plaide
+JUGE|Il rend la justice
+NOTAIRE|Il rédige les actes
+GENDARME|Militaire de la sécurité publique
+FACTEUR|Il distribue le courrier
+JOURNALISTE|Il écrit dans la presse
+VETERINAIRE|Médecin des animaux
+PHARMACIEN|Il prépare les remèdes
+ARCHITECTE|Il dessine les plans d'un bâtiment
+INGENIEUR|Concepteur technique
+SAVANT|Homme de science
+CHERCHEUR|Il fait avancer la science
+JARDINIER|Il soigne les plantes
+VIGNERON|Il cultive la vigne
+BIJOUTIER|Il vend des bijoux
+ORFEVRE|Il travaille l'or
+POTIER|Il façonne l'argile
+TISSERAND|Il fabrique le tissu
+CORDONNIER|Il répare les souliers
+HORLOGER|Il répare les montres
+ARTISAN|Travailleur manuel indépendant
+EMPLOYE|Salarié
+MARCHAND|Il vend
+COMMERCANT|Il tient une boutique
+BANQUIER|Homme d'argent
+PRINCE|Fils de roi
+PRINCESSE|Fille de roi
+EMPEREUR|Chef d'un empire
+CHEVALIER|Noble en armure
+ARMURE|Protection du guerrier
+EPEE|Arme du chevalier
+LANCE|Arme d'hast
+ARC|Il tire des flèches
+BOUCLIER|Il protège des coups
+REMPART|Mur d'enceinte
+DONJON|Tour principale d'un château fort
+COURONNE|Elle ceint la tête du roi
+TRONE|Siège du roi
+SCEPTRE|Bâton de commandement
+DRAGON|Monstre qui crache du feu
+GEANT|Être de taille énorme
+NAIN|Petit homme de la fable
+OGRE|Il mange les enfants
+SORCIER|Il jette des sorts
+SORT|Maléfice jeté par un sorcier
+VOILIER|Bateau à voiles
+MAT|Support de voile
+ANCRE|Elle retient le bateau
+BARQUE|Petit bateau
+RAME|Elle propulse la barque
+GOUVERNAIL|Il dirige le bateau
+EQUIPAGE|Ensemble des marins
+CAPITAINE|Chef du navire
+MAREE|Mouvement de la mer
+ECUME|Mousse des vagues
+AEROPORT|Lieu de décollage des avions
+MOTO|Deux-roues à moteur
+CAMION|Poids lourd
+TAXI|Voiture de louage
+TRAM|Il roule dans la rue sur des rails
+AVENUE|Large voie
+CARREFOUR|Croisement de routes
+VOYAGEUR|Il parcourt le monde
+BOUSSOLE|Elle montre le nord
+VOLANT|Il dirige la voiture
+PNEU|Il entoure la roue
+ESSENCE|Carburant
+GRELE|Pluie de glace en petits grains
+FOUDRE|Décharge électrique du ciel
+BRISE|Vent léger
+BROUILLARD|Brume épaisse
+GIVRE|Gelée blanche
+CHALEUR|Température élevée
+AURORE|Lever du jour
+MIDI|Milieu du jour
+CREPUSCULE|Lueur du soir
+MINUIT|Douzième coup de l'horloge
+MOIS|Un douzième de l'année
+MINUTE|Soixante secondes
+SECONDE|Soixantième de minute
+MARS|Mois du printemps
+AVRIL|Mois des poissons
+JUIN|Mois du solstice d'été
+JUILLET|Mois de la fête nationale
+AOUT|Mois des vacances
+SEPTEMBRE|Mois de la rentrée
+OCTOBRE|Mois des vendanges
+NOVEMBRE|Mois des chrysanthèmes
+DECEMBRE|Dernier mois
+HETRE|Arbre aux feuilles ovales
+OLIVIER|Arbre de la paix
+PEUPLIER|Arbre grand et élancé
+PLATANE|Arbre des routes du Midi
+SAULE|Arbre pleureur
+BOULEAU|Arbre à écorce blanche
+ERABLE|Arbre dont la sève fait un sirop
+TILLEUL|Arbre de la tisane
+PALMIER|Arbre à dattes
+CYPRES|Arbre des cimetières
+RACINE|Partie de l'arbre dans la terre
+ECORCE|Peau de l'arbre
+SEVE|Liquide de l'arbre
+BOURGEON|Il devient feuille ou fleur
+TULIPE|Fleur de Hollande
+LYS|Fleur des armes de la monarchie
+MUGUET|Fleur porte-bonheur du premier mai
+VIOLETTE|Petite fleur parfumée
+PAQUERETTE|Petite fleur blanche des prés
+COQUELICOT|Fleur rouge des blés
+MARGUERITE|Fleur que l'on effeuille
+TOURNESOL|Fleur qui suit le soleil
+LILAS|Arbuste à grappes parfumées
+LAVANDE|Fleur violette de Provence
+ORCHIDEE|Fleur exotique rare
+MOUSSE|Végétal doux sur les pierres
+FOUGERE|Plante à frondes
+ROSEAU|Plante des marais
+EPINE|Piquant
+BLE|Céréale du pain
+ORGE|Céréale de la bière
+AVOINE|Céréale du cheval
+SEIGLE|Céréale du pain noir
+BAGUETTE|Pain long
+BRIOCHE|Viennoiserie moelleuse
+CROISSANT|Viennoiserie en forme de lune
+TARTE|Pâte garnie de fruits
+CREPE|Fine galette sucrée
+GAUFRE|Pâtisserie quadrillée
+BEIGNET|Pâte frite
+CARAMEL|Sucre brûlé
+BEURRE|Crème barattée
+CREME|Partie grasse du lait
+YAOURT|Lait fermenté
+SAUCISSE|Charcuterie en boyau
+OMELETTE|Oeufs battus et poêlés
+PIZZA|Galette italienne garnie
+SPAGHETTI|Pâte italienne longue
+RAGOUT|Viande mijotée
+GIGOT|Cuisse d'agneau
+RAISINS|Fruits de la vigne
+CIDRE|Boisson de pommes
+LIMONADE|Boisson gazeuse citronnée
+TISANE|Infusion de plantes
+CHAMPAGNE|Vin pétillant de Reims
+APERITIF|Boisson avant le repas
+DINER|Repas du soir
+FESTIN|Grand repas
+GOUTER|Collation de l'après-midi
+APPETIT|Envie de manger
+SAVEUR|Goût agréable
+GOURMAND|Amateur de bonne chère
+TRISTESSE|Chagrin
+PEUR|Crainte
+HAINE|Contraire de l'amour
+AMITIE|Affection entre amis
+DOUTE|Incertitude
+CHAGRIN|Peine profonde
+ENNUI|Manque d'intérêt qui pèse
+ENVIE|Désir de posséder
+HONTE|Sentiment d'humiliation
+FIERTE|Satisfaction de soi
+COURAGE|Force devant le danger
+AUDACE|Hardiesse
+SAGESSE|Prudence et bon sens
+SOUVENIR|Image du passé
+OUBLI|Perte de mémoire
+AME|Part immatérielle de l'être
+CONSCIENCE|Connaissance de soi
+MENSONGE|Affirmation fausse
+SECRET|Ce qu'on ne dit pas
+LIBERTE|Absence de contrainte
+JUSTICE|Droit rendu par un juge
+BATAILLE|Combat de deux armées
+VICTOIRE|Succès sur l'adversaire
+DEFAITE|Échec au combat
+FAIBLESSE|Manque de force
+CHUCHOTER|Parler très bas
+MURMURE|Bruit léger de voix
+MALHEUR|Grande infortune
+DESTIN|Suite d'événements imposée
+RICHESSE|Abondance de biens
+PAUVRETE|Manque de moyens
+BILLET|Papier-monnaie
+SALAIRE|Paie
+DETTE|Somme due
+NOEL|Fête du sapin
+PAQUES|Fête des oeufs
+ANNIVERSAIRE|Fête qui revient chaque année
+BEBE|Nourrisson
+MERE|Parent féminin
+TANTE|Soeur de la mère
+INCONNU|Que l'on ne connaît pas
+MARCHER|Aller à pied
+COURIR|Aller vite à pied
+SAUTER|Bondir
+NAGER|Se déplacer dans l'eau
+VOLER|Se déplacer dans les airs
+GRIMPER|Monter en s'aidant des mains
+DORMIR|Se reposer la nuit
+MANGER|Absorber des aliments
+BOIRE|Absorber un liquide
+PARLER|Dire des mots
+CHANTER|Faire de la musique avec sa voix
+LIRE|Parcourir un texte
+ECRIRE|Tracer des mots
+DESSINER|Faire un croquis
+PLEURER|Verser des larmes
+CRIER|Parler très fort
+ECOUTER|Prêter l'oreille
+REGARDER|Porter les yeux sur
+OBSERVER|Examiner avec attention
+SENTIR|Percevoir une odeur
+TOUCHER|Palper
+PENSER|Réfléchir
+REVER|Imaginer en dormant
+AIMER|Éprouver de l'amour
+DONNER|Offrir
+PRENDRE|Saisir
+OUVRIR|Contraire de fermer
+FERMER|Contraire d'ouvrir
+POUSSER|Exercer une force pour éloigner
+TIRER|Attirer à soi
+LEVER|Dresser vers le haut
+BAISSER|Mettre plus bas
+PORTER|Soutenir un poids
+JETER|Lancer au loin
+ATTRAPER|Saisir au vol
+CACHER|Dissimuler
+TROUVER|Découvrir
+CHERCHER|Essayer de trouver
+PERDRE|Ne plus retrouver
+GAGNER|Remporter
+JOUER|S'amuser
+TRAVAILLER|Faire un effort pour produire
+REPOSER|Se détendre
+APPRENDRE|Acquérir un savoir
+ENSEIGNER|Transmettre un savoir
+COMPRENDRE|Saisir le sens
+OUBLIER|Perdre le souvenir
+CONSTRUIRE|Bâtir
+CREUSER|Faire un trou
+PLANTER|Mettre en terre
+RECOLTER|Cueillir les produits de la terre
+CUEILLIR|Prendre une fleur ou un fruit
+COUPER|Trancher
+BRULER|Détruire par le feu
+ALLUMER|Mettre le feu ou la lumière
+ETEINDRE|Faire cesser de brûler
+GROS|Qui a du volume
+MINCE|Peu épais
+LONG|Qui a beaucoup de longueur
+COURT|Pas long
+BAS|Peu élevé
+LARGE|Étendu en travers
+ETROIT|Peu large
+LOURD|Qui pèse
+LEGER|Qui pèse peu
+RAPIDE|Qui va vite
+LENT|Qui va doucement
+SEC|Sans humidité
+HUMIDE|Un peu mouillé
+PROPRE|Sans saleté
+SALE|Plein de saletés
+NEUF|Qui n'a pas servi
+JEUNE|De peu d'âge
+BEAU|Agréable à voir
+LAID|Désagréable à voir
+JOLI|Plaisant à l'oeil
+DUR|Qui résiste
+MOU|Sans fermeté
+RICHE|Qui a beaucoup d'argent
+PAUVRE|Qui manque d'argent
+HEUREUX|Content de son sort
+TRISTE|Qui a du chagrin
+MECHANT|Qui fait du mal
+SAGE|Tranquille
+FOU|Qui a perdu la raison
+BRUYANT|Qui fait du bruit
+CLAIR|Lumineux
+SOMBRE|Sans lumière
+BRUN|Couleur de la terre
+DORE|De la couleur de l'or
+ARGENTE|De la couleur de la lune
+ATOME|Plus petite particule d'un élément
+MOLECULE|Assemblage d'atomes
+ENERGIE|Capacité à produire un travail
+ELECTRICITE|Courant des prises
+AIMANT|Il attire le fer
+MAGNETISME|Force de l'aimant
+GRAVITE|Force qui attire vers le sol
+VAPEUR|Eau à l'état gazeux
+LIQUIDE|Qui coule
+SOLIDE|Qui a une forme propre
+METAL|Fer, cuivre ou or
+CUIVRE|Métal rouge des casseroles
+PLOMB|Métal lourd et gris
+ZINC|Métal des toits de Paris
+ACIER|Fer allié au carbone
+BRONZE|Alliage de cuivre et d'étain
+ARGILE|Terre à modeler
+GRANIT|Roche dure bretonne
+MARBRE|Roche polie des statues
+CRISTAL|Verre brillant
+RUBIS|Pierre précieuse rouge
+VENUS|Étoile du berger
+JUPITER|Plus grosse planète
+SATURNE|Planète aux anneaux
+COMETE|Astre à longue queue lumineuse
+GALAXIE|Immense ensemble d'étoiles
+ASTRE|Corps céleste
+FUSEE|Elle va dans l'espace
+SATELLITE|Astre qui tourne autour d'une planète
+TELESCOPE|Il observe les astres
+MICROSCOPE|Il montre l'infiniment petit
+CHIMIE|Science des corps et de leurs transformations
+PHYSIQUE|Science de la matière et de l'énergie
+BIOLOGIE|Science du vivant
+GEOLOGIE|Science de la terre
+GEOGRAPHIE|Science des lieux
+MATHS|Science des nombres
+CALCUL|Opération sur les nombres
+ZERO|Rien en chiffre
+DEUX|Un et un
+TROIS|Nombre impair après deux
+QUATRE|Nombre des saisons
+CINQ|Nombre de doigts
+SIX|Demi-douzaine
+SEPT|Nombre des jours de la semaine
+HUIT|Double de quatre
+DIX|Nombre des doigts des deux mains
+DOUZE|Nombre des mois de l'année
+CENT|Dix fois dix
+MILLE|Dix fois cent
+MOITIE|Une partie sur deux
+DOUBLE|Deux fois plus
+TRIPLE|Trois fois plus
+PRODUIT|Résultat d'une multiplication
+ANGLE|Il est droit ou aigu
+CERCLE|Rond parfait
+CARRE|Quatre côtés égaux
+DROITE|Ligne sans courbe
+COURBE|Ligne qui s'infléchit
+SPHERE|Ballon parfait
+CUBE|Dé en géométrie
+CONE|Forme d'un chapeau de sorcière
+AIRE|Mesure d'une surface
+GRAMME|Unité de masse
+LITRE|Unité de volume
+METRE|Unité de longueur
+RUGBY|Sport au ballon ovale
+GOLF|Sport de balle et de trous
+BASKET|Sport où l'on lance dans un panier
+NATATION|Sport de nage
+ATHLETISME|Course, saut et lancer
+CYCLISME|Sport du Tour de France
+BOXE|Sport de poings
+JUDO|Art martial japonais
+ESCRIME|Sport de l'épée
+ESCALADE|Sport de falaise
+RANDONNEE|Longue marche en nature
+PETANQUE|Jeu de boules du Midi
+ECHECS|Jeu de rois et de fous sur damier
+DAMES|Jeu de pions sur damier
+CARTES|Jeu de rois, dames et valets
+DOMINO|Jeu de plaques à points
+LOTO|Jeu de tirage de numéros
+MANEGE|Attraction qui tourne
+POUPEE|Jouet à figure humaine
+BALLON|Il rebondit
+PUZZLE|Jeu de pièces à assembler
+ARBITRE|Il siffle les fautes
+MATCH|Rencontre sportive
+STADE|Enceinte sportive
+PISTE|Terrain de course ovale
+MEDAILLE|Récompense d'un champion
+CHAMPION|Vainqueur
+RECORD|Meilleure performance
