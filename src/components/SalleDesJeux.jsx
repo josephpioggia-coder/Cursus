@@ -12,7 +12,7 @@
  * src/lib/jeuxDeMots.js, et une ligne dans JEUX ci-dessous.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ScrabbleSolveur from "./ScrabbleSolveur.jsx";
 import Motus from "./jeux/Motus.jsx";
 import Pendu from "./jeux/Pendu.jsx";
@@ -50,7 +50,7 @@ async function chargerDonnees() {
 
 const carte = { background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: 12, padding: "16px", cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "var(--color-text-primary)" };
 
-export default function SalleDesJeux() {
+export default function SalleDesJeux({ jeuInitial = null }) {
   const [jeu, setJeu] = useState(null);
   const [donnees, setDonnees] = useState(donneesEnCache);
   const [etat, setEtat] = useState(""); // "" | "chargement" | message d'erreur
@@ -62,6 +62,8 @@ export default function SalleDesJeux() {
     catch (e) { setEtat(e.message || String(e)); }
   };
   const courant = JEUX.find((j) => j.id === jeu);
+  // Lien direct (« ?jeu=croises ») : ouvre ce jeu dès l'arrivée ; un id inconnu ou « salle » laisse la liste.
+  useEffect(() => { const j = JEUX.find((x) => x.id === jeuInitial); if (j) ouvrir(j); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (courant?.propre) {
     return (

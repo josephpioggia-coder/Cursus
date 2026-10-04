@@ -713,3 +713,10 @@ Demande de Joseph : « autres jeux de mots comme mots croisés ou mots fléchés
   moyen n'utilisent QUE les mots courants ; difficile (`entreesDuNiveau`) = mots durs ×3 + 40 % des mots courants, pour
   qu'il reste des croisements possibles (≈ 43 % de mots durs par grille de croisés, ≈ 40 % en fléchés ; les mots
   courants servent de points d'appui). Le vérificateur contrôle les deux fichiers (doublons entre eux inclus).
+- **Liens directs vers un jeu (04/10/2026, demande « donne-moi un accès direct au jeu »)** : `https://cursus.pro/?jeu=<id>`
+  avec `id` ∈ `croises`, `fleches`, `codes`, `motus`, `boggle`, `long`, `pendu`, `echelle`, `meles`, `grille` ; `salle`
+  (ou id inconnu) = liste des jeux. Lu une fois au chargement (`JEU_PAR_LIEN`, App.jsx) → vue « scrabble » +
+  `SalleDesJeux jeuInitial`. Sans espace déjà choisi, ouvre CursEdit (pas d'écran de choix). Il faut toujours être connecté
+  (le lien passe par la connexion) ; l'ajouter en favori / écran d'accueil du mobile. Testé sur SalleDesJeux seule
+  (croises, codes, salle, id inconnu) ; PAS testé dans l'app complète connectée (Supabase indisponible en dev).
+  Piège d'outillage : ne jamais tuer un serveur par `pgrep -f`/`grep` sur sa ligne de commande depuis Bash (le shell se tue lui-même).
