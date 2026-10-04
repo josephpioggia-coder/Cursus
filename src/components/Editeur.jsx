@@ -1387,7 +1387,7 @@ export default function Editeur({
       {!modeFocus && (
         <div style={{
           padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5",
-          display: "flex", alignItems: "center", gap: 10,
+          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
           background: "#fafafa",
           flexShrink: 0,
         }}>
