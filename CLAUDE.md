@@ -690,3 +690,20 @@ fonction de `type`, avec un texte d'intro qui ne prétend plus "fiction"
 sur un essai. `type`/`typeProjet` propagé jusqu'à `promptDialogue`
 (ajout d'un second paramètre) pour que le fil de suivi par carte
 applique la bonne variante lui aussi.
+
+### Mots croisés, mots fléchés, mots codés (04/10/2026)
+
+Demande de Joseph : « autres jeux de mots comme mots croisés ou mots fléchés… ». Trois jeux ajoutés à la Salle
+(`MotsCroises.jsx`, `MotsFleches.jsx` → interface commune `GrilleIndicee.jsx` ; `MotsCodes.jsx`), moteur pur
+`src/lib/grillesMots.js`, dessin `GrilleMotsCanvas` (dessin.jsx, canvas : règle du mode sombre forcé).
+- **Indices** : `public/jeux/mots-croises.txt`, 704 lignes `MOT|indice`, ÉCRITES par Claude (originales, sans
+  copie : Wiktionnaire & co. inaccessibles depuis l'environnement de dev). Réponses sans accents (`COEUR`, `OEUF`).
+  Contrôle : `node scripts/verifier-mots-croises.mjs` (format, doublons, présence au dictionnaire, indice ne contenant
+  pas la réponse, longueur ≤ 46). À relancer après tout ajout. Vocabulaire limité : agrandir la liste = plus de variété.
+- **Grilles LIBRES, pas denses** (générateur par placement glouton avec croisements, mots parallèles jamais collés) :
+  une vraie grille de presse (pleine, symétrique) demanderait un solveur de remplissage et un dictionnaire d'indices bien
+  plus grand. Fléchés : case d'indice avant le mot (à gauche = →, au-dessus = ↓), une case peut porter 2 indices.
+- Codés : mots COURANTS (rang ≤ 6000, 3–8 lettres), 3 lettres données, une lettre = un numéro ; saisir une lettre
+  l'applique à toutes les cases du numéro et la retire d'un autre numéro.
+- Vérifié le 04/10/2026 à 360 px (sombre forcé, `scrollWidth <= innerWidth`) : rendu des 3 jeux, grilles terminées
+  via « le mot » / « une lettre » (détection de fin + statistiques). Pas testé : saisie au clavier physique, double-sens.

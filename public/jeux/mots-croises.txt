@@ -1,0 +1,704 @@
+AIR|Ce qu'on respire
+AMI|Compagnon fidèle
+ART|La peinture en est un
+AIL|Gousse piquante en cuisine
+AGE|Nombre d'années vécues
+ANE|Bête de somme aux longues oreilles
+AIE|Cri de douleur
+BAL|Soirée dansante
+BAC|Examen de fin de lycée
+BEC|Il se trouve chez l'oiseau
+BOA|Serpent constricteur
+BUS|Transport en commun
+CAP|Pointe de terre dans la mer
+COL|Passage entre deux sommets
+COQ|Mâle de la poule
+CRI|Voix poussée fort
+DOS|Opposé au ventre
+DON|Cadeau généreux
+DUC|Titre de noblesse
+EAU|H2O
+ECU|Ancienne pièce d'argent
+EGO|Le moi
+ELU|Choisi par un vote
+EPI|Tête du blé
+ERE|Longue période historique
+ETE|Saison chaude
+FEE|Marraine de Cendrillon
+FER|Métal des forgerons
+FIL|Brin à coudre
+FIN|Terme d'une histoire
+FOI|Croyance religieuse
+GAZ|Fluide de la cuisinière
+GEL|Eau à moins de zéro
+ICI|En ce lieu
+ILE|Terre entourée d'eau
+IRE|Colère littéraire
+JEU|Passe-temps ludique
+JUS|Boisson de fruit pressé
+LAC|Étendue d'eau douce
+LIT|On y dort
+LOI|Texte voté au Parlement
+MAI|Mois du muguet
+MAL|Contraire de bien
+MER|Étendue salée
+MUR|Cloison extérieure
+NEZ|Siège de l'odorat
+NID|Maison d'oiseau
+NON|Contraire de oui
+OIE|Volatile qui cacarde
+OUI|Réponse affirmative
+PAS|Enjambée
+PIC|Sommet pointu
+PIN|Conifère de la plage
+PLI|Marque dans un tissu
+PRE|Champ d'herbe
+RAT|Rongeur d'égout
+RIZ|Céréale d'Asie
+ROI|Il règne sur un royaume
+RUE|Voie en ville
+SAC|Contenant à anse
+SEL|Il relève la soupe
+SKI|Sport d'hiver
+SOL|Terre sous nos pieds
+SOT|Idiot
+SUD|Opposé au nord
+THE|Infusion de feuilles
+TOI|Pronom de la deuxième personne
+TON|Hauteur d'un son
+TRI|Opération de classement
+VIN|Jus de raisin fermenté
+VUE|Un des cinq sens
+ZOO|Jardin des animaux
+AILE|Elle permet de voler
+AIDE|Coup de main
+AMER|Goût du café noir
+ANGE|Messager ailé
+ARBRE|Il a un tronc et des branches
+ASIE|Continent du Japon
+AVIS|Opinion
+BAIN|On le prend dans la baignoire
+BALLE|Elle rebondit au tennis
+BANC|On s'y assoit au parc
+BARBE|Poils du menton
+BASE|Fondation
+BETE|Animal
+BLEU|Couleur du ciel clair
+BOIS|Matière de la forêt
+BOITE|Récipient avec couvercle
+BORD|Limite d'une surface
+BOUC|Mâle de la chèvre
+BRAS|Il se termine par la main
+BRIN|Petite tige d'herbe
+BRUIT|Son désagréable
+BUT|Objectif
+CAFE|Boisson noire du matin
+CAGE|Prison d'oiseau
+CAMP|Lieu de tentes
+CANE|Femelle du canard
+CARTE|On la joue au poker
+CASE|Carré d'un échiquier
+CAVE|Pièce sous la maison
+CERF|Animal aux bois
+CHAT|Il ronronne
+CHEF|Celui qui dirige
+CHER|Qui coûte beaucoup
+CIEL|Il est bleu ou gris
+CLEF|Elle ouvre la serrure
+COEUR|Organe qui bat
+COIN|Angle
+CORDE|Elle sert à grimper ou à lier
+COTE|Rivage ou os
+COUDE|Articulation du bras
+COUP|Choc donné
+COUR|Espace devant la maison
+CRIME|Infraction grave
+CUIR|Peau tannée
+DAME|Femme élégante
+DANSE|Elle se pratique en rythme
+DENT|Elle mord
+DIEU|Être suprême
+DOIGT|Il y en a cinq à la main
+DOUX|Agréable au toucher
+DRAP|Il couvre le matelas
+DROIT|Qui ne penche pas
+ECOLE|Lieu d'apprentissage
+ENFANT|Petit d'homme
+ETAT|Nation organisée
+FACE|Visage ou côté d'une pièce
+FAIM|Besoin de manger
+FARCE|Plaisanterie
+FAUX|Contraire de vrai
+FETE|Jour de réjouissances
+FEU|Il brûle
+FILLE|Enfant de sexe féminin
+FLEUR|Elle éclôt au printemps
+FOIN|Herbe séchée pour le bétail
+FOLIE|Perte de raison
+FORET|Grande étendue d'arbres
+FORT|Qui a de la puissance
+FRERE|Fils des mêmes parents
+FROID|Contraire de chaud
+FRUIT|Pomme ou poire
+GANT|Il protège la main
+GARE|Lieu où l'on prend le train
+GATEAU|Dessert d'anniversaire
+GOUT|Un des cinq sens
+GRAIN|Petite semence
+GRAND|De haute taille
+GRIS|Couleur de la cendre
+GUERRE|Conflit armé
+HAUT|Contraire de bas
+HERBE|Verdure des prés
+HEURE|Soixante minutes
+HIVER|Saison de la neige
+HOMME|Être humain adulte masculin
+HOTEL|Lieu où l'on loge en voyage
+HUILE|Liquide gras de cuisine
+IDEE|Pensée
+JARDIN|Il se cultive devant la maison
+JAUNE|Couleur du citron
+JOIE|Grand bonheur
+JOUR|Il succède à la nuit
+LAIT|Boisson de la vache
+LAINE|Matière du mouton
+LANGUE|Organe du goût
+LIEU|Endroit
+LIGNE|Trait continu
+LIVRE|On le lit
+LOUP|Il hurle à la lune
+LUNE|Satellite de la Terre
+MAIN|Elle a cinq doigts
+MAIRE|Premier magistrat de la commune
+MARCHE|Elle se fait à pied
+MARI|Époux
+MASQUE|Il cache le visage
+MATIN|Début de journée
+MIEL|Produit des abeilles
+MINE|Lieu d'extraction du charbon
+MODE|Tendance vestimentaire
+MONDE|La Terre entière
+MORT|Fin de la vie
+MOT|Il est formé de lettres
+MUSIQUE|Art des sons
+NAGE|Façon de se déplacer dans l'eau
+NEIGE|Flocons blancs
+NOIR|Couleur du corbeau
+NOM|Il identifie une personne
+NORD|Direction de l'étoile polaire
+NUIT|Il fait sombre
+OEUF|La poule le pond
+OISEAU|Il vole et chante
+ONDE|Vague
+OREILLE|Organe de l'ouïe
+OURS|Plantigrade des montagnes
+PAGE|Feuille d'un livre
+PAIN|Aliment de la boulangerie
+PAIX|Contraire de guerre
+PANIER|Corbeille à anse
+PAPIER|On y écrit
+PARC|Jardin public
+PATE|Elle se pétrit
+PAYS|Territoire d'une nation
+PEAU|Elle recouvre le corps
+PERE|Papa
+PERLE|Bijou de l'huître
+PETIT|Contraire de grand
+PIED|Il sert à marcher
+PIERRE|Roche
+PLAGE|Sable au bord de la mer
+PLAN|Dessin d'une maison
+PLUIE|Elle tombe des nuages
+PLUME|Elle orne l'oiseau
+POIDS|Il se mesure en kilos
+POMME|Fruit rouge ou vert croquant
+PONT|Il enjambe la rivière
+PORT|Abri pour les bateaux
+PORTE|On l'ouvre pour entrer
+POUCE|Premier doigt
+PRIX|Récompense ou coût
+PUITS|Trou pour l'eau
+RADIO|Poste qui diffuse des émissions
+REINE|Souveraine
+REPAS|Déjeuner ou dîner
+RIRE|Manifestation de joie
+RIVE|Bord d'un cours d'eau
+ROBE|Vêtement féminin
+ROCHE|Matière dure de la montagne
+ROND|Qui a la forme d'un cercle
+ROSE|Fleur à épines
+ROUE|Elle tourne sous la voiture
+ROUGE|Couleur du sang
+ROUTE|Voie pour les voitures
+SABLE|Il tapisse la plage
+SAISON|Printemps ou été
+SALLE|Pièce d'une maison
+SANG|Liquide rouge du corps
+SEIN|Poitrine
+SERRE|Abri vitré pour les plantes
+SOEUR|Fille des mêmes parents
+SOIF|Envie de boire
+SOIR|Fin de journée
+SOLEIL|Étoile du jour
+SOMMET|Point le plus haut
+SOUPE|Plat liquide chaud
+SOURIS|Rongeur qui craint le chat
+TABLE|On y mange
+TASSE|Récipient à café
+TEMPS|Il passe sans s'arrêter
+TERRE|Planète bleue
+TETE|Elle porte le cerveau
+TIGRE|Félin rayé
+TOIT|Il couvre la maison
+TOUR|Haut bâtiment étroit
+TRAIN|Il roule sur des rails
+TRONC|Partie principale de l'arbre
+UNION|Rassemblement
+VACHE|Elle donne du lait
+VENT|Air en mouvement
+VERRE|On y boit
+VERT|Couleur de l'herbe
+VIDE|Qui ne contient rien
+VIE|Contraire de la mort
+VILLE|Grande agglomération
+VOIX|Elle sert à chanter
+VOL|Déplacement dans les airs
+ABEILLE|Elle fait le miel
+ABRICOT|Fruit orangé à noyau
+ACCIDENT|Événement fâcheux sur la route
+ACTEUR|Il joue un rôle au cinéma
+AMANDE|Fruit sec à coque dure
+AMOUR|Sentiment tendre
+ANIMAL|Être vivant qui se déplace
+ANNEE|Douze mois
+APPEL|Coup de téléphone
+ARAIGNEE|Elle tisse sa toile
+ARGENT|Métal blanc ou monnaie
+ARMOIRE|Meuble à vêtements
+AUTOMNE|Saison des feuilles mortes
+AVENIR|Temps à venir
+AVION|Il traverse le ciel
+BALCON|Plateforme à la façade
+BANANE|Fruit jaune courbé
+BATEAU|Il flotte sur l'eau
+BEAUTE|Qualité de ce qui plaît à l'œil
+BERGER|Il garde les moutons
+BIBLIOTHEQUE|Lieu où l'on emprunte des livres
+BICYCLETTE|Deux roues à pédales
+BIERE|Boisson à base d'orge
+BIJOU|Parure précieuse
+BLANC|Couleur de la neige
+BOISSON|On la boit
+BONBON|Friandise sucrée
+BONHEUR|État de grande joie
+BOTTE|Chaussure montante
+BOUCHE|Elle sert à parler
+BOUGIE|Elle fond en éclairant
+BOULANGER|Il fait le pain
+BOUTEILLE|Elle contient le vin
+BRANCHE|Elle part du tronc
+BRUME|Léger brouillard
+BUREAU|Table de travail
+CABINET|Local d'un médecin
+CADEAU|Présent offert
+CAHIER|Il sert à écrire à l'école
+CALME|Sans agitation
+CAMPAGNE|Espace hors de la ville
+CANARD|Il fait coin-coin
+CANAL|Voie d'eau creusée
+CANIF|Petit couteau de poche
+CARNET|Petit cahier de notes
+CAROTTE|Racine orange
+CARTON|Boîte de papier épais
+CASQUE|Il protège la tête
+CASSEROLE|On y fait cuire la sauce
+CEINTURE|Elle tient le pantalon
+CERISE|Petit fruit rouge à noyau
+CHAINE|Suite d'anneaux
+CHAISE|On s'y assoit à table
+CHAMBRE|Pièce où l'on dort
+CHAMP|Terre cultivée
+CHANCE|Bonne fortune
+CHANSON|Air chanté
+CHAPEAU|Il coiffe la tête
+CHARBON|Combustible noir
+CHATEAU|Demeure fortifiée
+CHAUD|Contraire de froid
+CHAUSSON|Pantoufle ou pâtisserie
+CHAUSSURE|On la met au pied
+CHEMIN|Petite route de campagne
+CHEMISE|Vêtement à col et boutons
+CHENE|Arbre aux glands
+CHEVAL|Il galope
+CHEVEU|Poil de la tête
+CHEVRE|Elle donne un fromage
+CHIEN|Il aboie
+CHIFFRE|Signe de numération
+CHOCOLAT|Il vient du cacao
+CHOSE|Objet quelconque
+CINEMA|Lieu où l'on voit des films
+CIRQUE|Spectacle avec clowns
+CITRON|Fruit acide et jaune
+CLASSE|Groupe d'élèves
+CLIMAT|Ensemble des conditions météo
+CLOCHE|Instrument de bronze qui sonne les heures
+CLOWN|Il fait rire au cirque
+COCHON|Il est élevé pour sa viande
+COIFFEUR|Il coupe les cheveux
+COLERE|Mouvement d'humeur violent
+COLLIER|Bijou porté au cou
+COMPTE|On le tient à la banque
+CONCERT|Spectacle de musique
+CONFITURE|Fruits cuits avec du sucre
+COQUILLE|Enveloppe de l'escargot
+CORBEAU|Oiseau noir
+COSTUME|Tenue de théâtre
+COTON|Fibre de la plante textile
+COUCOU|Oiseau qui pond dans les nids d'autres
+COUSIN|Fils de l'oncle ou de la tante
+COUTEAU|Il tranche le pain
+COUVERT|Fourchette et cuiller
+CRAYON|Il écrit en gris
+CRISE|Moment difficile
+CUISINE|Pièce où l'on prépare les repas
+CUISSE|Partie haute de la jambe
+CULTURE|Ensemble des savoirs
+DANGER|Menace
+DEBUT|Commencement
+DEJEUNER|Repas de midi
+DENTISTE|Il soigne les caries
+DESERT|Étendue de sable aride
+DESSERT|Fin de repas sucrée
+DESSIN|Œuvre au crayon
+DETAIL|Élément mineur
+DEVOIR|Travail à rendre
+DIAMANT|Pierre la plus dure
+DIMANCHE|Jour du repos
+DISQUE|Rond gravé de musique
+DOCTEUR|Médecin
+DOSSIER|Chemise de documents
+DRAPEAU|Étendard national
+ECHARPE|Elle se noue autour du cou
+ECLAIR|Lumière vive de l'orage
+ECOUTE|Action d'entendre avec attention
+ECRAN|Surface de télévision
+ECUREUIL|Rongeur roux qui aime les noisettes
+EGLISE|Lieu de culte chrétien
+ELEPHANT|Pachyderme à trompe
+EMPLOI|Travail rémunéré
+ENCRE|Liquide du stylo
+ENNEMI|Adversaire
+ENTREE|Début d'un repas
+ENVELOPPE|Elle contient la lettre
+EPAULE|Elle relie le bras au tronc
+EPICE|Poivre ou safran
+EPINARD|Légume vert de Popeye
+EPOQUE|Période de l'histoire
+EQUIPE|Groupe de joueurs
+ESCALIER|Il monte marche après marche
+ESPACE|Étendue sans limite
+ESPOIR|Attente confiante
+ESPRIT|Intelligence
+ETOILE|Astre qui brille la nuit
+ETRANGER|Qui vient d'un autre pays
+EXAMEN|Épreuve pour juger du savoir
+EXEMPLE|Modèle à suivre
+FAMILLE|Parents et enfants
+FARINE|Poudre de blé
+FAUTEUIL|Siège confortable à bras
+FEMME|Adulte de sexe féminin
+FENETRE|Elle laisse passer la lumière
+FERME|Exploitation agricole
+FERMIER|Il travaille à la ferme
+FEUILLE|Elle pousse sur l'arbre
+FEVRIER|Mois le plus court
+FICELLE|Mince corde
+FIGURE|Visage
+FILET|Réseau de pêche
+FILM|On le voit au cinéma
+FLAMME|Langue de feu
+FLECHE|Elle part de l'arc
+FLEUVE|Grand cours d'eau
+FOLLE|Qui a perdu la raison
+FONTAINE|Elle jaillit sur la place
+FOOTBALL|Sport du ballon rond
+FORCE|Puissance
+FORGE|Atelier du métal chauffé
+FOULE|Grand nombre de gens
+FOURCHETTE|Elle pique dans l'assiette
+FOURMI|Insecte travailleur
+FRAISE|Petit fruit rouge parfumé
+FRANCE|Pays de Paris
+FRANCAIS|Langue de Molière
+FREIN|Il fait ralentir la voiture
+FRITE|Pomme de terre en bâtonnet
+FROMAGE|Produit du lait
+FRONT|Partie haute du visage
+FUMEE|Elle monte de la cheminée
+GAGNANT|Celui qui remporte la partie
+GALET|Pierre ronde de la plage
+GARCON|Enfant de sexe masculin
+GARDIEN|Celui qui surveille
+GENOU|Articulation de la jambe
+GENTIL|Aimable
+GIRAFE|Animal au long cou
+GLACE|Eau gelée ou dessert froid
+GOMME|Elle efface le crayon
+GORGE|Partie du cou
+GRAINE|Elle donne naissance à une plante
+GRENIER|Pièce sous le toit
+GRENOUILLE|Elle coasse
+GRIPPE|Maladie hivernale
+GROTTE|Cavité dans la montagne
+GRUE|Oiseau ou engin de chantier
+GUITARE|Instrument à six cordes
+HABIT|Vêtement
+HAMEAU|Tout petit village
+HARICOT|Légume vert ou blanc
+HASARD|Circonstance imprévisible
+HERISSON|Animal à piquants
+HEROS|Personnage courageux
+HIBOU|Rapace nocturne
+HISTOIRE|Récit du passé
+HOPITAL|Lieu de soins
+HORLOGE|Elle donne l'heure
+HUMOUR|Art de faire rire
+IMAGE|Représentation visuelle
+INSECTE|Fourmi ou mouche
+INVITE|Personne conviée
+JAMBE|Elle sert à marcher
+JAMBON|Charcuterie de porc
+JANVIER|Premier mois
+JEUDI|Jour avant vendredi
+JOUET|Poupée ou petite voiture
+JOURNAL|Il donne les nouvelles
+JUPE|Vêtement féminin court
+JUSTE|Équitable
+KILO|Mille grammes
+LAMPE|Elle éclaire
+LAPIN|Il a de longues oreilles
+LARME|Elle coule de l'œil
+LEGUME|Haricot ou carotte
+LETTRE|Missive
+LEVRE|Elle borde la bouche
+LIBRE|Qui n'est pas prisonnier
+LIEVRE|Il court plus vite que la tortue
+LIMITE|Frontière
+LION|Roi des animaux
+LISTE|Suite de noms
+LUMIERE|Elle éclaire
+LUNDI|Premier jour de la semaine
+LUNETTE|Elle corrige la vue
+LUTTE|Combat corps à corps
+MACHINE|Appareil mécanique
+MADAME|Titre d'une femme mariée
+MAGASIN|Lieu où l'on achète
+MAGIE|Art des illusions
+MAIGRE|Peu gras
+MAISON|On y habite
+MALADE|Qui a besoin d'un médecin
+MANCHE|Partie de la chemise pour le bras
+MANTEAU|Vêtement chaud d'extérieur
+MARAIS|Terrain humide
+MARDI|Deuxième jour de la semaine
+MARIAGE|Union de deux époux
+MARTEAU|Il enfonce les clous
+MATELAS|Il garnit le lit
+MEDECIN|Il soigne les malades
+MELON|Fruit d'été à écorce
+MEMOIRE|Faculté de se souvenir
+MENU|Liste des plats
+MERCREDI|Troisième jour de la semaine
+METIER|Profession
+METRO|Train urbain souterrain
+MEUBLE|Table ou armoire
+MIROIR|Il reflète l'image
+MOINEAU|Petit oiseau des villes
+MONTAGNE|Haute élévation du sol
+MONTRE|Elle se porte au poignet
+MOTEUR|Il fait tourner la voiture
+MOUCHE|Insecte agaçant
+MOUTON|Il donne la laine
+MOYEN|Ni grand ni petit
+MUSEE|Lieu d'exposition d'œuvres
+NAGEUR|Il fend l'eau
+NAISSANCE|Venue au monde
+NATURE|Monde du vivant
+NAVIRE|Grand bateau
+NEVEU|Fils du frère ou de la sœur
+NOISETTE|Fruit de la coudre
+NOMBRE|Chiffre ou quantité
+NOTE|Signe de musique
+NOURRITURE|Aliments
+NOUVEAU|Récent
+NUAGE|Il flotte dans le ciel
+OCEAN|Immense étendue d'eau salée
+ODEUR|Elle se sent au nez
+OIGNON|Légume qui fait pleurer
+OMBRE|Zone sans soleil
+ONCLE|Frère du père ou de la mère
+ORAGE|Tempête avec tonnerre
+ORANGE|Fruit et couleur
+ORDRE|Contraire du désordre
+ORGUE|Instrument d'église
+ORTEIL|Doigt de pied
+OUVRIER|Travailleur manuel
+PAILLE|Tige de blé séchée
+PALAIS|Demeure d'un roi
+PANTALON|Il couvre les jambes
+PAPILLON|Insecte aux ailes colorées
+PARAPLUIE|Il protège de l'averse
+PARENT|Père ou mère
+PAROLE|Mot prononcé
+PARTIE|Manche d'un jeu
+PASSAGE|Voie étroite
+PATIENCE|Qualité de celui qui sait attendre
+PATRON|Chef d'entreprise
+PECHE|Fruit rond et duveteux
+PEINTRE|Artiste de la toile
+PELLE|Outil à creuser
+PENDULE|Horloge à balancier
+PENSEE|Idée ou fleur
+PERROQUET|Oiseau qui imite la voix
+PERSONNE|Individu
+PHARE|Il guide les navires la nuit
+PHOTO|Image prise à l'appareil
+PIANO|Instrument à clavier
+PIGEON|Oiseau des villes
+PILOTE|Il conduit l'avion
+PINCEAU|Outil du peintre
+PIRATE|Bandit des mers
+PISCINE|Grand bassin pour nager
+PLACE|Espace public dans la ville
+PLAFOND|Surface au-dessus de la tête
+PLAINE|Vaste terrain plat
+PLANETE|La Terre en est une
+PLANTE|Elle pousse dans le sol
+PLAT|Contraire de bosselé
+PLEIN|Contraire de vide
+POCHE|Elle est cousue au pantalon
+POEME|Texte en vers
+POIRE|Fruit en forme de goutte
+POISSON|Il vit dans l'eau
+POIVRE|Épice piquante
+POLICE|Elle fait respecter l'ordre
+POMPIER|Il éteint les incendies
+POPULATION|Ensemble des habitants
+PORC|Cochon
+PORTRAIT|Image d'une personne
+POSTE|Lieu d'envoi du courrier
+POULE|Elle pond des œufs
+POUSSIN|Petit de la poule
+PRAIRIE|Grande étendue d'herbe
+PRINTEMPS|Saison des bourgeons
+PRISON|Lieu d'enfermement
+PROBLEME|Question à résoudre
+PROFESSEUR|Il enseigne
+PROMENADE|Sortie à pied
+PRUNE|Fruit violet à noyau
+PUBLIC|Spectateurs
+PUCE|Insecte sauteur
+QUARTIER|Partie d'une ville
+RADEAU|Embarcation de troncs
+RAISIN|Fruit de la vigne
+RAISON|Faculté de bien juger
+RAYON|Trait de lumière
+RECETTE|Mode d'emploi de cuisine
+REGARD|Façon de voir
+REGION|Vaste zone d'un pays
+REGLE|Elle trace des traits droits
+RENARD|Roux et rusé
+RESEAU|Ensemble de lignes reliées
+RESTAURANT|Lieu où l'on dîne dehors
+RETOUR|Fait de revenir
+REVE|Il vient pendant le sommeil
+RIDEAU|Il masque la fenêtre
+RIVIERE|Cours d'eau
+ROCHER|Gros bloc de pierre
+ROMAN|Récit d'imagination
+ROSEE|Gouttelettes du matin
+RUBAN|Bande de tissu
+RUCHE|Maison des abeilles
+RUMEUR|Bruit qui court
+SALADE|Plat de laitue
+SALON|Pièce de réception
+SAMEDI|Jour avant dimanche
+SANDALE|Chaussure ouverte d'été
+SANTE|Bon état du corps
+SAPIN|Arbre de Noël
+SAUCE|Elle nappe les pâtes
+SAUMON|Poisson rose
+SAVON|Il mousse pour se laver
+SCENE|Lieu du théâtre
+SCIENCE|Connaissance organisée
+SCULPTEUR|Artiste de la pierre
+SEMAINE|Sept jours
+SENTIER|Petit chemin
+SERPENT|Reptile qui rampe
+SERVICE|Aide rendue
+SIECLE|Cent ans
+SIFFLET|Il émet un son aigu
+SIGNE|Geste ou marque
+SILENCE|Absence de bruit
+SINGE|Primate qui grimpe
+SOIE|Fil du ver
+SOLDAT|Homme de guerre
+SOMMEIL|Repos de la nuit
+SORCIERE|Elle jette des sorts
+SORTIE|Porte pour partir
+SOURCE|Lieu où naît un cours d'eau
+SOURIRE|Joie du visage
+SPORT|Exercice physique
+STATION|Arrêt de bus ou de métro
+STYLO|Il écrit à l'encre
+SUCRE|Il adoucit le café
+TABAC|Plante à fumer
+TABLEAU|Œuvre accrochée au mur
+TAILLE|Hauteur d'une personne
+TAMBOUR|Instrument frappé
+TAPIS|Il couvre le sol
+TELEPHONE|Appareil pour appeler
+TEMPETE|Violent coup de vent
+TENNIS|Sport de raquette
+TENTE|Abri de toile
+TERRAIN|Surface de terre
+THEATRE|Lieu des pièces
+TIROIR|Boîte coulissante
+TISSU|Étoffe
+TOILE|Peinture ou tissu
+TOMATE|Fruit rouge de la salade
+TONNERRE|Bruit de l'orage
+TORTUE|Elle porte sa maison
+TOUCHE|Elle se presse au clavier
+TRAVAIL|Activité rémunérée
+TRESOR|Butin des pirates
+TRIANGLE|Figure à trois côtés
+TROUPEAU|Groupe de moutons
+TRUITE|Poisson de rivière
+TUNNEL|Passage sous la montagne
+USINE|Lieu de fabrication
+VACANCES|Temps de repos
+VAGUE|Onde de la mer
+VALISE|Bagage de voyage
+VALLEE|Creux entre deux montagnes
+VEILLE|Jour d'avant
+VELO|Bicyclette
+VENDREDI|Cinquième jour de la semaine
+VERITE|Contraire du mensonge
+VESTE|Elle se porte sur la chemise
+VETEMENT|Habit
+VIANDE|Chair des animaux
+VIEUX|Qui a beaucoup d'années
+VILLAGE|Petite commune rurale
+VINAIGRE|Il aigrit la salade
+VIOLET|Couleur de la prune
+VIOLON|Instrument à archet
+VISAGE|Face
+VITESSE|Rapidité
+VITRE|Carreau de verre
+VOILE|Elle fait avancer le bateau
+VOISIN|Habitant d'à côté
+VOITURE|Automobile
+VOLEUR|Il dérobe
+VOYAGE|Déplacement lointain
+ZEBRE|Cheval rayé
