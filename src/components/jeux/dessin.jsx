@@ -363,3 +363,124 @@ export function GrilleMotsCanvas({ lignes, colonnes, cellules, onCase, maxCase =
     </div>
   );
 }
+
+
+// ─── Mots en cercle (05/10/2026) ──────────────────────────────────────────────────────────────────
+
+/**
+ * Grille des mots à trouver : une ligne de cases par mot, rangés par longueur puis alphabet, répartis en 1 à 4
+ * colonnes selon la place (cases les plus grandes possibles). Mot trouvé = vert ; lettres dévoilées (indice, ou
+ * première lettre en niveau facile) = bleu ; case vide = gris.
+ */
+export function SlotsCanvas({ mots, trouves, reveles, premiere }) {
+  const [refBoite, largeur] = useLargeur();
+  const refCanvas = useRef(null);
+  const W = Math.max(200, largeur || 300);
+  const gap = 14, esp = 2;
+  const maxLong = Math.max(...mots.map((m) => m.length));
+  // répartition en colonnes : on privilégie une grille COMPACTE (le cercle doit rester à l'écran) tant que les cases
+  // restent confortables (≥ 20 px) ; sinon, les cases les plus grandes possibles.
+  const candidats = [];
+  for (let cols = 1; cols <= 4; cols++) {
+    const parCol = Math.ceil(mots.length / cols);
+    const colonnes = Array.from({ length: cols }, (_, c) => mots.slice(c * parCol, (c + 1) * parCol)).filter((c) => c.length);
+    for (let cs = 30; cs >= 14; cs--) {
+      const w = colonnes.reduce((s, c) => s + Math.max(...c.map((m) => m.length)) * (cs + esp), 0) + (colonnes.length - 1) * gap;
+      if (w <= W) { candidats.push({ colonnes, cs, h: parCol * (cs + 4), w }); break; }
+    }
+  }
+  const confortables = candidats.filter((c) => c.cs >= 20);
+  const meilleur = confortables.length
+    ? confortables.reduce((a, b) => (b.h < a.h || (b.h === a.h && b.cs > a.cs) ? b : a))
+    : candidats.reduce((a, b) => (b.cs > a.cs ? b : a), candidats[0] || null);
+  const { colonnes, cs, h: H, w: Wu } = meilleur || { colonnes: [mots], cs: 14, h: mots.length * 18, w: maxLong * 16 };
+  useEffect(() => {
+    const canvas = refCanvas.current;
+    if (!canvas) return;
+    const ctx = preparer(canvas, W, H + 4);
+    ctx.clearRect(0, 0, W, H + 4);
+    let x0 = Math.max(0, (W - Wu) / 2);
+    for (const col of colonnes) {
+      const lc = Math.max(...col.map((m) => m.length));
+      col.forEach((mot, r) => {
+        const y = r * (cs + 4) + 2, ok = trouves.has(mot), n = reveles[mot] ?? (premiere ? 1 : 0);
+        for (let i = 0; i < mot.length; i++) {
+          const x = x0 + i * (cs + esp);
+          const montre = ok || i < n;
+          ctx.fillStyle = ok ? "#2e9e6b" : montre ? "#4857d9" : "rgba(110,124,138,0.88)";
+          ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, cs, cs, 4) : ctx.rect(x, y, cs, cs); ctx.fill();
+          if (montre) {
+            ctx.fillStyle = "#fff"; ctx.font = `700 ${cs * 0.62}px ${POLICE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(mot[i], x + cs / 2, y + cs / 2 + 1);
+          }
+        }
+      });
+      x0 += lc * (cs + esp) + gap;
+    }
+  }, [mots, trouves, reveles, premiere, W, H, cs, Wu, colonnes]);
+  return (
+    <div ref={refBoite} style={{ position: "relative", width: "100%", minWidth: 0, height: H + 4, overflow: "hidden" }}>
+      <canvas ref={refCanvas} role="img" aria-label={`${mots.length} mots à trouver, ${trouves.size} trouvés`} style={{ position: "absolute", left: 0, top: 0 }} />
+    </div>
+  );
+}
+
+/**
+ * Cercle de lettres : on pose le doigt sur une lettre et on glisse de lettre en lettre ; relâcher valide le mot.
+ * Revenir sur l'avant-dernière lettre annule la dernière. `apercu` (mot en cours) est dessiné au-dessus du cercle.
+ */
+export function RoueCanvas({ lettres, chemin, apercu, onChemin, onValider }) {
+  const [refBoite, largeur] = useLargeur();
+  const refCanvas = useRef(null);
+  const cheminRef = useRef(chemin);
+  cheminRef.current = chemin;
+  const glisse = useRef(false);
+  const S = Math.max(180, Math.min(largeur || 300, 290)), HAUT = 46, H = S + HAUT;
+  const cx = S / 2, cy = HAUT + S / 2, nr = S * 0.105, R = S / 2 - nr - 8;
+  const pos = lettres.map((_, i) => { const a = -Math.PI / 2 + (i * 2 * Math.PI) / lettres.length; return [cx + R * Math.cos(a), cy + R * Math.sin(a)]; });
+  useEffect(() => {
+    const canvas = refCanvas.current;
+    if (!canvas) return;
+    const ctx = preparer(canvas, S, H);
+    ctx.clearRect(0, 0, S, H);
+    if (apercu) {
+      ctx.font = `700 22px ${POLICE}`; const w = Math.max(40, ctx.measureText(apercu).width + 28);
+      ctx.fillStyle = "#1d2733"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect((S - w) / 2, 6, w, 34, 17) : ctx.rect((S - w) / 2, 6, w, 34); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(apercu, S / 2, 24);
+    }
+    ctx.fillStyle = "#2a3441"; ctx.beginPath(); ctx.arc(cx, cy, S / 2 - 2, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = "#4b5a6b"; ctx.lineWidth = 2; ctx.stroke();
+    if (chemin.length > 1) {
+      ctx.strokeStyle = "rgba(242,201,76,0.85)"; ctx.lineWidth = nr * 0.38; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); chemin.forEach((k, i) => (i ? ctx.lineTo(pos[k][0], pos[k][1]) : ctx.moveTo(pos[k][0], pos[k][1]))); ctx.stroke();
+    }
+    lettres.forEach((l, i) => {
+      const sel = chemin.includes(i);
+      if (sel) { ctx.fillStyle = "#f2c94c"; ctx.beginPath(); ctx.arc(pos[i][0], pos[i][1], nr, 0, 2 * Math.PI); ctx.fill(); }
+      ctx.fillStyle = sel ? "#1b1b1b" : "#fff"; ctx.font = `700 ${nr * 1.25}px ${POLICE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(l, pos[i][0], pos[i][1] + 1);
+    });
+  }, [lettres, chemin, apercu, S, H, nr, cx, cy, R]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toucher = (e) => {
+    const rect = refCanvas.current.getBoundingClientRect(), k = rect.width / S;
+    const x = (e.clientX - rect.left) / k, y = (e.clientY - rect.top) / k;
+    let best = -1, bd = nr * 1.15;
+    pos.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  const avancer = (e) => {
+    const i = toucher(e), c = cheminRef.current;
+    if (i < 0) return;
+    if (c.length >= 2 && c[c.length - 2] === i) onChemin(c.slice(0, -1));
+    else if (!c.includes(i)) onChemin([...c, i]);
+  };
+  const debut = (e) => { if (toucher(e) < 0) return; glisse.current = true; refCanvas.current.setPointerCapture?.(e.pointerId); onChemin([]); cheminRef.current = []; avancer(e); };
+  const fin = () => { if (!glisse.current) return; glisse.current = false; const c = cheminRef.current; onChemin([]); if (c.length) onValider(c); };
+  return (
+    <div ref={refBoite} style={{ position: "relative", width: "100%", maxWidth: 290, minWidth: 0, height: H, margin: "0 auto", overflow: "hidden" }}>
+      <canvas ref={refCanvas} role="img" aria-label={`Cercle de lettres : ${lettres.join(", ")}`}
+        onPointerDown={debut} onPointerMove={(e) => glisse.current && avancer(e)} onPointerUp={fin} onPointerCancel={fin}
+        style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: 0, touchAction: "none", cursor: "pointer" }} />
+    </div>
+  );
+}
