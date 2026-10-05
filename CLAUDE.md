@@ -788,6 +788,13 @@ première lettre de chaque mot donnée en facile). Nommé « Mots en cercle » (
 - Interaction : glisser de lettre en lettre (`pointer` sur le canvas, `touch-action: none`), relâcher valide, revenir sur
   l'avant-dernière lettre annule la dernière ; 🔀 mélanger, 💡 indice (dévoile une lettre du mot le plus long restant), Solution.
   Grille : `SlotsCanvas` répartit les mots en 1 à 4 colonnes, la plus COMPACTE à cases ≥ 20 px (sinon le cercle sort de l'écran).
+- **Bug « les mots ne se construisent pas » sur mobile (05/10/2026)** : `RoueCanvas` relisait `cheminRef.current`, mis à jour seulement au rendu
+  suivant ; un doigt rapide envoie plusieurs `pointermove` avant que React ne redessine → les lettres déjà prises étaient écrasées (la souris,
+  lente, ne le montrait pas : le test d'origine n'avait JAMAIS reçu de vrais événements tactiles). Corrigé : `cheminRef` est mis à jour
+  immédiatement, le segment parcouru est échantillonné (une lettre traversée entre deux événements n'est plus ratée), `setPointerCapture`
+  protégé (try/catch), pas de menu contextuel ni de sélection au toucher long. Vérifié par une RAFALE d'événements dans la même tâche et
+  par de vrais événements tactiles (CDP `Input.dispatchTouchEvent`, 1 ou 2 points par segment) : facile, moyen, difficile terminés au doigt.
+  **Règle** : tout geste continu (glisser) se teste avec des événements tactiles rapides, pas seulement à la souris.
 - `window.__cercle` (niveau courant) n'existe qu'en dev (`import.meta.env.DEV`) : sert aux tests automatiques.
 - Vérifié à 360 px (souris Playwright, sombre forcé) : niveaux facile et difficile joués jusqu'au bout, « au moins 3 lettres »,
   « déjà trouvé », `scrollWidth == innerWidth`. NON testé : doigt réel (événements tactiles), bonus (mots hors grille).

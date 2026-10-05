@@ -484,26 +484,55 @@ export function RoueCanvas({ lettres, chemin, apercu, message, onChemin, onValid
       ctx.fillText(l, pos[i][0], pos[i][1] + 1);
     });
   }, [lettres, chemin, apercu, message, S, H, nr, cx, cy, R]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toucher = (e) => {
-    const rect = refCanvas.current.getBoundingClientRect(), k = rect.width / S;
-    const x = (e.clientX - rect.left) / k, y = (e.clientY - rect.top) / k;
+  // Position du doigt en coordonnées du cercle (px CSS du canvas, S × H), puis lettre touchée (ou -1).
+  const point = (e) => { const rect = refCanvas.current.getBoundingClientRect(), k = rect.width / S; return [(e.clientX - rect.left) / k, (e.clientY - rect.top) / k]; };
+  const lettreEn = ([x, y]) => {
     let best = -1, bd = nr * 1.15;
     pos.forEach(([px, py], i) => { const d = Math.hypot(px - x, py - y); if (d < bd) { bd = d; best = i; } });
     return best;
   };
-  const avancer = (e) => {
-    const i = toucher(e), c = cheminRef.current;
-    if (i < 0) return;
-    if (c.length >= 2 && c[c.length - 2] === i) onChemin(c.slice(0, -1));
-    else if (!c.includes(i)) onChemin([...c, i]);
+  const dernier = useRef(null);
+  // Ajoute (ou retire, si on revient sur l'avant-dernière) une lettre. `cheminRef` est mis à jour TOUT DE SUITE : un doigt rapide envoie
+  // plusieurs événements avant que React ne redessine, et relire un chemin périmé écrasait les lettres déjà prises (mots qui « ne se
+  // construisent pas » sur mobile, 05/10/2026).
+  const ajouter = (i) => {
+    const c = cheminRef.current;
+    let n = null;
+    if (c.length >= 2 && c[c.length - 2] === i) n = c.slice(0, -1);
+    else if (!c.includes(i)) n = [...c, i];
+    if (n) { cheminRef.current = n; onChemin(n); }
   };
-  const debut = (e) => { if (toucher(e) < 0) return; glisse.current = true; refCanvas.current.setPointerCapture?.(e.pointerId); onChemin([]); cheminRef.current = []; avancer(e); };
-  const fin = () => { if (!glisse.current) return; glisse.current = false; const c = cheminRef.current; onChemin([]); if (c.length) onValider(c); };
+  // Avance jusqu'à `p` en échantillonnant le segment depuis la dernière position : un doigt qui glisse vite saute des événements,
+  // et ne doit pas pour autant rater une lettre traversée.
+  const avancerVers = (p) => {
+    const d = dernier.current, pas = nr * 0.45;
+    const n = d ? Math.max(1, Math.ceil(Math.hypot(p[0] - d[0], p[1] - d[1]) / pas)) : 1;
+    for (let k = 1; k <= n; k++) {
+      const q = d ? [d[0] + ((p[0] - d[0]) * k) / n, d[1] + ((p[1] - d[1]) * k) / n] : p;
+      const i = lettreEn(q);
+      if (i >= 0) ajouter(i);
+    }
+    dernier.current = p;
+  };
+  const debut = (e) => {
+    const p = point(e);
+    if (lettreEn(p) < 0) return;
+    glisse.current = true; dernier.current = null; cheminRef.current = [];
+    try { refCanvas.current.setPointerCapture?.(e.pointerId); } catch { /* pointeur déjà relâché */ }
+    avancerVers(p);
+  };
+  const bouge = (e) => { if (glisse.current) avancerVers(point(e)); };
+  const fin = () => {
+    if (!glisse.current) return;
+    glisse.current = false; dernier.current = null;
+    const c = cheminRef.current; cheminRef.current = []; onChemin([]);
+    if (c.length) onValider(c);
+  };
   return (
     <div ref={refBoite} style={{ position: "relative", width: "100%", maxWidth: 290, minWidth: 0, height: H, margin: "0 auto", overflow: "hidden" }}>
       <canvas ref={refCanvas} role="img" aria-label={`Cercle de lettres : ${lettres.join(", ")}`}
-        onPointerDown={debut} onPointerMove={(e) => glisse.current && avancer(e)} onPointerUp={fin} onPointerCancel={fin}
-        style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: 0, touchAction: "none", cursor: "pointer" }} />
+        onPointerDown={debut} onPointerMove={bouge} onPointerUp={fin} onPointerCancel={fin} onContextMenu={(e) => e.preventDefault()}
+        style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", top: 0, touchAction: "none", cursor: "pointer", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }} />
     </div>
   );
 }
