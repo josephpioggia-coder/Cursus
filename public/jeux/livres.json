@@ -9,7 +9,7 @@
   "genre": "Thriller psychologique",
   "epoque": "contemporaine",
   "lieu": "Banlieue aisée près de New York",
-  "palmares": "Présente au palmarès français depuis plus de 80 semaines en poche, d'après un extrait de classement consulté en octobre 2026 ; Freida McFadden est l'autrice la plus vendue de 2025 en France.",
+  "palmares": "Au Top 200 de la semaine 39 (2026), La Femme de ménage est au rang 43 en poche (J'ai lu), avec 156 semaines au classement ; Freida McFadden est l'autrice la plus vendue de 2025 en France.",
   "pitch": "Une jeune femme à la recherche d'un emploi est engagée dans une riche maison où rien n'est tout à fait normal. Un thriller domestique à rebondissements, très lu en poche.",
   "indices": [
    "Un thriller psychologique venu des États-Unis, traduit en français à partir de 2023.",
@@ -121,7 +121,7 @@
   "genre": "Roman littéraire, histoire récente",
   "epoque": "passe",
   "lieu": "Algérie",
-  "palmares": "Prix Goncourt 2024.",
+  "palmares": "Prix Goncourt 2024 ; l'édition Folio, en poche depuis septembre 2026, est au rang 47 du Top 200 (semaine 39).",
   "pitch": "Une jeune femme marquée à jamais par la guerre civile algérienne s'adresse à l'enfant qu'elle porte. Un texte dur, puissant, sur la mémoire et le silence.",
   "indices": [
    "Un roman en français couronné par le Goncourt, en 2024.",
@@ -205,7 +205,7 @@
   "genre": "Roman d'apprentissage",
   "epoque": "passe",
   "lieu": "Burundi",
-  "palmares": "Prix Goncourt des lycéens 2016 ; grand succès de librairie.",
+  "palmares": "Rang 62 du Top 200 (semaine 39, 2026, poche), avec 240 semaines au classement ; Prix Goncourt des lycéens 2016.",
   "pitch": "Un garçon grandit au Burundi au début des années 1990, entre jeux d'enfants et peur grandissante, tandis que la guerre approche. Un premier roman poignant.",
   "indices": [
    "Un premier roman, devenu un grand succès après 2016.",
@@ -429,7 +429,7 @@
   "genre": "Conte philosophique",
   "epoque": "intemporelle",
   "lieu": "Désert du Sahara et planètes imaginaires",
-  "palmares": "L'un des livres les plus lus et traduits au monde.",
+  "palmares": "Rangs 172 (Gallimard Jeunesse, 236 semaines) et 199 (Folio, 341 semaines) du Top 200 (semaine 39, 2026).",
   "pitch": "Un pilote tombé en panne dans le désert rencontre un enfant venu d'une autre planète. Un conte pour tous les âges sur l'amitié, la perte et ce qui est essentiel.",
   "indices": [
    "Un conte publié en 1943, lu dans le monde entier.",
@@ -569,7 +569,7 @@
   "genre": "Roman, mystère et émotion",
   "epoque": "contemporaine",
   "lieu": "Bourgogne, cimetière d'un village",
-  "palmares": "Très grand succès de librairie, notamment en poche.",
+  "palmares": "Rang 51 du Top 200 (semaine 39, 2026, poche), avec 366 semaines au classement.",
   "pitch": "Une gardienne de cimetière accueille les visiteurs, écoute leurs histoires et finit par plonger dans la sienne. Un roman tendre, drôle et mystérieux sur la mémoire des vivants et des morts.",
   "indices": [
    "Un roman français très aimé des lecteurs.",
@@ -793,7 +793,7 @@
   "genre": "Fantasy jeunesse",
   "epoque": "contemporaine",
   "lieu": "Angleterre et école de magie",
-  "palmares": "L'un des livres les plus vendus au monde.",
+  "palmares": "Rang 158 du Top 200 (semaine 39, 2026), avec 84 semaines au classement.",
   "pitch": "Un orphelin qui vit chez son oncle et sa tante apprend le jour de ses onze ans qu'il est sorcier et rejoint une école de magie. Une aventure pleine d'humour et de courage.",
   "indices": [
    "Premier tome d'une série jeunesse devenue mondiale.",
@@ -921,6 +921,426 @@
    "realisme": 4,
    "exigence": 1,
    "humour": 3
+  }
+ },
+ {
+  "id": "etranger",
+  "titre": "L'Étranger",
+  "auteur": "Albert Camus",
+  "pays": "France / Algérie",
+  "annee": 1942,
+  "format": "roman",
+  "genre": "Roman de l'absurde",
+  "epoque": "passe",
+  "lieu": "Alger",
+  "palmares": "Rang 63 du Top 200 (semaine 39, 2026, poche Folio), avec 746 semaines au classement.",
+  "pitch": "À Alger, un homme ordinaire apprend la mort de sa mère, puis commet un geste irréparable sur une plage écrasée de soleil. Un récit sec et fascinant sur l'absurde et le regard de la société.",
+  "indices": [
+   "Un roman publié en 1942, devenu un classique mondial.",
+   "L'action se passe à Alger, entre la ville et une plage écrasée de soleil.",
+   "Le narrateur reçoit un télégramme qui annonce la mort de sa mère.",
+   "Il est ensuite jugé, moins pour son geste que pour son attitude.",
+   "Auteur : A. C., prix Nobel de littérature en 1957 ; le titre désigne celui qui reste à l'écart des autres."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "1984",
+  "titre": "1984",
+  "auteur": "George Orwell",
+  "pays": "Royaume-Uni",
+  "annee": 1949,
+  "format": "roman",
+  "genre": "Roman d'anticipation",
+  "epoque": "intemporelle",
+  "lieu": "Londres, dans un pays imaginaire",
+  "palmares": "Rang 107 du Top 200 (semaine 39, 2026, poche Folio), avec 83 semaines au classement.",
+  "pitch": "Dans un pays où le Parti surveille tout, un employé chargé de réécrire le passé ose penser par lui-même et tomber amoureux. Un roman glaçant sur la surveillance et la manipulation de la vérité.",
+  "indices": [
+   "Un roman d'anticipation publié en 1949.",
+   "Une capitale où des écrans épient chaque geste, dans un pays en guerre perpétuelle.",
+   "Le héros, employé d'un ministère, falsifie les archives.",
+   "Un visage sur d'immenses affiches semble toujours regarder les citoyens.",
+   "Auteur : G. O. ; le titre est une année."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 2,
+   "noirceur": 4,
+   "realisme": 1,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "promesse-de-laube",
+  "titre": "La Promesse de l'aube",
+  "auteur": "Romain Gary",
+  "pays": "France",
+  "annee": 1960,
+  "format": "recit",
+  "genre": "Récit autobiographique",
+  "epoque": "passe",
+  "lieu": "Pologne, Nice, Londres, Afrique",
+  "palmares": "Rang 173 du Top 200 (semaine 39, 2026, poche Folio), avec 138 semaines au classement.",
+  "pitch": "Romain Gary raconte son enfance et sa jeunesse auprès d'une mère qui croit en lui jusqu'à l'excès et lui promet un destin d'exception. Un récit autobiographique drôle et bouleversant sur l'amour maternel.",
+  "indices": [
+   "Un récit autobiographique publié en 1960.",
+   "L'enfance se passe en Pologne, puis la famille s'installe dans le sud de la France.",
+   "Une mère est persuadée que son fils sera un grand homme.",
+   "Le fils devient aviateur pendant la guerre, puis diplomate et écrivain.",
+   "Auteur : R. G. ; le titre parle d'un engagement pris à l'aurore."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 2
+  }
+ },
+ {
+  "id": "ce-que-le-jour",
+  "titre": "Ce que le jour doit à la nuit",
+  "auteur": "Yasmina Khadra",
+  "pays": "Algérie / France",
+  "annee": 2008,
+  "format": "roman",
+  "genre": "Roman historique et sentimental",
+  "epoque": "passe",
+  "lieu": "Oran, Algérie",
+  "palmares": "Rang 165 du Top 200 (semaine 39, 2026, poche Pocket), avec 66 semaines au classement.",
+  "pitch": "Dans l'Algérie des années 1930 à 1960, un garçon pauvre est confié à son oncle pharmacien à Oran, où il grandit entre amitiés d'adolescence, amour impossible et guerre d'indépendance.",
+  "indices": [
+   "Un roman publié en 2008, signé d'un pseudonyme féminin.",
+   "L'action se passe en Algérie, de l'entre-deux-guerres à l'indépendance.",
+   "Un garçon pauvre est confié à son oncle pharmacien, dans une grande ville de l'Ouest.",
+   "Il s'y fait une bande d'amis d'origines différentes et tombe amoureux.",
+   "Auteur : Y. K. ; le titre oppose deux moments d'une journée."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 0
+  }
+ },
+ {
+  "id": "miserables",
+  "titre": "Les Misérables",
+  "auteur": "Victor Hugo",
+  "pays": "France",
+  "annee": 1862,
+  "format": "roman",
+  "genre": "Roman historique, fresque sociale",
+  "epoque": "passe",
+  "lieu": "Paris et la France du XIXe siècle",
+  "palmares": "Rang 117 du Top 200 (semaine 39, 2026), dans une édition scolaire (Belin Éducation), avec 11 semaines au classement.",
+  "pitch": "Un forçat libéré, Jean Valjean, tente de se racheter alors que l'inspecteur Javert ne le lâche pas. Une immense fresque de la misère et de la justice au XIXe siècle.",
+  "indices": [
+   "Un roman monumental publié en 1862.",
+   "Une fresque de la France du XIXe siècle, de la province à Paris.",
+   "Un ancien forçat est recueilli par un évêque et change de vie.",
+   "Un policier obstiné le traque pendant des années ; une fillette nommée Cosette entre dans sa vie.",
+   "Auteur : V. H. ; le titre désigne ceux que la société écrase."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 4,
+   "noirceur": 3,
+   "realisme": 3,
+   "exigence": 4,
+   "humour": 0
+  }
+ },
+ {
+  "id": "journal-anne-frank",
+  "titre": "Le Journal d'Anne Frank",
+  "auteur": "Anne Frank",
+  "pays": "Pays-Bas",
+  "annee": 1947,
+  "format": "recit",
+  "genre": "Journal intime, témoignage",
+  "epoque": "passe",
+  "lieu": "Amsterdam, 1942-1944",
+  "palmares": "Rang 133 du Top 200 (semaine 39, 2026, poche Le Livre de Poche), avec 42 semaines au classement.",
+  "pitch": "Une adolescente juive cachée avec sa famille à Amsterdam pendant l'Occupation confie à son cahier la peur, l'espoir et son rêve de devenir écrivaine. L'un des témoignages les plus lus sur la Seconde Guerre mondiale.",
+  "indices": [
+   "Des pages écrites au jour le jour par une adolescente, devenues un témoignage mondial.",
+   "Elles viennent d'Amsterdam, pendant la Seconde Guerre mondiale.",
+   "Une famille vit cachée dans une annexe secrète, derrière une bibliothèque.",
+   "L'autrice s'adresse à une confidente imaginaire et rêve de devenir écrivaine.",
+   "Autrice : A. F. ; le titre dit simplement de quel genre de texte il s'agit."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 1
+  }
+ },
+ {
+  "id": "on-ne-badine-pas",
+  "titre": "On ne badine pas avec l'amour",
+  "auteur": "Alfred de Musset",
+  "pays": "France",
+  "annee": 1834,
+  "format": "theatre",
+  "genre": "Théâtre romantique",
+  "epoque": "passe",
+  "lieu": "Un château de campagne",
+  "palmares": "Rangs 28 (Hatier) et 64 (Belin) du Top 200 (semaine 39, 2026), dans des éditions scolaires.",
+  "pitch": "Deux cousins, Perdican et Camille, se retrouvent après des années. Elle sort du couvent et refuse l'amour, il la défie : leur jeu d'orgueil tourne au drame. Une pièce romantique sur les sentiments dont on ne joue pas.",
+  "indices": [
+   "Une pièce de théâtre romantique de 1834.",
+   "L'action se passe à la campagne, dans la demeure d'un baron.",
+   "Un jeune docteur revient chez lui après ses études ; sa cousine sort du couvent.",
+   "Ils jouent avec leurs sentiments, par orgueil, et le jeu devient cruel.",
+   "Auteur : A. de M. ; le titre est un proverbe qui interdit de traiter ce sujet à la légère."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 3,
+   "noirceur": 2,
+   "realisme": 2,
+   "exigence": 3,
+   "humour": 1
+  }
+ },
+ {
+  "id": "antigone",
+  "titre": "Antigone",
+  "auteur": "Jean Anouilh",
+  "pays": "France",
+  "annee": 1944,
+  "format": "theatre",
+  "genre": "Théâtre, tragédie moderne",
+  "epoque": "intemporelle",
+  "lieu": "Thèbes (Grèce antique, revisitée)",
+  "palmares": "Rang 80 du Top 200 (semaine 39, 2026, poche La Table Ronde), avec 320 semaines au classement.",
+  "pitch": "Antigone refuse d'obéir à l'ordre de son oncle, le roi Créon, qui interdit d'enterrer son frère. Une tragédie moderne, jouée en 1944, sur la révolte, le devoir et le refus du compromis.",
+  "indices": [
+   "Une pièce de théâtre créée en 1944.",
+   "Elle reprend une légende de la Grèce antique, à Thèbes.",
+   "Un roi interdit d'enterrer un homme qui s'est battu contre sa propre cité.",
+   "Sa nièce décide d'enfreindre l'interdiction, quoi qu'il lui en coûte.",
+   "Auteur : J. A. ; le titre est le prénom de la jeune fille."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 3,
+   "noirceur": 3,
+   "realisme": 1,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "la-vague",
+  "titre": "La Vague",
+  "auteur": "Todd Strasser",
+  "pays": "États-Unis",
+  "annee": 1981,
+  "format": "roman",
+  "genre": "Roman jeunesse, expérience sociale",
+  "epoque": "passe",
+  "lieu": "Un lycée américain",
+  "palmares": "Rang 146 du Top 200 (semaine 39, 2026, poche Pocket), avec 69 semaines au classement.",
+  "pitch": "Dans un lycée américain, un professeur d'histoire lance une expérience de discipline collective pour faire comprendre comment un régime autoritaire peut séduire. Le groupe prend vite de l'ampleur.",
+  "indices": [
+   "Un court roman américain inspiré d'une expérience réelle dans un lycée.",
+   "Il est très lu en classe, depuis sa parution en 1981.",
+   "Un professeur d'histoire veut montrer à ses élèves comment les foules suivent un chef.",
+   "Le mouvement a un salut, un slogan et un insigne ; les élèves y adhèrent peu à peu.",
+   "Auteur : T. S. ; le titre désigne un mouvement qui s'étend."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 3,
+   "exigence": 1,
+   "humour": 0
+  }
+ },
+ {
+  "id": "matin-brun",
+  "titre": "Matin brun",
+  "auteur": "Franck Pavloff",
+  "pays": "France",
+  "annee": 1998,
+  "format": "roman",
+  "genre": "Nouvelle, fable politique",
+  "epoque": "contemporaine",
+  "lieu": "Une ville, dans un pays imaginaire",
+  "palmares": "Rang 196 du Top 200 (semaine 39, 2026, Cheyne), avec 110 semaines au classement.",
+  "pitch": "Un homme raconte comment, par habitude et par confort, lui et son ami Charlie acceptent d'abord des lois absurdes sur la couleur des animaux, puis comprennent trop tard. Une fable très courte sur la montée de l'autoritarisme.",
+  "indices": [
+   "Une nouvelle très courte, publiée en 1998, qui se lit en un quart d'heure.",
+   "Un récit à la première personne, entre deux amis qui se retrouvent dans un café.",
+   "Une loi impose de se débarrasser des animaux d'une certaine couleur.",
+   "Le narrateur accepte d'abord par commodité, puis la loi touche ses proches.",
+   "Auteur : F. P. ; le titre associe un moment de la journée et une couleur."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 1,
+   "exigence": 1,
+   "humour": 0
+  }
+ },
+ {
+  "id": "anne-green-gables",
+  "titre": "Anne de Green Gables",
+  "auteur": "Lucy Maud Montgomery",
+  "pays": "Canada",
+  "annee": 1908,
+  "format": "roman",
+  "genre": "Roman jeunesse, classique",
+  "epoque": "passe",
+  "lieu": "Île-du-Prince-Édouard, Canada",
+  "palmares": "Rang 130 du Top 200 (semaine 39, 2026), dans une édition scolaire (Belin Éducation), avec 2 semaines au classement.",
+  "pitch": "Une orpheline de onze ans à l'imagination débordante arrive par erreur chez un frère et une sœur qui attendaient un garçon pour les aider à la ferme. Elle conquiert peu à peu tout le village.",
+  "indices": [
+   "Un roman canadien paru en 1908, devenu un classique pour la jeunesse.",
+   "L'action se passe dans un village de l'Île-du-Prince-Édouard.",
+   "Un frère et une sœur demandent un garçon à l'orphelinat ; une fille arrive à la place.",
+   "Elle a des cheveux roux, une imagination sans limites et un caractère explosif.",
+   "Autrice : L. M. M. ; le titre cite l'héroïne et le nom de la maison aux pignons verts."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 2,
+   "exigence": 1,
+   "humour": 2
+  }
+ },
+ {
+  "id": "royaume-de-kensuke",
+  "titre": "Le Royaume de Kensuke",
+  "auteur": "Michael Morpurgo",
+  "pays": "Royaume-Uni",
+  "annee": 1999,
+  "format": "roman",
+  "genre": "Roman d'aventure jeunesse",
+  "epoque": "contemporaine",
+  "lieu": "Une île du Pacifique",
+  "palmares": "Rang 112 du Top 200 (semaine 39, 2026), avec 99 semaines au classement.",
+  "pitch": "Un garçon part avec ses parents faire le tour du monde en voilier, tombe à la mer et échoue sur une île où vit un vieil homme mystérieux. Un roman d'aventure sur l'amitié et le pardon.",
+  "indices": [
+   "Un roman jeunesse britannique, très lu au collège.",
+   "Une famille décide de faire le tour du monde en voilier.",
+   "Le jeune héros tombe à la mer, avec son chien, et se retrouve seul.",
+   "Sur une île déserte, il découvre qu'un vieil homme y vit depuis la guerre.",
+   "Auteur : M. M. ; le titre cite le nom de ce vieil homme japonais."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 2,
+   "exigence": 1,
+   "humour": 1
+  }
+ },
+ {
+  "id": "one-piece",
+  "titre": "One Piece",
+  "auteur": "Eiichiro Oda",
+  "pays": "Japon",
+  "annee": 1997,
+  "format": "bd",
+  "genre": "Manga d'aventure",
+  "epoque": "intemporelle",
+  "lieu": "Un monde de mers et d'îles",
+  "palmares": "Le tome 113 entre aux rangs 2 et 3 du Top 200 (semaine 39, 2026, Glénat) : une série publiée depuis 1997.",
+  "pitch": "Luffy, un garçon au corps élastique, rêve de devenir roi des pirates. Avec son équipage de chapeaux de paille, il parcourt les mers à la recherche du trésor ultime. Aventure, humour et amitié.",
+  "indices": [
+   "Un manga japonais d'aventure, publié depuis 1997.",
+   "Le héros mange un fruit du démon qui rend son corps élastique.",
+   "Il veut devenir roi des pirates et trouver un trésor légendaire.",
+   "Son équipage porte un drapeau avec un crâne coiffé d'un chapeau de paille.",
+   "Auteur : E. O. ; le titre désigne le trésor ultime."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 0,
+   "exigence": 0,
+   "humour": 4
+  }
+ },
+ {
+  "id": "blue-lock",
+  "titre": "Blue Lock",
+  "auteur": "Muneyuki Kaneshiro et Yusuke Nomura",
+  "pays": "Japon",
+  "annee": 2018,
+  "format": "bd",
+  "genre": "Manga de sport",
+  "epoque": "contemporaine",
+  "lieu": "Un centre d'entraînement au Japon",
+  "palmares": "Tome 34 au rang 113 et tome 1 au rang 180 du Top 200 (semaine 39, 2026, Pika).",
+  "pitch": "Après une humiliation du Japon au football, un projet enferme 300 jeunes attaquants pour former le meilleur buteur du monde. Isagi y découvre que l'égoïsme peut être une arme.",
+  "indices": [
+   "Un manga de sport, publié depuis 2018.",
+   "Le sport est le football, et le Japon veut gagner la Coupe du monde.",
+   "Trois cents jeunes attaquants sont enfermés dans un centre d'entraînement.",
+   "Un seul gagnera ; le projet exige d'oser être égoïste.",
+   "Auteur : M. K. ; le titre anglais associe une couleur et un cadenas."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 2,
+   "noirceur": 1,
+   "realisme": 3,
+   "exigence": 0,
+   "humour": 1
+  }
+ },
+ {
+  "id": "solo-leveling",
+  "titre": "Solo Leveling",
+  "auteur": "Chugong",
+  "pays": "Corée du Sud",
+  "annee": 2016,
+  "format": "bd",
+  "genre": "Manhwa d'action et de fantasy",
+  "epoque": "contemporaine",
+  "lieu": "Corée, portails et donjons",
+  "palmares": "Tome 21 au rang 164 du Top 200 (semaine 39, 2026, Kbooks).",
+  "pitch": "Dans un monde où des portails s'ouvrent sur des donjons, le plus faible des chasseurs reçoit un pouvoir unique : monter en niveau sans limite. Action, monstres et progression façon jeu vidéo.",
+  "indices": [
+   "Un manhwa (BD coréenne) adapté d'un roman publié sur le web.",
+   "Le monde est envahi de portails qui ouvrent sur des donjons.",
+   "Des chasseurs affrontent des monstres ; le héros est le plus faible de tous.",
+   "Après un piège mortel, il peut progresser comme dans un jeu vidéo.",
+   "Auteur : C. ; le titre promet de monter en puissance sans l'aide de personne."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 0,
+   "exigence": 0,
+   "humour": 1
   }
  }
 ]

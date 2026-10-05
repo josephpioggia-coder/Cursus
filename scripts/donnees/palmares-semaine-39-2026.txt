@@ -1,0 +1,200 @@
+1|=|4|Le casse du siècle|Sarah Knafo|Essais & Références|Fayard|02/09/2026|19,90
+2|E|1|One Piece, édition originale, tome 113 : La naissance de Loki|Eiichiro Oda|Bandes dessinées|Glénat|23/09/2026|7,20
+3|E|1|One Piece, édition originale, tome 113 : La naissance de Loki (grand format)|Eiichiro Oda|Bandes dessinées|Glénat|23/09/2026|25,00
+4|+1|6|C'était ça ou mourir|Thélyson Orélien|Littérature (hors poche)|Grasset|19/08/2026|21,50
+5|-3|2|Retour à Folegandros|Agnès Martin-Lugand|Littérature (hors poche)|Michel Lafon|17/09/2026|21,95
+6|+6|2|Les Renaissances|Agnès Martin-Lugand|Littérature (poche)|Pocket|17/09/2026|9,90
+7|-3|13|Le dîner|Freida McFadden|Littérature (poche)|City|01/07/2026|6,00
+8|-5|59|Cahiers de Douai (1re générale et technologique, bac de français)|Arthur Rimbaud|Enseignement|Hatier|05/04/2023|2,70
+9|E|1|Les Évadées, partie 1|Marc Levy|Littérature (hors poche)|Robert Laffont / Versilio|22/09/2026|21,90
+10|+1|4|Pluie et vent sur Télumée Miracle|Simone Schwarz-Bart|Enseignement|Points|17/04/2026|6,50
+11|-4|6|L'Adolescence du perroquet|Amélie Nothomb|Littérature (hors poche)|Albin Michel|19/08/2026|18,90
+12|-6|4|La Vengeance de la veuve noire|Morgane Moncomble|Littérature (hors poche)|Hugo Roman|02/09/2026|19,90
+13|E|1|Diana, ma sœur : le chant du cygne|Charles Spencer|Essais & Références|Flammarion|22/09/2026|25,50
+14|-5|3|Le Secret des secrets|Dan Brown|Littérature (poche)|Le Livre de Poche|10/09/2026|10,90
+15|E|1|Rappelle-toi|Harlan Coben|Littérature (poche)|Pocket|24/09/2026|9,60
+16|E|1|Mariposa, tome 2|Azra Reed|Littérature (hors poche)|Hugo Roman|23/09/2026|18,50
+17|=|6|Nous aussi|Anne Godard|Littérature (hors poche)|Actes Sud|19/08/2026|20,00
+18|-5|4|Les Ombres du monde|Michel Bussi|Littérature (poche)|Pocket|03/09/2026|11,20
+19|-9|12|Code civil : annoté (édition 2027)|Pascal Ancel|Essais & Références|Dalloz|25/06/2026|22,00
+20|-2|22|La Prof|Freida McFadden|Littérature (poche)|J'ai lu|29/04/2026|8,80
+21|+53|2|Le Clan de Walden|Catherine Meurisse|Bandes dessinées|Dargaud|18/09/2026|26,50
+22|E|1|Dailycieux : 150 recettes pour se régaler tous les jours|Whoogy's|Vie pratique & Loisirs|Chêne|23/09/2026|35,00
+23|-9|3|La Route du diable|Franck Thilliez|Littérature (hors poche)|Fleuve Éditions|10/09/2026|20,95
+24|-5|6|Le Palais|François-Henri Désérable|Littérature (hors poche)|Gallimard|20/08/2026|23,00
+25|-9|7|L'Inconnue du quai de Javel|Philippe Jaenada|Littérature (hors poche)|Flammarion|12/08/2026|23,00
+26|-6|4|Je crois que je l'ai tuée|Andrea Mara|Littérature (poche)|Points|04/09/2026|9,90
+27|-3|26|Tata|Valérie Perrin|Littérature (poche)|Le Livre de Poche|01/04/2026|10,90
+28|-13|52|On ne badine pas avec l'amour|Alfred de Musset|Enseignement|Hatier|10/04/2024|2,70
+29|+28|2|Tout le miel de la vie|Christian Signol|Littérature (hors poche)|Albin Michel|16/09/2026|21,90
+30|-5|21|Les Heures fragiles|Virginie Grimaldi|Littérature (poche)|Le Livre de Poche|06/05/2026|8,90
+31|+73|2|Une si lente agonie|Elizabeth George|Littérature (poche)|Pocket|17/09/2026|10,70
+32|+1|4|Fall in love|Sophie Jomain|Jeunesse|Auzou|03/09/2026|21,95
+33|-5|76|La Psy|Freida McFadden|Littérature (poche)|J'ai lu|16/04/2025|8,60
+34|=|12|Celle qui sait|Riley Sager|Littérature (hors poche)|Verso|03/07/2026|21,90
+35|-27|4|Cahiers de Douai|Arthur Rimbaud|Enseignement|Belin Éducation - Gallimard|07/01/2026|2,60
+36|+10|6|La Solitude des professeurs est infinie|Yannick Haenel|Littérature (hors poche)|Gallimard|20/08/2026|21,50
+37|+88|15|Magnifique humanité : encyclique|Léon XIV|Essais & Références|Cerf|25/05/2026|4,90
+38|-2|30|Inheritance, tome 1 : La Révolte de la reine|Morgane Moncomble|Littérature (hors poche)|Hugo Roman|04/03/2026|19,90
+39|-2|104|Les Secrets de la femme de ménage|Freida McFadden|Littérature (poche)|J'ai lu|02/10/2024|8,60
+40|-2|6|Je|Lilia Hassaine|Littérature (hors poche)|Gallimard|20/08/2026|21,00
+41|-11|4|Code Yesterday : le secret le mieux gardé du rock'n'roll|Michel Bussi|Littérature (hors poche)|Presses de la Cité|03/09/2026|22,90
+42|-3|51|La Femme de ménage voit tout|Freida McFadden|Littérature (poche)|J'ai lu|08/10/2025|8,60
+43|-3|156|La Femme de ménage|Freida McFadden|Littérature (poche)|J'ai lu|04/10/2023|8,60
+44|+51|3|Simple too|Yotam Ottolenghi|Vie pratique & Loisirs|Hachette Pratique|10/09/2026|38,00
+45|-3|30|Quelqu'un d'autre|Guillaume Musso|Littérature (poche)|Le Livre de Poche|03/03/2026|9,40
+46|-23|25|Mes forêts|Hélène Dorion|Littérature (poche)|Bruno Doucey|03/03/2023|5,90
+47|-3|4|Houris|Kamel Daoud|Littérature (poche)|Folio|03/09/2026|10,00
+48|-13|2|Curieux automne à l'auberge de Certilleux|Caroline Costa|Littérature (poche)|J'ai lu|16/09/2026|8,90
+49|-20|3|La Bascule : Allemagne, 1933|Johann Chapoutot|Essais & Références|Gallimard|10/09/2026|23,80
+50|-28|28|Pour un oui ou pour un non (bac 2026)|Nathalie Sarraute|Enseignement|Folio|04/04/2024|5,90
+51|+1|366|Changer l'eau des fleurs|Valérie Perrin|Littérature (poche)|Le Livre de Poche|24/04/2019|10,40
+52|+18|5|Le Fabuleux Piano|Sonia Devillers|Littérature (hors poche)|Robert Laffont|27/08/2026|21,00
+53|+9|71|La Femme de ménage se marie|Freida McFadden|Littérature (poche)|City|21/05/2025|4,90
+54|+97|3|On aurait pu se rencontrer|François Cheng|Littérature (hors poche)|Albin Michel|02/09/2026|17,90
+55|-35|15|Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Hatier|16/04/2025|2,50
+56|-2|6|Sous les eaux d'Avalon|Michael Connelly|Littérature (poche)|Le Livre de Poche|19/08/2026|9,90
+57|-16|8|Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Belin Éducation|23/04/2025|3,50
+58|-13|4|Plan comptable général|Sébastien Paugam|Essais & Références|Foucher|14/01/2026|2,99
+59|+12|18|Mortelle Adèle, tome 23 : Nazebrocadabra !|Mr Tan|Bandes dessinées|Mr Tan and Co|28/05/2026|11,50
+60|E|1|Absolute Batman, tome 3 : L'Atelier du diable|Scott Snyder|Bandes dessinées|Urban Comics|25/09/2026|20,50
+61|-8|42|L'Odyssée|Homère|Enseignement|Belin Éducation|19/05/2021|3,70
+62|-14|240|Petit pays|Gaël Faye|Littérature (poche)|Le Livre de Poche|23/08/2017|8,40
+63|-8|746|L'Étranger|Albert Camus|Littérature (poche)|Folio|07/01/1972|7,60
+64|-33|8|On ne badine pas avec l'amour|Alfred de Musset|Enseignement|Belin Éducation - Gallimard|20/08/2025|2,70
+65|=|2|Nestor Burma, tome 4 : Nestor Burma dans l'île|Léo Malet|Bandes dessinées|Casterman|16/09/2026|18,00
+66|+10|86|Seasons, tome 1 : Un automne pour te pardonner|Morgane Moncomble|Littérature (poche)|Hugo Poche|05/02/2025|8,90
+67|E|1|Les Guerres d'Arran, tome 8 : Cendres et couronnes|Jean-Luc Istin|Bandes dessinées|Soleil|24/09/2026|16,50
+68|-25|13|New I Bet You Can, anglais 6e (workbook)|Emmanuel Vesse|Enseignement|Magnard|06/06/2025|9,20
+69|-6|5|Anatole Latuile, tome 20 : Drôles d'oiseaux !|Anne Didier|Bandes dessinées|Bayard Jeunesse|26/08/2026|12,20
+70|+71|2|L'Ange d'Auschwitz|Ellie Midwood|Littérature (poche)|J'ai lu|16/09/2026|9,50
+71|+2|21|L'Intruse|Freida McFadden|Littérature (hors poche)|City|06/05/2026|22,00
+72|E|1|Yu-Gi-Oh ! Édition Millenium, tome 2|Kazuki Takahashi|Bandes dessinées|Kana|25/09/2026|13,95
+73|-26|9|Lettres d'une Péruvienne|Françoise de Graffigny|Enseignement|Hatier|16/04/2025|3,20
+74|E|1|Près de moi pour toujours|Harlan Coben|Littérature (hors poche)|Belfond|24/09/2026|23,00
+75|+8|7|Transylvania|Nicolas Beuglet|Littérature (poche)|Pocket|13/08/2026|9,30
+76|+10|2|Te retrouver en automne : t'aimer à Noël|Carène Ponte|Littérature (hors poche)|Fleuve Éditions|17/09/2026|19,95
+77|E|1|Décidément non ! Le RN : ce que nous ne pouvons pas taire|Roselyne Bachelot|Essais & Références|Plon|24/09/2026|19,00
+78|E|1|La Femme au foyer|Natalie Barelli|Littérature (hors poche)|Verso|18/09/2026|21,90
+79|-47|5|Le Vrai du faux : BTS 2027|Collectif|Enseignement|Flammarion|26/08/2026|4,50
+80|-30|320|Antigone|Jean Anouilh|Littérature (poche)|La Table Ronde|08/06/2016|6,80
+81|E|1|Un juif, un chrétien, un musulman : fraternels ou fratricides ?|Éric-Emmanuel Schmitt|Essais & Références|Albin Michel|23/09/2026|15,90
+82|E|1|Elfes, tome 36 : Le Carnet de Lanawyn|Jean-Luc Istin|Bandes dessinées|Soleil|24/09/2026|15,95
+83|-14|3|À couper le souffle|Alexis Laipsker|Littérature (poche)|Pocket|10/09/2026|9,30
+83|+39|2|Welcome to Fae Café|Jennifer Kropf|Littérature (poche)|J'ai lu|16/09/2026|10,00
+85|-8|3|La Cuisinière de Frida|Florencia Etcheves|Littérature (poche)|J'ai lu|09/09/2026|10,90
+86|+3|47|Une jeunesse au temps de la Shoah : extraits d'une vie|Simone Veil|Essais & Références|Le Livre de Poche|01/09/2010|6,40
+87|+10|27|Un animal sauvage|Joël Dicker|Littérature (poche)|Rosie & Wolfe|26/03/2026|10,90
+88|E|1|Nains, tome 26 : Le Cycle de l'empereur : La Couronne de plomb|Nicolas Jarry|Bandes dessinées|Soleil|24/09/2026|17,50
+89|+17|22|À retardement|Franck Thilliez|Littérature (poche)|Pocket|28/04/2026|9,60
+90|+9|7|La Guerre par d'autres moyens|Karine Tuil|Littérature (poche)|Folio|13/08/2026|10,00
+91|+32|2|Rewitched|Lucy Jane Wood|Littérature (poche)|J'ai lu|16/09/2026|10,00
+92|+80|2|Nanbanjin|Pedrosa|Bandes dessinées|Dupuis|04/09/2026|49,00
+93|-35|18|Nouvelles réalistes et fantastiques|Guy de Maupassant|Enseignement|Flammarion|24/05/2023|3,20
+94|-7|2|Catacharmique|Eva Delallande|Littérature (poche)|J'ai lu|16/09/2026|9,50
+95|+25|39|La Petite Bonne|Bérénice Pichat|Littérature (poche)|Le Livre de Poche|02/01/2026|8,70
+96|-2|5|Plan comptable général : liste intégrale des comptes|Charlotte Disle|Essais & Références|Dunod|14/01/2026|2,90
+97|-29|22|Courir|Jean Echenoz|Enseignement|Folio|12/09/2024|5,90
+98|-14|4|Boruto - Two Blue Vortex, tome 6|Masashi Kishimoto|Bandes dessinées|Kana|04/09/2026|7,30
+99|-24|5|Viser juste|Adèle Haenel|Littérature (hors poche)|L'Arche|21/08/2026|17,00
+100|+1|21|D'autres printemps|Virginie Grimaldi|Littérature (hors poche)|Flammarion|06/05/2026|20,90
+101|-8|6|Le Livre de Kells|Sorj Chalandon|Littérature (poche)|Le Livre de Poche|19/08/2026|9,40
+102|+12|20|Tout le monde aime Clara|David Foenkinos|Littérature (poche)|Folio|14/05/2026|9,20
+103|+13|3|Le Cercle de Kern|Alexis Laipsker|Littérature (hors poche)|Michel Lafon|10/09/2026|20,95
+104|-55|4|New I Bet You Can, anglais 5e (workbook)|Simone Chabas|Enseignement|Magnard|24/04/2026|9,20
+105|E|1|P'tit Loup fête Halloween|Orianne Lallemand|Jeunesse|Auzou|17/09/2026|5,99
+106|+33|2|Verity|Colleen Hoover|Littérature (poche)|Hugo Poche|10/09/2026|7,90
+107|+45|83|1984|George Orwell|Littérature (poche)|Folio|28/05/2020|9,50
+108|-57|4|Le Chevalier de la charrette|Chrétien de Troyes|Enseignement|Hatier|15/04/2026|3,99
+109|-42|116|La Rivière à l'envers, tome 1 : Tomek|Jean-Claude Mourlevat|Jeunesse|Pocket Jeunesse|07/10/2009|6,20
+110|+23|3|Archibald, tome 19 : Les Premières fois|Astrid Desbordes|Jeunesse|Albin Michel|02/09/2026|11,90
+110|+35|4|La Première Phrase du premier livre|Philippe Besson|Littérature (hors poche)|Julliard|03/09/2026|21,00
+112|-13|99|Le Royaume de Kensuke|Michael Morpurgo|Jeunesse|Gallimard Jeunesse|17/05/2018|8,95
+113|+23|5|Blue Lock, tome 34|Muneyuki Kaneshiro|Bandes dessinées|Pika|26/08/2026|7,20
+114|E|1|Le Tsar en personne : l'enquête russe sur le vrai Vladimir Poutine|Mikhaïl Roubine|Essais & Références|Les Arènes|17/09/2026|24,90
+115|+12|4|La Mauvaise fille|Dandy Smith|Littérature (poche)|J'ai lu|02/09/2026|10,20
+116|-5|13|L'Homme qui lisait des livres|Rachid Benzine|Littérature (poche)|Pocket|18/06/2026|7,90
+117|+20|11|Les Misérables|Victor Hugo|Enseignement|Belin Éducation|03/05/2023|4,95
+118|+53|37|Le Barman du Ritz|Philippe Collin|Littérature (poche)|Le Livre de Poche|14/01/2026|9,90
+119|-17|2|Rochebrune|Sophie Divry|Littérature (hors poche)|Actes Sud|19/08/2026|20,00
+120|-8|2|Gaza : eux, c'est nous|Marie Desplechin|Jeunesse|La Martinière Jeunesse|11/09/2026|5,00
+121|E|1|Saint Seiya : Rerise of Poseidon, tome 1|Masami Kurumada|Bandes dessinées|Kana|25/09/2026|8,10
+122|-40|8|Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Folio|17/04/2025|3,00
+123|-38|6|Code pénal : annoté (édition 2027)|Yves Mayaud|Essais & Références|Dalloz|25/06/2026|37,00
+124|+44|51|La Dernière Allumette|Marie Vareille|Littérature (poche)|Le Livre de Poche|02/04/2025|8,90
+125|+17|50|Le Mariage parfait|Jeneva Rose|Littérature (poche)|Pocket|08/06/2023|9,60
+126|E|1|Le Voleur de citrouilles|Nicola Slater|Jeunesse|Père Castor|23/09/2026|13,90
+127|+22|34|La Locataire|Freida McFadden|Littérature (hors poche)|City|11/02/2026|22,00
+128|-68|4|Grevisse langue française, 5e : cahier d'exercices|Myriam Dufour|Enseignement|Magnard|02/04/2026|6,50
+129|E|3|De l'autre côté du lac|Sylvain Prudhomme|Littérature (hors poche)|Minuit|27/08/2026|22,00
+130|+18|2|Anne de Green Gables|Lucy Maud Montgomery|Enseignement|Belin Éducation|23/04/2026|5,90
+131|E|1|Valentina, tome 3|Azra Reed|Littérature (poche)|Hugo Poche|23/09/2026|8,90
+132|-11|3|iParcours, tome 33 : cahier d'exercices maths 5e|Katia Hache|Enseignement|Generation 5|21/05/2026|6,50
+133|-9|42|Le Journal d'Anne Frank|Anne Frank|Littérature (poche)|Le Livre de Poche|25/05/2022|7,90
+134|+22|16|Swan, tome 1|Sarah Rivens|Littérature (hors poche)|HLab|10/06/2026|20,00
+135|E|21|Tant que fleuriront les citronniers|Zoulfa Katouh|Jeunesse|10/18|16/04/2026|9,20
+136|E|89|Mémoires d'un expert psychiatre|Angélina Delcroix|Littérature (poche)|Hugo Poche|02/10/2024|8,90
+137|+10|25|Une unique lueur|Fred Vargas|Littérature (hors poche)|Flammarion|08/04/2026|23,00
+138|-79|2|Ta mère et moi|Guillaume de Tonquédec|Littérature (hors poche)|Stock|10/09/2026|19,00
+139|E|18|Le Pumpkin Spice Café|Laurie Gilmore|Littérature (hors poche)|HarperCollins|24/09/2025|19,50
+140|E|1|Une aventure « classic » de Tanguy et Laverdure, tome 8 : Mission de guerre|Jean-Michel Charlier|Bandes dessinées|Dargaud Zéphyr|18/09/2026|16,50
+141|E|277|Les Sept Sœurs, tome 1 : Maia|Lucinda Riley|Littérature (poche)|Le Livre de Poche|03/06/2020|10,90
+142|+12|5|Jujutsu Kaisen Modulo, tome 1 : Menace de classe S|Gege Akutami|Bandes dessinées|Ki-oon|27/08/2026|7,20
+143|E|1|Les Chroniques de Saint-Roustan, tome 2 : Le Grand Déluge doré|Pierre-Emmanuel Barré|Bandes dessinées|Delcourt|24/09/2026|15,50
+144|-63|8|Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Belin Éducation - Gallimard|23/04/2025|2,50
+145|-16|5|Nous, les Français : raconter la France comme les politiques ne le feront jamais|Gérald Andrieu|Essais & Références|Robert Laffont|27/08/2026|25,00
+146|-11|69|La Vague|Todd Strasser|Littérature (poche)|Pocket|19/02/2009|7,40
+147|E|21|L'Autre moi|Franck Thilliez|Littérature (hors poche)|Fleuve Éditions|28/04/2026|22,95
+148|-68|14|Les Cahiers de Douai (bac 2023)|Arthur Rimbaud|Enseignement|Folio|06/04/2023|3,00
+149|-7|30|Le Crime du paradis|Guillaume Musso|Littérature (hors poche)|Calmann-Lévy|03/03/2026|22,90
+150|E|29|Résister|Salomé Saqué|Essais & Références|Payot|28/01/2026|5,00
+151|E|1|Sword Art Online : Re:Aincrad, tome 1|Reki Kawahara|Bandes dessinées|Nobi Nobi|23/09/2026|25,00
+152|+1|7|Lakota|Caryl Férey|Littérature (hors poche)|Gallimard|13/08/2026|21,00
+152|+29|2|Le Crépuscule des hommes|Alfred de Montesquiou|Littérature (poche)|Pocket|03/09/2026|9,60
+154|-37|4|Plan comptable général|Jean-Luc Siegwart|Essais & Références|Nathan|08/01/2026|2,99
+155|E|56|Les Guerriers de l'hiver|Olivier Norek|Littérature (poche)|Pocket|14/08/2025|9,60
+156|-65|13|Œuvres intégrales (bac) : Cahiers de Douai|Arthur Rimbaud|Enseignement|Nathan|04/05/2023|3,70
+157|+2|24|Un avenir radieux|Pierre Lemaitre|Littérature (poche)|Le Livre de Poche|08/04/2026|10,90
+158|+8|84|Harry Potter, tome 1 : Harry Potter à l'école des sorciers|J. K. Rowling|Jeunesse|Gallimard Jeunesse|25/05/2023|8,95
+159|E|1|Tramp, tome 15 : Les Naufragés du Lavalette|Jean-Charles Kraehn|Bandes dessinées|Dargaud|18/09/2026|18,00
+160|-27|10|Les Mille et Une Nuits|Collectif|Enseignement|Hatier|11/01/2023|3,50
+161|E|26|Nous qui avons connu Solange|Marie Vareille|Littérature (hors poche)|Flammarion|11/03/2026|22,00
+162|-70|21|Grevisse langue française, 4e : cahier d'exercices|Ariane Carrère|Enseignement|Magnard|26/04/2021|6,50
+163|-86|2|Bloom, tome 12|Saka Mikami|Bandes dessinées|Nobi Nobi|16/09/2026|7,20
+164|+2|5|Solo Leveling, tome 21 : Ragnarok|Chugong|Bandes dessinées|Kbooks|27/08/2026|14,95
+165|+8|66|Ce que le jour doit à la nuit|Yasmina Khadra|Littérature (poche)|Pocket|03/09/2009|9,00
+166|-100|8|La Grammaire par les exercices, 4e : cahier de l'élève|Joëlle Paul|Enseignement|Bordas|09/04/2025|6,60
+167|-7|30|La Fille au pair|Sidonie Bonnec|Littérature (poche)|Le Livre de Poche|25/02/2026|9,20
+168|E|1|Paradisi gloria|Élise Lespade|Littérature (hors poche)|Le Cercle ouvert|20/08/2026|24,90
+169|-90|13|Cahier de français, 3e : cahier élève|Guillaume Diana|Enseignement|Hatier|29/05/2024|6,70
+169|-43|3|La Femme effacée|Sidonie Bonnec|Littérature (hors poche)|Albin Michel|02/09/2026|22,90
+171|-52|40|Céleste, ma planète|Timothée de Fombelle|Jeunesse|Gallimard Jeunesse|19/02/2009|5,00
+172|-42|236|Le Petit Prince|Antoine de Saint-Exupéry|Jeunesse|Gallimard Jeunesse|15/03/2007|7,50
+173|+8|5|Minecraft : voyage au bout du monde, tome 10|Kazuyoshi Seto|Bandes dessinées|Nobi Nobi|26/08/2026|7,20
+173|+6|138|La Promesse de l'aube|Romain Gary|Littérature (poche)|Folio|26/04/1973|9,50
+175|E|1|Les Règles du mikado|Erri De Luca|Littérature (poche)|Folio|10/09/2026|7,60
+176|-78|7|Œuvres intégrales (bac) : Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Nathan|07/05/2025|3,20
+177|+23|2|Pour une politique de l'amitié|Clémence Guetté|Essais & Références|La Découverte|27/08/2026|14,00
+178|E|1|Le Roman de Renart|Gaëlle Brodhag|Enseignement|Belin Éducation|15/05/2024|3,50
+178|E|2|Discours de la servitude volontaire|Étienne de La Boétie|Enseignement|Lelivrescolaire.fr|07/05/2025|3,50
+180|E|71|Blue Lock, tome 1|Muneyuki Kaneshiro|Bandes dessinées|Pika|02/06/2021|3,00
+180|E|15|La Femme du serial killer|Alice Hunter|Littérature (poche)|Pocket|04/06/2026|9,50
+182|E|348|Kilomètre zéro|Maud Ankaoua|Littérature (poche)|J'ai lu|02/10/2019|8,90
+183|E|32|Bescherelle : la conjugaison pour tous|Collectif|Enseignement|Hatier|12/06/2024|9,50
+184|-81|3|Kagurabachi, tome 10|Takeru Hokazono|Bandes dessinées|Kana|11/09/2026|7,30
+185|E|19|Un jour sans femme|Laetitia Colombani|Littérature (hors poche)|L'Iconoclaste|07/05/2026|20,90
+186|-12|2|Français, 5e : cahier d'exercices|Stanislaw Eon du Val|Enseignement|Lelivrescolaire.fr|02/05/2026|6,50
+187|-23|3|Les Aventures du chevalier Silence|Fabien Clavel|Enseignement|Flammarion|19/06/2019|4,00
+188|-162|5|La Grammaire par les exercices, 6e : cahier de l'élève|Joëlle Paul|Enseignement|Bordas|23/03/2026|6,60
+189|E|1|Rosa & Bjork|Satu Rämö|Littérature (poche)|Points|11/09/2026|8,95
+190|-86|13|Cahiers de Douai (1res générales et technologiques, parcours « émancipations créatrices », bac 2024)|Arthur Rimbaud|Enseignement|Flammarion|03/05/2023|2,90
+191|E|4|Un marché noir|Bérénice Pichat|Littérature (hors poche)|Les Avrils|20/08/2026|22,00
+192|E|102|Les Quatre Accords toltèques : la voie de la liberté personnelle|Miguel Ruiz|Essais & Références|Jouvence|21/08/2024|8,95
+193|E|1|Mon beau miroir|Cynthia Kafka|Littérature (hors poche)|Charleston|10/09/2026|19,90
+194|E|5|La Patiente|Sarah A. Denzil|Littérature (hors poche)|Michel Lafon Poche|04/06/2026|8,50
+195|E|42|Panorama|Lilia Hassaine|Littérature (poche)|Folio|06/02/2025|8,60
+196|E|110|Matin brun|Franck Pavloff|Littérature (hors poche)|Cheyne|02/05/2002|2,80
+197|-133|13|Cahiers de Douai|Arthur Rimbaud|Enseignement|Hachette Éducation|12/04/2023|2,50
+198|E|14|L'Heure des prédateurs|Giuliano Da Empoli|Littérature (poche)|Folio|04/06/2026|7,60
+199|-7|341|Le Petit Prince|Antoine de Saint-Exupéry|Littérature (poche)|Folio|23/02/1999|7,50
+200|E|1|On est tous différents !|Mai Lan Chapiron|Jeunesse|La Martinière Jeunesse|||

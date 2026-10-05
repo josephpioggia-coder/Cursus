@@ -21,6 +21,8 @@ export const melanger = (t, rng = Math.random) => {
 };
 
 export const NB_MANCHES = 10;
+/** Roman et récit vont ensemble (distracteurs, filtre « roman ») ; le théâtre et la BD forment chacun leur groupe. */
+export const groupe = (l) => (l.format === "bd" ? "bd" : l.format === "theatre" ? "theatre" : "roman");
 /** Points d'une bonne réponse selon le nombre d'indices déjà affichés (1 indice = 5 points … 5 indices = 1 point). */
 export const pointsPour = (nbIndices) => Math.max(1, 6 - nbIndices);
 
@@ -31,8 +33,8 @@ export const pointsPour = (nbIndices) => Math.max(1, 6 - nbIndices);
 export function preparerManches(livres, n = NB_MANCHES, rng = Math.random) {
   const tirage = melanger(livres, rng).slice(0, Math.min(n, livres.length));
   return tirage.map((livre) => {
-    const memes = livres.filter((l) => l.id !== livre.id && l.format === livre.format);
-    const autres = livres.filter((l) => l.id !== livre.id && l.format !== livre.format);
+    const memes = livres.filter((l) => l.id !== livre.id && groupe(l) === groupe(livre));
+    const autres = livres.filter((l) => l.id !== livre.id && groupe(l) !== groupe(livre));
     const distracteurs = melanger(memes, rng).concat(melanger(autres, rng)).slice(0, 3);
     return { livre, choix: melanger([livre, ...distracteurs], rng) };
   });
@@ -75,7 +77,7 @@ export const QUESTIONS = [
   { axe: "epoque", texte: "Tu préfères une histoire…", options: [
     { label: "D'aujourd'hui", epoque: "contemporaine" }, { label: "D'hier, qui plonge dans le passé", epoque: "passe" }, { label: "Peu importe", epoque: null }] },
   { axe: "format", texte: "Roman ou bande dessinée ?", options: [
-    { label: "Un roman", format: "roman" }, { label: "Une BD", format: "bd" }, { label: "Les deux me vont", format: null }] },
+    { label: "Un roman ou un récit", format: "roman" }, { label: "Une BD ou un manga", format: "bd" }, { label: "Les deux me vont", format: null }] },
 ];
 
 /**
@@ -87,7 +89,7 @@ export function calculerAffinites(reponses, livres, n = 3) {
   const choix = QUESTIONS.map((q, i) => q.options[reponses[i]]).filter(Boolean);
   const par = Object.fromEntries(QUESTIONS.map((q, i) => [q.axe, q.options[reponses[i]]]));
   let pool = livres;
-  if (par.format?.format) { const f = livres.filter((l) => l.format === par.format.format); if (f.length) pool = f; }
+  if (par.format?.format) { const f = livres.filter((l) => groupe(l) === par.format.format); if (f.length) pool = f; }
   const max = 6 * 4 + (par.epoque?.epoque ? 2 : 0);
   const res = pool.map((livre) => {
     let s = 0; const communs = [];
