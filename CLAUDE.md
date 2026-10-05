@@ -818,3 +818,9 @@ rang sont alors périmées (elles disent « semaine 39 »).
   theatre, bd (`groupe()` : roman+récit ensemble ; le filtre du questionnaire dit « roman ou récit » / « BD ou manga »). NON ajoutés : toutes
   les nouveautés 2026 du palmarès (Le casse du siècle, C'était ça ou mourir, Les Évadées…) dont Claude ne connaît pas le contenu —
   ne jamais inventer l'intrigue ; ajouter une fiche seulement si Joseph en fournit un résumé ou si le livre est connu.
+- **Cercle trop grand sur le GSM de Joseph (05/10/2026, capture 392×~660 px utiles)** : `RoueCanvas` mesure la place RESTANTE sous la grille
+  (position du cadre dans son conteneur défilant, `visualViewport`) et se dimensionne entre 170 et 290 px pour que le cercle ET la
+  rangée de boutons tiennent sans défiler ; le message (« ✔ MOT », « déjà trouvé »…) est dessiné DANS la bande du haut du canvas
+  (plus de ligne vide au-dessus) ; titre et explication retirés pendant la partie ; cases de la grille jusqu'à 17 px (3 colonnes en
+  difficile) ; boutons compacts. Vérifié à 392×640, 360×600, 360×740 (facile et difficile) : cercle et boutons visibles sans défiler.
+  Test automatique : les messages n'étant plus du texte DOM, ne plus les chercher avec `getByText`.
