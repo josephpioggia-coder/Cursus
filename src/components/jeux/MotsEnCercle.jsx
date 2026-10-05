@@ -52,10 +52,9 @@ export default function MotsEnCercle({ donnees }) {
   const indice = () => { if (niveau && !fini) { setReveles(donnerIndice(niveau, trouves, reveles)); setIndices((x) => x + 1); } };
   const abandonner = () => { if (window.confirm("Afficher tous les mots et abandonner ce niveau ?")) { setTrouves(new Set(niveau.mots)); setFini(true); setStats(noterPartie("cercle", { gagne: false })); } };
 
-  const couleur = { ok: "#2e9e6b", non: "#c0392b", info: "var(--color-text-secondary)" };
   return (
     <div>
-      <EnTete titre="Mots en cercle" sous="Pose le doigt sur une lettre et glisse de lettre en lettre ; relâche pour valider le mot. Remplis la grille, et cherche aussi des mots bonus !" />
+      {!niveau && <EnTete titre="Mots en cercle" sous="Pose le doigt sur une lettre et glisse de lettre en lettre ; relâche pour valider le mot. Remplis la grille, et cherche aussi des mots bonus !" />}
       {!niveau ? (
         <div style={carte}>
           <label style={{ fontSize: 13 }}>Niveau{" "}
@@ -68,11 +67,11 @@ export default function MotsEnCercle({ donnees }) {
         </div>
       ) : (
         <div style={{ maxWidth: 520 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
             <span>{trouves.size} / {niveau.mots.length} mots</span><span>⭐ {bonus.length} bonus</span>
           </div>
           <SlotsCanvas mots={niveau.mots} trouves={trouves} reveles={reveles} premiere={niveau.premiere} />
-          <div style={{ minHeight: 24, textAlign: "center", fontSize: 14, fontWeight: 600, margin: "10px 0 4px", color: message ? couleur[message.ton] : "inherit" }}>{message?.texte || ""}</div>
+          <div style={{ height: 4 }} />
           {fini ? (
             <div style={carte}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{trouves.size === niveau.mots.length && !Object.keys(reveles).length && indices === 0 ? "🎉 Niveau terminé, sans indice !" : "Niveau terminé"}</div>
@@ -82,12 +81,12 @@ export default function MotsEnCercle({ donnees }) {
             </div>
           ) : (
             <>
-              <RoueCanvas lettres={lettres} chemin={chemin} apercu={apercu} onChemin={setChemin} onValider={valider} />
+              <RoueCanvas lettres={lettres} chemin={chemin} apercu={apercu} message={message} onChemin={setChemin} onValider={valider} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 10 }}>
-                <button style={boutonClair()} onClick={() => setLettres(melangerTab(lettres))}>🔀 Mélanger</button>
-                <button style={boutonClair()} onClick={indice}>💡 Indice</button>
-                <button style={boutonClair()} onClick={abandonner}>Solution</button>
-                <button style={boutonClair()} onClick={nouveau}>Autre niveau</button>
+                <button style={{ ...boutonClair(), padding: "7px 9px" }} onClick={() => setLettres(melangerTab(lettres))}>🔀 Mélanger</button>
+                <button style={{ ...boutonClair(), padding: "7px 9px" }} onClick={indice}>💡 Indice</button>
+                <button style={{ ...boutonClair(), padding: "7px 9px" }} onClick={abandonner}>Solution</button>
+                <button style={{ ...boutonClair(), padding: "7px 9px" }} onClick={nouveau}>Autre niveau</button>
               </div>
             </>
           )}
