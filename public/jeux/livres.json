@@ -1,0 +1,926 @@
+[
+ {
+  "id": "femme-de-menage",
+  "titre": "La Femme de ménage",
+  "auteur": "Freida McFadden",
+  "pays": "États-Unis",
+  "annee": 2022,
+  "format": "roman",
+  "genre": "Thriller psychologique",
+  "epoque": "contemporaine",
+  "lieu": "Banlieue aisée près de New York",
+  "palmares": "Présente au palmarès français depuis plus de 80 semaines en poche, d'après un extrait de classement consulté en octobre 2026 ; Freida McFadden est l'autrice la plus vendue de 2025 en France.",
+  "pitch": "Une jeune femme à la recherche d'un emploi est engagée dans une riche maison où rien n'est tout à fait normal. Un thriller domestique à rebondissements, très lu en poche.",
+  "indices": [
+   "Un thriller psychologique venu des États-Unis, traduit en français à partir de 2023.",
+   "L'action se passe dans une grande demeure d'une banlieue aisée près de New York.",
+   "Une jeune employée au passé lourd accepte un poste et s'installe chez ses employeurs.",
+   "Sa chambre est sous les toits… et la porte se ferme de l'extérieur.",
+   "Autrice américaine, initiales F. M. ; son livre a lancé une série à succès."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 1,
+   "noirceur": 3,
+   "realisme": 2,
+   "exigence": 0,
+   "humour": 0
+  }
+ },
+ {
+  "id": "asterix-lusitanie",
+  "titre": "Astérix en Lusitanie",
+  "auteur": "Fabcaro et Didier Conrad",
+  "pays": "France / Belgique",
+  "annee": 2025,
+  "format": "bd",
+  "genre": "Bande dessinée humoristique",
+  "epoque": "passe",
+  "lieu": "Lusitanie romaine (péninsule Ibérique)",
+  "palmares": "Meilleure vente de livres de l'année 2025 en France, avec environ 1,54 million d'exemplaires (GfK / Livres Hebdo).",
+  "pitch": "Les deux Gaulois les plus célèbres de la BD partent à l'autre bout de l'Empire romain. Humour, bagarres et clins d'œil à l'actualité, dans la grande tradition de la série.",
+  "indices": [
+   "Une bande dessinée humoristique de la tradition franco-belge.",
+   "La série est née à la fin des années 1950 et compte plus de quarante albums.",
+   "Les héros sont deux amis inséparables : l'un est tombé dans la marmite étant petit.",
+   "Le voyage les mène aux confins de l'Empire romain, dans la péninsule Ibérique.",
+   "L'album de 2025 porte le nom d'une ancienne province romaine ; héros : A. et O."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 1,
+   "noirceur": 0,
+   "realisme": 0,
+   "exigence": 0,
+   "humour": 4
+  }
+ },
+ {
+  "id": "la-maison-vide",
+  "titre": "La Maison vide",
+  "auteur": "Laurent Mauvignier",
+  "pays": "France",
+  "annee": 2025,
+  "format": "roman",
+  "genre": "Roman littéraire, récit familial",
+  "epoque": "passe",
+  "lieu": "France",
+  "palmares": "Prix Goncourt 2025 ; roman grand format le plus vendu de 2025 en France (près de 500 000 exemplaires au 28 décembre, GfK / Livres Hebdo).",
+  "pitch": "Un roman de mémoire et de famille, construit autour d'un lieu qui garde la trace de ceux qui l'ont habité. Écriture ample, qui a valu à son auteur le Goncourt.",
+  "indices": [
+   "Un roman français couronné par un grand prix littéraire d'automne.",
+   "Il est publié aux Éditions de Minuit.",
+   "L'auteur est aussi celui de « Des hommes », sur la guerre d'Algérie.",
+   "Le thème : la famille, la mémoire, et un lieu où l'on a vécu avant d'être absent.",
+   "Le titre désigne un logement sans occupants ; auteur : L. M."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 3,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 4,
+   "humour": 0
+  }
+ },
+ {
+  "id": "yeux-de-mona",
+  "titre": "Les Yeux de Mona",
+  "auteur": "Thomas Schlesser",
+  "pays": "France",
+  "annee": 2024,
+  "format": "roman",
+  "genre": "Roman, art et émotion",
+  "epoque": "contemporaine",
+  "lieu": "Paris et ses musées",
+  "palmares": "Immense succès de librairie depuis sa parution en 2024 (Albin Michel).",
+  "pitch": "Un grand-père emmène chaque mercredi sa petite-fille voir une œuvre d'art, pour lui donner de quoi regarder le monde avant que sa vue ne la trahisse. Un roman qui fait aimer la peinture.",
+  "indices": [
+   "Un roman français devenu un très grand succès à partir de 2024.",
+   "L'histoire se déroule à Paris, entre appartements et musées.",
+   "Une fillette de dix ans est menacée de perdre la vue.",
+   "Son grand-père lui fait découvrir une œuvre d'art par semaine, pendant un an.",
+   "Auteur : historien de l'art, initiales T. S. ; le titre cite la fillette."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 3,
+   "exigence": 2,
+   "humour": 1
+  }
+ },
+ {
+  "id": "houris",
+  "titre": "Houris",
+  "auteur": "Kamel Daoud",
+  "pays": "Algérie / France",
+  "annee": 2024,
+  "format": "roman",
+  "genre": "Roman littéraire, histoire récente",
+  "epoque": "passe",
+  "lieu": "Algérie",
+  "palmares": "Prix Goncourt 2024.",
+  "pitch": "Une jeune femme marquée à jamais par la guerre civile algérienne s'adresse à l'enfant qu'elle porte. Un texte dur, puissant, sur la mémoire et le silence.",
+  "indices": [
+   "Un roman en français couronné par le Goncourt, en 2024.",
+   "Il évoque une période de violence en Afrique du Nord, dans les années 1990.",
+   "La narratrice a survécu à une blessure à la gorge qui l'a rendue muette.",
+   "Elle parle à l'enfant qu'elle attend.",
+   "L'auteur est un écrivain et journaliste algérien : K. D."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 4,
+   "realisme": 4,
+   "exigence": 4,
+   "humour": 0
+  }
+ },
+ {
+  "id": "jacaranda",
+  "titre": "Jacaranda",
+  "auteur": "Gaël Faye",
+  "pays": "France / Rwanda",
+  "annee": 2024,
+  "format": "roman",
+  "genre": "Roman littéraire, mémoire",
+  "epoque": "contemporaine",
+  "lieu": "France et Rwanda",
+  "palmares": "Prix Renaudot 2024 (Grasset).",
+  "pitch": "Un jeune homme né en France d'une mère rwandaise cherche à comprendre l'histoire de sa famille et celle d'un pays marqué par le génocide. Un roman de transmission, tendre et grave.",
+  "indices": [
+   "Un roman français couronné par le Renaudot en 2024.",
+   "Il relie la France à un petit pays d'Afrique de l'Est.",
+   "Le narrateur est un adolescent, puis un homme qui veut savoir d'où il vient.",
+   "Le titre est celui d'un arbre aux fleurs violettes.",
+   "L'auteur est aussi chanteur de rap : G. F."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "veiller-sur-elle",
+  "titre": "Veiller sur elle",
+  "auteur": "Jean-Baptiste Andrea",
+  "pays": "France",
+  "annee": 2023,
+  "format": "roman",
+  "genre": "Roman historique et romanesque",
+  "epoque": "passe",
+  "lieu": "Italie, début du XXe siècle",
+  "palmares": "Prix Goncourt 2023 (L'Iconoclaste).",
+  "pitch": "Un sculpteur hors du commun et la fille d'une grande famille italienne, liés pour la vie à travers les bouleversements du XXe siècle. Un roman d'amour et d'art, ample et romanesque.",
+  "indices": [
+   "Un roman français couronné par le Goncourt en 2023.",
+   "L'histoire se passe en Italie, dans la première moitié du XXe siècle.",
+   "Le héros est un sculpteur de petite taille, doué d'un talent hors norme.",
+   "Il aime la fille d'une famille noble, dans l'ombre du fascisme.",
+   "Auteur : J.-B. A. ; le titre dit la promesse de rester auprès d'elle."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "petit-pays",
+  "titre": "Petit pays",
+  "auteur": "Gaël Faye",
+  "pays": "France / Burundi",
+  "annee": 2016,
+  "format": "roman",
+  "genre": "Roman d'apprentissage",
+  "epoque": "passe",
+  "lieu": "Burundi",
+  "palmares": "Prix Goncourt des lycéens 2016 ; grand succès de librairie.",
+  "pitch": "Un garçon grandit au Burundi au début des années 1990, entre jeux d'enfants et peur grandissante, tandis que la guerre approche. Un premier roman poignant.",
+  "indices": [
+   "Un premier roman, devenu un grand succès après 2016.",
+   "Il se passe en Afrique de l'Est dans les années 1990.",
+   "Le narrateur est un garçon qui vit avec sa bande de copains.",
+   "Tout bascule quand la guerre civile gagne la région voisine.",
+   "L'auteur est aussi chanteur : G. F. ; le titre évoque une terre minuscule."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 0
+  }
+ },
+ {
+  "id": "plus-secrete-memoire",
+  "titre": "La Plus Secrète Mémoire des hommes",
+  "auteur": "Mohamed Mbougar Sarr",
+  "pays": "Sénégal / France",
+  "annee": 2021,
+  "format": "roman",
+  "genre": "Roman littéraire, quête",
+  "epoque": "passe",
+  "lieu": "Paris, Dakar et l'Europe",
+  "palmares": "Prix Goncourt 2021.",
+  "pitch": "Un jeune écrivain sénégalais à Paris se lance sur les traces d'un auteur disparu après un livre maudit des années 1930. Une enquête littéraire foisonnante.",
+  "indices": [
+   "Un roman français couronné par le Goncourt en 2021.",
+   "Il suit un jeune écrivain venu d'Afrique de l'Ouest, installé à Paris.",
+   "Il découvre un livre publié en 1938 puis retiré, dont l'auteur a disparu.",
+   "La quête de cet auteur mène d'Europe à l'Afrique.",
+   "L'auteur est sénégalais : M. M. S. ; le titre parle d'une mémoire cachée."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 3,
+   "noirceur": 2,
+   "realisme": 2,
+   "exigence": 4,
+   "humour": 0
+  }
+ },
+ {
+  "id": "premier-sang",
+  "titre": "Premier sang",
+  "auteur": "Amélie Nothomb",
+  "pays": "Belgique",
+  "annee": 2021,
+  "format": "roman",
+  "genre": "Roman biographique",
+  "epoque": "passe",
+  "lieu": "Congo, 1964",
+  "palmares": "Prix Renaudot 2021 ; autrice belge parmi les plus lues en France et en Belgique.",
+  "pitch": "L'écrivaine raconte la jeunesse de son père, jeune diplomate belge pris en otage lors d'une révolte au Congo. Un récit court, vif et émouvant sur le courage et la parole.",
+  "indices": [
+   "Un roman court publié en 2021 par une autrice belge.",
+   "Il retrace la vie de l'un de ses proches, un homme qui n'a pas peur des mots.",
+   "L'action se passe en Afrique centrale, en 1964.",
+   "Le héros est un jeune diplomate pris en otage face à des rebelles.",
+   "Autrice : A. N. ; le titre parle d'un baptême du feu."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 3,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 1
+  }
+ },
+ {
+  "id": "hygiene-assassin",
+  "titre": "Hygiène de l'assassin",
+  "auteur": "Amélie Nothomb",
+  "pays": "Belgique",
+  "annee": 1992,
+  "format": "roman",
+  "genre": "Roman, huis clos",
+  "epoque": "contemporaine",
+  "lieu": "Une maison, en Belgique",
+  "palmares": "Premier roman publié de l'autrice belge Amélie Nothomb (1992) ; best-seller durable.",
+  "pitch": "Un écrivain célèbre et mourant accepte de recevoir des journalistes, qui n'en ressortent pas indemnes. Un huis clos de dialogues féroces, drôles et glaçants.",
+  "indices": [
+   "Le premier roman d'une écrivaine belge devenue célèbre.",
+   "Un huis clos presque entièrement fait de dialogues.",
+   "Des journalistes viennent interroger un auteur obèse qui n'a plus que deux mois à vivre.",
+   "Il se montre odieux, cynique, provocateur.",
+   "Autrice : A. N. ; le titre associe propreté et crime."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 1,
+   "noirceur": 4,
+   "realisme": 1,
+   "exigence": 3,
+   "humour": 2
+  }
+ },
+ {
+  "id": "vraie-vie",
+  "titre": "La Vraie Vie",
+  "auteur": "Adeline Dieudonné",
+  "pays": "Belgique",
+  "annee": 2018,
+  "format": "roman",
+  "genre": "Roman noir",
+  "epoque": "contemporaine",
+  "lieu": "Une maison isolée, en Belgique",
+  "palmares": "Prix du Roman Fnac 2018 ; premier roman de l'autrice belge Adeline Dieudonné.",
+  "pitch": "Dans une maison dominée par un père violent et passionné de chasse, une adolescente cherche à sauver son petit frère. Un premier roman sombre, rapide, qui a fait date.",
+  "indices": [
+   "Un premier roman belge publié en 2018.",
+   "Une famille vit dans un pavillon à l'écart de tout.",
+   "Le père, chasseur, règne par la peur.",
+   "La narratrice rêve de construire une machine pour réparer le passé.",
+   "Autrice : A. D. ; le titre parle de ce qu'on n'apprend pas à l'école."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 3,
+   "noirceur": 4,
+   "realisme": 2,
+   "exigence": 2,
+   "humour": 1
+  }
+ },
+ {
+  "id": "moi-qui-nai-pas-connu-les-hommes",
+  "titre": "Moi qui n'ai pas connu les hommes",
+  "auteur": "Jacqueline Harpman",
+  "pays": "Belgique",
+  "annee": 1995,
+  "format": "roman",
+  "genre": "Roman d'anticipation",
+  "epoque": "intemporelle",
+  "lieu": "Un monde clos, hors du temps",
+  "palmares": "Classique de la littérature belge, régulièrement réimprimé.",
+  "pitch": "Quarante femmes enfermées dans une cage sous la surveillance de gardiens, et une petite fille qui ne sait rien du monde d'avant. Un récit étrange et lumineux sur ce qui fait un être humain.",
+  "indices": [
+   "Un roman belge de 1995, entre fable et science-fiction.",
+   "Il se déroule en dehors de tout repère de temps.",
+   "Une quarantaine de femmes sont enfermées dans une cage.",
+   "La narratrice est la plus jeune et ne connaît pas le monde d'avant.",
+   "Autrice : J. H. ; le titre parle de ce qu'elle n'a jamais rencontré."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 0,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "monsieur-ibrahim",
+  "titre": "Monsieur Ibrahim et les fleurs du Coran",
+  "auteur": "Éric-Emmanuel Schmitt",
+  "pays": "Belgique / France",
+  "annee": 2001,
+  "format": "roman",
+  "genre": "Récit initiatique",
+  "epoque": "passe",
+  "lieu": "Paris, rue Bleue",
+  "palmares": "Grand classique contemporain, adapté au théâtre et au cinéma.",
+  "pitch": "Un adolescent juif et un vieil épicier musulman nouent une amitié improbable dans un quartier de Paris. Un conte tendre et drôle sur la tolérance et la transmission.",
+  "indices": [
+   "Un court récit de 2001 devenu un classique.",
+   "Il se passe dans un quartier de Paris, dans les années 1960.",
+   "Un garçon de onze ans a un père dépressif.",
+   "Il se lie d'amitié avec le sage de l'épicerie d'à côté.",
+   "Auteur : É.-E. S. ; le titre cite le nom du vieil ami et un livre sacré."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 3,
+   "exigence": 1,
+   "humour": 2
+  }
+ },
+ {
+  "id": "tintin-tibet",
+  "titre": "Tintin au Tibet",
+  "auteur": "Hergé",
+  "pays": "Belgique",
+  "annee": 1960,
+  "format": "bd",
+  "genre": "Bande dessinée d'aventure",
+  "epoque": "passe",
+  "lieu": "Himalaya",
+  "palmares": "L'un des albums de Tintin les plus aimés ; la série est un monument de la BD belge.",
+  "pitch": "Tintin part dans l'Himalaya à la recherche d'un ami disparu dans un crash, malgré l'avis de tous. Un album d'amitié, sans ennemi, sur la fidélité.",
+  "indices": [
+   "Un album de BD belge sorti en 1960.",
+   "Un jeune reporter y est le héros.",
+   "Il est sûr qu'un ami a survécu à un accident d'avion.",
+   "L'album se déroule en haute montagne, avec une créature légendaire.",
+   "Auteur : H. ; le titre nomme le héros et un haut plateau d'Asie."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 3,
+   "noirceur": 1,
+   "realisme": 1,
+   "exigence": 0,
+   "humour": 2
+  }
+ },
+ {
+  "id": "petit-prince",
+  "titre": "Le Petit Prince",
+  "auteur": "Antoine de Saint-Exupéry",
+  "pays": "France",
+  "annee": 1943,
+  "format": "roman",
+  "genre": "Conte philosophique",
+  "epoque": "intemporelle",
+  "lieu": "Désert du Sahara et planètes imaginaires",
+  "palmares": "L'un des livres les plus lus et traduits au monde.",
+  "pitch": "Un pilote tombé en panne dans le désert rencontre un enfant venu d'une autre planète. Un conte pour tous les âges sur l'amitié, la perte et ce qui est essentiel.",
+  "indices": [
+   "Un conte publié en 1943, lu dans le monde entier.",
+   "Un aviateur est contraint de se poser au milieu d'un désert.",
+   "Il y rencontre un enfant aux cheveux d'or venu d'une autre planète.",
+   "L'enfant parle d'une fleur, d'un renard et d'un serpent.",
+   "Auteur : A. de S.-E. ; le titre désigne l'enfant."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 4,
+   "noirceur": 1,
+   "realisme": 0,
+   "exigence": 2,
+   "humour": 1
+  }
+ },
+ {
+  "id": "harry-quebert",
+  "titre": "La Vérité sur l'affaire Harry Quebert",
+  "auteur": "Joël Dicker",
+  "pays": "Suisse",
+  "annee": 2012,
+  "format": "roman",
+  "genre": "Thriller littéraire",
+  "epoque": "contemporaine",
+  "lieu": "Nouvelle-Angleterre, États-Unis",
+  "palmares": "Best-seller mondial dès 2012 ; Grand Prix du roman de l'Académie française.",
+  "pitch": "Un jeune écrivain en panne d'inspiration vient aider son ancien professeur, soupçonné d'un meurtre vieux de trente ans. Un thriller à tiroirs, très addictif.",
+  "indices": [
+   "Un thriller d'un auteur suisse, devenu un best-seller mondial.",
+   "L'action se passe dans une petite ville du nord-est des États-Unis.",
+   "Un jeune écrivain est bloqué pour son deuxième livre.",
+   "Il veut sauver son ancien maître, accusé d'avoir tué une adolescente des années 1970.",
+   "Auteur : J. D. ; le titre parle d'une vérité sur le suspect."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 2,
+   "noirceur": 2,
+   "realisme": 3,
+   "exigence": 1,
+   "humour": 0
+  }
+ },
+ {
+  "id": "jeune-fille-et-la-nuit",
+  "titre": "La Jeune Fille et la Nuit",
+  "auteur": "Guillaume Musso",
+  "pays": "France",
+  "annee": 2018,
+  "format": "roman",
+  "genre": "Thriller",
+  "epoque": "contemporaine",
+  "lieu": "Côte d'Azur",
+  "palmares": "Grand succès de librairie de Guillaume Musso.",
+  "pitch": "Vingt-cinq ans après, d'anciens élèves d'un lycée de la Côte d'Azur se retrouvent autour du souvenir d'une disparition. Un thriller nostalgique et à rebondissements.",
+  "indices": [
+   "Un thriller d'un auteur français très lu.",
+   "L'action se passe dans un lycée de la Côte d'Azur, au début des années 1990.",
+   "Une étudiante et son professeur disparaissent le même soir.",
+   "Un quart de siècle plus tard, un ancien élève revient sur les lieux.",
+   "Auteur : G. M. ; le titre associe une adolescente et l'obscurité."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 2,
+   "noirceur": 2,
+   "realisme": 3,
+   "exigence": 0,
+   "humour": 0
+  }
+ },
+ {
+  "id": "nympheas-noirs",
+  "titre": "Nymphéas noirs",
+  "auteur": "Michel Bussi",
+  "pays": "France",
+  "annee": 2011,
+  "format": "roman",
+  "genre": "Polar",
+  "epoque": "contemporaine",
+  "lieu": "Giverny, Normandie",
+  "palmares": "Grand succès de librairie du polar français.",
+  "pitch": "À Giverny, village des impressionnistes, un meurtre trouble la vie de trois femmes. Un polar à l'intrigue ingénieuse, avec une fin qu'on n'oublie pas.",
+  "indices": [
+   "Un polar français très populaire.",
+   "L'action se passe dans un village normand célèbre pour un peintre.",
+   "Un notable est retrouvé mort, et trois femmes se croisent autour de l'affaire.",
+   "Une petite fille de onze ans a un talent exceptionnel pour peindre.",
+   "Auteur : M. B. ; le titre cite des fleurs d'eau peintes et une couleur sombre."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 2,
+   "noirceur": 3,
+   "realisme": 3,
+   "exigence": 1,
+   "humour": 0
+  }
+ },
+ {
+  "id": "tout-le-bleu-du-ciel",
+  "titre": "Tout le bleu du ciel",
+  "auteur": "Mélissa Da Costa",
+  "pays": "France",
+  "annee": 2019,
+  "format": "roman",
+  "genre": "Roman feel-good, road-trip",
+  "epoque": "contemporaine",
+  "lieu": "France, de la montagne à la mer",
+  "palmares": "Immense succès de librairie, notamment en poche.",
+  "pitch": "Un jeune homme atteint d'une maladie qui efface la mémoire part sur les routes avec une femme rencontrée par annonce. Un roman émouvant, solaire, sur la vie qu'on choisit.",
+  "indices": [
+   "Un roman français devenu un grand succès de librairie à partir de 2019.",
+   "L'histoire est un voyage à travers la France.",
+   "Le héros n'a que vingt-six ans et sait que sa maladie va progresser.",
+   "Il passe une annonce pour trouver quelqu'un qui partira avec lui.",
+   "Autrice : M. D. C. ; le titre parle d'un ciel clair."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 3,
+   "exigence": 0,
+   "humour": 1
+  }
+ },
+ {
+  "id": "changer-eau-fleurs",
+  "titre": "Changer l'eau des fleurs",
+  "auteur": "Valérie Perrin",
+  "pays": "France",
+  "annee": 2018,
+  "format": "roman",
+  "genre": "Roman, mystère et émotion",
+  "epoque": "contemporaine",
+  "lieu": "Bourgogne, cimetière d'un village",
+  "palmares": "Très grand succès de librairie, notamment en poche.",
+  "pitch": "Une gardienne de cimetière accueille les visiteurs, écoute leurs histoires et finit par plonger dans la sienne. Un roman tendre, drôle et mystérieux sur la mémoire des vivants et des morts.",
+  "indices": [
+   "Un roman français très aimé des lecteurs.",
+   "L'héroïne a un métier peu courant, à la frontière entre la vie et la mort.",
+   "Elle écoute les confidences de ceux qui viennent se recueillir.",
+   "Un policier, des lettres et un passé qui revient la rattrapent.",
+   "Autrice : V. P. ; le titre décrit un geste de tendresse sur les tombes."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 3,
+   "exigence": 1,
+   "humour": 1
+  }
+ },
+ {
+  "id": "vivre-vite",
+  "titre": "Vivre vite",
+  "auteur": "Brigitte Giraud",
+  "pays": "France",
+  "annee": 2022,
+  "format": "roman",
+  "genre": "Récit littéraire",
+  "epoque": "passe",
+  "lieu": "Lyon, 1999",
+  "palmares": "Prix Goncourt 2022.",
+  "pitch": "Une femme remonte le temps pour comprendre comment un simple achat de maison a pu mener à un accident mortel. Un texte court, dense, sur le deuil et les « si ».",
+  "indices": [
+   "Un court roman français couronné par le Goncourt en 2022.",
+   "Il se passe à la fin des années 1990 dans une grande ville française.",
+   "Un couple cherche à acheter une maison.",
+   "Un accident de moto change tout.",
+   "Autrice : B. G. ; le titre parle d'aller trop fort."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "leurs-enfants-apres-eux",
+  "titre": "Leurs enfants après eux",
+  "auteur": "Nicolas Mathieu",
+  "pays": "France",
+  "annee": 2018,
+  "format": "roman",
+  "genre": "Roman social",
+  "epoque": "passe",
+  "lieu": "Vallée industrielle de l'Est de la France",
+  "palmares": "Prix Goncourt 2018.",
+  "pitch": "Quatre étés dans une vallée de l'Est de la France, de l'adolescence à l'âge adulte, d'un garçon qui rêve de partir. Un roman social qui capte une génération.",
+  "indices": [
+   "Un roman français couronné par le Goncourt en 2018.",
+   "Il suit quatre étés, dans les années 1990.",
+   "L'action se déroule dans une vallée industrielle de l'Est de la France.",
+   "Un adolescent rêve d'ailleurs, entre lac, motos et première histoire d'amour.",
+   "Auteur : N. M. ; le titre parle de la génération suivante."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 3,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 0
+  }
+ },
+ {
+  "id": "et-si-cetait-vrai",
+  "titre": "Et si c'était vrai…",
+  "auteur": "Marc Levy",
+  "pays": "France",
+  "annee": 2000,
+  "format": "roman",
+  "genre": "Roman fantastique et sentimental",
+  "epoque": "contemporaine",
+  "lieu": "San Francisco",
+  "palmares": "Premier roman de Marc Levy ; best-seller mondial adapté au cinéma.",
+  "pitch": "Un architecte emménage dans un appartement où il rencontre une jeune femme que lui seul peut voir. Une comédie romantique pleine de tendresse, entre fantastique et émotion.",
+  "indices": [
+   "Le premier roman d'un auteur français devenu mondialement célèbre.",
+   "L'action se passe dans une ville américaine de la côte ouest.",
+   "Un jeune architecte s'installe dans un nouvel appartement.",
+   "Il y rencontre une femme que personne d'autre ne peut voir.",
+   "Auteur : M. L. ; le titre commence par une hypothèse."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 0,
+   "realisme": 0,
+   "exigence": 0,
+   "humour": 2
+  }
+ },
+ {
+  "id": "homme-qui-voulait-etre-heureux",
+  "titre": "L'homme qui voulait être heureux",
+  "auteur": "Laurent Gounelle",
+  "pays": "France",
+  "annee": 2008,
+  "format": "roman",
+  "genre": "Roman de développement personnel",
+  "epoque": "contemporaine",
+  "lieu": "Bali, Indonésie",
+  "palmares": "Grand succès de librairie en France depuis 2008.",
+  "pitch": "Un homme malheureux part à Bali consulter un guérisseur aux méthodes déroutantes. Un roman qui mêle aventure et conseils pour changer son regard sur la vie.",
+  "indices": [
+   "Un roman français de 2008, à mi-chemin entre fiction et développement personnel.",
+   "Le héros est insatisfait de sa vie professionnelle et de lui-même.",
+   "Il part à l'autre bout du monde, sur une île asiatique.",
+   "Il y rencontre un sage dont les méthodes surprennent.",
+   "Auteur : L. G. ; le titre parle de ce que cherche le héros."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 3,
+   "noirceur": 0,
+   "realisme": 1,
+   "exigence": 0,
+   "humour": 1
+  }
+ },
+ {
+  "id": "ne-le-dis-a-personne",
+  "titre": "Ne le dis à personne",
+  "auteur": "Harlan Coben",
+  "pays": "États-Unis",
+  "annee": 2001,
+  "format": "roman",
+  "genre": "Thriller",
+  "epoque": "contemporaine",
+  "lieu": "New York",
+  "palmares": "Grand succès de librairie ; adapté au cinéma en France.",
+  "pitch": "Huit ans après le meurtre de sa femme, un médecin reçoit un message qui laisse penser qu'elle est vivante. Un thriller haletant, plein de faux-semblants.",
+  "indices": [
+   "Un thriller américain devenu un classique du genre.",
+   "Un médecin pleure encore sa femme, assassinée huit ans plus tôt.",
+   "Il reçoit un message qui le bouleverse.",
+   "La police le soupçonne, et il doit fuir.",
+   "Auteur : H. C. ; le titre est un ordre qu'on murmure."
+  ],
+  "dims": {
+   "suspense": 4,
+   "emotion": 2,
+   "noirceur": 2,
+   "realisme": 3,
+   "exigence": 0,
+   "humour": 1
+  }
+ },
+ {
+  "id": "elegance-herisson",
+  "titre": "L'Élégance du hérisson",
+  "auteur": "Muriel Barbery",
+  "pays": "France",
+  "annee": 2006,
+  "format": "roman",
+  "genre": "Roman littéraire, sensible",
+  "epoque": "contemporaine",
+  "lieu": "Paris, un immeuble bourgeois",
+  "palmares": "Immense succès de librairie, traduit dans de très nombreuses langues.",
+  "pitch": "Dans un immeuble parisien, une concierge secrètement cultivée et une fillette surdouée se découvrent à l'arrivée d'un nouveau voisin. Un roman drôle, fin et tendre sur les apparences.",
+  "indices": [
+   "Un roman français très lu, traduit dans de nombreuses langues.",
+   "Il se passe dans un immeuble bourgeois de Paris.",
+   "Une concierge cache un goût immense pour la culture.",
+   "Une fillette de douze ans surdouée prévoit un geste dramatique pour ses treize ans.",
+   "Autrice : M. B. ; le titre mêle grâce et animal piquant."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 3,
+   "noirceur": 1,
+   "realisme": 3,
+   "exigence": 3,
+   "humour": 2
+  }
+ },
+ {
+  "id": "le-parfum",
+  "titre": "Le Parfum",
+  "auteur": "Patrick Süskind",
+  "pays": "Allemagne",
+  "annee": 1985,
+  "format": "roman",
+  "genre": "Roman noir, conte",
+  "epoque": "passe",
+  "lieu": "Paris et la France du XVIIIe siècle",
+  "palmares": "Best-seller mondial, traduit dans des dizaines de langues.",
+  "pitch": "Un homme né dans la puanteur d'un marché parisien possède un odorat prodigieux et se met à tuer pour capturer des senteurs. Un roman noir envoûtant, à la frontière du conte.",
+  "indices": [
+   "Un roman allemand devenu un best-seller mondial.",
+   "L'action se passe au XVIIIe siècle, de Paris jusqu'au Sud de la France.",
+   "Le héros naît dans un marché et n'a aucune odeur propre.",
+   "Il possède un odorat hors du commun.",
+   "Auteur : P. S. ; le titre parle de ce que le héros cherche à capturer."
+  ],
+  "dims": {
+   "suspense": 3,
+   "emotion": 1,
+   "noirceur": 4,
+   "realisme": 1,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "harry-potter-1",
+  "titre": "Harry Potter à l'école des sorciers",
+  "auteur": "J. K. Rowling",
+  "pays": "Royaume-Uni",
+  "annee": 1997,
+  "format": "roman",
+  "genre": "Fantasy jeunesse",
+  "epoque": "contemporaine",
+  "lieu": "Angleterre et école de magie",
+  "palmares": "L'un des livres les plus vendus au monde.",
+  "pitch": "Un orphelin qui vit chez son oncle et sa tante apprend le jour de ses onze ans qu'il est sorcier et rejoint une école de magie. Une aventure pleine d'humour et de courage.",
+  "indices": [
+   "Premier tome d'une série jeunesse devenue mondiale.",
+   "L'action se passe en Angleterre, entre un monde ordinaire et un monde caché.",
+   "Le héros vit chez des proches qui ne l'aiment pas.",
+   "À onze ans, il apprend qu'il est magicien.",
+   "Autrice britannique : J. K. R. ; le titre nomme le héros et son école."
+  ],
+  "dims": {
+   "suspense": 2,
+   "emotion": 3,
+   "noirceur": 1,
+   "realisme": 0,
+   "exigence": 0,
+   "humour": 3
+  }
+ },
+ {
+  "id": "amie-prodigieuse",
+  "titre": "L'Amie prodigieuse",
+  "auteur": "Elena Ferrante",
+  "pays": "Italie",
+  "annee": 2011,
+  "format": "roman",
+  "genre": "Roman d'amitié, fresque",
+  "epoque": "passe",
+  "lieu": "Naples, années 1950",
+  "palmares": "Immense succès de librairie, première partie d'une série de quatre romans.",
+  "pitch": "Deux fillettes d'un quartier pauvre de Naples nouent une amitié faite d'admiration et de rivalité qui durera toute leur vie. Une fresque intime et sociale.",
+  "indices": [
+   "Premier tome d'une grande saga italienne.",
+   "L'histoire commence dans un quartier pauvre d'une grande ville du Sud.",
+   "Deux fillettes sont liées par l'amitié et la rivalité.",
+   "L'une est brillante, l'autre quitte l'école trop tôt.",
+   "Autrice : E. F. ; le titre parle de l'amie hors du commun."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 3,
+   "humour": 0
+  }
+ },
+ {
+  "id": "le-chat",
+  "titre": "Le Chat",
+  "auteur": "Philippe Geluck",
+  "pays": "Belgique",
+  "annee": 1986,
+  "format": "bd",
+  "genre": "Bande dessinée d'humour",
+  "epoque": "contemporaine",
+  "lieu": "Un décor minimaliste, sans lieu précis",
+  "palmares": "Série phare de la BD belge d'humour ; l'auteur a exposé ses sculptures du héros sur les Champs-Élysées en 2021.",
+  "pitch": "Un grand félin noir, placide et pince-sans-rire, énonce des vérités absurdes avec le plus grand sérieux. Des gags courts, nourris de jeux de mots et de paradoxes.",
+  "indices": [
+   "Une série de BD belge d'humour, faite de gags courts.",
+   "Le héros est un animal noir, massif, au regard impassible.",
+   "Il énonce des phrases absurdes avec un grand sérieux.",
+   "Son auteur est un humoriste belge, aussi connu à la télévision et à la radio.",
+   "Auteur : P. G. ; le titre désigne un animal domestique."
+  ],
+  "dims": {
+   "suspense": 0,
+   "emotion": 0,
+   "noirceur": 1,
+   "realisme": 0,
+   "exigence": 1,
+   "humour": 4
+  }
+ },
+ {
+  "id": "persepolis",
+  "titre": "Persepolis",
+  "auteur": "Marjane Satrapi",
+  "pays": "France / Iran",
+  "annee": 2000,
+  "format": "bd",
+  "genre": "Bande dessinée autobiographique",
+  "epoque": "passe",
+  "lieu": "Iran, puis Autriche",
+  "palmares": "Classique de la bande dessinée, adapté au cinéma en film d'animation en 2007.",
+  "pitch": "Une petite fille grandit à Téhéran pendant la révolution islamique, puis est envoyée à l'étranger à l'adolescence. Un récit autobiographique en noir et blanc, drôle et poignant.",
+  "indices": [
+   "Une bande dessinée autobiographique en noir et blanc, parue à partir de 2000.",
+   "Une petite fille grandit en Iran à la fin des années 1970.",
+   "Sa famille traverse la révolution, puis la guerre.",
+   "Ses parents l'envoient en Europe à l'adolescence pour la protéger.",
+   "Autrice : M. S. ; le titre évoque une ancienne capitale de l'empire perse."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 4,
+   "noirceur": 3,
+   "realisme": 4,
+   "exigence": 2,
+   "humour": 2
+  }
+ },
+ {
+  "id": "arabe-du-futur",
+  "titre": "L'Arabe du futur",
+  "auteur": "Riad Sattouf",
+  "pays": "France",
+  "annee": 2014,
+  "format": "bd",
+  "genre": "Bande dessinée autobiographique",
+  "epoque": "passe",
+  "lieu": "Libye, Syrie et Bretagne",
+  "palmares": "Grand succès de la BD française depuis 2014, plusieurs tomes.",
+  "pitch": "Un petit garçon blond grandit entre la Libye, la Syrie et la Bretagne, au gré des rêves de son père. Une enfance racontée avec humour et tendresse, malgré une réalité parfois rude.",
+  "indices": [
+   "Une série de BD autobiographique d'un auteur français, lancée en 2014.",
+   "L'enfance se partage entre deux pays d'Afrique et du Proche-Orient, puis la Bretagne.",
+   "Le héros est un petit garçon aux cheveux blonds.",
+   "Son père, universitaire syrien, croit à un avenir meilleur pour son pays ; sa mère est bretonne.",
+   "Auteur : R. S. ; le titre associe une origine et ce qui est à venir."
+  ],
+  "dims": {
+   "suspense": 1,
+   "emotion": 3,
+   "noirceur": 2,
+   "realisme": 4,
+   "exigence": 1,
+   "humour": 3
+  }
+ }
+]

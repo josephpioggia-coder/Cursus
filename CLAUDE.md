@@ -751,3 +751,27 @@ Au passage, `EcranChoixEspace.jsx` (écran désormais vu à CHAQUE visite) débo
 `width: 300` fixes → texte coupé des deux côtés) : `width: 100%` + `maxWidth`, marge haute sur mobile pour ne pas passer sous
 « Mode d'emploi / Se déconnecter ». Vérifié à 360 et 1280 px (`scrollWidth == innerWidth`). Les liens `?jeu=` ne sont pas
 touchés. Deux adresses coexistent (www.cursus.pro et cursus-seven.vercel.app) : mémoire propre à chacune.
+
+## Jeux « livres » : Devine le livre, Quel lecteur es-tu ? (05/10/2026)
+
+Idée de Joseph : un jeu autour de l'écriture, des romans et des best-sellers de France et de Belgique. **Données** :
+`public/jeux/livres.json` (33 fiches : 28 romans, 5 BD — titre, auteur, pays, année, genre, époque, lieu, `palmares`,
+résumé de 2 phrases, 5 indices du vague au parlant, 6 dimensions 0-4 pour le questionnaire). Fiches ÉCRITES par Claude
+de mémoire (pas de recopie de quatrième de couverture), sans accès aux classements : le web n'était joignable que par
+recherche (extraits), pas par lecture des pages (Livres Hebdo, Edistat, Fnac Belgique, Filigranes, ActuaLitté bloqués).
+Seuls les chiffres 2025 vus dans ces extraits figurent dans `palmares` (Astérix en Lusitanie ≈ 1,54 M d'exemplaires ;
+La Maison vide, Goncourt 2025, ≈ 500 000 en grand format ; McFadden autrice la plus vendue) ; le reste = prix connus
+(Goncourt 2018/2021/2022/2023/2024, Renaudot 2021/2024…) ou « grand succès de librairie ». **Ce n'est PAS un palmarès
+« de l'année » à jour** : les nouveautés de la rentrée 2026 ne sont pas dedans (inconnues de Claude, non vérifiables).
+Fiches les moins sûres (peu de détails de l'intrigue connus) : La Maison vide, Jacaranda. Pour ajouter les nouveautés :
+Joseph envoie une capture du Top 20 Livres Hebdo/Edistat → fiches à écrire dans `livres.json` (ne jamais inventer
+l'intrigue d'un livre qu'on ne connaît pas) puis `node scripts/verifier-livres.mjs` (champs, 5 indices, dimensions,
+indices qui ne contiennent pas les mots du titre). Afficher la date du palmarès quand il y en aura un.
+- `src/lib/jeuLivres.js` (moteur pur) ; `DevineLeLivre.jsx` : 10 manches, 4 propositions (3 distracteurs du MÊME format),
+  bonne réponse = 6 − indices affichés, une erreur dévoile l'indice suivant, fiche après chaque livre, stats `livres` ;
+  `QuelLecteur.jsx` : 8 questions (6 axes suspense/émotion/noirceur/réalisme/exigence/humour + époque + roman/BD),
+  score = Σ(4 − écart) (+2 époque), le format filtre ; 3 livres + « ce qui vous rapproche ». Gratuit, sans IA.
+- Entrées `leger: true` dans `JEUX` (SalleDesJeux.jsx) : ne chargent PAS le dictionnaire de 411 000 mots, seulement
+  `livres.json`. Liens directs : `/?jeu=livre`, `/?jeu=lecteur`.
+- Vérifié à 360 px : partie complète de 10 livres (somme des points == score final), questionnaire jusqu'aux résultats,
+  `scrollWidth == innerWidth`. Idée non faite : « Dans quel rayon va mon manuscrit ? » (avec IA, payant).
