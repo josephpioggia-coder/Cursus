@@ -775,3 +775,20 @@ indices qui ne contiennent pas les mots du titre). Afficher la date du palmarès
   `livres.json`. Liens directs : `/?jeu=livre`, `/?jeu=lecteur`.
 - Vérifié à 360 px : partie complète de 10 livres (somme des points == score final), questionnaire jusqu'aux résultats,
   `scrollWidth == innerWidth`. Idée non faite : « Dans quel rayon va mon manuscrit ? » (avec IA, payant).
+
+## Mots en cercle (05/10/2026)
+
+Idée de Joseph (capture d'un jeu de type « Word Connect » : lettres en cercle reliées du doigt, mots rangés dans une grille,
+première lettre de chaque mot donnée en facile). Nommé « Mots en cercle » (pas de nom de marque). `src/lib/motsEnCercle.js`
+(moteur pur) + `MotsEnCercle.jsx` + `SlotsCanvas` / `RoueCanvas` (dessin.jsx, canvas : mode sombre forcé).
+- Niveau = un mot courant de 6 (facile) ou 7 lettres (moyen, difficile) ; la grille contient ce mot et les mots COURANTS
+  (`mots-courants.txt`, par fréquence, présents au dictionnaire) formables avec ses lettres, 3 lettres minimum : 8 / 12 / 16 mots.
+  Soluble par construction. Tout autre mot du dictionnaire formable = BONUS (compteur ⭐, pas obligatoire). `EXCLUS` : interjections
+  et sigles de la liste de fréquence (EUH, USA, BEN, REA, HEU…) jamais mis dans la grille (acceptés en bonus s'ils sont au dico).
+- Interaction : glisser de lettre en lettre (`pointer` sur le canvas, `touch-action: none`), relâcher valide, revenir sur
+  l'avant-dernière lettre annule la dernière ; 🔀 mélanger, 💡 indice (dévoile une lettre du mot le plus long restant), Solution.
+  Grille : `SlotsCanvas` répartit les mots en 1 à 4 colonnes, la plus COMPACTE à cases ≥ 20 px (sinon le cercle sort de l'écran).
+- `window.__cercle` (niveau courant) n'existe qu'en dev (`import.meta.env.DEV`) : sert aux tests automatiques.
+- Vérifié à 360 px (souris Playwright, sombre forcé) : niveaux facile et difficile joués jusqu'au bout, « au moins 3 lettres »,
+  « déjà trouvé », `scrollWidth == innerWidth`. NON testé : doigt réel (événements tactiles), bonus (mots hors grille).
+  Lien direct : `/?jeu=cercle`. Pas de thème « livres » (idée possible : mots du lexique littéraire).

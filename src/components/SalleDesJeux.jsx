@@ -23,6 +23,7 @@ import MotsMeles from "./jeux/MotsMeles.jsx";
 import MotsCroises from "./jeux/MotsCroises.jsx";
 import MotsFleches from "./jeux/MotsFleches.jsx";
 import MotsCodes from "./jeux/MotsCodes.jsx";
+import MotsEnCercle from "./jeux/MotsEnCercle.jsx";
 import DevineLeLivre from "./jeux/DevineLeLivre.jsx";
 import QuelLecteur from "./jeux/QuelLecteur.jsx";
 import { chargerLivres } from "../lib/jeuLivres.js";
@@ -38,6 +39,7 @@ const JEUX = [
   { id: "pendu", icone: "🪢", titre: "Pendu", resume: "Devine le mot lettre par lettre avant la dernière erreur.", Composant: Pendu },
   { id: "echelle", icone: "🪜", titre: "Échelle de mots", resume: "Change une lettre à la fois pour passer d'un mot à un autre.", Composant: EchelleDeMots },
   { id: "meles", icone: "🔎", titre: "Mots mêlés", resume: "Retrouve les mots cachés dans la grille.", Composant: MotsMeles },
+  { id: "cercle", icone: "⭕", titre: "Mots en cercle", resume: "Relie les lettres du cercle du bout du doigt pour trouver tous les mots cachés.", Composant: MotsEnCercle },
   { id: "croises", icone: "✏️", titre: "Mots croisés", resume: "Une grille, des définitions : trois niveaux.", Composant: MotsCroises },
   { id: "fleches", icone: "➡️", titre: "Mots fléchés", resume: "Les définitions sont dans la grille, les flèches montrent le sens.", Composant: MotsFleches },
   { id: "codes", icone: "🔢", titre: "Mots codés", resume: "Chaque numéro cache une lettre : déchiffre la grille.", Composant: MotsCodes },
