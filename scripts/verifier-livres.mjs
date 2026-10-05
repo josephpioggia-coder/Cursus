@@ -5,11 +5,11 @@ const livres = JSON.parse(fs.readFileSync("public/jeux/livres.json", "utf8"));
 const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const pb = [], ids = new Set();
 const DIMS = ["suspense", "emotion", "noirceur", "realisme", "exigence", "humour"];
-const OUTILS = new Set(["le", "la", "les", "des", "une", "un", "du", "de", "et", "en", "au", "aux", "qui", "que", "dans", "sur", "sous", "pour", "par", "ne", "dis", "personne"]);
+const OUTILS = new Set(["le", "la", "les", "des", "une", "un", "du", "de", "et", "en", "au", "aux", "qui", "que", "dans", "sur", "sous", "pour", "par", "ne", "dis", "personne", "avec", "pas", "ce", "ou"]);
 for (const l of livres) {
   if (ids.has(l.id)) pb.push(`doublon id ${l.id}`); ids.add(l.id);
   for (const k of ["titre", "auteur", "pays", "annee", "format", "genre", "epoque", "lieu", "palmares", "pitch"]) if (!l[k]) pb.push(`${l.id}: champ ${k} manquant`);
-  if (!["roman", "bd"].includes(l.format)) pb.push(`${l.id}: format ${l.format}`);
+  if (!["roman", "recit", "theatre", "bd"].includes(l.format)) pb.push(`${l.id}: format ${l.format}`);
   if (!["contemporaine", "passe", "intemporelle"].includes(l.epoque)) pb.push(`${l.id}: epoque ${l.epoque}`);
   if (!Array.isArray(l.indices) || l.indices.length !== 5) pb.push(`${l.id}: il faut 5 indices`);
   for (const d of DIMS) if (!(l.dims?.[d] >= 0 && l.dims[d] <= 4)) pb.push(`${l.id}: dimension ${d} hors 0-4`);

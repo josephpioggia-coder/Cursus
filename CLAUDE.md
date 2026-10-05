@@ -792,3 +792,29 @@ première lettre de chaque mot donnée en facile). Nommé « Mots en cercle » (
 - Vérifié à 360 px (souris Playwright, sombre forcé) : niveaux facile et difficile joués jusqu'au bout, « au moins 3 lettres »,
   « déjà trouvé », `scrollWidth == innerWidth`. NON testé : doigt réel (événements tactiles), bonus (mots hors grille).
   Lien direct : `/?jeu=cercle`. Pas de thème « livres » (idée possible : mots du lexique littéraire).
+
+## Palmarès réel des ventes (Edistat, semaine 39) et jeu « Au palmarès » (05/10/2026)
+
+Joseph a collé le **Top 200 hebdomadaire Edistat, semaine 39 (21–27 septembre 2026)** — la source que Claude n'avait pas pu lire
+lui-même (pages bloquées). Saisie dans `scripts/donnees/palmares-semaine-39-2026.txt` (une ligne par livre : rang|évolution|semaines|
+titre|auteur|segment|éditeur|date|prix) puis `node scripts/importer-palmares.mjs <fichier> 39 2026-09-21 2026-09-27` →
+`public/jeux/palmares.json` ; contrôle `node scripts/verifier-palmares.mjs` (200 lignes, rangs, dates, prix). Le tableau d'Edistat
+colle des titres SANS accents et des auteurs « nom, prénom » en minuscules : les titres et noms ont été corrigés à la main pendant la
+saisie (premier auteur seulement ; traducteurs et illustrateurs ignorés). « E » = entrée ou retour dans le Top 200. Ex æquo : rang
+répété (83, 110, 152, 169, 173, 178, 180). Ligne 200 : éditeur tronqué dans la source (« La martiniere j » → La Martinière Jeunesse),
+sans date ni prix. Pour une nouvelle semaine : nouveau fichier de saisie + import ; les fiches `palmares` de `livres.json` citant un
+rang sont alors périmées (elles disent « semaine 39 »).
+- **Au palmarès** (`AuPalmares.jsx`, `src/lib/jeuPalmares.js`) : 10 questions de comparaison entre deux livres (mieux classé, dans le
+  Top 200 depuis le plus longtemps, EDITION parue en premier, EDITION la plus chère ; écarts nets : ≥ 8 rangs, ≥ 10 semaines, ≥ 6 mois,
+  ≥ 3 €) ; livres jouables = hors Enseignement, codes juridiques, plans comptables, un exemplaire par titre+auteur (156 sur 200). La date et
+  le prix sont ceux de l'ÉDITION classée (L'Étranger = Folio 1972), pas la première parution : c'est dit dans l'écran. Onglet « Le
+  classement » : seulement les 20 premiers, avec la source. Vérifié : 300 parties simulées (3 000 manches, 0 incohérente) ; UI à 360 px.
+- **Réserve juridique à régler par Joseph** : Edistat est un service commercial (la mention « Accès gratuit » ne couvre que quelques lignes) ;
+  `palmares.json` contient les 200 lignes et est servi publiquement. Le classement affiché se limite aux 20 premiers, mais les 200 sont
+  exploitées par le jeu. Avant un usage commercial large : vérifier les conditions d'Edistat / demander l'autorisation, ou réduire les données.
+- `livres.json` passe à 48 fiches (+15 livres du palmarès que Claude connaît bien : L'Étranger, 1984, La Promesse de l'aube, Ce que le jour
+  doit à la nuit, Les Misérables, Le Journal d'Anne Frank, On ne badine pas avec l'amour, Antigone, La Vague, Matin brun, Anne de Green Gables,
+  Le Royaume de Kensuke, One Piece, Blue Lock, Solo Leveling), avec leur rang réel de la semaine 39 dans `palmares`. Formats : roman, recit,
+  theatre, bd (`groupe()` : roman+récit ensemble ; le filtre du questionnaire dit « roman ou récit » / « BD ou manga »). NON ajoutés : toutes
+  les nouveautés 2026 du palmarès (Le casse du siècle, C'était ça ou mourir, Les Évadées…) dont Claude ne connaît pas le contenu —
+  ne jamais inventer l'intrigue ; ajouter une fiche seulement si Joseph en fournit un résumé ou si le livre est connu.

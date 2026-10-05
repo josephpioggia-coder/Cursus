@@ -24,9 +24,11 @@ import MotsCroises from "./jeux/MotsCroises.jsx";
 import MotsFleches from "./jeux/MotsFleches.jsx";
 import MotsCodes from "./jeux/MotsCodes.jsx";
 import MotsEnCercle from "./jeux/MotsEnCercle.jsx";
+import AuPalmares from "./jeux/AuPalmares.jsx";
 import DevineLeLivre from "./jeux/DevineLeLivre.jsx";
 import QuelLecteur from "./jeux/QuelLecteur.jsx";
 import { chargerLivres } from "../lib/jeuLivres.js";
+import { chargerPalmares } from "../lib/jeuPalmares.js";
 import { chargerMotsCroises } from "../lib/grillesMots.js";
 import { chargerMoteur } from "../lib/jeuMots.js";
 import { chargerListe, chargerMotsCourants } from "../lib/jeuxDeMots.js";
@@ -44,6 +46,7 @@ const JEUX = [
   { id: "fleches", icone: "➡️", titre: "Mots fléchés", resume: "Les définitions sont dans la grille, les flèches montrent le sens.", Composant: MotsFleches },
   { id: "codes", icone: "🔢", titre: "Mots codés", resume: "Chaque numéro cache une lettre : déchiffre la grille.", Composant: MotsCodes },
   { id: "livre", icone: "📚", titre: "Devine le livre", resume: "Cinq indices, un best-seller de France ou de Belgique : trouve-le le plus vite possible.", Composant: DevineLeLivre, leger: true },
+  { id: "palmares", icone: "📊", titre: "Au palmarès", resume: "Les vrais chiffres du Top 200 des ventes de livres : devine qui est devant.", Composant: AuPalmares, leger: true },
   { id: "lecteur", icone: "🔖", titre: "Quel lecteur es-tu ?", resume: "Huit questions sur tes goûts, trois livres faits pour toi.", Composant: QuelLecteur, leger: true },
 ];
 
@@ -67,7 +70,7 @@ export default function SalleDesJeux({ jeuInitial = null }) {
     if (j.leger) {
       if (livres) { setJeu(j.id); return; }
       setEtat("chargement");
-      try { setLivres(await chargerLivres()); setEtat(""); setJeu(j.id); } catch (e) { setEtat(e.message || String(e)); }
+      try { const [lv, pa] = await Promise.all([chargerLivres(), chargerPalmares()]); setLivres({ livres: lv, palmares: pa }); setEtat(""); setJeu(j.id); } catch (e) { setEtat(e.message || String(e)); }
       return;
     }
     if (j.propre || donnees) { setJeu(j.id); return; }
@@ -93,7 +96,7 @@ export default function SalleDesJeux({ jeuInitial = null }) {
       <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", padding: "16px 20px 60px" }}>
         <div style={{ maxWidth: 980, margin: "0 auto" }}>
           <button onClick={() => setJeu(null)} style={{ background: "transparent", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 12 }}>← Tous les jeux</button>
-          <Composant donnees={courant.leger ? { livres } : donnees} />
+          <Composant donnees={courant.leger ? livres : donnees} />
         </div>
       </div>
     );
