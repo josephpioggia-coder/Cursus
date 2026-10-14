@@ -386,6 +386,19 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
   // réglables avant l'analyse (par défaut Titre 1 / Titre 2, comme avant).
   const [niveauPartie, setNiveauPartie] = useState(1);
   const [niveauChapitre, setNiveauChapitre] = useState(2);
+  // Sommaire de travail (ajouté 14/10/2026, demande de Joseph : un document
+  // d'architecture éditoriale — objectif/angle/sources par chapitre, texte
+  // pas encore rédigé — importé tel quel atterrissait dans le corps du
+  // chapitre, au même titre qu'un texte définitif. Avec cette case cochée,
+  // chaque CHAPITRE "nouveau" est créé avec un corps VIDE (prêt à écrire) et
+  // le contenu importé part dans un nœud enfant dédié, zone "methodo" (donc
+  // jamais exporté comme texte du livre, jamais confondu avec du texte
+  // rédigé) — voir aussi CopiloteIA.jsx (noteDeCadrage) qui lit ce nœud
+  // comme contexte de rédaction. Les Parties (normalement sans texte propre)
+  // et les chapitres déjà EXISTANTS (associés à un nœud) ne sont pas
+  // concernés par cette bascule — limite assumée, à traiter séparément si
+  // le besoin se présente.
+  const [sommaireDeTravail, setSommaireDeTravail] = useState(false);
   const inputRef = useRef(null);
   const couleur = projet?.couleur || "#7F77DD";
 
@@ -520,14 +533,26 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
 
         if (décision.statut === "nouveau") {
           const parentId = ch.type === "partie" ? null : dernièrePartieId;
+          const enModeSommaire = sommaireDeTravail && ch.type === "chapitre";
           const { data, error } = await nœudsAPI.créer({
             type: ch.type,
             titre: ch.titre,
             parentId,
-            texte: ch.html,
+            texte: enModeSommaire ? "" : ch.html,
           }, projet.id);
           if (error || !data) throw error || new Error("Échec de création du nœud « " + ch.titre + " »");
           nœudId = data.id;
+
+          if (enModeSommaire) {
+            const { error: erreurNote } = await nœudsAPI.créer({
+              type: "scene",
+              titre: "Note de cadrage",
+              parentId: nœudId,
+              texte: ch.html,
+              zone: "methodo",
+            }, projet.id);
+            if (erreurNote) throw erreurNote;
+          }
 
           const clé = parentId || "__racine__";
           (groupesParParent[clé] ||= []).push(nœudId);
@@ -613,6 +638,12 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   Les Parties et les Chapitres utilisent le même niveau de titre — tout sera importé comme Partie.
                 </div>
               )}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 16, padding: "10px 12px", background: `${couleur}08`, border: `0.5px solid ${couleur}30`, borderRadius: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={sommaireDeTravail} onChange={(e) => setSommaireDeTravail(e.target.checked)} style={{ marginTop: 2 }} />
+                <span style={{ fontSize: 12.5, color: "#333", lineHeight: 1.5 }}>
+                  <strong>Importer comme sommaire de travail</strong> — le texte de chaque chapitre (objectif, angle, sources…) devient une note de cadrage, pas le texte définitif. Chaque nouveau chapitre est créé avec un corps vide, prêt à écrire ; la note reste disponible à côté (zone "méthodo") et sert de repère au Co-pilote.
+                </span>
+              </label>
               <div onClick={() => inputRef.current?.click()}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); analyser(e.dataTransfer.files[0]); }}

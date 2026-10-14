@@ -1399,7 +1399,7 @@ function CarteBlocage({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "" }) {
   const { t } = useTranslation("copilote");
   const [contexteADNBrut, setContexteADNBrut] = useState(null);
   // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
@@ -1411,13 +1411,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // démarrage d'une scène — via le useMemo `contexteADN` plus bas. Voir
   // "💾 Mémoriser cette intention" dans FilDialogue pour l'écriture.
   const [notesProjet, setNotesProjet] = useState(null);
+  // Note de cadrage (réf. 14/10/2026) — contenu du nœud enfant "methodo" du
+  // chapitre actif (ex. objectif/angle/sources importés via ImportDocx en
+  // mode "sommaire de travail"). Boussole pour la rédaction de CE chapitre
+  // précis, pas un texte à reprendre tel quel — le prompt le dit
+  // explicitement pour éviter qu'une suggestion ne recopie la note au lieu
+  // de s'en inspirer.
+  const noteDeCadrageTexte = useMemo(() => extraireTexte(noteDeCadrage || "").texte, [noteDeCadrage]);
   const contexteADN = useMemo(() => {
-    if (!contexteADNBrut && !notesProjet) return null;
+    if (!contexteADNBrut && !notesProjet && !noteDeCadrageTexte) return null;
     return [
       contexteADNBrut,
       notesProjet ? `NOTES ET IDÉES DÉJÀ ENREGISTRÉES POUR CE PROJET (Carnet d'idées — mémoire des sessions précédentes, à prendre en compte) :\n${notesProjet}` : null,
+      noteDeCadrageTexte ? `OBJECTIF DE CADRAGE DE CE CHAPITRE PRÉCIS (note de travail de l'auteur·ice — angle, sources, intention — sert de boussole pour tes suggestions sur CE chapitre ; ce n'est pas du texte rédigé, ne le recopie jamais tel quel) :\n${noteDeCadrageTexte}` : null,
     ].filter(Boolean).join("\n\n");
-  }, [contexteADNBrut, notesProjet]);
+  }, [contexteADNBrut, notesProjet, noteDeCadrageTexte]);
   // Consommation IA réelle du compte (60803-03) — remontée par
   // CompteurUsageIA, sert à désactiver le bouton d'analyse une fois le
   // quota du palier épuisé (le compteur affiche lui-même l'avertissement

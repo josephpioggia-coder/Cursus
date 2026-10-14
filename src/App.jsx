@@ -2110,6 +2110,15 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     ? trouverContexteHiérarchique(projetActif.structure, nœudActif.id)
     : { titrePartieParente: null, titresChapitresVoisins: [] };
 
+  // Note de cadrage (réf. 14/10/2026) — nœud enfant "methodo" du chapitre
+  // actif (ex. objectif/angle importé via ImportDocx en mode "sommaire de
+  // travail"), transmis à CopiloteIA comme contexte de rédaction. `enfants`
+  // porte déjà tous les champs du nœud (voir construireArbre), pas besoin
+  // d'un chargement séparé. S'il y a plusieurs notes "methodo" (cas rare,
+  // pas encore d'UI pour en ajouter plusieurs), seule la première trouvée
+  // est transmise.
+  const noteDeCadrageActive = (nœudActif?.enfants || []).find((e) => (e.zone || "corps") === "methodo")?.texte || "";
+
   // ── Actions projets ──
 
   const créerProjet = async (données) => {
@@ -2941,6 +2950,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}
+                noteDeCadrage={noteDeCadrageActive}
               />
             </div>
             </div>
