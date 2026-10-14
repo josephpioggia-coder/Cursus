@@ -390,14 +390,21 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
   // d'architecture éditoriale — objectif/angle/sources par chapitre, texte
   // pas encore rédigé — importé tel quel atterrissait dans le corps du
   // chapitre, au même titre qu'un texte définitif. Avec cette case cochée,
-  // chaque CHAPITRE "nouveau" est créé avec un corps VIDE (prêt à écrire) et
-  // le contenu importé part dans un nœud enfant dédié, zone "methodo" (donc
-  // jamais exporté comme texte du livre, jamais confondu avec du texte
-  // rédigé) — voir aussi CopiloteIA.jsx (noteDeCadrage) qui lit ce nœud
-  // comme contexte de rédaction. Les Parties (normalement sans texte propre)
-  // et les chapitres déjà EXISTANTS (associés à un nœud) ne sont pas
-  // concernés par cette bascule — limite assumée, à traiter séparément si
-  // le besoin se présente.
+  // chaque nœud "nouveau" PORTANT RÉELLEMENT DU TEXTE est créé avec un corps
+  // VIDE (prêt à écrire) et le contenu importé part dans un nœud enfant
+  // dédié, zone "methodo" (donc jamais exporté comme texte du livre, jamais
+  // confondu avec du texte rédigé) — voir aussi CopiloteIA.jsx
+  // (noteDeCadrage) qui lit ce nœud comme contexte de rédaction.
+  // CORRECTIF 14/10/2026 (même jour, constaté sur un import réel) : au
+  // départ restreint aux CHAPITRES, en supposant qu'une Partie n'a jamais de
+  // texte propre — faux pour un Avant-propos, une Introduction générale ou
+  // une Partie avec un paragraphe de cadrage : leur texte atterrissait
+  // encore directement dans le corps. S'applique maintenant à tout type de
+  // nœud dès qu'il porte du texte (ch.mots > 0) — une Partie réellement vide
+  // (simple conteneur de chapitres) n'obtient pas de note inutile. Les
+  // chapitres déjà EXISTANTS (associés à un nœud) ne sont pas concernés par
+  // cette bascule — limite assumée, à traiter séparément si le besoin se
+  // présente.
   const [sommaireDeTravail, setSommaireDeTravail] = useState(false);
   const inputRef = useRef(null);
   const couleur = projet?.couleur || "#7F77DD";
@@ -533,7 +540,18 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
 
         if (décision.statut === "nouveau") {
           const parentId = ch.type === "partie" ? null : dernièrePartieId;
-          const enModeSommaire = sommaireDeTravail && ch.type === "chapitre";
+          // CORRECTIF 14/10/2026 — constaté sur un import réel : une "Partie"
+          // n'est pas toujours un simple conteneur vide. "Avant-propos",
+          // "Introduction générale" ou une "PARTIE I" peuvent porter leur
+          // propre texte d'objectif/angle, exactement comme un chapitre.
+          // Restreindre la bascule au seul type "chapitre" laissait ce texte
+          // atterrir tel quel dans le corps d'une Partie — le même problème
+          // que le mode "sommaire de travail" existe pour éviter. S'applique
+          // désormais à tout nœud "nouveau", quel que soit son type ; la
+          // note n'est créée que s'il y a réellement du texte à y mettre
+          // (ch.mots > 0), pour ne pas encombrer les Parties qui sont de
+          // vrais conteneurs vides.
+          const enModeSommaire = sommaireDeTravail && ch.mots > 0;
           const { data, error } = await nœudsAPI.créer({
             type: ch.type,
             titre: ch.titre,
@@ -641,7 +659,7 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
               <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 16, padding: "10px 12px", background: `${couleur}08`, border: `0.5px solid ${couleur}30`, borderRadius: 8, cursor: "pointer" }}>
                 <input type="checkbox" checked={sommaireDeTravail} onChange={(e) => setSommaireDeTravail(e.target.checked)} style={{ marginTop: 2 }} />
                 <span style={{ fontSize: 12.5, color: "#333", lineHeight: 1.5 }}>
-                  <strong>Importer comme sommaire de travail</strong> — le texte de chaque chapitre (objectif, angle, sources…) devient une note de cadrage, pas le texte définitif. Chaque nouveau chapitre est créé avec un corps vide, prêt à écrire ; la note reste disponible à côté (zone "méthodo") et sert de repère au Co-pilote.
+                  <strong>Importer comme sommaire de travail</strong> — le texte de chaque section (objectif, angle, sources…) devient une note de cadrage, pas le texte définitif, qu'il s'agisse d'une Partie ou d'un Chapitre. Chaque nouveau nœud est créé avec un corps vide, prêt à écrire ; la note reste disponible à côté (zone "méthodo") et sert de repère au Co-pilote.
                 </span>
               </label>
               <div onClick={() => inputRef.current?.click()}
