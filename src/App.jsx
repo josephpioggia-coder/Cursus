@@ -2951,6 +2951,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}
                 noteDeCadrage={noteDeCadrageActive}
+                descriptionProjet={projetActif.description || ""}
               />
             </div>
             </div>

@@ -1399,7 +1399,7 @@ function CarteBlocage({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "" }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "" }) {
   const { t } = useTranslation("copilote");
   const [contexteADNBrut, setContexteADNBrut] = useState(null);
   // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
@@ -1418,14 +1418,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // explicitement pour éviter qu'une suggestion ne recopie la note au lieu
   // de s'en inspirer.
   const noteDeCadrageTexte = useMemo(() => extraireTexte(noteDeCadrage || "").texte, [noteDeCadrage]);
+  // Description courte du projet (réf. 14/10/2026, demande de l'auteur du
+  // projet) — jusqu'ici purement décorative (carte projet, formulaire
+  // d'édition), jamais lue par le Co-pilote. Injectée désormais dans le
+  // même contexteADN, automatiquement pour ce projet et tous les suivants
+  // — rien à dupliquer dans le questionnaire d'intention.
+  const descriptionProjetTexte = (descriptionProjet || "").trim();
   const contexteADN = useMemo(() => {
-    if (!contexteADNBrut && !notesProjet && !noteDeCadrageTexte) return null;
+    if (!contexteADNBrut && !notesProjet && !noteDeCadrageTexte && !descriptionProjetTexte) return null;
     return [
+      descriptionProjetTexte ? `DESCRIPTION COURTE DU PROJET (positionnement général à respecter dans toutes tes suggestions) :\n${descriptionProjetTexte}` : null,
       contexteADNBrut,
       notesProjet ? `NOTES ET IDÉES DÉJÀ ENREGISTRÉES POUR CE PROJET (Carnet d'idées — mémoire des sessions précédentes, à prendre en compte) :\n${notesProjet}` : null,
       noteDeCadrageTexte ? `OBJECTIF DE CADRAGE DE CE CHAPITRE PRÉCIS (note de travail de l'auteur·ice — angle, sources, intention — sert de boussole pour tes suggestions sur CE chapitre ; ce n'est pas du texte rédigé, ne le recopie jamais tel quel) :\n${noteDeCadrageTexte}` : null,
     ].filter(Boolean).join("\n\n");
-  }, [contexteADNBrut, notesProjet, noteDeCadrageTexte]);
+  }, [contexteADNBrut, notesProjet, noteDeCadrageTexte, descriptionProjetTexte]);
   // Consommation IA réelle du compte (60803-03) — remontée par
   // CompteurUsageIA, sert à désactiver le bouton d'analyse une fois le
   // quota du palier épuisé (le compteur affiche lui-même l'avertissement
