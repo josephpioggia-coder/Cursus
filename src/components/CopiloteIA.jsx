@@ -778,9 +778,22 @@ function BoutonCopier({ texte, couleur = "#888" }) {
 // cas où la limite est quand même atteinte.
 const DIALOGUE_MAX_TOKENS = 2048;
 
-function promptDialogue(langueProjet, typeProjet) {
+// CORRECTIF 15/10/2026 — signalé en usage réel par Joseph (vérification
+// directe de l'onglet Réseau du navigateur, aucune note de cadrage dans la
+// requête) : promptDialogue ne recevait pas contexteADN, contrairement à
+// TOUS les autres prompts du Co-pilote (systemAvecLangue). Ça ne touchait
+// pas l'appel PROMPTS.jeSuisBloqué lui-même (le diagnostic initial, qui lui
+// passe bien par systemAvecLangue), mais tout le fil de dialogue qui suit —
+// les 5 boutons de suivi après un diagnostic, et plus généralement toute
+// question posée dans le fil de n'importe quelle carte — perdait la
+// description du projet, le questionnaire d'intention, le Carnet d'idées ET
+// la note de cadrage dès le premier message de suivi. Corrigé en donnant à
+// promptDialogue le même mécanisme que systemAvecLangue (bloc contexteADN
+// séparé, avec cache_control), sans reprendre son texte de fin spécifique
+// au JSON (promptDialogue répond en texte libre, pas en JSON).
+function promptDialogue(langueProjet, typeProjet, contexteADN) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  return `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement.
+  const corps = `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement.
 
 RÈGLE NON NÉGOCIABLE sur toute reformulation proposée — signalé en usage réel (13-14/09/2026) : plusieurs reformulations proposées d'affilée pour une même phrase répétaient un mot ("je me disais"/"je me dis") avec la phrase qui suivait IMMÉDIATEMENT dans le texte, sans jamais s'en apercevoir avant que l'auteur ne le signale lui-même trois échanges plus tard — l'erreur que tu es censé repérer, pas créer. Avant de proposer une reformulation, relis-la à voix haute dans son contexte immédiat (la ou les phrases qui la précèdent et la suivent dans le "Texte actuel" fourni ci-dessous, quand il est présent) et vérifie qu'elle n'introduit AUCUNE redite, écho de mot/sonorité, ni rupture de rythme involontaire avec ce qui l'entoure. Si tu ne peux pas vérifier ce contexte immédiat (texte non fourni), dis-le explicitement plutôt que de proposer une reformulation à l'aveugle.
 
@@ -793,6 +806,14 @@ ${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
 ${RÈGLE_COMPARAISON_FACTUELLE}
 
 ${instruction}`;
+
+  if (!contexteADN) return corps;
+
+  const blocADN = `CONTEXTE DU PROJET — réponses de l'auteur au questionnaire d'intention (à respecter impérativement dans ton comportement, pas seulement à titre informatif) :\n${contexteADN}\n\n`;
+  return [
+    { type: "text", text: blocADN, cache_control: { type: "ephemeral" } },
+    { type: "text", text: corps },
+  ];
 }
 
 // Réf. 60816-01, suite, 30/08/2026 — voir "💾 Mémoriser cette intention"
@@ -1654,7 +1675,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
-        promptDialogue(langueProjet, typeProjet),
+        promptDialogue(langueProjet, typeProjet, contexteADN),
         userContent,
         null,
         DIALOGUE_MAX_TOKENS,
@@ -1687,7 +1708,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId]);
+  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId, contexteADN]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
