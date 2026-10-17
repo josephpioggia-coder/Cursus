@@ -882,3 +882,43 @@ pour vérifier que la citation exacte y figure) — seule l'existence réelle de
 pas le contenu précis de la page, comme pour les Références de CopiloteIA. NON TESTÉ EN CONDITIONS
 RÉELLES (ni le couple `web_search` + outil de sortie structurée forcé dans le même appel Claude, ni
 le comportement du badge côté UI sur un vrai cas théorique/factuel).
+
+## Point 2 traité : CursAudit lit enfin les images intégrées au .docx (17/10/2026)
+
+Suite de l'audit de préparation à la commercialisation : point 2, "lecture d'image par CursAudit
+encore incomplète" (`docs/liste-attente.md` #4). En creusant AVANT d'écrire du code, le diagnostic
+s'est révélé plus profond que prévu : la note de la liste d'attente pensait que CursAudit relisait
+les images de CursEdit — en réalité CursAudit a son propre pipeline, totalement séparé (un .docx
+téléversé spécifiquement pour l'audit, lu par `segmenterCursAudit.js`), qui ne lisait QUE le texte
+des paragraphes Word (`<w:t>`) : aucune image n'était jamais extraite, ni côté client ni côté
+serveur, même pour un fichier qui en contient. Soumis à Joseph avant de se lancer (ampleur du
+chantier, bien au-delà d'un correctif ciblé) : « Chantier complet maintenant ».
+
+- `src/lib/segmenterCursAudit.js` récupère EXACTEMENT la lecture OOXML déjà éprouvée dans
+  `ImportDocx.jsx` pour CursEdit (24/09/2026) — `idsImagesDuParagraphe`/`téléverserImagesDocx`
+  déplacées là plutôt que dupliquées (même bucket `images-manuscrits`) ; `ImportDocx.jsx` les
+  importe désormais d'ici au lieu d'en garder sa propre copie.
+- `analyserStructureDocx` associe à chaque paragraphe ses images (URLs publiques, téléversées une
+  seule fois pour tout le document) ; `regrouperParNiveaux` les reporte vers la bonne unité —
+  même principe que `titresEnAttente` pour un titre non retenu comme frontière : un paragraphe
+  qui ne porte qu'une image (sans texte propre) n'est plus silencieusement perdu par le filtre
+  `!texte`, exactement le cas d'origine ("Oracle du Sermon sur la montagne", une image par carte,
+  souvent sans texte propre).
+- `audit_sections.images` (colonne jsonb, migration `2026-10-17-audit-sections-images.sql` — **à
+  exécuter par Joseph dans l'éditeur SQL de Supabase**) : tableau parallèle à `texte_source`,
+  rempli par `auditsAPI.créer()` et `auditsAPI.remplacerContenu()` (réimport après correction).
+- `orchestrer-audit-cursaudit` — le pipeline RÉELLEMENT exécuté par "Lancer/Continuer l'analyse"
+  (voir son propre commentaire "FICHIER AUTONOME") — et `analyser-unite-cursaudit` (même correctif
+  par cohérence, bien que ce second fichier semble non relié à l'UI actuelle, cf. note du
+  01/10/2026 sur le correctif `thinking`) transmettent désormais les images de l'unité analysée
+  (plafonnées à 3, même limite que CopiloteIA) à Claude ET à GPT, en blocs image natifs — jamais
+  celles des unités voisines (le voisinage ne sert qu'à SITUER le texte, jamais à être noté
+  lui-même, règle déjà en place pour le texte).
+
+**Limite assumée, pas corrigée ici** : GPT (`gpt-4o`) reçoit les images via l'API Chat Completions
+(vision native, pas besoin de l'API Responses pour ça, à la différence de `web_search` — voir
+point 1 ci-dessus) — pas de limite nouvelle de ce côté. **NON TESTÉ EN CONDITIONS RÉELLES** : la
+migration SQL n'est pas encore exécutée au moment de ce correctif, donc la chaîne complète (import
+.docx avec images → audit créé → analyse par Claude/GPT) n'a pas pu être vérifiée de bout en bout
+sur un vrai fichier contenant des images — seul `npm run build` (compilation du bundle client) a
+été vérifié.

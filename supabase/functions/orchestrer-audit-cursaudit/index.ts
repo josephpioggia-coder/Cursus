@@ -72,6 +72,12 @@ interface AppelMoteurIAParams {
   system: string;
   contexte: string;
   max_tokens?: number;
+  // Images Word de l'unité analysée (17/10/2026, point 2 de l'audit de
+  // préparation à la commercialisation — voir CLAUDE.md, le même champ
+  // dans analyser-unite-cursaudit, et src/lib/segmenterCursAudit.js côté
+  // client). URLs publiques (bucket images-manuscrits) — jamais celles
+  // des unités voisines.
+  images?: string[];
 }
 interface UsageIA { tokens_entree: number; tokens_sortie: number; modele: string }
 interface AppelMoteurIAResultat { data: unknown; usage: UsageIA }
@@ -184,7 +190,15 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       // "tool_use" sont lus.
       thinking: { type: "disabled" },
       system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: params.contexte }],
+      // 17/10/2026 — blocs image natifs en plus du texte quand l'unité en
+      // porte (voir AppelMoteurIAParams.images) — même pattern que
+      // CopiloteIA (appelClaude, images 6e paramètre).
+      messages: [{
+        role: "user",
+        content: params.images?.length
+          ? [{ type: "text", text: params.contexte }, ...params.images.map((url) => ({ type: "image", source: { type: "url", url } }))]
+          : params.contexte,
+      }],
       // CORRECTIF 26/08/2026 — vraie cure plutôt qu'un simple garde-fou après
       // coup (voir compterCritèresVides ci-dessous, qui ne fait que détecter
       // le problème) : `strict: true` fait garantir par l'API Claude
@@ -238,7 +252,18 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: params.modele,
-      messages: [{ role: "system", content: params.system }, { role: "user", content: params.contexte }],
+      // 17/10/2026 — même pattern que l'appel Claude ci-dessus (gpt-4o est
+      // vision-capable sur Chat Completions, pas besoin de l'API Responses
+      // pour ça, à la différence de web_search — voir verification-deux-ia).
+      messages: [
+        { role: "system", content: params.system },
+        {
+          role: "user",
+          content: params.images?.length
+            ? [{ type: "text", text: params.contexte }, ...params.images.map((url) => ({ type: "image_url", image_url: { url } }))]
+            : params.contexte,
+        },
+      ],
       response_format: { type: "json_schema", json_schema: { name: "sortie_structuree", schema: params.schema_sortie, strict: true } },
     }),
   });
@@ -619,6 +644,8 @@ async function analyserUneSection(
   consigneCriteres: string,
   contexteQualification: string,
   consigneSyntheseEditoriale: string,
+  // Images Word de cette unité (17/10/2026) — voir AppelMoteurIAParams.images.
+  images: string[] = [],
 ): Promise<Record<string, unknown>> {
   // CORRECTIF 12/09/2026 — cette fonction, PAS analyser-unite-cursaudit,
   // est le vrai chemin exécuté par "Lancer/Continuer l'analyse" (voir le
@@ -651,6 +678,7 @@ async function analyserUneSection(
   const { data: analyse, usage: usageClaude } = await appellerMoteurIAStructure({
     moteur: "claude", modele: MODELE_CLAUDE, role: "analyseur_cursaudit",
     schema_sortie: schema, system: systemClaude, contexte: texteAvecContexte, max_tokens: 8192,
+    images,
   });
 
   const nbCritèresVides = compterCritèresVides(analyse as Record<string, unknown>, criteres);
@@ -672,6 +700,7 @@ async function analyserUneSection(
       moteur: "gpt", modele: MODELE_GPT, role: "second_lecteur_cursaudit",
       schema_sortie: SCHEMA_CONTROLE_GPT, system: systemGPT,
       contexte: JSON.stringify({ texte_source: texteAvecContexte, analyse_premier_moteur: analyse }),
+      images,
     });
     controleGPT = résultatGPT.data;
     usageGPT = résultatGPT.usage;
@@ -715,11 +744,12 @@ async function analyserUneSectionAvecReprise(
   consigneCriteres: string,
   contexteQualification: string,
   consigneSyntheseEditoriale: string,
+  images: string[] = [],
 ): Promise<Record<string, unknown>> {
   let dernièreErreur: unknown;
   for (let tentative = 1; tentative <= TENTATIVES_MAX; tentative++) {
     try {
-      return await analyserUneSection(texteAvecContexte, modeIA, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+      return await analyserUneSection(texteAvecContexte, modeIA, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale, images);
     } catch (err) {
       dernièreErreur = err;
       if (!estErreurRéessayable(err) || tentative === TENTATIVES_MAX) throw err;
@@ -815,11 +845,11 @@ Deno.serve(async (req) => {
     // — un livre à plus de 1000 unités non traitées ne doit pas dépendre de
     // cette compensation accidentelle. Lecture par lots de 1000 via .range().
     const TAILLE_PAGE = 1000;
-    const aTraiter: { id: string; texte_source: string; ordre: number; chapitre_index: number | null }[] = [];
+    const aTraiter: { id: string; texte_source: string; ordre: number; chapitre_index: number | null; images: string[] | null }[] = [];
     for (let page = 0; ; page++) {
       let requeteSections = admin
         .from("audit_sections")
-        .select("id, texte_source, ordre, chapitre_index")
+        .select("id, texte_source, ordre, chapitre_index, images")
         .eq("audit_id", auditId)
         .is("resultat_analyse", null);
       if (chapitreMaxIndex !== undefined) requeteSections = requeteSections.lte("chapitre_index", chapitreMaxIndex);
@@ -911,16 +941,25 @@ Deno.serve(async (req) => {
             (lectureChapitre.a_verifier ? `À vérifier : ${lectureChapitre.a_verifier}\n` : "") +
             (lectureChapitre.a_approfondir_audit_final ? `À approfondir ici : ${lectureChapitre.a_approfondir_audit_final}` : "")
           : "";
+        // Images Word de CETTE unité (17/10/2026, point 2 de l'audit de
+        // préparation à la commercialisation — voir CLAUDE.md) — jamais
+        // celles des voisines (texteAvant/texteAprès ne servent qu'à
+        // situer le texte, jamais à être eux-mêmes notés). Plafonné à 3,
+        // même limite que CopiloteIA (coût/payload), pour la même raison.
+        const imagesUnité = Array.isArray(section.images) ? section.images.slice(0, 3) : [];
+        const noteImages = imagesUnité.length
+          ? `\n\n(${imagesUnité.length} image${imagesUnité.length > 1 ? "s" : ""} jointe${imagesUnité.length > 1 ? "s" : ""} à cette unité — observe-${imagesUnité.length > 1 ? "les" : "la"} et tiens-en compte dans ton analyse.)`
+          : "";
         const texteAvecContexte =
           (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
-          `[Unité à analyser]\n${section.texte_source}` +
+          `[Unité à analyser]\n${section.texte_source}` + noteImages +
           (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "") +
           contextePréaudit;
 
         const modeIAEffectif = audit.mode_ia === "2 IA" && !estUnitéConclusive(section) ? "1 IA" : audit.mode_ia;
 
         try {
-          const résultat = await analyserUneSectionAvecReprise(texteAvecContexte, modeIAEffectif, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale);
+          const résultat = await analyserUneSectionAvecReprise(texteAvecContexte, modeIAEffectif, criteres, schema, consigneCriteres, contexteQualification, consigneSyntheseEditoriale, imagesUnité);
           await admin.from("audit_sections").update({ resultat_analyse: résultat }).eq("id", section.id);
           traiteesCetteFois++;
         } catch (err) {

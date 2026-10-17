@@ -70,6 +70,12 @@ interface AppelMoteurIAParams {
   system: string;
   contexte: string;
   max_tokens?: number;
+  // Images Word associées à l'unité analysée (17/10/2026, point 2 de
+  // l'audit de préparation à la commercialisation — voir CLAUDE.md et
+  // src/lib/segmenterCursAudit.js côté client). URLs publiques (bucket
+  // images-manuscrits) — jamais celles des unités voisines, seulement
+  // celle de l'unité réellement marquée "à analyser".
+  images?: string[];
 }
 interface UsageIA { tokens_entree: number; tokens_sortie: number; modele: string }
 interface AppelMoteurIAResultat { data: unknown; usage: UsageIA }
@@ -114,7 +120,16 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       // "tool_use" sont lus.
       thinking: { type: "disabled" },
       system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
-      messages: [{ role: "user", content: params.contexte }],
+      // 17/10/2026 — blocs image natifs en plus du texte quand l'unité en
+      // porte (voir AppelMoteurIAParams.images) — même pattern que
+      // CopiloteIA (appelClaude, images 6e paramètre) : source url, pas de
+      // base64 à gérer ici.
+      messages: [{
+        role: "user",
+        content: params.images?.length
+          ? [{ type: "text", text: params.contexte }, ...params.images.map((url) => ({ type: "image", source: { type: "url", url } }))]
+          : params.contexte,
+      }],
       // CORRECTIF 26/08/2026 — même correctif que orchestrer-audit-cursaudit :
       // `strict: true` fait garantir par l'API Claude elle-même la conformité
       // complète de tool_use.input, au lieu de découvrir des champs omis
@@ -142,7 +157,19 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
     body: JSON.stringify({
       model: params.modele,
-      messages: [{ role: "system", content: params.system }, { role: "user", content: params.contexte }],
+      // 17/10/2026 — même pattern que l'appel Claude ci-dessus : blocs
+      // image natifs (gpt-4o est vision-capable sur Chat Completions,
+      // pas besoin de l'API Responses pour ça, à la différence de
+      // web_search — voir verification-deux-ia).
+      messages: [
+        { role: "system", content: params.system },
+        {
+          role: "user",
+          content: params.images?.length
+            ? [{ type: "text", text: params.contexte }, ...params.images.map((url) => ({ type: "image_url", image_url: { url } }))]
+            : params.contexte,
+        },
+      ],
       response_format: { type: "json_schema", json_schema: { name: "sortie_structuree", schema: params.schema_sortie, strict: true } },
     }),
   });
@@ -525,10 +552,19 @@ Deno.serve(async (req) => {
     // 3. Charger l'unité et son audit parent, vérifier propriété + paiement
     const { data: section } = await admin
       .from("audit_sections")
-      .select("id, audit_id, texte_source, ordre, chapitre_index")
+      .select("id, audit_id, texte_source, ordre, chapitre_index, images")
       .eq("id", auditSectionId)
       .maybeSingle();
     if (!section) return json({ error: "Unité introuvable." }, 404);
+
+    // Images Word de CETTE unité (17/10/2026) — jamais celles des voisines
+    // (voir texteAvecVoisinage plus bas : les voisins ne sont là que pour
+    // situer le texte, jamais pour être eux-mêmes notés). Plafonné à 3,
+    // même limite que CopiloteIA (coût/payload), pour la même raison.
+    const imagesUnité: string[] = Array.isArray(section.images) ? section.images.slice(0, 3) : [];
+    const noteImages = imagesUnité.length
+      ? `\n\n(${imagesUnité.length} image${imagesUnité.length > 1 ? "s" : ""} jointe${imagesUnité.length > 1 ? "s" : ""} à cette unité — observe-${imagesUnité.length > 1 ? "les" : "la"} et tiens-en compte dans ton analyse.)`
+      : "";
 
     // Contexte de voisinage (12/09/2026) — demandé par l'auteur du projet
     // après un cas réel absurde : un titre nu ("Oracle du Sermon sur la
@@ -548,7 +584,7 @@ Deno.serve(async (req) => {
     const texteAprès = voisines?.find((v) => v.ordre === section.ordre + 1)?.texte_source;
     const texteAvecVoisinage =
       (texteAvant ? `[Extrait juste avant, pour situer — NE PAS l'évaluer]\n${texteAvant}\n\n` : "") +
-      `[Unité à analyser]\n${section.texte_source}` +
+      `[Unité à analyser]\n${section.texte_source}` + noteImages +
       (texteAprès ? `\n\n[Extrait juste après, pour situer — NE PAS l'évaluer]\n${texteAprès}` : "");
 
     const { data: audit } = await admin
@@ -632,6 +668,7 @@ Deno.serve(async (req) => {
       schema_sortie: schema,
       system: systemClaude,
       contexte: texteAvecContexte,
+      images: imagesUnité,
     });
 
     let controleGPT: unknown = null;
@@ -652,6 +689,7 @@ Deno.serve(async (req) => {
         schema_sortie: SCHEMA_CONTROLE_GPT,
         system: systemGPT,
         contexte: JSON.stringify({ texte_source: texteAvecContexte, analyse_premier_moteur: analyse }),
+        images: imagesUnité,
       });
       controleGPT = résultatGPT.data;
       usageGPT = résultatGPT.usage;

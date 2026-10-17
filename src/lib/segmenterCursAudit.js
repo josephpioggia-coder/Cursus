@@ -39,7 +39,96 @@
  * CONFIRME ensuite ce découpage dans l'aperçu gratuit
  * avant de pouvoir lancer le pré-audit — voir ApercuGlobal dans
  * CursAuditDetail.jsx et `audits.chapitres_confirmes`.
+ *
+ * IMAGES INTÉGRÉES AU .docx (17/10/2026, point 2 de l'audit de préparation
+ * à la commercialisation — CLAUDE.md) : jusqu'ici, ce fichier ne lisait
+ * QUE le texte des paragraphes Word (`<w:t>`) — une image intégrée (cas
+ * d'origine : "Oracle du Sermon sur la montagne", une image par carte)
+ * n'était jamais extraite, quelle que soit la suite du pipeline. Les
+ * fonctions ci-dessous reprennent EXACTEMENT la lecture OOXML déjà
+ * éprouvée dans ImportDocx.jsx pour CursEdit (24/09/2026, voir son propre
+ * commentaire d'en-tête) — déplacées ici plutôt que dupliquées, puisque ce
+ * fichier est déjà le point d'entrée OOXML partagé ; ImportDocx.jsx les
+ * importe désormais d'ici. `analyserStructureDocx` associe à chaque
+ * paragraphe ses images (URLs publiques déjà téléversées) ; `regrouperParNiveaux`
+ * les reporte vers la bonne unité, sur le même principe que `titresEnAttente`
+ * (une image seule sur sa ligne, ou accompagnant un titre non retenu comme
+ * frontière, est reportée vers le prochain contenu réel plutôt que perdue).
  */
+
+import { supabase } from "./supabase.js";
+import { journaliserErreur } from "./journalErreurs.js";
+
+// ─── Images intégrées au .docx — voir le paragraphe dédié ci-dessus.
+// Un .docx est un zip : le texte est dans word/document.xml, les images
+// sont des fichiers binaires séparés dans word/media/, référencés par un
+// identifiant de relation (r:embed="rIdN") plutôt que par leur chemin
+// direct — la correspondance rId → fichier vit dans
+// word/_rels/document.xml.rels. Recherche par NAMESPACE (getAttributeNS),
+// pas par préfixe littéral ("a:blip", "r:embed") : Word peut réutiliser
+// des préfixes différents selon l'outil qui a produit le fichier, la
+// résolution par URI de namespace est fiable dans tous les cas.
+const NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+// Identifiants de relation (rId) de toutes les images dans un paragraphe,
+// dans l'ordre où elles apparaissent — un paragraphe peut être un mélange
+// de texte et d'image(s) inline, ou une image seule sans texte.
+export function idsImagesDuParagraphe(p) {
+  return Array.from(p.getElementsByTagName("*"))
+    .filter((el) => el.localName === "blip")
+    .map((el) => el.getAttributeNS(NS_RELATIONSHIPS, "embed"))
+    .filter(Boolean);
+}
+
+// rId → chemin dans le zip (ex. "rId4" → "word/media/image1.png").
+async function chargerRelationsImages(zip) {
+  const relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
+  if (!relsXml) return {};
+  const doc = new DOMParser().parseFromString(relsXml, "text/xml");
+  const relations = {};
+  for (const rel of Array.from(doc.getElementsByTagName("Relationship"))) {
+    const id = rel.getAttribute("Id");
+    const cible = rel.getAttribute("Target");
+    if (id && cible) relations[id] = cible.startsWith("media/") ? `word/${cible}` : cible;
+  }
+  return relations;
+}
+
+const MIME_PAR_EXTENSION = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", webp: "image/webp", emf: "image/x-emf", wmf: "image/x-wmf" };
+
+// Extrait chaque image UNE SEULE FOIS (un même rId peut apparaître dans
+// plusieurs paragraphes si l'auteur·ice a copié-collé) et l'envoie vers le
+// même bucket que le bouton 🖼️ de l'éditeur et l'import .docx de CursEdit
+// (images-manuscrits) — même stockage, même politique d'accès, pas de
+// code dupliqué côté base. Retourne { rId: urlPublique }. Une image qui
+// échoue (fichier manquant dans le zip, upload en échec) est simplement
+// omise plutôt que de faire échouer tout l'import — le texte reste
+// prioritaire.
+export async function téléverserImagesDocx(zip, idsUtilisés) {
+  if (!idsUtilisés.size) return {};
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  const relations = await chargerRelationsImages(zip);
+  const urlParId = {};
+  await Promise.all(Array.from(idsUtilisés).map(async (rId) => {
+    try {
+      const cheminZip = relations[rId];
+      const fichierZip = cheminZip && zip.file(cheminZip);
+      if (!fichierZip) return;
+      const extension = (cheminZip.split(".").pop() || "png").toLowerCase();
+      const contentType = MIME_PAR_EXTENSION[extension] || "application/octet-stream";
+      const blob = await fichierZip.async("blob");
+      const chemin = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+      const { error } = await supabase.storage.from("images-manuscrits").upload(chemin, blob, { contentType, upsert: false });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("images-manuscrits").getPublicUrl(chemin);
+      urlParId[rId] = publicUrl;
+    } catch (err) {
+      journaliserErreur("segmenterCursAudit:téléverserImagesDocx", `${rId} — ${err.message}`);
+    }
+  }));
+  return urlParId;
+}
 
 // Filtre le bruit typique d'un texte collé ou d'un paragraphe Word : lignes
 // vides résiduelles, numéros de page isolés, en-têtes/pieds de page très
@@ -139,8 +228,11 @@ const STYLES_IGNORÉS = new Set([
 /**
  * Lecture brute d'un .docx — un seul passage sur le document, sans encore
  * choisir de niveau de titre. Renvoie { infos, niveauxDisponibles } :
- *  - infos : [{ texte, niveau }] pour chaque paragraphe, dans l'ordre du
- *    document (niveau 1-based, `undefined` pour un paragraphe sans titre).
+ *  - infos : [{ texte, niveau, images }] pour chaque paragraphe, dans
+ *    l'ordre du document (niveau 1-based, `undefined` pour un paragraphe
+ *    sans titre ; `images` = URLs publiques des images Word intégrées à
+ *    CE paragraphe, [] sinon — voir note du 17/10/2026 en tête de
+ *    fichier).
  *  - niveauxDisponibles : [{ niveau, nombre }] pour chaque niveau de titre
  *    apparu au moins deux fois (une seule occurrence n'est pas une
  *    structure répétée), trié du plus grossier (niveau 1) au plus fin.
@@ -151,7 +243,8 @@ const STYLES_IGNORÉS = new Set([
  * regrouperParNiveaux() ci-dessous. `analyserStructureDocx` fait la
  * lecture une fois ; regrouperParNiveaux() peut ensuite être rappelée
  * plusieurs fois (à chaque changement de sélection du client) sans
- * relire le fichier.
+ * relire le fichier (le téléversement des images, lui, n'a lieu qu'ici,
+ * une seule fois).
  */
 export async function analyserStructureDocx(fichier) {
   const JSZip = await chargerJSZip();
@@ -166,10 +259,25 @@ export async function analyserStructureDocx(fichier) {
 
   const infos = [];
   const comptageParNiveau = {};
+  // 17/10/2026 — voir note en tête de fichier. Les rId collectés ici
+  // servent au téléversement UNIQUE en fin de fonction ; idsImages reste
+  // porté par paragraphe dans `infos` pour résoudre ensuite vers de
+  // vraies URLs (voir plus bas).
+  const idsImagesVus = new Set();
   for (const p of paras) {
     const style = p.getElementsByTagNameNS(ns, "pStyle")[0]?.getAttribute("w:val") || "";
     const texte = Array.from(p.getElementsByTagNameNS(ns, "t")).map((t) => t.textContent).join("").trim();
-    if (!texte || STYLES_IGNORÉS.has(style)) { infos.push({ texte: "", niveau: undefined }); continue; }
+    // Un paragraphe ignoré (table des matières, métadonnées) n'emporte
+    // jamais ses images avec lui — cas marginal, cohérent avec le fait
+    // qu'il n'est de toute façon jamais lu plus loin.
+    const idsImages = STYLES_IGNORÉS.has(style) ? [] : idsImagesDuParagraphe(p);
+    // CORRECTIF 17/10/2026 — un paragraphe qui ne contient QU'une image
+    // (pas de texte) était avant ceci totalement ignoré par la condition
+    // `!texte` ci-dessous, l'image disparaissant avec lui sans jamais
+    // être lue : exactement le cas d'origine ("Oracle du Sermon sur la
+    // montagne", une image par carte, souvent sans texte propre).
+    if ((!texte && idsImages.length === 0) || STYLES_IGNORÉS.has(style)) { infos.push({ texte: "", niveau: undefined, images: [] }); continue; }
+    idsImages.forEach((id) => idsImagesVus.add(id));
 
     const niveauParagraphe = p.getElementsByTagNameNS(ns, "pPr")[0]
       ?.getElementsByTagNameNS(ns, "outlineLvl")[0]?.getAttribute("w:val");
@@ -178,7 +286,7 @@ export async function analyserStructureDocx(fichier) {
       : (niveauxParStyle[style] !== undefined ? niveauxParStyle[style] : niveauDepuisNomStyle(style));
     const niveau = niveau0Based !== undefined ? niveau0Based + 1 : undefined;
 
-    infos.push({ texte, niveau });
+    infos.push({ texte, niveau, idsImages });
     if (niveau !== undefined) comptageParNiveau[niveau] = (comptageParNiveau[niveau] || 0) + 1;
   }
 
@@ -187,7 +295,18 @@ export async function analyserStructureDocx(fichier) {
     .filter(({ nombre }) => nombre >= 2) // une seule occurrence n'est pas une structure répétée
     .sort((a, b) => a.niveau - b.niveau);
 
-  return { infos, niveauxDisponibles };
+  // Téléversement UNE FOIS pour tout le document (pas par paragraphe) —
+  // puis résolution de idsImages (rId) vers de vraies URLs publiques dans
+  // `infos`, pour que regrouperParNiveaux() n'ait plus jamais besoin du
+  // zip ni du rId brut.
+  const urlParId = await téléverserImagesDocx(zip, idsImagesVus);
+  const infosAvecImages = infos.map((info) => ({
+    texte: info.texte,
+    niveau: info.niveau,
+    images: (info.idsImages || []).map((id) => urlParId[id]).filter(Boolean),
+  }));
+
+  return { infos: infosAvecImages, niveauxDisponibles };
 }
 
 /**
@@ -203,12 +322,15 @@ export async function analyserStructureDocx(fichier) {
  * ne fait qu'ajouter une entrée quasi vide, sans rien casser.
  *
  * `niveauxRetenus` : tableau ou Set de niveaux (1-based) à traiter comme
- * frontières. Renvoie { unités, chapitres } — même forme qu'avant.
+ * frontières. Renvoie { unités, images, chapitres } — `images` (ajouté le
+ * 17/10/2026) est un tableau PARALLÈLE à `unités` : images[i] = tableau
+ * d'URLs publiques pour unités[i], [] si aucune image.
  */
 export function regrouperParNiveaux(infos, niveauxRetenus) {
   const retenus = niveauxRetenus instanceof Set ? niveauxRetenus : new Set(niveauxRetenus);
 
   const unités = [];
+  const images = [];
   const chapitres = [];
   let chapitreCourant = null;
   // CORRECTIF 28/08/2026 (réf. 60816-01, suite) — bug confirmé sur un
@@ -225,12 +347,19 @@ export function regrouperParNiveaux(infos, niveauxRetenus) {
   // titre non retenu comme frontière est désormais préfixé au contenu qui
   // le suit plutôt que de devenir sa propre unité.
   let titresEnAttente = "";
-  for (const { texte, niveau } of infos) {
-    if (!texte) continue;
+  // 17/10/2026 — même principe que titresEnAttente, pour les images : une
+  // image portée par un titre (retenu ou non comme frontière) ou par un
+  // paragraphe sans texte propre (image seule sur sa ligne) est reportée
+  // vers la prochaine unité réelle plutôt que perdue.
+  let imagesEnAttente = [];
+  for (const { texte, niveau, images: imagesParagraphe } of infos) {
+    const imgs = imagesParagraphe || [];
+    if (!texte && imgs.length === 0) continue;
     if (niveau !== undefined && retenus.has(niveau)) {
       if (chapitreCourant) chapitres.push(chapitreCourant);
       chapitreCourant = { titre: texte, indexPremièreUnité: unités.length, nombreUnités: 0, mots: 0 };
       titresEnAttente = "";
+      imagesEnAttente = imagesEnAttente.concat(imgs);
       continue;
     }
     if (niveau !== undefined) {
@@ -238,12 +367,16 @@ export function regrouperParNiveaux(infos, niveauxRetenus) {
       // mis de côté pour être rattaché au prochain contenu réel plutôt
       // que traité comme une unité à part.
       titresEnAttente = titresEnAttente ? `${titresEnAttente}\n${texte}` : texte;
+      imagesEnAttente = imagesEnAttente.concat(imgs);
       continue;
     }
-    if (texte.length >= LONGUEUR_MIN_UNITE) {
+    if (texte.length >= LONGUEUR_MIN_UNITE || imgs.length > 0) {
       const texteAvecTitres = titresEnAttente ? `${titresEnAttente}\n${texte}` : texte;
+      const imagesUnité = imagesEnAttente.concat(imgs);
       titresEnAttente = "";
+      imagesEnAttente = [];
       unités.push(texteAvecTitres);
+      images.push(imagesUnité);
       if (chapitreCourant) {
         chapitreCourant.nombreUnités += 1;
         chapitreCourant.mots += texteAvecTitres.split(/\s+/).filter(Boolean).length;
@@ -252,7 +385,7 @@ export function regrouperParNiveaux(infos, niveauxRetenus) {
   }
   if (chapitreCourant) chapitres.push(chapitreCourant);
 
-  return { unités, chapitres };
+  return { unités, images, chapitres };
 }
 
 /**
@@ -286,9 +419,9 @@ export async function extraireParagraphesDocxAvecChapitres(fichier) {
   // 8 "FAMILLE" en Titre1).
   const niveauChapitre = niveauxDisponibles.length > 0 ? niveauxDisponibles[0].niveau : null;
 
-  const { unités, chapitres } = regrouperParNiveaux(infos, niveauChapitre !== null ? [niveauChapitre] : []);
+  const { unités, images, chapitres } = regrouperParNiveaux(infos, niveauChapitre !== null ? [niveauChapitre] : []);
 
-  return { unités, chapitres, niveauChapitre };
+  return { unités, images, chapitres, niveauChapitre };
 }
 
 /**

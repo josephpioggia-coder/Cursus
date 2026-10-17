@@ -153,14 +153,35 @@ mesuré : une image ≈ une unité de texte supplémentaire (~1300 tokens pour
 une image de taille courante), pas un multiplicateur de coût comme
 d'abord estimé.
 
-**Ce qui reste à construire** : la même chose côté **CursAudit**
-(`orchestrer-audit-cursaudit`/`analyser-unite-cursaudit`, le pipeline
-serveur qui traite les unités d'un audit détaillé) — c'est le cas d'usage
-d'origine ("Oracle du Sermon sur la montagne", chaque carte associée à une
-image), pas encore couvert. Ce pipeline est plus complexe (concurrence,
-reprises, détection de chapitres) qu'un simple appel `appelClaude()`
-côté client — un chantier à part, pas juste un copier-coller du
-correctif Co-pilote.
+**Ce qui est fait (phase 3 — CursAudit, 17/10/2026)** : point 2 de l'audit
+de préparation à la commercialisation (CLAUDE.md). Le diagnostic initial
+de cette phase 3 ("le serveur ne lit pas encore les images") s'est révélé
+incomplet une fois le code relu : CursAudit a son PROPRE pipeline
+d'upload, séparé de CursEdit/noeuds (un .docx téléversé spécifiquement
+pour l'audit) — aucune image n'y était jamais extraite, ni côté client ni
+côté serveur, même pour un .docx qui en contient. Corrigé de bout en
+bout :
+- `src/lib/segmenterCursAudit.js` : reprend EXACTEMENT la lecture OOXML
+  déjà éprouvée dans `ImportDocx.jsx` (relations `word/_rels/document.xml.rels`,
+  upload vers `images-manuscrits`) — déplacée ici plutôt que dupliquée ;
+  `ImportDocx.jsx` l'importe désormais d'ici. `analyserStructureDocx`
+  associe à chaque paragraphe ses images ; `regrouperParNiveaux` les
+  reporte vers la bonne unité (même principe que les titres non retenus
+  comme frontière : reportés vers le prochain contenu réel, jamais
+  perdus) et n'ignore plus un paragraphe qui ne contient qu'une image
+  sans texte (le cas même d'"Oracle du Sermon sur la montagne").
+- `audit_sections.images` (nouvelle colonne jsonb, migration
+  `2026-10-17-audit-sections-images.sql` — **à exécuter par Joseph**) :
+  URLs publiques, tableau parallèle à `texte_source`.
+- `orchestrer-audit-cursaudit` (le pipeline réellement exécuté par
+  "Lancer/Continuer l'analyse") et `analyser-unite-cursaudit` (même
+  correctif par cohérence, voir son propre statut dans CLAUDE.md) :
+  l'unité analysée transmet ses images (plafonnées à 3, même limite que
+  CopiloteIA) à Claude ET à GPT (`gpt-4o` est vision-capable sur Chat
+  Completions) en blocs image natifs — jamais celles des unités voisines.
+- NON TESTÉ EN CONDITIONS RÉELLES (migration pas encore exécutée au
+  moment du correctif) : la chaîne complète (import .docx avec images →
+  audit créé → analyse) sur un vrai fichier contenant des images.
 
 **Pourquoi la phase 2 a été reportée puis reprise le jour même** :
 d'abord estimée trop coûteuse en tokens, l'estimation a été corrigée

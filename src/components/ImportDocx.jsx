@@ -19,8 +19,7 @@
 
 import { useState, useRef } from "react";
 import { nœudsAPI } from "../lib/api.js";
-import { supabase } from "../lib/supabase.js";
-import { journaliserErreur } from "../lib/journalErreurs.js";
+import { idsImagesDuParagraphe, téléverserImagesDocx } from "../lib/segmenterCursAudit.js";
 
 // ─── Lecture du .docx via JSZip (chargé une fois) ────────────────────────────
 
@@ -92,77 +91,11 @@ function niveauDepuisNomStyle(styleId) {
   return m ? parseInt(m[1], 10) - 1 : undefined;
 }
 
-// ─── Images intégrées au .docx (24/09/2026, demande de Joseph : "comment
+// Images intégrées au .docx (24/09/2026, demande de Joseph : "comment
 // importer un texte qui comprend déjà des images dans le fichier word ?")
-// ─────────────────────────────────────────────────────────────────────────
-// Un .docx est un zip : le texte est dans word/document.xml, les images
-// sont des fichiers binaires séparés dans word/media/, référencés par un
-// identifiant de relation (r:embed="rIdN") plutôt que par leur chemin
-// direct — la correspondance rId → fichier vit dans
-// word/_rels/document.xml.rels. Recherche par NAMESPACE (getAttributeNS),
-// pas par préfixe littéral ("a:blip", "r:embed") : Word peut réutiliser
-// des préfixes différents selon l'outil qui a produit le fichier, la
-// résolution par URI de namespace est fiable dans tous les cas.
-const NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
-// Identifiants de relation (rId) de toutes les images dans un paragraphe,
-// dans l'ordre où elles apparaissent — un paragraphe peut être un mélange
-// de texte et d'image(s) inline, ou une image seule sans texte.
-function idsImagesDuParagraphe(p) {
-  return Array.from(p.getElementsByTagName("*"))
-    .filter((el) => el.localName === "blip")
-    .map((el) => el.getAttributeNS(NS_RELATIONSHIPS, "embed"))
-    .filter(Boolean);
-}
-
-// rId → chemin dans le zip (ex. "rId4" → "word/media/image1.png").
-async function chargerRelationsImages(zip) {
-  const relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
-  if (!relsXml) return {};
-  const doc = new DOMParser().parseFromString(relsXml, "text/xml");
-  const relations = {};
-  for (const rel of Array.from(doc.getElementsByTagName("Relationship"))) {
-    const id = rel.getAttribute("Id");
-    const cible = rel.getAttribute("Target");
-    if (id && cible) relations[id] = cible.startsWith("media/") ? `word/${cible}` : cible;
-  }
-  return relations;
-}
-
-const MIME_PAR_EXTENSION = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", webp: "image/webp", emf: "image/x-emf", wmf: "image/x-wmf" };
-
-// Extrait chaque image UNE SEULE FOIS (un même rId peut apparaître dans
-// plusieurs paragraphes si l'auteur·ice a copié-collé) et l'envoie vers le
-// même bucket que le bouton 🖼️ de l'éditeur (images-manuscrits) — même
-// stockage, même politique d'accès, pas de code dupliqué côté base.
-// Retourne { rId: urlPublique }. Une image qui échoue (fichier manquant
-// dans le zip, upload en échec) est simplement omise plutôt que de faire
-// échouer tout l'import — le texte reste prioritaire.
-async function téléverserImagesDocx(zip, idsUtilisés) {
-  if (!idsUtilisés.size) return {};
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return {};
-  const relations = await chargerRelationsImages(zip);
-  const urlParId = {};
-  await Promise.all(Array.from(idsUtilisés).map(async (rId) => {
-    try {
-      const cheminZip = relations[rId];
-      const fichierZip = cheminZip && zip.file(cheminZip);
-      if (!fichierZip) return;
-      const extension = (cheminZip.split(".").pop() || "png").toLowerCase();
-      const contentType = MIME_PAR_EXTENSION[extension] || "application/octet-stream";
-      const blob = await fichierZip.async("blob");
-      const chemin = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-      const { error } = await supabase.storage.from("images-manuscrits").upload(chemin, blob, { contentType, upsert: false });
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from("images-manuscrits").getPublicUrl(chemin);
-      urlParId[rId] = publicUrl;
-    } catch (err) {
-      journaliserErreur("ImportDocx:téléverserImagesDocx", `${rId} — ${err.message}`);
-    }
-  }));
-  return urlParId;
-}
+// — idsImagesDuParagraphe/téléverserImagesDocx déplacées dans
+// src/lib/segmenterCursAudit.js le 17/10/2026 (reprises pour CursAudit,
+// voir son en-tête) : importées ci-dessus plutôt que dupliquées.
 
 // niveauPartie / niveauChapitre : niveaux de titre (1 à 6) choisis à l'écran
 // de sélection pour représenter les Parties et les Chapitres — ajouté

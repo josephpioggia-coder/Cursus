@@ -145,10 +145,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
   // changement de niveauxRetenus. chapitresDétectés reste `null` si import
   // non-.docx (texte collé, pas de style Word à lire) ou si aucune
   // structure de titres répétée n'a été trouvée, comme avant.
-  const { unitésDocx, chapitresDétectés } = useMemo(() => {
-    if (!infosDocx) return { unitésDocx: null, chapitresDétectés: null };
-    const { unités: u, chapitres } = regrouperParNiveaux(infosDocx, niveauxRetenus);
-    return { unitésDocx: u, chapitresDétectés: chapitres.length > 0 ? chapitres : null };
+  const { unitésDocx, imagesDocx, chapitresDétectés } = useMemo(() => {
+    if (!infosDocx) return { unitésDocx: null, imagesDocx: null, chapitresDétectés: null };
+    const { unités: u, images: img, chapitres } = regrouperParNiveaux(infosDocx, niveauxRetenus);
+    return { unitésDocx: u, imagesDocx: img, chapitresDétectés: chapitres.length > 0 ? chapitres : null };
   }, [infosDocx, niveauxRetenus]);
   const [nomFichier, setNomFichier] = useState(null);
   const [importEnCours, setImportEnCours] = useState(false);
@@ -257,6 +257,15 @@ export default function CursAudit({ onVoirAudits } = {}) {
     if (source === "docx") return unitésDocx || [];
     return segmenterTexte(texte);
   }, [source, texte, unitésDocx]);
+
+  // Images Word associées à chaque unité (17/10/2026, point 2 de l'audit de
+  // préparation à la commercialisation — voir CLAUDE.md) — tableau
+  // PARALLÈLE à `unités` ; jamais d'image pour du texte collé (aucun style
+  // Word à lire dans ce cas).
+  const images = useMemo(() => {
+    if (source === "docx") return imagesDocx || unités.map(() => []);
+    return unités.map(() => []);
+  }, [source, imagesDocx, unités]);
 
   // Aperçu de confirmation (12/09/2026) — début et fin du texte RÉELLEMENT
   // soumis (unités jointes, pas `texte` brut : pour un import .docx, `texte`
@@ -388,6 +397,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
     const { data, error } = await auditsAPI.créer({
       titre: titre.trim(),
       unités,
+      images,
       palierDimensions: palier,
       nombreDimensions: palierChoisi.dimensions,
       modeIA,
