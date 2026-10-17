@@ -996,3 +996,44 @@ autre usage OpenAI du compte Cursus.
 - **NON TESTÉ EN CONDITIONS RÉELLES** (migration pas encore exécutée au moment de ce correctif) :
   seul `npm run build` a été vérifié — l'écriture réelle dans `usage_voix` depuis un vrai appel
   OpenAI, et l'agrégation dans l'écran "Usage voix", restent à confirmer après la migration.
+
+## Mise en place du paiement (17/10/2026) — pas un chantier à construire, déjà largement fait
+
+Dernier point de l'audit de préparation à la commercialisation. Avant d'écrire du code, vérifié
+l'état réel : `creer-session-checkout`/`stripe-webhook` forment déjà un pipeline Stripe Checkout
+mature, durci par plusieurs correctifs réels au fil des mois (recalcul du prix CursAudit côté
+serveur contre la fraude, anti-doublon d'abonnement, codes promo consommés atomiquement sur
+paiement confirmé) ; `prix-stripe-config.mjs` porte un vrai catalogue à 5 paliers ; trois pages
+légales détaillées existent déjà (`PagesLegales.jsx` : Mentions légales, CGV, Politique de
+confidentialité, avec références au Code de droit économique belge). Ce n'est donc pas "à mettre
+en place" au sens de construire — c'est déjà construit. Trois points bloquent réellement un
+lancement, confirmés directement avec Joseph :
+
+1. **Stripe est toujours en mode TEST** (compte pas encore vérifié pour de vrais paiements —
+   KYC/coordonnées bancaires, une démarche sur le dashboard Stripe, rien que du code ne peut
+   faire). Avant de passer en live : vérifier le compte, probablement recréer les Prix en mode
+   live (test et live sont deux catalogues Stripe séparés malgré des ID de forme identique), puis
+   mettre à jour `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` (secrets Supabase) ET les deux
+   mappings price_id → palier qui doivent rester synchronisés : `prix-stripe-config.mjs` (client)
+   et `PALIERS` dans `stripe-webhook/index.ts` (serveur).
+2. **La structure juridique reste en suspens.** `PagesLegales.jsx` utilise "HMS-i SA" explicitement
+   marqué provisoire le 14/09/2026 ("une nouvelle entité à créer sous un mois") — ce délai est
+   dépassé depuis près de trois semaines au 17/10/2026. Tant que ce n'est pas tranché,
+   `IDENTITE_EDITEUR` (le seul endroit à modifier) reste provisoire — risqué d'encaisser de vrais
+   paiements sous un nom qui pourrait encore changer. Les pages elles-mêmes recommandaient déjà
+   une relecture par un avocat avant mise en ligne publique définitive, pas faite non plus.
+3. **Bug réel trouvé et corrigé** : `creer-session-checkout` redirigeait après paiement
+   (`success_url`/`cancel_url`) vers `cursus-seven.vercel.app`, pas `cursus.pro` — déjà le domaine
+   réellement utilisé par l'auteur·ice (voir `ModeEmploi.jsx`, les commentaires d'`App.jsx` sur
+   "quand je clique sur cursus.pro"). Un client qui paie depuis cursus.pro se serait retrouvé
+   redirigé vers une AUTRE origine après paiement — session Supabase (`localStorage`, propre à
+   chaque origine) absente là-bas, l'écran de retour de paiement (`?abonnement=succes` /
+   `?audit=succes`, lu dans `App.jsx`) risquant de s'afficher à un visiteur apparemment déconnecté
+   plutôt qu'au client qui vient de payer. `URL_BASE` pointe maintenant vers `https://cursus.pro`.
+   Cause : un correctif du 03/08/2026 avait déjà aligné ce fichier sur "la bonne adresse de
+   production" de l'époque (cursus-seven.vercel.app) — cursus.pro l'a remplacée depuis sans que ce
+   fichier ne suive.
+
+**Prochaine étape, pas commencée** : vérifier le compte Stripe ensemble (dashboard) pour confirmer
+l'état exact avant toute bascule en mode live — rien d'autre n'a été changé côté paiement dans
+cette passe que le correctif de redirection ci-dessus.

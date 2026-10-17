@@ -315,12 +315,22 @@ Deno.serve(async (req) => {
       codePromoId = ligne.id;
     }
 
-    // CORRECTIF 03/08/2026 : l'ancien commentaire disait "à remplacer une
-    // fois déployé" avec une adresse locale (localhost:5173) — la vraie
-    // version en ligne utilisait déjà la bonne adresse de production,
-    // jamais mise à jour dans ce fichier du dépôt. Reprise ici depuis la
-    // version réellement déployée sur Supabase, vérifiée directement.
-    const URL_BASE = "https://cursus-seven.vercel.app";
+    // CORRECTIF 17/10/2026 (point "mise en place du paiement" de l'audit
+    // de commercialisation — CLAUDE.md) : redirigeait vers
+    // cursus-seven.vercel.app, un second domaine distinct de cursus.pro
+    // (déjà le domaine réellement utilisé par l'auteur·ice — voir
+    // ModeEmploi.jsx, les commentaires d'App.jsx sur "quand je clique sur
+    // cursus.pro"). Un client qui paie depuis cursus.pro se serait retrouvé
+    // redirigé vers une AUTRE origine après paiement — session Supabase
+    // (localStorage, propre à chaque origine) absente là-bas, l'écran de
+    // retour de paiement (?abonnement=succes / ?audit=succes, lu dans
+    // App.jsx) risquant de s'afficher à un visiteur apparemment déconnecté
+    // plutôt qu'au client qui vient de payer. Avant ce correctif
+    // (03/08/2026) : "la vraie version en ligne utilisait déjà la bonne
+    // adresse de production, jamais mise à jour dans ce fichier du dépôt"
+    // — cursus-seven.vercel.app ÉTAIT alors la bonne adresse ; cursus.pro
+    // l'a remplacée depuis sans que ce fichier ne suive.
+    const URL_BASE = "https://cursus.pro";
 
     const session = await stripe.checkout.sessions.create({
       mode: modeCheckout,
