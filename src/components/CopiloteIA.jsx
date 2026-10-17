@@ -1308,6 +1308,27 @@ function PanneauVerification({ résultat }) {
         );
       })}
 
+      {/* CORRECTIF 17/10/2026 — point 1 du GO/NO-GO fiabilité des IA (voir
+          CLAUDE.md) : affirmations théoriques/factuelles (ex. attribution
+          d'une idée à un auteur nommé) jamais confirmées par une recherche
+          web réelle pendant le dialogue, quoi que Claude ou GPT en aient dit
+          par ailleurs — même esprit que le badge rouge des Références. */}
+      {Array.isArray(résultat.claims_theoriques_non_confirmees) && résultat.claims_theoriques_non_confirmees.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: "#A32D2D", marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            ⚠ Affirmations théoriques non confirmées par une recherche
+          </div>
+          {résultat.claims_theoriques_non_confirmees.map((c, i) => (
+            <div key={i} style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", marginBottom: 5, fontSize: 12, color: "#1a1a1a", lineHeight: 1.5 }}>
+              {c.affirmation}
+              <div style={{ fontSize: 10, color: "#A32D2D", marginTop: 3 }}>
+                Aucune source trouvée par Cursus pour confirmer cette affirmation — à vérifier par vous-même avant de vous y appuyer.
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {!résultat.contexte_suffisant && (
         <div style={{ fontSize: 10.5, color: "#999", marginTop: 4, fontStyle: "italic" }}>
           Contexte du projet jugé partiel au moment de l'analyse.

@@ -38,6 +38,40 @@
  *    à vérifier/mettre à jour — surchageables via le corps de la requête
  *    (`modele_claude`, `modele_gpt`).
  *
+ * VÉRIFICATION EXTERNE DES AFFIRMATIONS THÉORIQUES/FACTUELLES (17/10/2026) :
+ * point 1 du GO/NO-GO fiabilité des IA (CLAUDE.md, 03/10/2026) — ce protocole
+ * ne donnait jusqu'ici à Claude et GPT AUCUN accès à une source extérieure à
+ * eux-mêmes : deux IA qui débattent entre elles, jamais une preuve
+ * indépendante (le risque nommé explicitement, ex. "attribution correcte
+ * d'une idée à Jung"). Traitement mécanique, pas une "3e IA" : même principe
+ * que CopiloteIA pour l'onglet Références (CLAUDE.md, 03/10/2026).
+ *  - Le tour Claude (A1/A2, rôle "analyseur_initial") dispose maintenant de
+ *    l'outil `web_search` natif d'Anthropic, dans le MÊME appel que celui qui
+ *    produit la sortie structurée (`tool_choice` passe de forcé à "auto" dès
+ *    que la recherche est activée, pour laisser Claude chercher puis conclure
+ *    dans le même tour — combinaison non testée ailleurs dans ce dépôt,
+ *    CopiloteIA utilisant la recherche web UNIQUEMENT avec une sortie texte
+ *    libre, jamais avec un tool_choice forcé sur un second outil).
+ *  - Chaque `claim` de registre "theorique_general" ou "symbolique_spirituel"
+ *    porte maintenant `source_verification` (URL revendiquée par Claude) et,
+ *    après coup, `source_confirmée` : calculé par `recouperClaimsAvecRecherche`
+ *    (pure, aucun appel IA) contre les résultats RÉELLEMENT renvoyés par
+ *    l'outil pendant ce tour — peut seulement RÉTROGRADER vers `false`,
+ *    jamais confirmer sur la seule parole du modèle. GPT voit ce signal dans
+ *    `tour_precedent` et est explicitement averti de ne jamais le traiter
+ *    comme acquis s'il est absent ou faux.
+ *  - PAS FAIT dans cette passe, assumé : GPT n'a toujours aucun accès à une
+ *    recherche indépendante — l'outil `web_search` hébergé d'OpenAI n'existe
+ *    que sur l'API Responses (`/v1/responses`), pas sur Chat Completions
+ *    (`/v1/chat/completions`, utilisée ici pour sa sortie JSON stricte) ;
+ *    migrer uniquement pour ça était jugé hors périmètre de ce premier
+ *    correctif. GPT bénéficie malgré tout d'un vrai signal non auto-déclaré
+ *    (celui de Claude, recoupé mécaniquement), ce qu'il n'avait jamais eu
+ *    avant. Pas de "Layer 2" non plus (relire soi-même la page confirmée
+ *    pour vérifier que la citation exacte y figure) — seule l'existence
+ *    réelle de l'URL est confirmée, pas le contenu précis de la page, comme
+ *    pour les Références de CopiloteIA.
+ *
  * SECRETS REQUIS : ANTHROPIC_KEY, OPENAI_API_KEY, SUPABASE_URL,
  * SERVICE_ROLE_KEY (tous déjà en place, voir P0a/P0b).
  */
@@ -125,8 +159,14 @@ const SCHEMA_TOUR_CLAUDE = {
               "prescriptif",
             ],
           },
+          // 17/10/2026 — voir note en tête de fichier. Rempli seulement pour
+          // un registre theorique_general/symbolique_spirituel que la
+          // recherche web a réellement confirmé ; recoupé mécaniquement
+          // après coup par recouperClaimsAvecRecherche, jamais pris pour
+          // argent comptant.
+          source_verification: { type: ["string", "null"] },
         },
-        required: ["affirmation", "registre"],
+        required: ["affirmation", "registre", "source_verification"],
         additionalProperties: false,
       },
     },
@@ -363,6 +403,8 @@ interface AppelMoteurIAParams {
   system: string;
   contexte: string;
   max_tokens?: number;
+  /** Claude uniquement (17/10/2026) — voir note en tête de fichier. */
+  avecRechercheWeb?: boolean;
 }
 
 interface UsageIA {
@@ -371,10 +413,19 @@ interface UsageIA {
   modele: string;
 }
 
+interface RésultatRecherche {
+  url: string;
+  titre: string;
+}
+
 interface AppelMoteurIAResultat {
   data: unknown;
   usage: UsageIA;
+  /** Résultats RÉELS de web_search pendant cet appel (Claude uniquement, [] sinon). */
+  résultatsRecherche: RésultatRecherche[];
 }
+
+const OUTIL_RECHERCHE_WEB = { type: "web_search_20250305", name: "web_search", max_uses: 5 };
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
@@ -414,6 +465,16 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
 
   const nomOutil = "sortie_structuree";
+  const outils: Record<string, unknown>[] = [];
+  if (params.avecRechercheWeb) outils.push(OUTIL_RECHERCHE_WEB);
+  outils.push({ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie });
+  // 17/10/2026 — voir note en tête de fichier : dès que web_search est
+  // offert, tool_choice ne force plus directement sortie_structuree ("auto"
+  // laisse Claude chercher d'abord, server-side, dans le MÊME tour, puis
+  // conclure par l'appel à sortie_structuree) ; sans recherche, comportement
+  // strictement inchangé (forcé comme avant).
+  const toolChoice = params.avecRechercheWeb ? { type: "auto" } : { type: "tool", name: nomOutil };
+
   const réponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -431,8 +492,8 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       thinking: { type: "disabled" },
       system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
-      tools: [{ name: nomOutil, description: `Sortie structurée pour le rôle "${params.role}".`, input_schema: params.schema_sortie }],
-      tool_choice: { type: "tool", name: nomOutil },
+      tools: outils,
+      tool_choice: toolChoice,
     }),
   });
 
@@ -441,9 +502,17 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
     throw new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
   }
 
-  const blocOutil = (résultat.content ?? []).find((bloc: { type: string }) => bloc.type === "tool_use");
+  // Résultats RÉELS de web_search (voir CopiloteIA:appelClaude, même
+  // extraction) — url/title en clair dans la réponse Anthropic.
+  const résultatsRecherche: RésultatRecherche[] = (résultat.content ?? [])
+    .filter((b: { type: string }) => b.type === "web_search_tool_result")
+    .flatMap((b: { content?: unknown[] }) => (Array.isArray(b.content) ? b.content : []))
+    .filter((r: { type?: string; url?: string }) => r?.type === "web_search_result" && r.url)
+    .map((r: { url: string; title?: string }) => ({ url: r.url, titre: r.title || "" }));
+
+  const blocOutil = (résultat.content ?? []).find((bloc: { type: string; name?: string }) => bloc.type === "tool_use" && bloc.name === nomOutil);
   if (!blocOutil) {
-    throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
+    throw new Error("Claude n'a renvoyé aucun bloc tool_use pour la sortie structurée — sortie absente (peut-être resté en recherche web sans conclure).");
   }
 
   const donneesNormalisees = normaliserTableauxNuls(params.schema_sortie, blocOutil.input);
@@ -456,6 +525,7 @@ async function appellerClaudeMoteur(params: AppelMoteurIAParams): Promise<AppelM
       tokens_sortie: résultat.usage?.output_tokens ?? 0,
       modele: résultat.model ?? params.modele,
     },
+    résultatsRecherche,
   };
 }
 
@@ -502,6 +572,9 @@ async function appellerGPTMoteur(params: AppelMoteurIAParams): Promise<AppelMote
       tokens_sortie: résultat.usage?.completion_tokens ?? 0,
       modele: résultat.model ?? params.modele,
     },
+    // GPT n'a pas d'accès à une recherche web indépendante dans cette passe
+    // (voir note en tête de fichier) — jamais de résultats à recouper ici.
+    résultatsRecherche: [],
   };
 }
 
@@ -509,6 +582,57 @@ async function appellerMoteurIAStructure(params: AppelMoteurIAParams): Promise<A
   if (params.moteur === "claude") return appellerClaudeMoteur(params);
   if (params.moteur === "gpt") return appellerGPTMoteur(params);
   throw new Error(`Moteur IA inconnu : "${params.moteur}".`);
+}
+
+// ─── Recoupement mécanique des affirmations théoriques (17/10/2026) ───────
+// Même principe que CopiloteIA (CLAUDE.md, 03/10/2026, onglet Références,
+// recouperRéférencesAvecRecherche) : aucun appel IA ici, une simple
+// comparaison de chaînes contre les résultats RÉELLEMENT renvoyés par
+// l'outil de recherche web pendant CE tour précis. Peut seulement
+// RÉTROGRADER (source_confirmée: false), jamais remonter un statut.
+const REGISTRES_FACTUELS = new Set(["theorique_general", "symbolique_spirituel"]);
+
+function normaliserURLClaim(url: unknown): string {
+  if (!url || typeof url !== "string") return "";
+  try {
+    const u = new URL(url);
+    return (u.hostname + u.pathname).toLowerCase().replace(/\/+$/, "").replace(/^www\./, "");
+  } catch {
+    return url.toLowerCase().trim();
+  }
+}
+
+function recouperClaimsAvecRecherche(claims: unknown, résultatsRecherche: RésultatRecherche[]): unknown {
+  if (!Array.isArray(claims)) return claims;
+  const urlsRéelles = new Set(résultatsRecherche.map((r) => normaliserURLClaim(r.url)).filter(Boolean));
+  return claims.map((c) => {
+    if (!c || typeof c !== "object") return c;
+    const claim = c as Record<string, unknown>;
+    if (!REGISTRES_FACTUELS.has(String(claim.registre))) return claim;
+    const urlNormalisée = normaliserURLClaim(claim.source_verification);
+    const confirmée = !!urlNormalisée && urlsRéelles.has(urlNormalisée);
+    return { ...claim, source_confirmée: confirmée };
+  });
+}
+
+/** Rassemble, tous tours confondus, les affirmations factuelles/théoriques
+ * jamais confirmées mécaniquement — pour que la sortie finale les signale
+ * explicitement plutôt que de laisser l'auteur·e y faire confiance sur la
+ * seule parole d'une IA (voir note en tête de fichier, point 1 du GO/NO-GO). */
+function recueillirClaimsNonConfirmées(tours: Record<string, Record<string, unknown>>): Record<string, unknown>[] {
+  const résultat: Record<string, unknown>[] = [];
+  for (const [nomTour, tour] of Object.entries(tours)) {
+    const claims = tour.claims;
+    if (!Array.isArray(claims)) continue;
+    for (const c of claims) {
+      if (!c || typeof c !== "object") continue;
+      const claim = c as Record<string, unknown>;
+      if (REGISTRES_FACTUELS.has(String(claim.registre)) && claim.source_confirmée !== true) {
+        résultat.push({ ...claim, tour: nomTour });
+      }
+    }
+  }
+  return résultat;
 }
 
 // ─── Handler principal ──────────────────────────────────────────────────
@@ -582,16 +706,29 @@ Deno.serve(async (req) => {
     let dossier = await construireDossierContexte(admin, projetId, noeudId, texteSelectionne, intentionDeclaree);
 
     const appelerClaude = async (tour: string, consigne: string, tourPrecedentGPT?: unknown) => {
-      const { data, usage } = await appellerMoteurIAStructure({
+      const { data, usage, résultatsRecherche } = await appellerMoteurIAStructure({
         moteur: "claude",
         modele: modeleClaude,
         role: "analyseur_initial",
         schema_sortie: SCHEMA_TOUR_CLAUDE,
+        avecRechercheWeb: true,
         system: "Tu es l'analyseur initial du protocole de vérification à deux IA de Cursus (60805-06). " +
           "Analyse les affirmations précises du passage en tenant compte STRICTEMENT du dossier de contexte fourni. " +
           "Ne produis jamais de verdict définitif si contexte_suffisant est faux dans le dossier. " +
           "Tous les champs tableau (claims, corrections_bloquantes, corrections_non_bloquantes, requete_ciblee) " +
           "doivent toujours être un tableau JSON, jamais null — utilise [] si aucun élément. " +
+          // 17/10/2026 — point 1 du GO/NO-GO (CLAUDE.md, 03/10/2026) : une
+          // affirmation théorique/factuelle (ex. attribution d'une idée à un
+          // auteur ou un courant nommé) n'est jamais vraie parce qu'une IA le
+          // dit — même principe que pour les Références de CopiloteIA.
+          "Pour CHAQUE affirmation (claims) dont le registre est 'theorique_general' ou 'symbolique_spirituel' " +
+          "et qui se prête à une vérification externe (ex. attribution d'une idée à un auteur, un courant ou un " +
+          "concept théorique nommé) : utilise l'outil de recherche web pour la vérifier avant de conclure. " +
+          "Si la recherche confirme l'affirmation, copie dans 'source_verification' l'URL EXACTE telle que " +
+          "renvoyée par l'outil (jamais reconstruite ou devinée). Si la recherche ne confirme rien, ou si " +
+          "l'affirmation est de nature personnelle/interprétative et ne s'y prête pas, laisse 'source_verification' " +
+          "à null — n'invente jamais une URL plausible : ce champ est recoupé MÉCANIQUEMENT après coup contre les " +
+          "résultats réellement obtenus, et une URL qui ne correspond à rien de réel sera ignorée quoi que tu écrives. " +
           consigne,
         contexte: JSON.stringify({
           texte_selectionne: texteSelectionne,
@@ -600,7 +737,9 @@ Deno.serve(async (req) => {
         }),
       });
       journal.push({ tour, modele: usage.modele, tokens_entree: usage.tokens_entree, tokens_sortie: usage.tokens_sortie });
-      return data as Record<string, unknown>;
+      const sortie = data as Record<string, unknown>;
+      sortie.claims = recouperClaimsAvecRecherche(sortie.claims, résultatsRecherche);
+      return sortie;
     };
 
     const appelerGPT = async (tour: string, tourPrecedent: unknown) => {
@@ -615,7 +754,20 @@ Deno.serve(async (req) => {
           "Seule une objection factuelle, théorique, logique ou éthique réelle justifie peut_arreter=false ; " +
           "une préférence stylistique ne bloque jamais. " +
           "Tous les champs tableau (corrections_bloquantes, corrections_non_bloquantes, requete_ciblee) " +
-          "doivent toujours être un tableau JSON, jamais null — utilise [] si aucun élément.",
+          "doivent toujours être un tableau JSON, jamais null — utilise [] si aucun élément. " +
+          // 17/10/2026 — même point 1 du GO/NO-GO : source_confirmée sur un
+          // claim est calculé MÉCANIQUEMENT par Cursus (jamais par une IA,
+          // ni par Claude lui-même) contre une recherche web réelle — ce
+          // n'est toujours pas une preuve que TU as vérifiée, mais c'est un
+          // signal non auto-déclaré, à distinguer explicitement de ta propre
+          // conviction ou de celle de Claude.
+          "Chaque affirmation (claims) du tour précédent, de registre 'theorique_general' ou 'symbolique_spirituel', " +
+          "porte un champ 'source_confirmée' calculé mécaniquement par Cursus : vrai seulement si une recherche web " +
+          "a réellement confirmé l'URL revendiquée, jamais sur la seule parole de l'analyseur. Si 'source_confirmée' " +
+          "est absent ou faux pour une affirmation que le tour précédent traite comme établie, c'est une raison " +
+          "légitime de signaler un désaccord ou une correction (alertes_a_verifier_sur_source ou " +
+          "corrections_bloquantes selon la gravité) — ne la traite JAMAIS comme vérifiée simplement parce qu'elle " +
+          "te semble plausible ou parce que l'analyseur l'affirme.",
         contexte: JSON.stringify({
           texte_selectionne: texteSelectionne,
           dossier_contexte: dossier,
@@ -714,6 +866,12 @@ function assemblerSortieFinale(tours: Record<string, Record<string, unknown>>, d
     corrections_probables: buckets.corrections_probables,
     alertes_a_verifier_sur_source: buckets.alertes_a_verifier_sur_source,
     remarques_non_bloquantes: buckets.remarques_non_bloquantes,
+    // 17/10/2026 — point 1 du GO/NO-GO (voir note en tête de fichier) :
+    // affirmations théoriques/factuelles jamais confirmées par une recherche
+    // web réelle, quoi que l'IA ait pu en dire par ailleurs dans son analyse
+    // ou son verdict — distinct de alertes_a_verifier_sur_source (qui vise un
+    // artefact de numérisation, pas une affirmation théorique non sourcée).
+    claims_theoriques_non_confirmees: recueillirClaimsNonConfirmées(tours),
     contexte_suffisant: dossier.contexte_suffisant,
     couverture_manuscrit: dossier.couverture_manuscrit,
     tours_effectues: Object.keys(tours),

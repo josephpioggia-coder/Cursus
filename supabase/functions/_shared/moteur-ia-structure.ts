@@ -33,6 +33,15 @@ export interface AppelMoteurIAParams {
   contexte: string;
   /** Tokens de sortie maximum (Claude uniquement — obligatoire côté API Anthropic). */
   max_tokens?: number;
+  /**
+   * Claude uniquement (17/10/2026, voir verification-deux-ia/index.ts pour la
+   * version inlinée actuellement déployée) — ajoute l'outil `web_search`
+   * natif d'Anthropic en plus de l'outil de sortie structurée, et passe
+   * `tool_choice` de forcé à "auto" pour laisser Claude chercher server-side
+   * puis conclure dans le MÊME tour. Sans effet côté GPT (pas d'équivalent
+   * sur l'API Chat Completions — voir la même note côté fichier inliné).
+   */
+  avecRechercheWeb?: boolean;
 }
 
 export interface UsageIA {
@@ -41,10 +50,19 @@ export interface UsageIA {
   modele: string;
 }
 
+export interface RésultatRecherche {
+  url: string;
+  titre: string;
+}
+
 export interface AppelMoteurIAResultat {
   data: unknown;
   usage: UsageIA;
+  /** Résultats RÉELS de web_search pendant cet appel (Claude uniquement, [] sinon). */
+  résultatsRecherche: RésultatRecherche[];
 }
+
+const OUTIL_RECHERCHE_WEB = { type: "web_search_20250305", name: "web_search", max_uses: 5 };
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 
@@ -68,6 +86,15 @@ async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurI
   if (!ANTHROPIC_KEY) throw new Error("ANTHROPIC_KEY manquante.");
 
   const nomOutil = "sortie_structuree";
+  const outils: Record<string, unknown>[] = [];
+  if (params.avecRechercheWeb) outils.push(OUTIL_RECHERCHE_WEB);
+  outils.push({
+    name: nomOutil,
+    description: `Sortie structurée pour le rôle "${params.role}".`,
+    input_schema: params.schema_sortie,
+  });
+  const toolChoice = params.avecRechercheWeb ? { type: "auto" } : { type: "tool", name: nomOutil };
+
   const réponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -80,14 +107,8 @@ async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurI
       max_tokens: params.max_tokens ?? 4096,
       system: [{ type: "text", text: params.system, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: params.contexte }],
-      tools: [
-        {
-          name: nomOutil,
-          description: `Sortie structurée pour le rôle "${params.role}".`,
-          input_schema: params.schema_sortie,
-        },
-      ],
-      tool_choice: { type: "tool", name: nomOutil },
+      tools: outils,
+      tool_choice: toolChoice,
     }),
   });
 
@@ -96,8 +117,14 @@ async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurI
     throw new Error(résultat?.error?.message || `Échec de l'appel Claude (${réponse.status}).`);
   }
 
+  const résultatsRecherche: RésultatRecherche[] = (résultat.content ?? [])
+    .filter((b: { type: string }) => b.type === "web_search_tool_result")
+    .flatMap((b: { content?: unknown[] }) => (Array.isArray(b.content) ? b.content : []))
+    .filter((r: { type?: string; url?: string }) => r?.type === "web_search_result" && r.url)
+    .map((r: { url: string; title?: string }) => ({ url: r.url, titre: r.title || "" }));
+
   const blocOutil = (résultat.content ?? []).find(
-    (bloc: { type: string }) => bloc.type === "tool_use",
+    (bloc: { type: string; name?: string }) => bloc.type === "tool_use" && bloc.name === nomOutil,
   );
   if (!blocOutil) {
     throw new Error("Claude n'a renvoyé aucun bloc tool_use — sortie structurée absente.");
@@ -112,6 +139,7 @@ async function appellerClaude(params: AppelMoteurIAParams): Promise<AppelMoteurI
       tokens_sortie: résultat.usage?.output_tokens ?? 0,
       modele: résultat.model ?? params.modele,
     },
+    résultatsRecherche,
   };
 }
 
@@ -167,6 +195,9 @@ async function appellerGPT(params: AppelMoteurIAParams): Promise<AppelMoteurIARe
       tokens_sortie: résultat.usage?.completion_tokens ?? 0,
       modele: résultat.model ?? params.modele,
     },
+    // GPT n'a pas d'accès à une recherche web indépendante via cette API
+    // (Chat Completions) — voir la note sur `avecRechercheWeb` plus haut.
+    résultatsRecherche: [],
   };
 }
 

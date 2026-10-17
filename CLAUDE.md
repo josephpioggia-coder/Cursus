@@ -831,3 +831,54 @@ rang sont alors périmées (elles disent « semaine 39 »).
   (plus de ligne vide au-dessus) ; titre et explication retirés pendant la partie ; cases de la grille jusqu'à 17 px (3 colonnes en
   difficile) ; boutons compacts. Vérifié à 392×640, 360×600, 360×740 (facile et difficile) : cercle et boutons visibles sans défiler.
   Test automatique : les messages n'étant plus du texte DOM, ne plus les chercher avec `getByText`.
+
+## Audit de préparation à la commercialisation de CursEdit/CursAudit (17/10/2026)
+
+Joseph : « je pense qu'à présent CursEdit et Cursaudit sont suffisamment au point que pour être
+commercialisé... Peux tu en faire un audit ? ». Audit mené par lecture réelle du code (pas une
+réponse de principe), 5 points relevés, dont un déjà explicitement non refermé par Joseph lui-même :
+le point 1 du GO/NO-GO fiabilité des IA (03/10/2026) notait que `verification-deux-ia` n'avait
+toujours aucun accès à une source externe pour les affirmations théoriques/factuelles — resté « le
+chantier suivant si Joseph le confirme » depuis le correctif des Références de CopiloteIA. Joseph :
+« oui, commence par le point 1 ». Les points 2 à 5 (lecture d'image par CursAudit encore incomplète,
+revérification mobile de CursAudit/Bibliothèque, suivi de coût par caractère pour la voix,
+"Layer 2" de citation exacte) restent non traités, signalés mais pas corrigés dans cette passe.
+
+## Point 1 traité : vérification externe des affirmations théoriques dans verification-deux-ia (17/10/2026)
+
+Même principe que les Références de CopiloteIA (03/10/2026) : un statut ou une affirmation jamais
+recoupés contre une source EXTÉRIEURE à l'IA qui les énonce ne sont que sa propre parole — et une
+seconde IA d'accord ne compte toujours pas comme preuve indépendante (c'est le risque même du
+protocole à deux IA). Détail complet : voir la note en tête de
+`supabase/functions/verification-deux-ia/index.ts` et la nouvelle section du
+15/08/2026 du protocole (`docs/protocole-verification-approfondie-deux-ia.md`).
+
+- Le tour Claude (A1/A2, rôle « analyseur_initial ») dispose maintenant de l'outil `web_search`
+  natif d'Anthropic dans le MÊME appel que celui qui produit la sortie structurée (`tool_choice`
+  passe de forcé à `"auto"` dès que la recherche est activée). Combinaison non testée ailleurs dans
+  ce dépôt — CopiloteIA utilise la recherche web uniquement avec une sortie texte libre, jamais
+  combinée à un second outil forcé — à surveiller au premier usage réel.
+- Chaque `claim` de registre `theorique_general` ou `symbolique_spirituel` (le cas nommé dans le
+  GO/NO-GO : attribution d'une idée à un théoricien nommé) porte `source_verification` (URL
+  revendiquée par Claude, jamais inventée d'après la consigne), puis `source_confirmée`, calculé
+  par une fonction pure (`recouperClaimsAvecRecherche`, aucun appel IA, le même module existe aussi
+  dans `_shared/moteur-ia-structure.ts` pour un futur déploiement par CLI) contre les résultats
+  RÉELLEMENT renvoyés par l'outil pendant ce tour — ne peut que RÉTROGRADER vers `false`, jamais
+  confirmer sur la seule parole du modèle.
+- GPT (le critique) voit `source_confirmée` dans `tour_precedent` et est explicitement averti par
+  son system prompt de ne jamais le traiter comme acquis s'il est absent ou faux.
+- Sortie finale : nouveau champ `claims_theoriques_non_confirmees` (toutes les affirmations
+  factuelles/théoriques jamais confirmées, tous tours confondus) — affiché côté client
+  (`PanneauVerification`, `CopiloteIA.jsx`) en badge rouge dédié, sur le même principe que le badge
+  « IA affirme vérifié — non confirmé par Cursus » des Références.
+
+**Limite assumée, pas corrigée ici** : GPT n'a toujours aucun accès à une recherche indépendante —
+l'outil `web_search` hébergé d'OpenAI n'existe que sur l'API Responses, pas sur Chat Completions
+(utilisée ici pour sa sortie JSON stricte) ; migrer uniquement pour ça était jugé hors périmètre de
+ce premier correctif. GPT bénéficie malgré tout, pour la première fois, d'un signal non
+auto-déclaré (celui de Claude, recoupé mécaniquement) plutôt que de juger une affirmation
+théorique sur sa seule plausibilité. Pas de "Layer 2" non plus (relire soi-même la page confirmée
+pour vérifier que la citation exacte y figure) — seule l'existence réelle de l'URL est confirmée,
+pas le contenu précis de la page, comme pour les Références de CopiloteIA. NON TESTÉ EN CONDITIONS
+RÉELLES (ni le couple `web_search` + outil de sortie structurée forcé dans le même appel Claude, ni
+le comportement du badge côté UI sur un vrai cas théorique/factuel).
