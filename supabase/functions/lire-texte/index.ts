@@ -20,10 +20,16 @@
  * logique de session côté serveur.
  *
  * ACCÈS : réservé aux comptes avec un abonnement actif (même vérification
- * que claude-prox) — chaque appel a un coût réel chez OpenAI. PAS de suivi
- * de quota séparé par caractère pour l'instant (voir CLAUDE.md) : à ajouter
- * si le volume le justifie, surveillable en attendant via le dashboard
- * OpenAI (platform.openai.com/usage).
+ * que claude-prox) — chaque appel a un coût réel chez OpenAI.
+ *
+ * SUIVI DE CONSOMMATION (17/10/2026, point 4 de l'audit de préparation à
+ * la commercialisation — CLAUDE.md) : chaque appel réussi écrit une ligne
+ * dans `usage_voix` (longueur EXACTE du texte envoyé, pas une estimation)
+ * — observabilité seulement, aucun plafond appliqué ici (voir
+ * 2026-10-17-usage-voix.sql pour pourquoi aucun coût en euros n'y est
+ * calculé). Un échec d'écriture dans usage_voix ne fait jamais échouer la
+ * lecture elle-même — l'auteur·ice n'a pas à payer en expérience un défaut
+ * de notre propre suivi interne.
  *
  * SECRETS REQUIS (déjà présents, aucun ajout) :
  *   SUPABASE_URL, SERVICE_ROLE_KEY, OPENAI_API_KEY
@@ -121,6 +127,20 @@ Deno.serve(async (req) => {
     }
 
     const audio = await réponseOpenAI.arrayBuffer();
+
+    // Suivi de consommation (17/10/2026) — après coup, jamais bloquant :
+    // la lecture a déjà réussi, un souci d'écriture ici ne doit jamais se
+    // répercuter sur l'auteur·ice.
+    try {
+      await admin.from("usage_voix").insert({
+        user_id: userData.user.id,
+        fonctionnalite: "lecture_voix",
+        caracteres: texte.length,
+      });
+    } catch (erreurSuivi) {
+      console.error("Erreur usage_voix (lire-texte) :", erreurSuivi?.message);
+    }
+
     return new Response(audio, { headers: { "Content-Type": "audio/mpeg", ...CORS } });
   } catch (err) {
     console.error("Erreur lire-texte :", err.message);

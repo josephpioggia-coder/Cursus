@@ -11,6 +11,23 @@
  *   SUPABASE_URL      = déjà utilisée par les autres fonctions
  *   SERVICE_ROLE_KEY  = déjà utilisée par les autres fonctions
  *   OPENAI_API_KEY    = nouvelle — clé de compte OpenAI (platform.openai.com)
+ *
+ * SUIVI DE CONSOMMATION (17/10/2026, point 4 de l'audit de préparation à
+ * la commercialisation — CLAUDE.md) : chaque transcription réussie écrit
+ * une ligne dans `usage_voix` avec `taille_octets` (poids du fichier
+ * audio reçu). C'est un PROXY du volume, pas une mesure exacte : OpenAI
+ * facture cette API à la DURÉE de l'audio, pas à son poids, mais
+ * `gpt-4o-mini-transcribe` ne renvoie pas de façon fiable cette durée
+ * (contrairement à whisper-1 et son `response_format: "verbose_json"`,
+ * non demandé ici pour ne pas risquer de casser un appel qui fonctionne
+ * déjà, pour un champ dont le support n'est pas confirmé sur ce modèle).
+ * `duree_secondes` reste prévu en base pour le jour où une source fiable
+ * serait disponible — NULL pour l'instant. Note AUSSI, repérée en écrivant
+ * ce suivi : contrairement à lire-texte, cette fonction n'a JAMAIS vérifié
+ * d'abonnement actif — tout compte authentifié peut consommer cette API,
+ * un gap d'accès distinct du suivi lui-même, signalé mais pas corrigé ici
+ * (changer qui peut utiliser une fonctionnalité n'est pas un simple ajout
+ * d'observabilité).
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -76,6 +93,17 @@ Deno.serve(async (req) => {
     const résultat = await réponseOpenAI.json();
     if (!réponseOpenAI.ok) {
       return réponse({ error: résultat.error?.message || "Échec de la transcription." }, réponseOpenAI.status);
+    }
+
+    // Suivi de consommation (17/10/2026) — après coup, jamais bloquant.
+    try {
+      await supabase.from("usage_voix").insert({
+        user_id: user.id,
+        fonctionnalite: "dictee_vocale",
+        taille_octets: fichierAudio.size,
+      });
+    } catch (erreurSuivi) {
+      console.error("Erreur usage_voix (transcrire-audio) :", erreurSuivi?.message);
     }
 
     return réponse({ texte: résultat.text || "" });

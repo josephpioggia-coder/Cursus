@@ -958,3 +958,41 @@ mobile de Playwright, qui élargit la fenêtre au contenu et masque le problème
   faute d'un audit déjà terminé à charger dans ce test. Si un signalement mobile touche ces deux écrans,
   refaire le même test (serveur local + Playwright + Supabase simulé) plutôt que de supposer qu'ils sont
   sains par analogie.
+
+## Point 4 traité : suivi de consommation voix (17/10/2026)
+
+Gap documenté depuis le 01/10/2026 (section "Lecture à voix haute" ci-dessus) : `lire-texte` et
+`transcrire-audio` ont chacune un coût réel chez OpenAI à chaque appel, mais rien n'en gardait
+trace — seule la vérification "abonnement actif" existait côté `lire-texte`. Jusqu'ici
+surveillable uniquement via platform.openai.com/usage, qui confond cette consommation avec tout
+autre usage OpenAI du compte Cursus.
+
+- `usage_voix` (table, migration `2026-10-17-usage-voix.sql` — **à exécuter par Joseph dans
+  l'éditeur SQL de Supabase**) : une ligne par appel réussi. `caracteres` (lecture à voix haute :
+  longueur EXACTE du texte envoyé) et `taille_octets` (dictée vocale : poids du fichier audio reçu)
+  sont indépendants, seul le champ pertinent à la fonctionnalité est rempli. **Volontairement AUCUN
+  coût en euros calculé nulle part** (ni dans la table, ni dans l'écran) : les tarifs OpenAI ne sont
+  fixés nulle part dans ce dépôt, un chiffre figé ici deviendrait faux en silence au premier
+  changement de tarif — le volume brut reste exact quoi qu'il arrive, à rapprocher de
+  platform.openai.com/pricing pour obtenir un coût.
+- `lire-texte`/`transcrire-audio` : écrivent chacune leur ligne APRÈS un appel OpenAI réussi,
+  jamais avant — un échec d'écriture dans `usage_voix` (table pas encore créée, etc.) est journalisé
+  en console mais ne fait JAMAIS échouer la lecture/dictée elle-même pour l'auteur·ice.
+- `taille_octets` pour la dictée est un PROXY du volume, pas une mesure exacte : OpenAI facture
+  cette API à la DURÉE de l'audio, pas à son poids, mais `gpt-4o-mini-transcribe` ne renvoie pas
+  cette durée de façon confirmée (contrairement à whisper-1 et `verbose_json`) — non demandé ici
+  pour ne pas risquer de casser un appel qui fonctionne déjà pour un champ non garanti sur ce
+  modèle. `duree_secondes` existe déjà en base pour le jour où une source fiable serait disponible.
+- `admin-usage-voix` (nouvelle Edge Function, service_role, réservée à
+  `joseph.pioggia@gmail.com` — même principe que `admin-journal-erreurs`) agrège le mois civil en
+  cours : totaux par fonctionnalité + détail par compte (email résolu). Nouvel écran
+  `UsageVoix.jsx`, entrée de menu "Usage voix" à côté d'Administration/Supervision/Journal des
+  erreurs (visible seulement pour Joseph).
+- **Repéré au passage, PAS corrigé** : contrairement à `lire-texte`, `transcrire-audio` n'a JAMAIS
+  vérifié d'abonnement actif — tout compte authentifié peut consommer cette API sans palier payant.
+  C'est un gap d'ACCÈS, distinct du suivi construit ici (changer qui peut utiliser une
+  fonctionnalité n'est pas un simple ajout d'observabilité, à traiter séparément si Joseph le
+  confirme).
+- **NON TESTÉ EN CONDITIONS RÉELLES** (migration pas encore exécutée au moment de ce correctif) :
+  seul `npm run build` a été vérifié — l'écriture réelle dans `usage_voix` depuis un vrai appel
+  OpenAI, et l'agrégation dans l'écran "Usage voix", restent à confirmer après la migration.
