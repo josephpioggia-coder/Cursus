@@ -922,3 +922,39 @@ migration SQL n'est pas encore exécutée au moment de ce correctif, donc la cha
 .docx avec images → audit créé → analyse par Claude/GPT) n'a pas pu être vérifiée de bout en bout
 sur un vrai fichier contenant des images — seul `npm run build` (compilation du bundle client) a
 été vérifié.
+
+## Point 3 traité : revérification mobile CursAudit/Bibliothèque (17/10/2026)
+
+Vérifié RÉELLEMENT en conditions mobiles — pas une relecture de code seule : serveur Vite local +
+Playwright (Chromium pré-installé, `/opt/pw-browsers`), fenêtre fixe 360×760 px (jamais l'émulation
+mobile de Playwright, qui élargit la fenêtre au contenu et masque le problème — piège déjà noté le
+30/09/2026), session Supabase et tables REST simulées (aucun identifiant réel nécessaire).
+
+- **CursAudit** (écran de création, questionnaire inclus) : déjà propre, `scrollWidth == innerWidth`
+  sur tout le formulaire (brouillon restauré, titre, texte collé/import Word, palier, mode IA, prix,
+  consentement). Rien à corriger.
+- **Bibliothèque — bug réel trouvé et corrigé** : seule vue de tout le dépôt avec une grille à colonne
+  FIXE (`gridTemplateColumns: "280px 1fr"`) sans aucune variante `estMobile`, contrairement à la règle
+  déjà établie ailleurs. Pas de défilement horizontal (donc invisible au seul test `scrollWidth`), mais
+  le panneau droit (fiche d'un livre, formulaire d'ajout) s'écrasait dans les ~80 px restants à 360 px :
+  titre et auteur du livre COUPÉS net par l'`overflow: hidden` du panneau (ex. "L'interprétation des
+  rêves" tronqué en "L'interp…" / "des rêv…"), citation réduite à un mot par ligne, bouton "+ Nouvelle
+  citation" à peine lisible. Trouvé seulement en peuplant un vrai livre (l'état vide par défaut ne
+  l'aurait jamais montré) — leçon à retenir : un écran vide ne suffit pas à vérifier une mise en page.
+  Corrigé sur le même principe que Editeur.jsx/CopiloteIA (panneau plein écran plutôt que deux colonnes
+  pressées) : `Bibliotheque.jsx` reçoit maintenant `estMobile` (passé depuis `App.jsx`, qui le calcule
+  déjà) ; sur mobile, liste ET fiche ne sont JAMAIS affichées en même temps — un seul panneau à la fois,
+  plein écran, avec un bouton "← Retour" pour revenir à la liste depuis la fiche ou le formulaire
+  d'ajout. Revérifié après correctif : titre/auteur/tags entièrement lisibles, citation sur toute la
+  largeur, formulaire d'ajout de livre lisible de bout en bout.
+- **Corrigé au passage** : en testant l'écran de création d'un audit, repéré un message maintenant FAUX
+  ("CursAudit analyse uniquement le texte — les images... ne sont pas prises en compte") laissé par le
+  24/09/2026, jamais mis à jour par le correctif du point 2 ci-dessus le même jour. Reformulé selon la
+  source choisie : vrai pour le texte collé (aucune image possible par nature), mais plus pour un import
+  .docx (images désormais lues et transmises à l'analyse, voir point 2).
+- **Non revérifié** dans cette passe : CursAuditDetail.jsx (écran de résultat d'un audit déjà traité) et
+  CursAuditListe.jsx — lecture statique du code seulement (aucune grille à colonne fixe sans variante
+  mobile trouvée, seulement des `1fr 1fr` déjà sans risque de débordement), pas de capture d'écran réelle
+  faute d'un audit déjà terminé à charger dans ce test. Si un signalement mobile touche ces deux écrans,
+  refaire le même test (serveur local + Playwright + Supabase simulé) plutôt que de supposer qu'ils sont
+  sains par analogie.

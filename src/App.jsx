@@ -2539,7 +2539,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (
-          <Bibliotheque projets={projets} />
+          <Bibliotheque projets={projets} estMobile={estMobile} />
         )}
 
         {/* Pages légales (15/09/2026) — accessibles aussi une fois connecté,
