@@ -1,0 +1,50 @@
+# CURSUS — routage SPA pour hébergement Apache (OVH mutualisé)
+# ================================================================
+# Cursus est une application React compilée en fichiers statiques
+# (npm run build → dist/) : React Router gère les routes CÔTÉ
+# NAVIGATEUR, le serveur ne connaît que index.html. Sans ce fichier,
+# toute URL autre que la racine (ex. un lien direct /?jeu=croises
+# fonctionne car c'est un paramètre de requête sur /, mais un partage
+# vers une route de chemin comme /mode-emploi renverrait une 404
+# Apache) doit retomber sur index.html pour que l'appli démarre et
+# affiche la bonne vue elle-même.
+#
+# Règle : si le fichier ou dossier demandé EXISTE réellement sur le
+# serveur (JS, CSS, images, sw.js, manifest.json, robots.txt,
+# sitemap.xml, public/jeux/*, public/scrabble/*, public/cartes/*...),
+# Apache le sert tel quel — cette page ne s'applique qu'aux chemins
+# qui n'existent pas physiquement.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Laisse passer les fichiers et dossiers réels
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Tout le reste retombe sur index.html (React gère la route)
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Évite que le navigateur mette index.html en cache : sans ça, un
+# déploiement ultérieur pourrait rester invisible pour des visiteurs
+# qui ont déjà l'ancienne version en cache.
+<IfModule mod_headers.c>
+  <FilesMatch "^index\.html$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  # Les fichiers compilés par Vite portent un hash dans leur nom
+  # (ex. index-B_hmirrg.js) : changent de nom à chaque build, donc
+  # peuvent être mis en cache longtemps sans risque de servir une
+  # version périmée.
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+# Compression (perf, optionnel mais sans risque)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript text/javascript application/json image/svg+xml
+</IfModule>
