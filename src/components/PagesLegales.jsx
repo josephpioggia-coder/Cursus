@@ -31,13 +31,40 @@
  * désormais l'entreprise elle-même comme éditeur, avec son représentant
  * légal cité à titre d'information, pas comme une case juridique obligée.
  *
- * IDENTITÉ UTILISÉE — fournie explicitement par l'auteur du projet le
- * 14/09/2026 : structure "en nom propre" actuelle sans activité
- * commerciale ; ces pages sont rédigées "comme si" il s'agissait de HMS-i
- * SA, dans l'optique d'un apport du projet dans cette structure (ou une
- * nouvelle entité à créer sous un mois). À METTRE À JOUR dès que la
- * structure réelle est arrêtée définitivement — voir IDENTITE_EDITEUR
- * ci-dessous, seul endroit à modifier le jour où ça change.
+ * IDENTITÉ UTILISÉE — mise à jour le 18/10/2026, fournie explicitement par
+ * l'auteur du projet : HMS-i SA (identité précédente, voir git log pour le
+ * détail) n'a STRICTEMENT AUCUN lien avec Cursus — projet personnel de
+ * l'auteur, financé et construit par lui seul, sans aucun outil ni
+ * ressource de HMS-i. Le vendeur réel est désormais "CURSUS Entre-Prises.be"
+ * (société en commandite en cours de constitution — commandité : l'auteur
+ * du projet ; commanditaire : sa sœur ; capital 3 000 €), dont les
+ * documents sont prêts mais pas encore déposés au moment de ce correctif.
+ *
+ * ANONYMAT EXPLICITEMENT DEMANDÉ : l'auteur du projet a demandé que son nom
+ * personnel n'apparaisse NULLE PART sur le site — seule l'identité de la
+ * société (raison sociale, adresse, contact) doit figurer. Possible en
+ * droit belge (voir plus haut : contrairement au droit français, rien
+ * n'exige de nommer un gérant/administrateur sur des mentions légales) —
+ * le champ `administrateur` qui existait ici pour HMS-i SA n'est
+ * d'ailleurs JAMAIS rendu dans le JSX plus bas (vérifié), retiré par
+ * cohérence plutôt que laissé mort dans IDENTITE_EDITEUR. Limite
+ * explicitement signalée à l'auteur, qu'il a acceptée en connaissance de
+ * cause : pour une société en commandite spécifiquement, le commandité
+ * (responsabilité illimitée) fait généralement partie des informations
+ * publiées à la BCE/au Moniteur belge lors de la constitution — un
+ * registre public que Cursus ne contrôle pas, distinct de ce que ses
+ * propres pages affichent.
+ *
+ * `numéroEntreprise` reste volontairement "en cours d'attribution" :
+ * l'auteur a confirmé qu'aucune vente immédiate n'est prévue et que ce
+ * numéro n'est nécessaire qu'au moment d'établir une facture — À COMPLÉTER
+ * ici dès qu'il est attribué, avant toute vente réelle (l'article XII.6 du
+ * Code de droit économique l'exige). `raisonSociale` ne porte pour l'instant
+ * aucune forme juridique explicite (ex. "SC") — à ajouter dès que l'auteur
+ * confirme l'abréviation exacte à utiliser pour la société en commandite,
+ * toujours pour la même raison (XII.6 exige la forme juridique, pas
+ * seulement le nom). À METTRE À JOUR dans IDENTITE_EDITEUR ci-dessous, seul
+ * endroit à modifier si l'identité change encore.
  *
  * LIMITE ASSUMÉE : ces références ont été vérifiées via des sources
  * secondaires fiables (cabinets juridiques, fédérations professionnelles
@@ -54,10 +81,15 @@
  */
 
 const IDENTITE_EDITEUR = {
-  raisonSociale: "HMS-i SA",
-  adresse: "Rue de la Houillère 17, 4041 Vottem, Belgique",
-  numéroEntreprise: "0500.956.401 (BCE)",
-  administrateur: "Giuseppe Pioggia, administrateur délégué et actionnaire unique",
+  // 18/10/2026 — voir la note d'en-tête : plus aucun lien avec HMS-i SA.
+  // Pas de forme juridique encore ajoutée au nom (ex. "SC") — à compléter
+  // dès que l'auteur confirme l'abréviation exacte à utiliser.
+  raisonSociale: "CURSUS Entre-Prises.be",
+  adresse: "Rue Dony 77, 4000 Liège, Belgique",
+  // Pas encore attribué (société en cours de constitution) — aucune vente
+  // immédiate prévue, nécessaire seulement au moment d'établir une
+  // facture. À COMPLÉTER ici avant toute vente réelle.
+  numéroEntreprise: "en cours d'attribution",
   // Adresse de contact dédiée (15/09/2026, fournie par l'auteur du
   // projet) — remplace l'email personnel utilisé en placeholder le temps
   // de la rédaction initiale.
@@ -115,7 +147,7 @@ function Ul({ children }) {
 export function MentionsLegales({ onRetour, onNaviguer }) {
   const id = IDENTITE_EDITEUR;
   return (
-    <Page titre="Mentions légales" misÀJour="15 septembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
+    <Page titre="Mentions légales" misÀJour="18 octobre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
       <H2>Éditeur du site</H2>
       <P>
         {id.raisonSociale}<br />
@@ -150,7 +182,7 @@ export function MentionsLegales({ onRetour, onNaviguer }) {
 export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
   const id = IDENTITE_EDITEUR;
   return (
-    <Page titre="Politique de confidentialité" misÀJour="15 septembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
+    <Page titre="Politique de confidentialité" misÀJour="18 octobre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
       <P>
         Cette politique décrit comment {id.raisonSociale} ("Cursus", "nous") traite vos données personnelles,
         conformément au Règlement Général sur la Protection des Données (RGPD).
@@ -215,7 +247,7 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
 export function CGV({ onRetour, onNaviguer }) {
   const id = IDENTITE_EDITEUR;
   return (
-    <Page titre="Conditions générales de vente" misÀJour="15 septembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
+    <Page titre="Conditions générales de vente" misÀJour="18 octobre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
       <H2>1. Objet</H2>
       <P>
         Les présentes conditions générales de vente ("CGV") régissent la vente des services proposés par{" "}

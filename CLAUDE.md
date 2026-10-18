@@ -1037,3 +1037,51 @@ lancement, confirmés directement avec Joseph :
 **Prochaine étape, pas commencée** : vérifier le compte Stripe ensemble (dashboard) pour confirmer
 l'état exact avant toute bascule en mode live — rien d'autre n'a été changé côté paiement dans
 cette passe que le correctif de redirection ci-dessus.
+
+## Identité juridique du vendeur : HMS-i SA remplacée par CURSUS Entre-Prises.be (18/10/2026)
+
+Suite directe du point "structure juridique en suspens" de l'audit de préparation à la
+commercialisation (17/10/2026). Clarification de Joseph : **HMS-i SA n'a strictement rien à voir
+avec Cursus** — projet entièrement personnel (il a payé lui-même les abonnements Claude/GPT, fait
+le travail lui-même, sans aucun outil appartenant à HMS-i). Le compte en banque d'HMS-i SA est de
+toute façon actuellement bloqué en sortie par la banque (solde négatif < 10 000 €, peut recevoir
+mais pas retirer tant que ce n'est pas régularisé) — raison supplémentaire de ne pas lui faire
+porter les ventes de Cursus. Le vendeur réel sera une société en commandite en cours de
+constitution : **CURSUS Entre-Prises.be**, commandité Joseph, commanditaire sa sœur, capital
+3 000 €. D'éventuels reversements à HMS-i SE FERONT PAR FACTURES documentées, à la discrétion de
+Joseph (montant/moment) — pas un simple transit de fonds pour contourner le blocage bancaire.
+
+**Contrainte explicite et non négociable de Joseph, à respecter dans TOUT contenu public du site
+Cursus** : *"mon nom n'apparaît en aucun cas, il ne doit pas paraître, j'ai remarqué combien
+Internet a de la mémoire !"* — portée précisée : uniquement sur le site de Cursus lui-même : le
+registre public (BCE/Moniteur belge) listera très probablement le commandité d'une société en
+commandite de toute façon (un registre distinct, hors de notre contrôle) — Joseph l'a noté et
+accepté, c'est son action propre à vérifier avec qui a préparé ses documents de constitution, pas
+une correction à faire ici.
+
+`IDENTITE_EDITEUR` (`src/components/PagesLegales.jsx`, seul endroit à modifier — consommé par les
+3 pages légales : Mentions légales, Politique de confidentialité, CGV) :
+- `raisonSociale` : "CURSUS Entre-Prises.be" (le nom donné par Joseph). **Pas de forme juridique
+  explicitement accolée** (ex. "SC") — à ajouter dès qu'il confirme l'abréviation exacte issue de
+  ses documents de constitution ; l'article XII.6 du Code de droit économique exige la forme
+  juridique dans l'identification du vendeur, actuellement incomplète sur ce point précis.
+- `adresse` : "Rue Dony 77, 4000 Liège, Belgique" (fournie par Joseph).
+- `numéroEntreprise` : **volontairement "en cours d'attribution"**, pas un numéro inventé — Joseph
+  a confirmé qu'aucune vente immédiate n'est prévue et que ce numéro ne sera nécessaire qu'au
+  moment d'établir une facture, à mettre à jour ici dès qu'il sera attribué (quelques jours
+  annoncés). "RPM Liège" reste exact (nouvelle adresse elle aussi à Liège).
+- `administrateur` ("Giuseppe Pioggia, administrateur délégué...") : **supprimé entièrement**, pas
+  seulement vidé — vérifié par grep avant suppression qu'il n'était JAMAIS lu dans le JSX des 3
+  pages (champ mort depuis l'origine), donc aucun risque d'affichage en le retirant. C'est aussi ce
+  qui aurait fait apparaître le nom de Joseph si le champ avait été conservé et rempli.
+- `email` : inchangé (`infocursus.proia@gmail.com`).
+
+Dates "Dernière mise à jour" des 3 pages passées à "18 octobre 2026" (contenu réellement modifié,
+pas une mise à jour cosmétique).
+
+**Pas fait dans cette passe, assumé** : l'abréviation de forme juridique de `raisonSociale` (texte
+ci-dessus) ; la mise à jour de `PALIERS`/`prix-stripe-config.mjs` et des secrets Stripe pour un
+passage en mode live (toujours en attente, section précédente) ; aucune vérification que le nom
+"CURSUS Entre-Prises.be" est lui-même disponible/déposable — action de Joseph, pas de ce dépôt.
+`npm run build` vérifié (compile sans erreur) — pas de test visuel des pages légales en conditions
+réelles dans cette passe (changement de données, pas de mise en page).
