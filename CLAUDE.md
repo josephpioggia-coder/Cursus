@@ -1085,3 +1085,33 @@ passage en mode live (toujours en attente, section précédente) ; aucune vérif
 "CURSUS Entre-Prises.be" est lui-même disponible/déposable — action de Joseph, pas de ce dépôt.
 `npm run build` vérifié (compile sans erreur) — pas de test visuel des pages légales en conditions
 réelles dans cette passe (changement de données, pas de mise en page).
+
+## Correction du nom légal : ENTRE-PRISES.PRO SComm (pas "CURSUS Entre-Prises.be") (18/10/2026)
+
+Suite directe de la section précédente. Joseph m'a transmis l'acte constitutif (société en
+commandite) ainsi que la confirmation de commande du nom de domaine. Deux écarts avec ce qui avait
+été écrit la veille sur la seule base d'une description orale :
+
+- **Le nom légal exact, tel que rédigé dans l'acte (article 1)**, est **« ENTRE-PRISES.PRO SComm »**
+  — PAS "CURSUS Entre-Prises.be". Ça correspond au nom de domaine réellement acheté le même jour
+  (`entre-prises.pro`, commande OVH n°261313266, en cours de validation au moment de l'achat).
+  `raisonSociale` dans `IDENTITE_EDITEUR` (`PagesLegales.jsx`) corrigé en conséquence — ce nom DOIT
+  correspondre exactement à celui déposé à la BCE une fois la société inscrite, donc toute
+  correction future doit se baser sur l'acte constitutif (ou les statuts définitifs), pas sur une
+  reformulation orale.
+- La forme juridique manquante (signalée comme en attente la veille) est donc résolue : "SComm",
+  déjà intégrée dans la dénomination elle-même ("ENTRE-PRISES.PRO SComm"), pas besoin de suffixe
+  séparé.
+- Le reste reste inchangé et cohérent avec l'acte : siège rue Dony 77, 4000 Liège (article 2) ;
+  capital 3 000 € (apport en numéraire de l'associée commanditaire, article 6) ; répartition des
+  droits économiques 90/10 (article 10) ; formalités BCE/TVA/UBO encore à accomplir (article 18) —
+  `numéroEntreprise` reste donc "en cours d'attribution", rien à changer là-dessus.
+- Le gérant/associé commandité nommé dans l'acte est Joseph lui-même (identité complète) — attendu
+  pour ce type de document et deviendra effectivement public au registre BCE/Moniteur belge une
+  fois la société inscrite, comme déjà discuté et accepté par Joseph (18/10/2026, section
+  précédente). Cet acte en lui-même n'a été ni copié ni résumé dans ce dépôt au-delà du nom retenu
+  ici — pas de date de naissance, pas d'adresse personnelle, pas de détail de l'acte au-delà de la
+  dénomination sociale, pour ne pas disséminer plus de données personnelles que nécessaire dans un
+  dépôt de code.
+
+`npm run build` revérifié après ce correctif.

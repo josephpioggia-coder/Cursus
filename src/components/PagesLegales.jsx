@@ -82,9 +82,13 @@
 
 const IDENTITE_EDITEUR = {
   // 18/10/2026 — voir la note d'en-tête : plus aucun lien avec HMS-i SA.
-  // Pas de forme juridique encore ajoutée au nom (ex. "SC") — à compléter
-  // dès que l'auteur confirme l'abréviation exacte à utiliser.
-  raisonSociale: "CURSUS Entre-Prises.be",
+  // Nom exact repris de l'acte constitutif (société en commandite) : article
+  // 1, "ENTRE-PRISES.PRO SComm" — correspond aussi au nom de domaine acheté
+  // le même jour (entre-prises.pro). Ne pas modifier sans revérifier l'acte
+  // constitutif (ou les statuts définitivement déposés, une fois la société
+  // inscrite à la BCE) : c'est ce document qui fait foi, pas une
+  // reformulation orale.
+  raisonSociale: "ENTRE-PRISES.PRO SComm",
   adresse: "Rue Dony 77, 4000 Liège, Belgique",
   // Pas encore attribué (société en cours de constitution) — aucune vente
   // immédiate prévue, nécessaire seulement au moment d'établir une
