@@ -202,3 +202,33 @@ CursDecision autrement qu'en texte.
 réelle (page marketing seule, zéro backend) — ajouter des graphiques
 suppose d'abord de construire CursDecision depuis zéro, un chantier en
 soi. Discuté mais pas priorisé pour l'instant.
+
+---
+
+## #6 — Vitrine publique pour les auteur·ices qui publient via Cursus
+
+**Ajouté le** 19/10/2026.
+
+**Demande d'origine** : suite à l'examen d'une page Notion publique
+utilisée par un auteur indépendant (François Vanhille) comme site
+vitrine (bio, parutions, liens d'achat, univers, chroniques) — question
+de Joseph : "Ne pourrait-on pas envisager quelque part que Cursus fasse
+ce travail de promotion de ceux qui travaillent avec nous ?" Explicitement
+posée comme une question ouverte, pas une décision ("Je ne dis pas qu'il
+faille le faire ou non... à voir").
+
+**Ce que ça apporterait, si construit** : une page publique auto-générée
+par auteur·ice/livre (couverture, résumé, liens d'achat), élargissant
+Cursus au-delà de l'écriture/l'audit vers une étape de publication/
+promotion — source de revenu annexe possible (palier dédié ou option).
+
+**Pourquoi reporté** : contrairement à une page Notion, qui profite d'un
+trafic et d'un référencement déjà massifs et indépendants de l'auteur·ice,
+une vitrine sur Cursus n'aurait aujourd'hui aucune audience propre à
+offrir — ce serait d'abord un service de confort (page prête à partager),
+pas une vraie promotion, tant que Cursus n'a pas son propre trafic de
+lecteurs. S'ajoute à ça que c'est un produit différent du cœur actuel de
+Cursus (hébergement public, modération de contenu public, SEO) — à
+reprendre une fois le lancement commercial (Stripe live, structure
+juridique) refermé, voir
+`docs/route-vers-lancement-et-international-2026-10-19.md`.
