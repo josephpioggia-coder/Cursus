@@ -110,6 +110,38 @@ contexte B2B/consulting à ce que j'en comprends) pousse plutôt vers (b)
 — mais ce n'est pas tranché ici, c'est une vraie question pour Joseph
 avant tout code.
 
+**TRANCHÉ le 19/10/2026, même jour** : Joseph opte pour (b) —
+"Cursus Management" comme ligne de produit PARALLÈLE à CursEdit/
+CursAudit (pas un sous-ensemble), avec CursDecision comme son premier
+outil, destiné aux **dirigeants d'entreprise**, pas aux auteur·ices.
+Déclencheur immédiat : la pertinence perçue du cadre MIT CISR "AI
+Decision Matrix" (Sebastian/Weill/Haskamp/vom Brocke, juin 2026 —
+citation vérifiée réelle) pour CursDecision, qui est lui-même un cadre
+de gouvernance IA EN ENTREPRISE (décisions organisationnelles,
+plusieurs agents IA, risque à l'échelle d'une structure) — cohérent
+avec le choix (b), pas avec (a).
+
+**Implications concrètes de ce choix, pas encore traitées** :
+- CEDEC devient le canal naturel pour Cursus Management/CursDecision
+  spécifiquement, pas pour CursEdit/CursAudit — si l'espagnol (section
+  3) est priorisé pour cette approche, il devrait porter d'abord sur
+  Cursus Management, pas sur l'ensemble du produit.
+- CursDecision repart de zéro (toujours aucun backend) mais maintenant
+  avec un public et un cas d'usage CLAIRS (aide à la décision pour
+  dirigeant·es, à la MIT CISR) — ce qui change concrètement ce qu'il y
+  a à construire par rapport à un outil de décision éditoriale.
+- Reste à définir avant tout code : quelles données un·e dirigeant·e
+  fournirait (pas un manuscrit — des données d'entreprise, au moins en
+  partie confidentielles/sensibles, implications RGPD/sécurité
+  différentes de CursEdit/CursAudit), et si Cursus Management partage
+  l'infrastructure actuelle (comptes, Stripe, Supabase) ou en a besoin
+  d'une séparée.
+- "Cursus Management" en parallèle de CursEdit/CursAudit soulève une
+  question de marque/présentation : la page d'accueil, le ton, l'identité
+  visuelle actuels de Cursus sont pensés pour des auteur·ices — à
+  valider si ça convient aussi pour viser des dirigeant·es, ou si Cursus
+  Management a besoin de sa propre vitrine au sein du même compte.
+
 **Lien avec la liste d'attente #6** (vitrine publique auteur·ices,
 ajoutée aujourd'hui suite à l'exemple Notion) : cette idée-là est plus
 clairement dans la continuité de CursEdit — une étape "publication"
