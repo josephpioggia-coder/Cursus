@@ -1101,3 +1101,26 @@ supprimées (le bilan les remplace). Règles du bilan : citer un extrait exact, 
 SURTOUT aucun fait tranché : l'IA n'a pas accès au web, ses doutes sont affichés comme « à vérifier, pas à croire »
 (même principe que le GO/NO-GO fiabilité du 03/10/2026). NON TESTÉ en conditions réelles (appel IA) : vérifié seulement le
 parsing du bilan et `vite build`. Si la qualité du bilan déçoit, ajuster `construireConsigneBilan()` en premier.
+
+## « Vérifier le fond » — second bouton de CursEdit (22/10/2026)
+
+Demande de Joseph (« allons pour celui-là, si le client le veut c'est lui qui payera ») : après la Correction rapide (fautes +
+bilan qui SIGNALE sans trancher), un bouton séparé « 🔎 Vérifier le fond » qui fait ce que Claude avait fait en conversation sur le
+texte des photons et de la lune. `src/lib/verifierLeFond.js` + `src/components/VerifierLeFond.jsx` (+ `src/lib/paragraphesEditeur.js`,
+lecture des paragraphes TipTap, partagée avec CorrectionRapide).
+- Deux temps (pour tenir dans le délai d'une Edge Function) : (1) extraction des affirmations vérifiables (≤ 8, sans web) ;
+  (2) UNE vérification par affirmation avec l'outil `web_search` (max 3 recherches, 3 affirmations en parallèle).
+- **Calculs refaits par le CODE** (`evaluerCalcul`, évaluateur restreint : chiffres et + - * / ( ) seulement) : l'IA ne fournit
+  que l'expression et le résultat annoncé, les deux restent visibles ; ils ne passent pas par le web. Écart > 25 % = « écart
+  important ». Si l'expression est mal posée le résultat est faux : l'écran demande de la relire.
+- **Verdict recoupé mécaniquement** (même principe que les Références du Co-pilote, GO/NO-GO du 03/10/2026) : « confirmé » ou
+  « contredit » sans URL parmi les `web_search_tool_result` réellement renvoyés → rétrogradé « incertain », et sa reformulation
+  n'est pas proposée. Seule l'EXISTENCE de la source est confirmée, pas son contenu exact (pas de « Layer 2 ») : le lien est là
+  pour que l'auteur·ice tranche.
+- Reformulations jamais cochées par défaut ; appliquées en une transaction (Ctrl+Z annule), à l'endroit où l'extrait exact est
+  retrouvé UNE seule fois dans le document actuel (sinon à reporter à la main).
+- Coût : une recherche web par affirmation (≤ 8) + 1 appel d'extraction : nettement plus cher que la Correction rapide ; action à la
+  demande, pas de quota séparé (compté dans les tokens du palier via claude-prox).
+- Vérifié : extraction/lecture, calcul (700 000 km / 10 000 ans ≈ 7,99 m/h, cohérent avec « 8 »), rétrogradation d'une source
+  inventée, localisation d'un extrait, `vite build`. **NON TESTÉ en conditions réelles** : appels IA, outil `web_search` dans un appel
+  à sortie texte structurée (déjà utilisé ainsi par CopiloteIA), délai réel, qualité des verdicts.

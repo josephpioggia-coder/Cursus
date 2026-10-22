@@ -13,32 +13,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { lireParagraphes } from "../lib/paragraphesEditeur.js";
 import { NIVEAUX, CATEGORIES_BILAN, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
-
-/** Paragraphes (blocs de texte) du document, avec leur position. */
-function lireParagraphes(editor, seulementSélection) {
-  const { from, to, empty } = editor.state.selection;
-  const filtrer = seulementSélection && !empty;
-  const liste = [];
-  let rang = 0;
-  let ignorés = 0;
-  editor.state.doc.descendants((nœud, pos) => {
-    if (!nœud.isTextblock) return true;
-    const idx = ++rang;
-    const fin = pos + nœud.nodeSize;
-    if (filtrer && (fin <= from || pos >= to)) return false;
-    let texte = "";
-    let purTexte = true;
-    nœud.forEach((enfant) => { if (enfant.isText) texte += enfant.text; else purTexte = false; });
-    // Moins de 3 mots (« Envoyer », icônes, titres d'interface) : rien à corriger,
-    // et ça ne ferait que produire des remarques parasites.
-    if (texte.split(/\s+/).filter((m) => /\p{L}/u.test(m)).length < 3) return false;
-    if (!purTexte) { ignorés++; return false; }
-    liste.push({ idx, texte, pos: pos + 1 });
-    return false;
-  });
-  return { liste, ignorés, filtrer };
-}
 
 export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer }) {
   const [étape, setÉtape] = useState("choix"); // choix | encours | revue
