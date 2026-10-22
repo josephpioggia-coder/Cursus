@@ -1089,3 +1089,15 @@ icônes d'interface. Corrigé : (1) `sansChangementsDeStyle()` supprime MÉCANIQ
 qui touche une lettre ou un espace simple est conservé ; (2) la consigne le dit aussi ; (3) numérotation continue envoyée
 à l'IA puis ré-associée aux vrais paragraphes ; (4) paragraphes de moins de 3 mots (icônes, « Envoyer ») non envoyés.
 Ce que Joseph attendait exactement n'est pas encore confirmé : à redemander s'il reste insatisfait.
+
+### Correction rapide — 2e retour : ce que Joseph attendait vraiment (22/10/2026)
+« Je m'attendais à une correction du type de celle que tu m'as proposée [dans le chat, sur son texte des rayons du soleil
+réfléchis par la lune] et non cette correction orthographique qui existe déjà par ailleurs » = une RELECTURE ÉDITORIALE, pas
+seulement des fautes : texte corrigé + liste de ce qu'il doit regarder lui-même (fragments orphelins et où les replacer,
+phrases lourdes, faits/chiffres douteux, incohérences). Ajouté : `bilanDuTexte()` (`correctionRapide.js`), UN appel
+séparé sur le texte ENTIER (parties de 30 000 car. au-delà), hors lots (un fragment n'est « orphelin » que par rapport au
+reste) → rubriques `CATEGORIES_BILAN`, affichées sous les corrections (« Bilan de relecture »). Les remarques par lot sont
+supprimées (le bilan les remplace). Règles du bilan : citer un extrait exact, aucune interprétation psychologique, et
+SURTOUT aucun fait tranché : l'IA n'a pas accès au web, ses doutes sont affichés comme « à vérifier, pas à croire »
+(même principe que le GO/NO-GO fiabilité du 03/10/2026). NON TESTÉ en conditions réelles (appel IA) : vérifié seulement le
+parsing du bilan et `vite build`. Si la qualité du bilan déçoit, ajuster `construireConsigneBilan()` en premier.

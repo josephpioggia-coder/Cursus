@@ -13,7 +13,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { journaliserErreur } from "../lib/journalErreurs.js";
-import { NIVEAUX, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
+import { NIVEAUX, CATEGORIES_BILAN, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
 
 /** Paragraphes (blocs de texte) du document, avec leur position. */
 function lireParagraphes(editor, seulementSélection) {
@@ -73,8 +73,8 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
         const d = diffMots(p.texte, corrigé);
         if (d.hunks.length) cartes.push({ ...p, corrigé, segments: d.segments, hunks: d.hunks });
       }
-      if (r.échecs) journaliserErreur("CorrectionRapide", `${r.échecs}/${lots.length} lot(s) en échec : ${r.premièreErreur?.message}`);
-      setRésultat({ cartes, remarques: r.remarques, ignorés, échecs: r.échecs, message: r.premièreErreur?.message });
+      if (r.échecs || r.échecsBilan) journaliserErreur("CorrectionRapide", `${r.échecs}/${lots.length} lot(s) et ${r.échecsBilan} bilan(s) en échec : ${r.premièreErreur?.message}`);
+      setRésultat({ cartes, bilan: r.bilan, ignorés, échecs: r.échecs, échecsBilan: r.échecsBilan, message: r.premièreErreur?.message });
       setRefusés(new Set());
       setÉtape("revue");
     } catch (e) {
@@ -139,7 +139,7 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
               <p style={{ fontSize: 13, color: "#555", margin: "0 0 14px", lineHeight: 1.5 }}>
                 Une seule passe sur le texte : l'IA corrige, vous voyez tous les changements d'un coup, puis vous
                 appliquez (ou décochez ceux que vous refusez). Rien n'est modifié avant votre accord, et un Ctrl+Z annule tout.
-                Elle ne réécrit pas : les fragments et les doutes sur un fait sont seulement signalés.
+                Elle ne réécrit pas : en plus des fautes, un bilan de relecture signale les fragments à replacer, les phrases lourdes et les faits à vérifier.
               </p>
               <div style={{ fontSize: 12.5, color: "#777", marginBottom: 6 }}>Quoi corriger ?</div>
               <label style={{ display: "block", fontSize: 13, marginBottom: 4, opacity: aSélection ? 1 : 0.45 }}>
@@ -195,13 +195,24 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
                   </div>
                 );
               })}
-              {résultat.remarques.length > 0 && (
-                <div style={{ marginTop: 14, background: "#FFF8E6", border: "0.5px solid #F0D98A", borderRadius: 8, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 500, color: "#7A5B00", marginBottom: 6 }}>À regarder vous-même (non modifié)</div>
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#5a4a1a", lineHeight: 1.55 }}>
-                    {résultat.remarques.map((r, i) => <li key={i}>{r}</li>)}
-                  </ul>
+              {Object.entries(CATEGORIES_BILAN).some(([clé]) => résultat.bilan[clé].length) && (
+                <div style={{ marginTop: 18 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "#333", marginBottom: 4 }}>Bilan de relecture</div>
+                  <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+                    Rien de tout ceci n'est modifié : c'est à vous de décider. Les doutes sur les faits viennent de l'IA seule, sans recherche : à vérifier, pas à croire.
+                  </div>
+                  {Object.entries(CATEGORIES_BILAN).map(([clé, titre]) => résultat.bilan[clé].length > 0 && (
+                    <div key={clé} style={{ marginBottom: 10, background: clé === "FAITS" ? "#FFF8E6" : "#F5F4FD", border: `0.5px solid ${clé === "FAITS" ? "#F0D98A" : "#D8D5F5"}`, borderRadius: 8, padding: "10px 12px" }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, color: clé === "FAITS" ? "#7A5B00" : "#4B44A8", marginBottom: 6 }}>{titre}</div>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#333", lineHeight: 1.55 }}>
+                        {résultat.bilan[clé].map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
+              )}
+              {résultat.échecsBilan > 0 && (
+                <div style={{ marginTop: 10, fontSize: 12.5, color: "#A32D2D" }}>Le bilan de relecture n'a pas pu être établi ({résultat.message}). Relancez pour le reprendre.</div>
               )}
             </>
           )}
@@ -221,7 +232,7 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
           {étape === "revue" && !appliqué && (
             <>
               <button style={bouton(false)} onClick={onFermer}>Tout refuser</button>
-              {résultat?.échecs > 0 && <button style={bouton(false)} onClick={lancer}>Relancer</button>}
+              {(résultat?.échecs > 0 || résultat?.échecsBilan > 0) && <button style={bouton(false)} onClick={lancer}>Relancer</button>}
               {retenues.length > 0 && <button style={bouton(true)} onClick={appliquer}>Appliquer {retenues.length === résultat.cartes.length ? "tout" : `les ${retenues.length} retenus`}</button>}
             </>
           )}
