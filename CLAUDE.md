@@ -1037,3 +1037,21 @@ lancement, confirmés directement avec Joseph :
 **Prochaine étape, pas commencée** : vérifier le compte Stripe ensemble (dashboard) pour confirmer
 l'état exact avant toute bascule en mode live — rien d'autre n'a été changé côté paiement dans
 cette passe que le correctif de redirection ci-dessus.
+
+## Correction rapide dans CursEdit (22/10/2026)
+
+Demande de Joseph : le Co-pilote (suggestions par passage, à trancher une à une) prend des heures sur un
+texte brut, alors qu'une seule passe de correction prend quelques minutes. Bouton à part « ✨ Correction
+rapide » dans l'en-tête de l'éditeur (`Editeur.jsx`, masqué en lecture seule) → `CorrectionRapide.jsx` +
+moteur `src/lib/correctionRapide.js`.
+- Flux : sélection ou chapitre entier → paragraphes en lots de 4000 car. (3 appels `claude-prox` en parallèle,
+  `thinking: disabled`) → l'IA renvoie chaque paragraphe corrigé (`[[n]] texte`) + `[[REMARQUES]]` → diff mot à
+  mot → revue (cartes décochables) → application en UNE transaction TipTap (un Ctrl+Z annule tout).
+- Deux niveaux : fautes seulement / fautes + fluidité légère (défaut, mémorisé). Jamais de réécriture ni d'ajout :
+  fragments et faits douteux sont SIGNALÉS (encadré « À regarder vous-même »), pas modifiés.
+- Garde-fous : un paragraphe renvoyé vide ou dont la longueur varie de plus de 30 %/35 % est ignoré ; seuls les
+  paragraphes ne contenant QUE du texte sont traités (images, notes, sauts de ligne = ignorés et comptés) ; à
+  l'application, un paragraphe modifié entre-temps est sauté. Remplacements ciblés → gras/italique conservés.
+- Vérifié : diff + reconstruction exacte, lecture de la réponse, découpage en lots, application sur un vrai
+  document ProseMirror (marques conservées) ; `vite build` OK. NON TESTÉ en conditions réelles : l'appel IA
+  (abonnement + session requis) et l'interface dans le navigateur.

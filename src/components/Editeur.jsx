@@ -48,6 +48,7 @@ import Image from "@tiptap/extension-image";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import CorrectionRapide from "./CorrectionRapide.jsx";
 import { lire, arrêterLecture, basculerPause, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -1021,6 +1022,8 @@ export default function Editeur({
   const [formatRéférence, setFormatRéférence] = useState("a4");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
+  // Correction rapide (22/10/2026) — voir CorrectionRapide.jsx.
+  const [correctionOuverte, setCorrectionOuverte] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1427,6 +1430,19 @@ export default function Editeur({
           >
             {texteCopié ? "✓ Copié !" : "📋 Copier tout"}
           </button>
+          {!lectureSeule && (
+            <button
+              onClick={() => setCorrectionOuverte(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Une seule passe de correction sur tout le texte (ou la sélection) : vous voyez les changements puis vous les appliquez d'un clic"
+            >
+              ✨ Correction rapide
+            </button>
+          )}
           {voixDisponible() && (
             <button
               onClick={basculerLecture}
@@ -1490,6 +1506,10 @@ export default function Editeur({
             ↺ Historique ({historique.length})
           </button>
         </div>
+      )}
+
+      {correctionOuverte && editor && (
+        <CorrectionRapide editor={editor} couleur={projetCouleur} onFermer={() => setCorrectionOuverte(false)} />
       )}
 
       {!modeFocus && erreurLecture && (
