@@ -30,7 +30,9 @@ function lireParagraphes(editor, seulementSélection) {
     let texte = "";
     let purTexte = true;
     nœud.forEach((enfant) => { if (enfant.isText) texte += enfant.text; else purTexte = false; });
-    if (!texte.trim()) return false;
+    // Moins de 3 mots (« Envoyer », icônes, titres d'interface) : rien à corriger,
+    // et ça ne ferait que produire des remarques parasites.
+    if (texte.split(/\s+/).filter((m) => /\p{L}/u.test(m)).length < 3) return false;
     if (!purTexte) { ignorés++; return false; }
     liste.push({ idx, texte, pos: pos + 1 });
     return false;

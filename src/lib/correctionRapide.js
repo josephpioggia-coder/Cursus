@@ -64,12 +64,14 @@ export function construireConsigne(niveau) {
 
 MISSION : corriger les paragraphes fournis, en respectant à la lettre la voix de l'auteur·ice.
 
-Tu corriges : orthographe, accords, conjugaison, mots doublés ou collés, ponctuation, typographie française (majuscules accentuées « À », « É » ; « œ » ; guillemets « » ; points de suspension « … » ; apostrophe typographique ’ si le texte l'emploie ; doubles espaces ; ç/çà → ça), ainsi que les chiffres écrits de façon incohérente dans le même passage.
+Tu corriges : orthographe, accords, conjugaison, mots doublés ou collés, ponctuation, majuscules accentuées (« A peine » → « À peine », « Etre » → « Être »), « oe » collé → « œ », doubles espaces, « çà » → « ça », ainsi que les chiffres écrits de façon incohérente dans le même passage.
+
+STYLE TYPOGRAPHIQUE = CHOIX DE L'AUTEUR·ICE, JAMAIS TOUCHÉ : ne remplace pas un trait d'union par un tiret (- ↔ – ↔ —), ne change pas l'apostrophe droite ' ou courbe ’, ne transforme pas les guillemets " " en « », ne change pas « ... » en « … », n'ajoute ni ne retire d'espace insécable. Si le texte est cohérent avec lui-même, laisse-le : seuls comptent les vrais fautes.
 ${fluidite}
 
 INTERDIT : ajouter du contenu, compléter une phrase coupée, supprimer une idée, changer le sens, le ton, le registre (familier, argot, néologismes, audaces de style, fragments voulus), modifier un fait, un chiffre ou un nom propre, fusionner, scinder, réordonner ou omettre un paragraphe.
 
-CAS PARTICULIERS : un paragraphe qui est un fragment incomplet, une note de travail ou une liste de remarques de l'auteur·ice se renvoie TEL QUEL (seules les fautes évidentes y sont corrigées) et se signale dans les remarques. Un chiffre ou un fait qui te paraît douteux N'EST PAS corrigé : il se signale dans les remarques.
+CAS PARTICULIERS : la numérotation [[n]] est continue et purement technique : n'en parle jamais. Un paragraphe qui est un fragment incomplet, une note de travail ou une liste de remarques de l'auteur·ice se renvoie TEL QUEL (seules les fautes évidentes y sont corrigées) et se signale dans les remarques. Un chiffre ou un fait qui te paraît douteux N'EST PAS corrigé : il se signale dans les remarques.
 
 FORMAT DE SORTIE (strict, rien d'autre — pas d'introduction, pas de commentaire) :
 Chaque paragraphe reçu sous la forme « [[n]] » est renvoyé avec le MÊME numéro, sur le même modèle, corrigé (ou identique s'il n'a aucune faute) :
@@ -196,6 +198,35 @@ export function diffMots(a, b) {
   return { segments, hunks };
 }
 
+// ─── Filtre typographique ────────────────────────────────────────────────
+
+// Tirets, traits d'union, apostrophes, guillemets, points de suspension.
+const CARACTERES_DE_STYLE = /[-\u2010-\u2015\u2212'\u2019\u2018\u02bc`´"“”«»…]/;
+const STYLE_ET_ESPACES = /[-\u2010-\u2015\u2212'\u2019\u2018\u02bc`´"“”«»…\s]|\.\.\./g;
+
+/**
+ * Retire d'un texte corrigé les changements de PURE typographie (trait d'union
+ * → tiret, ' → ’, " → « », ... → …, espaces insécables) : ce sont des choix de
+ * l'auteur·ice, pas des fautes — retour de Joseph (22/10/2026) : l'IA les
+ * appliquait partout malgré la consigne. Un changement qui touche aussi une
+ * lettre (« A » → « À ») ou qui ne touche aucun caractère de style
+ * (« a,b » → « a, b ») est conservé.
+ */
+export function sansChangementsDeStyle(original, corrigé) {
+  const { hunks } = diffMots(original, corrigé);
+  if (!hunks.length) return corrigé;
+  let résultat = "";
+  let pos = 0;
+  for (const h of hunks) {
+    const ancien = original.slice(h.debut, h.fin);
+    const styleSeul = CARACTERES_DE_STYLE.test(ancien + h.remplacement)
+      && ancien.replace(STYLE_ET_ESPACES, "") === h.remplacement.replace(STYLE_ET_ESPACES, "");
+    résultat += original.slice(pos, h.debut) + (styleSeul ? ancien : h.remplacement);
+    pos = h.fin;
+  }
+  return résultat + original.slice(pos);
+}
+
 // ─── Appel IA ────────────────────────────────────────────────────────────
 
 /** Corrige un lot → { corriges: Map, remarques: string[] }. Lève une Error lisible. */
@@ -205,6 +236,10 @@ export async function corrigerLot(lot, niveau, signal) {
   if (!token) throw new Error("Session expirée — reconnectez-vous.");
 
   const caracteres = lot.reduce((s, p) => s + p.texte.length, 0);
+  // Numérotation CONTINUE envoyée à l'IA (1, 2, 3…) : les paragraphes écartés
+  // (images, notes, trop courts) laissaient des trous dans les numéros du
+  // document, que l'IA signalait comme « absents » dans ses remarques.
+  const lotNumeroté = lot.map((p, k) => ({ idx: k + 1, texte: p.texte }));
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
     signal,
@@ -218,7 +253,7 @@ export async function corrigerLot(lot, niveau, signal) {
       max_tokens: Math.min(16000, Math.ceil(caracteres / 2) + 1500),
       thinking: { type: "disabled" },
       system: construireConsigne(niveau),
-      messages: [{ role: "user", content: construireMessage(lot) }],
+      messages: [{ role: "user", content: construireMessage(lotNumeroté) }],
     }),
   });
   const data = await response.json().catch(() => ({}));
@@ -227,14 +262,18 @@ export async function corrigerLot(lot, niveau, signal) {
   }
   const texte = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   if (!texte) throw new Error("L'IA n'a renvoyé aucun texte exploitable.");
+  const r = analyserReponse(texte);
   if (data.stop_reason === "max_tokens") {
     // Réponse tronquée : on garde ce qui est complet (le dernier paragraphe est suspect).
-    const r = analyserReponse(texte);
-    const derniers = [...r.corriges.keys()].pop();
-    if (derniers !== undefined) r.corriges.delete(derniers);
-    return r;
+    const dernier = [...r.corriges.keys()].pop();
+    if (dernier !== undefined) r.corriges.delete(dernier);
   }
-  return analyserReponse(texte);
+  // Retour aux numéros réels du document.
+  const corriges = new Map();
+  for (const [k, corrigé] of r.corriges) {
+    if (lot[k - 1]) corriges.set(lot[k - 1].idx, corrigé);
+  }
+  return { corriges, remarques: r.remarques };
 }
 
 /**
@@ -257,7 +296,9 @@ export async function corrigerTout(lots, niveau, { signal, surProgres } = {}) {
         const r = await corrigerLot(lot, niveau, signal);
         for (const [idx, corrigé] of r.corriges) {
           const original = originaux.get(idx);
-          if (original !== undefined && validerParagraphe(original, corrigé)) corrections.set(idx, corrigé);
+          if (original !== undefined && validerParagraphe(original, corrigé)) {
+            corrections.set(idx, sansChangementsDeStyle(original, corrigé));
+          }
         }
         remarques.push(...r.remarques);
       } catch (e) {

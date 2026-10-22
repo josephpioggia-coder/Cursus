@@ -1080,3 +1080,12 @@ fonctionnalités de chaque palier, avec son plafond).
   seulement si le compte a des crédits) pourrait être sous-compté au-delà de ~1 000 appels.
 - Vendre une recharge reste bloqué par : Stripe en mode test, structure juridique provisoire (voir « Mise en place du paiement »).
 - NON TESTÉ en conditions réelles (migration + redéploiement non faits au moment de ce correctif) : seul `vite build` a été vérifié.
+
+### Correction rapide — premier retour d'usage (22/10/2026, « pas du tout ce que j'attendais »)
+Capture de Joseph sur un chapitre réel : l'IA changeait les traits d'union en tirets (« Faut–il »), les guillemets droits
+en « », les apostrophes ; elle signalait des numéros de paragraphes « absents » (trous dus aux paragraphes écartés) et des
+icônes d'interface. Corrigé : (1) `sansChangementsDeStyle()` supprime MÉCANIQUEMENT tout changement de pure typographie
+(tirets, apostrophes, guillemets, « ... » → « … », espaces insécables), quelle que soit la réponse de l'IA ; un changement
+qui touche une lettre ou un espace simple est conservé ; (2) la consigne le dit aussi ; (3) numérotation continue envoyée
+à l'IA puis ré-associée aux vrais paragraphes ; (4) paragraphes de moins de 3 mots (icônes, « Envoyer ») non envoyés.
+Ce que Joseph attendait exactement n'est pas encore confirmé : à redemander s'il reste insatisfait.
