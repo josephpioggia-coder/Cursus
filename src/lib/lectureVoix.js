@@ -198,6 +198,33 @@ export async function lire(texte, { voix = "nova", vitesse = 1, onDébut, onTran
   jouerTranche(0);
 }
 
+/**
+ * Solde de lecture à voix haute du mois (22/10/2026, voir lire-texte :
+ * quota du palier + crédits). → { utilise, quota_inclus, credits, disponible,
+ * restant } ou null si indisponible (pas d'abonnement, fonction pas à jour,
+ * réseau) — le compteur est une aide, jamais bloquant.
+ */
+export async function soldeVoix() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return null;
+    const réponse = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ solde: true }),
+    });
+    if (!réponse.ok) return null;
+    const données = await réponse.json();
+    return typeof données?.disponible === "number" ? données : null;
+  } catch {
+    return null;
+  }
+}
+
 export function basculerPause() {
   const audio = obtenirÉlémentAudio();
   if (!audio.src) return;

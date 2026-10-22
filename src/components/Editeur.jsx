@@ -49,7 +49,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
-import { lire, arrêterLecture, basculerPause, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
+import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -1028,6 +1028,10 @@ export default function Editeur({
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
   const [erreurLecture, setErreurLecture] = useState(null);
+  // Solde mensuel de lecture (quota du palier + crédits) — voir lire-texte.
+  const [solde, setSolde] = useState(null);
+  const rafraîchirSolde = useCallback(() => { soldeVoix().then(setSolde); }, []);
+  useEffect(() => { rafraîchirSolde(); }, [rafraîchirSolde]);
   const [progressionLecture, setProgressionLecture] = useState(null);
   // Voix/vitesse "pro" (OpenAI) remplaçant la voix du navigateur, jugée
   // "vraiment nulle" par Joseph — préférence mémorisée par appareil, pas
@@ -1353,8 +1357,8 @@ export default function Editeur({
         vitesse: vitesseLecture,
         onDébut: () => setÉtatLecture("lecture"),
         onTranche: (i, total) => setProgressionLecture(total > 1 ? `${i}/${total}` : null),
-        onFin: () => { setÉtatLecture("arrêté"); setProgressionLecture(null); },
-        onErreur: (message) => { setErreurLecture(message); setÉtatLecture("arrêté"); setProgressionLecture(null); },
+        onFin: () => { setÉtatLecture("arrêté"); setProgressionLecture(null); rafraîchirSolde(); },
+        onErreur: (message) => { setErreurLecture(message); setÉtatLecture("arrêté"); setProgressionLecture(null); rafraîchirSolde(); },
       });
     } else if (étatLecture === "lecture") {
       basculerPause();
@@ -1363,7 +1367,7 @@ export default function Editeur({
       basculerPause();
       setÉtatLecture("lecture");
     }
-  }, [étatLecture, obtenirTexteLecture, voixLecture, vitesseLecture]);
+  }, [étatLecture, obtenirTexteLecture, voixLecture, vitesseLecture, rafraîchirSolde]);
 
   // Changer de chapitre/scène (nœud) ou quitter l'éditeur en plein
   // lecture ne doit pas laisser la voix continuer sur un texte qui n'est
@@ -1479,6 +1483,14 @@ export default function Editeur({
                 {VITESSES_DISPONIBLES.map((v) => <option key={v} value={v}>{v}×</option>)}
               </select>
             </>
+          )}
+          {voixDisponible() && solde && (
+            <span
+              title={`Lecture à voix haute ce mois-ci : ${solde.utilise.toLocaleString("fr-FR")} caractères lus sur ${solde.disponible.toLocaleString("fr-FR")} disponibles (${solde.quota_inclus.toLocaleString("fr-FR")} inclus dans votre formule${solde.credits ? `, plus ${solde.credits.toLocaleString("fr-FR")} de crédit` : ""}). Se renouvelle le 1er du mois.`}
+              style={{ fontSize: 11, color: solde.restant < solde.disponible * 0.1 ? "#A32D2D" : "#999", whiteSpace: "nowrap" }}
+            >
+              {Math.round(solde.restant / 1000).toLocaleString("fr-FR")} k car. restants
+            </span>
           )}
           {étatLecture !== "arrêté" && (
             <button
