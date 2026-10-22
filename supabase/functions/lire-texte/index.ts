@@ -31,6 +31,18 @@
  * lecture elle-même — l'auteur·ice n'a pas à payer en expérience un défaut
  * de notre propre suivi interne.
  *
+ * QUOTA MENSUEL (22/10/2026, demande de Joseph : la voix fait partie du
+ * "pack" de chaque palier, avec un plafond, et pourra se vendre en plus) :
+ * `quotas_paliers.caracteres_voix_mensuels` (QUOTA_DEFAUT si absent ou si la
+ * migration 2026-10-22-quota-voix.sql n'est pas encore passée) + crédits
+ * ponctuels `credits_voix` (recharges, PAS ENCORE reliées à Stripe). Les
+ * crédits se CONSOMMENT : ils ne couvrent que le dépassement du quota
+ * inclus (mois courant et mois passés), contrairement à `credits_ia`
+ * qui s'ajoute à chaque mois sans jamais s'épuiser. Un appel est refusé
+ * (429) quand le mois est déjà à/au-dessus du disponible ; l'appel qui
+ * franchit la limite passe (dépassement < 4096 car.), comme claude-prox.
+ * `{ solde: true }` en corps → renvoie le solde en JSON, sans rien lire.
+ *
  * SECRETS REQUIS (déjà présents, aucun ajout) :
  *   SUPABASE_URL, SERVICE_ROLE_KEY, OPENAI_API_KEY
  */
@@ -59,6 +71,50 @@ const erreurJSON = (data: unknown, status = 200) =>
 const VOIX_AUTORISEES = new Set(["alloy", "echo", "fable", "nova", "onyx", "sage", "shimmer"]);
 const LONGUEUR_MAX = 4096; // limite dure d'OpenAI pour /v1/audio/speech
 
+// Quota mensuel de caractères lus à voix haute quand le palier n'en définit pas.
+const QUOTA_DEFAUT = 30000;
+
+async function calculerSolde(admin: ReturnType<typeof createClient>, userId: string, palier: string) {
+  const { data: q } = await admin
+    .from("quotas_paliers")
+    .select("caracteres_voix_mensuels")
+    .ilike("palier", palier)
+    .maybeSingle();
+  const quota: number = q?.caracteres_voix_mensuels ?? QUOTA_DEFAUT;
+
+  const { data: credits } = await admin.from("credits_voix").select("caracteres").eq("user_id", userId);
+  const creditsTotal = (credits ?? []).reduce((somme, l) => somme + (l.caracteres ?? 0), 0);
+
+  const debutMois = new Date();
+  debutMois.setUTCDate(1);
+  debutMois.setUTCHours(0, 0, 0, 0);
+  const moisCourant = debutMois.toISOString().slice(0, 7);
+
+  // L'historique complet ne sert qu'à savoir combien de crédits ont déjà été
+  // consommés par des dépassements passés : inutile sans crédits.
+  let requete = admin
+    .from("usage_voix")
+    .select("caracteres, cree_le")
+    .eq("user_id", userId)
+    .eq("fonctionnalite", "lecture_voix");
+  if (creditsTotal === 0) requete = requete.gte("cree_le", debutMois.toISOString());
+  const { data: lignes } = await requete.limit(50000);
+
+  const parMois = new Map<string, number>();
+  for (const l of lignes ?? []) {
+    const mois = String(l.cree_le).slice(0, 7);
+    parMois.set(mois, (parMois.get(mois) ?? 0) + (l.caracteres ?? 0));
+  }
+  const utilise = parMois.get(moisCourant) ?? 0;
+  let depassementPasse = 0;
+  for (const [mois, total] of parMois) {
+    if (mois !== moisCourant) depassementPasse += Math.max(0, total - quota);
+  }
+  const creditsRestants = Math.max(0, creditsTotal - depassementPasse);
+  const disponible = quota + creditsRestants;
+  return { utilise, quota_inclus: quota, credits: creditsRestants, disponible, restant: Math.max(0, disponible - utilise) };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
@@ -77,9 +133,10 @@ Deno.serve(async (req) => {
 
     const { data: abos } = await admin
       .from("abonnements")
-      .select("statut")
+      .select("palier")
       .eq("user_id", userData.user.id)
       .eq("statut", "actif")
+      .order("date_debut", { ascending: false })
       .limit(1);
     if (!abos?.length) {
       return erreurJSON(
@@ -88,7 +145,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { texte, voix, vitesse } = await req.json();
+    const { texte, voix, vitesse, solde } = await req.json();
+    const état = await calculerSolde(admin, userData.user.id, abos[0].palier);
+    if (solde === true) return erreurJSON(état);
+
+    if (état.utilise >= état.disponible) {
+      return erreurJSON(
+        {
+          error: "quota",
+          message: `Vous avez utilisé les ${état.disponible.toLocaleString("fr-FR")} caractères de lecture à voix haute de ce mois. Ils se renouvellent le 1er du mois, ou passez à une formule supérieure.`,
+          ...état,
+        },
+        429,
+      );
+    }
+
     if (typeof texte !== "string" || !texte.trim()) {
       return erreurJSON({ error: "Aucun texte à lire." }, 400);
     }

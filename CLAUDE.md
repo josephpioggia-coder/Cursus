@@ -1037,3 +1037,46 @@ lancement, confirmés directement avec Joseph :
 **Prochaine étape, pas commencée** : vérifier le compte Stripe ensemble (dashboard) pour confirmer
 l'état exact avant toute bascule en mode live — rien d'autre n'a été changé côté paiement dans
 cette passe que le correctif de redirection ci-dessus.
+
+## Correction rapide dans CursEdit (22/10/2026)
+
+Demande de Joseph : le Co-pilote (suggestions par passage, à trancher une à une) prend des heures sur un
+texte brut, alors qu'une seule passe de correction prend quelques minutes. Bouton à part « ✨ Correction
+rapide » dans l'en-tête de l'éditeur (`Editeur.jsx`, masqué en lecture seule) → `CorrectionRapide.jsx` +
+moteur `src/lib/correctionRapide.js`.
+- Flux : sélection ou chapitre entier → paragraphes en lots de 4000 car. (3 appels `claude-prox` en parallèle,
+  `thinking: disabled`) → l'IA renvoie chaque paragraphe corrigé (`[[n]] texte`) + `[[REMARQUES]]` → diff mot à
+  mot → revue (cartes décochables) → application en UNE transaction TipTap (un Ctrl+Z annule tout).
+- Deux niveaux : fautes seulement / fautes + fluidité légère (défaut, mémorisé). Jamais de réécriture ni d'ajout :
+  fragments et faits douteux sont SIGNALÉS (encadré « À regarder vous-même »), pas modifiés.
+- Garde-fous : un paragraphe renvoyé vide ou dont la longueur varie de plus de 30 %/35 % est ignoré ; seuls les
+  paragraphes ne contenant QUE du texte sont traités (images, notes, sauts de ligne = ignorés et comptés) ; à
+  l'application, un paragraphe modifié entre-temps est sauté. Remplacements ciblés → gras/italique conservés.
+- Vérifié : diff + reconstruction exacte, lecture de la réponse, découpage en lots, application sur un vrai
+  document ProseMirror (marques conservées) ; `vite build` OK. NON TESTÉ en conditions réelles : l'appel IA
+  (abonnement + session requis) et l'interface dans le navigateur.
+
+## Voix : premier son rapide, quota par palier, crédits (22/10/2026)
+
+Retours/demandes de Joseph : « très long avant de lire à haute voix » ; « une idée du coût de ce luxe ? » ; « me
+permettre de facturer ce service » ; « cette info fait partie du pack » (= la voix figure dans la liste de
+fonctionnalités de chaque palier, avec son plafond).
+- **Premier son** : `lire()` coupe la 1re tranche à ~200 car. (`TAILLE_PREMIÈRE_TRANCHE`), le reste suit en une tranche
+  préchargée — le délai est celui de la génération COMPLÈTE de la 1re tranche. Gain non mesuré (dépend d'OpenAI).
+- **Coût** (estimation web, NON exacte, l'API ne renvoie pas d'usage) : ≈ 1,5 centime par minute d'audio ≈ 1 000 car.
+  (0,60 $/M jetons texte + 12 $/M jetons audio). Un livre de 400 000 car. ≈ 6 €. Vrai coût : platform.openai.com/usage.
+- **Quota par palier** : `quotas_paliers.caracteres_voix_mensuels` (migration `2026-10-22-quota-voix.sql`, **à exécuter par
+  Joseph**) — valeurs PROPOSÉES : Découverte 10 000, Essentiel 30 000, Initié 60 000, Auteur/Studio 150 000 (modifiables par
+  UPDATE). Sans la migration, `QUOTA_DEFAUT = 30000` pour tous (la fonction dégrade proprement). Le texte marketing est dans
+  `CONTENU_PALIERS` (`contenuPaliers.js`) : **à garder synchronisé à la main** avec ces valeurs (même principe que « 200
+  analyses IA / mois » vs `tokens_mensuels`).
+- **`lire-texte`** (à REDÉPLOYER) calcule le solde (`calculerSolde`) : refus 429 + message quand le mois est à/au-dessus du
+  disponible (l'appel qui franchit la limite passe) ; `{ solde: true }` renvoie `{ utilise, quota_inclus, credits, disponible,
+  restant }`. Affiché dans l'en-tête de l'éditeur (« N k car. restants », rouge sous 10 %), rafraîchi après chaque lecture.
+- **Crédits (recharges)** : table `credits_voix` créée, PAS reliée à Stripe (ni écran d'achat, ni webhook). Contrairement à
+  `credits_ia` (additionné à chaque mois sans s'épuiser), ils se CONSOMMENT : ils ne couvrent que le dépassement du quota
+  (mois courant et mois passés). Offrir des caractères à la main : voir l'exemple en bas de la migration. Limite connue :
+  PostgREST plafonne à 1 000 lignes par requête — sans effet pour le calcul du mois, mais l'historique complet (utilisé
+  seulement si le compte a des crédits) pourrait être sous-compté au-delà de ~1 000 appels.
+- Vendre une recharge reste bloqué par : Stripe en mode test, structure juridique provisoire (voir « Mise en place du paiement »).
+- NON TESTÉ en conditions réelles (migration + redéploiement non faits au moment de ce correctif) : seul `vite build` a été vérifié.
