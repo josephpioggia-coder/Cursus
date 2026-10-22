@@ -49,6 +49,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
+import VerifierLeFond from "./VerifierLeFond.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -1024,6 +1025,7 @@ export default function Editeur({
   const [texteCopié, setTexteCopié] = useState(false);
   // Correction rapide (22/10/2026) — voir CorrectionRapide.jsx.
   const [correctionOuverte, setCorrectionOuverte] = useState(false);
+  const [vérificationOuverte, setVérificationOuverte] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1447,6 +1449,19 @@ export default function Editeur({
               ✨ Correction rapide
             </button>
           )}
+          {!lectureSeule && (
+            <button
+              onClick={() => setVérificationOuverte(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Vérifie les faits et les chiffres du texte (calculs refaits, recherche web, sources) et propose des reformulations"
+            >
+              🔎 Vérifier le fond
+            </button>
+          )}
           {voixDisponible() && (
             <button
               onClick={basculerLecture}
@@ -1518,6 +1533,10 @@ export default function Editeur({
             ↺ Historique ({historique.length})
           </button>
         </div>
+      )}
+
+      {vérificationOuverte && editor && (
+        <VerifierLeFond editor={editor} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
       )}
 
       {correctionOuverte && editor && (
