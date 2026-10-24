@@ -247,7 +247,7 @@ export function analyserBilan(reponse) {
   return bilan;
 }
 
-export async function appelClaude(system, user, maxTokens, signal) {
+export async function appelClaude(system, user, maxTokens, signal, images = null) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error("Session expirée — reconnectez-vous.");
@@ -264,7 +264,9 @@ export async function appelClaude(system, user, maxTokens, signal) {
       max_tokens: maxTokens,
       thinking: { type: "disabled" },
       system,
-      messages: [{ role: "user", content: user }],
+      messages: [{ role: "user", content: images?.length
+        ? [...images.map((i) => ({ type: "image", source: { type: "base64", media_type: i.media_type, data: i.data } })), { type: "text", text: user }]
+        : user }],
     }),
   });
   const data = await response.json().catch(() => ({}));

@@ -53,6 +53,7 @@ import CorrectionRapide from "./CorrectionRapide.jsx";
 import VerifierLeFond from "./VerifierLeFond.jsx";
 import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import NettoyageMecanique from "./NettoyageMecanique.jsx";
+import LirePhoto from "./LirePhoto.jsx";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -1125,6 +1126,7 @@ export default function Editeur({
   const [vérificationOuverte, setVérificationOuverte] = useState(false);
   const [avisOuvert, setAvisOuvert] = useState(false);
   const [nettoyageOuvert, setNettoyageOuvert] = useState(false);
+  const [photoOuverte, setPhotoOuverte] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1576,6 +1578,19 @@ export default function Editeur({
           </button>
           {!lectureSeule && (
             <button
+              onClick={() => setPhotoOuverte(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Photographier une page : l'IA la recopie fidèlement (fautes comprises) en texte dans le chapitre"
+            >
+              📷 Lire une photo
+            </button>
+          )}
+          {!lectureSeule && (
+            <button
               onClick={() => setNettoyageOuvert(true)}
               style={{
                 fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
@@ -1698,6 +1713,10 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {photoOuverte && editor && (
+        <LirePhoto editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "lecture_photo", action, nb })} couleur={projetCouleur} onFermer={() => setPhotoOuverte(false)} />
       )}
 
       {nettoyageOuvert && editor && (

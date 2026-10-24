@@ -17,7 +17,7 @@ create table if not exists usage_ia_projet (
   user_id    uuid not null references auth.users(id) on delete cascade,
   projet_id  uuid not null,
   noeud_id   uuid,
-  outil      text not null check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'copilote')),
+  outil      text not null check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'lecture_photo', 'copilote')),
   action     text not null check (action in ('lance', 'applique')),
   nb         integer,
   cree_le    timestamptz not null default now()
@@ -35,4 +35,4 @@ create policy "usage_ia_projet : écriture par le propriétaire"
 -- CORRECTIF si la table existe déjà (créée avant le 24/10/2026 soir) : élargir la liste des outils.
 -- alter table usage_ia_projet drop constraint if exists usage_ia_projet_outil_check;
 -- alter table usage_ia_projet add constraint usage_ia_projet_outil_check
---   check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'copilote'));
+--   check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'lecture_photo', 'copilote'));
