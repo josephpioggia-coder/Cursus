@@ -188,3 +188,22 @@ Critère de succès de la phase 0 : T1–T4 correctement séparés, T8 stable, T
 3. **Manuscrit témoin — DÉCIDÉ (Joseph, 24/10/2026)** : pas de numérisation du livre papier (temps, et on ne sait pas ce que le client en ferait). Si le client accepte, il fournit lui-même le fichier numérique ; la **première analyse (Aperçu avec profil de lisibilité) lui est offerte**, en lui annonçant qu'il y verra les éléments sur lesquels travailler ; le travail se fait ensuite **dans CursEdit, pas dans CursAudit** (à ce niveau de difficulté, l'auteur n'a pas à passer par l'audit). Conséquences : (a) la phase 0 se valide d'abord sur des **textes d'essai écrits pour l'occasion** (triplets T1–T9 du §9), pas sur le manuscrit réel ; (b) le premier cas réel sera celui du client, avec son accord explicite sur le traitement de son texte par les IA (consentement déjà présent à la création d'un audit) ; (c) en attendant le pont audit → projet, le fichier numérique est importé deux fois (Aperçu dans CursAudit, projet dans CursEdit).
 4. **Blocage ou avertissement** : confirmer qu'un DREM *recommande fortement* d'éviter le pré-audit/audit, sans l'interdire (mon avis, §3).
 5. **Seuils du DREM** : accord pour les présenter comme « repères de travail non validés » dans l'interface et les rapports ?
+
+---
+
+## Annexe — Premier examen sur une page réelle (24/10/2026)
+
+Joseph a fourni la photo d'**une** page imprimée du manuscrit qui a motivé le brief (aucune citation n'est reproduite ici : texte du client). Une page n'autorise aucune conclusion sur le livre ; elle sert à repérer des *familles* de problèmes et à décider dans quel ordre les traiter.
+
+| Famille | Constat sur la page | Traitement générique |
+|---|---|---|
+| **Typographie** | points de suspension écrits « ... » avec espace avant ; « .. ; » (deux points puis point-virgule) ; « ! » suivi d'une minuscule ; nom propre sans majuscule ; point final manquant à une phrase | **Règles déterministes (code, sans IA)**, option distincte et *activable* : la Correction rapide ignore volontairement la typographie (retour de Joseph du 22/10) |
+| **Accords / syntaxe locale** | accord singulier/pluriel sur une énumération ; construction « elle amène en moi à laisser… » bancale | Correction rapide (IA) — déjà couvert |
+| **Référents flottants** | « il » dont l'antécédent est une phrase plus haut ou implicite ; « ce que » sans antécédent net ; « certaines » (des passions) alors que le sujet annoncé est « la passion » au singulier | **Questions à l'auteur** (jamais devinées) — fonction nouvelle |
+| **Liens logiques implicites** | paragraphes d'une phrase juxtaposés sans articulation ; retour au thème annoncé après une digression sans signal | Cartographie + proposition de plan, validée par l'auteur |
+| **Tics et atténuateurs** | « en tout cas » deux fois, « une certaine… » répété, « important » trois fois dans un paragraphe, absolu aussitôt atténué (« tout est… mais pas… ; en tout cas rarement ») | **Compteur de répétitions** (code, sans IA) par chapitre, puis revue d'auteur |
+| **Mise en page imprimée** | retrait gauche qui varie de paragraphe en paragraphe, interlignes inégaux, espacement de justification irrégulier | Hors audit : problème de composition, réglé à l'export |
+
+Observation sur le fond : malgré cela, la **valeur potentielle est lisible** (pensée dichotomique, intensité émotionnelle, passions qui passent ou se figent). Les phrases sont courtes et en grande partie grammaticales : la difficulté dominante est **référentielle, logique et structurelle**, pas syntaxique — ce qui confirme le choix de la règle du §4.5 (référentiel ou syntaxique obligatoire) et rappelle le §7 : un style télégraphique peut être une voix ; ce qu'on corrige, ce sont les ambiguïtés précises, pas le style.
+
+**Ordre recommandé** : Aperçu sur le texte **brut** (il doit voir la difficulté réelle, sans nettoyage préalable) → import dans CursEdit, original gelé → **étape 0 mécanique** (typographie, répétitions, fautes) → questions à l'auteur → structure → révision.
