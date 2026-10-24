@@ -34,7 +34,7 @@ export function aplatirStructure(structure = [], profondeur = 0, sortie = []) {
  * @param versions [{ noeud_id, mots, created_at }]
  * @param aujourdhui Date (injectable pour les tests)
  */
-export function construireDossier(projet, versions = [], aujourdhui = new Date()) {
+export function construireDossier(projet, versions = [], aujourdhui = new Date(), usageIA = null) {
   const nœuds = aplatirStructure(projet.structure);
   const motsActuels = nœuds.reduce((a, n) => a + n.mots, 0);
 
@@ -85,5 +85,28 @@ export function construireDossier(projet, versions = [], aujourdhui = new Date()
     joursActifs: jours.length,
     lignes,
     chapitres,
+    usageIA: resumerUsageIA(usageIA),
   };
+}
+
+export const NOMS_OUTILS_IA = {
+  correction_rapide: "Correction rapide (fautes, fluidité, bilan de relecture)",
+  verifier_le_fond: "Vérifier le fond (affirmations, chiffres, sources)",
+  copilote: "Co-pilote (analyses et suggestions)",
+};
+
+/** null = registre indisponible (table absente) ; sinon un résumé par outil. */
+export function resumerUsageIA(lignes) {
+  if (!lignes) return null;
+  const outils = {};
+  for (const l of lignes) {
+    const o = outils[l.outil] || (outils[l.outil] = { lancements: 0, applications: 0, passagesModifies: 0, premier: null, dernier: null });
+    if (l.action === "lance") o.lancements++;
+    if (l.action === "applique") { o.applications++; o.passagesModifies += l.nb || 0; }
+    const j = jourDe(l.cree_le);
+    if (!o.premier || j < o.premier) o.premier = j;
+    if (!o.dernier || j > o.dernier) o.dernier = j;
+  }
+  const dates = lignes.map((l) => jourDe(l.cree_le)).sort();
+  return { outils, total: lignes.length, debutRegistre: dates[0] || null };
 }

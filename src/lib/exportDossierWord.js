@@ -8,13 +8,25 @@ import {
   Table, TableRow, TableCell, WidthType,
 } from "docx";
 import { supabase } from "./supabase.js";
-import { construireDossier, aplatirStructure } from "./dossierCreation.js";
+import { construireDossier, aplatirStructure, NOMS_OUTILS_IA } from "./dossierCreation.js";
 import { nomDeFichierSûr } from "./exportWord.js";
 
 const fmtJour = (j) => (j ? new Date(j + "T12:00:00").toLocaleDateString("fr-BE", { day: "numeric", month: "long", year: "numeric" }) : "—");
 const fmtN = (n) => (n ?? 0).toLocaleString("fr-FR");
 
 /** Lit TOUS les instantanés (date + mots seulement, pas le texte), par pages de 1000. */
+function sectionUsageIA(u) {
+  if (!u) return [p("Le registre d'usage de l'IA n'est pas disponible pour ce livre (non activé sur ce compte).")];
+  if (!u.total) return [p("Aucun usage d'un outil d'IA de Cursus n'est enregistré pour ce livre. Le registre existe depuis la mise en service de cette fonction ; il ne couvre pas ce qui s'est passé avant, ni hors de Cursus.")];
+  return [
+    p(`Registre en service depuis le ${fmtJour(u.debutRegistre)}. Les outils de Cursus proposent des corrections et des analyses ; le texte n'est modifié que lorsque l'auteur·ice applique une proposition.`),
+    tableau(["Outil", "Lancements", "Applications", "Passages modifiés", "Dernier usage"],
+      Object.entries(u.outils).map(([k, o]) => [NOMS_OUTILS_IA[k] || k, String(o.lancements), String(o.applications), String(o.passagesModifies), fmtJour(o.dernier)]),
+      [40, 14, 14, 16, 16], [1, 2, 3]),
+    p("Le Co-pilote n'écrit pas dans le texte : seuls ses lancements sont comptés."),
+  ];
+}
+
 export async function chargerVersions(projet) {
   const ids = aplatirStructure(projet.structure).map((n) => n.id);
   const toutes = [];
@@ -47,9 +59,24 @@ const tableau = (entetes, lignes, largeurs, droites = []) => new Table({
 const p = (texte, opts = {}) => new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: texte, size: 22, ...opts })] });
 const h = (texte) => new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 360, after: 160 }, text: texte });
 
+/** Lignes du registre d'usage de l'IA (null si la table n'existe pas encore). */
+export async function chargerUsageIA(projet) {
+  const toutes = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await supabase
+      .from("usage_ia_projet").select("outil, action, nb, cree_le")
+      .eq("projet_id", projet.id).order("cree_le", { ascending: true }).range(de, de + 999);
+    if (error) return null;
+    toutes.push(...data);
+    if (data.length < 1000) break;
+  }
+  return toutes;
+}
+
 export async function exporterDossierCreation(projet) {
   const versions = await chargerVersions(projet);
-  const d = construireDossier(projet, versions);
+  const usage = await chargerUsageIA(projet);
+  const d = construireDossier(projet, versions, new Date(), usage);
 
   const enfants = [
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 600, after: 120 }, children: [new TextRun({ text: "Dossier de création", size: 28, color: "666666" })] }),
@@ -79,10 +106,13 @@ export async function exporterDossierCreation(projet) {
       d.chapitres.map((c) => ["    ".repeat(c.profondeur) + c.titre, fmtN(c.mots), c.premiere ? fmtJour(c.premiere) : "—", c.derniere ? fmtJour(c.derniere) : "—", String(c.nbVersions)]),
       [36, 12, 20, 20, 12], [1, 4]),
 
+    h("Usage d'outils d'IA dans Cursus"),
+    ...sectionUsageIA(d.usageIA),
+
     h("Ce que ce document est — et n'est pas"),
     p("Il est généré par Cursus à partir des sauvegardes datées du livre (date et nombre de mots à chaque instantané). Il ne contient aucun extrait du texte."),
     p("Les instantanés ne sont pas pris à chaque frappe : ils sont enregistrés lorsque le texte change de façon notable, et au moins toutes les 5 minutes d'écriture pour les versions récentes. L'historique des livres écrits avant octobre 2026 est donc plus clairsemé."),
-    p("C'est un indice sur la manière dont le livre a été produit, pas une preuve juridique. Il n'indique pas si des outils d'intelligence artificielle ont été utilisés."),
+    p("C'est un indice sur la manière dont le livre a été produit, pas une preuve juridique. Le registre d'usage de l'IA ne couvre que les outils de Cursus, et seulement depuis sa mise en service : il ne dit rien de ce qui a pu être fait ailleurs (autres logiciels, autres services)."),
     p(`Document généré le ${fmtJour(d.genereLe.slice(0, 10))}.`, { color: "666666" }),
   ];
 

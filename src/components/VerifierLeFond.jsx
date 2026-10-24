@@ -20,7 +20,7 @@ const VERDICTS = {
 
 const nombre = (v) => v.toLocaleString("fr-FR", { maximumSignificantDigits: 4 });
 
-export default function VerifierLeFond({ editor, couleur = "#7F77DD", onFermer }) {
+export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
   const [étape, setÉtape] = useState("choix"); // choix | encours | revue
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
@@ -35,6 +35,7 @@ export default function VerifierLeFond({ editor, couleur = "#7F77DD", onFermer }
   const lancer = async () => {
     const { liste } = lireParagraphes(editor, portée === "sélection");
     if (!liste.length) { setErreur("Aucun texte à vérifier."); return; }
+    onUsage?.("lance");
     setErreur(null);
     setÉtape("encours");
     setPhase("Repérage des affirmations vérifiables…");
@@ -96,6 +97,7 @@ export default function VerifierLeFond({ editor, couleur = "#7F77DD", onFermer }
       n++;
     }
     if (n) editor.view.dispatch(tr);
+    if (n) onUsage?.("applique", n);
     setAppliqué({ n, périmés });
   };
 
