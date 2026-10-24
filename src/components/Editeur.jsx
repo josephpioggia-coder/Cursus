@@ -383,7 +383,14 @@ function BoutonDictee({ editor }) {
       formulaire.append("audio", blob, "dictee.webm");
       formulaire.append("langue", "fr");
       const { data, error } = await supabase.functions.invoke("transcrire-audio", { body: formulaire });
-      if (error) throw error;
+      if (error) {
+        // « Edge Function returned a non-2xx status code » ne dit rien : le vrai
+        // message du serveur (clé OpenAI absente, quota épuisé, session expirée…)
+        // est dans le corps de la réponse (24/10/2026).
+        let message = error.message;
+        try { const corps = await error.context?.json(); if (corps?.error) message = corps.error; } catch { /* corps illisible */ }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
       setTexte(data?.texte || "");
       setStatut("relecture");
