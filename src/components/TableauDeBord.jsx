@@ -22,7 +22,7 @@
  * plutôt que des chiffres inventés.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
 
@@ -61,12 +61,12 @@ const formaterDurée = (s) => {
 function CarteStats({ label, valeur, sous, couleur }) {
   return (
     <div style={{
-      background: "var(--color-background-secondary)",
+      background: "var(--color-background-secondary, #f5f5f5)",
       borderRadius: 10, padding: "14px 16px",
     }}>
-      <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 500, color: couleur || "var(--color-text-primary)" }}>{valeur}</div>
-      {sous && <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 3 }}>{sous}</div>}
+      <div style={{ fontSize: 12, color: "var(--color-text-tertiary, #888)", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 500, color: couleur || "var(--color-text-primary, #222)" }}>{valeur}</div>
+      {sous && <div style={{ fontSize: 11, color: "var(--color-text-tertiary, #888)", marginTop: 3 }}>{sous}</div>}
     </div>
   );
 }
@@ -92,11 +92,11 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
 
   return (
     <div style={{
-      background: "var(--color-background-primary)",
-      border: "0.5px solid var(--color-border-tertiary)",
+      background: "var(--color-background-primary, #fff)",
+      border: "0.5px solid var(--color-border-tertiary, #e5e5e5)",
       borderRadius: 12, padding: "1.25rem",
     }}>
-      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary, #222)", marginBottom: 16 }}>
         Cette semaine
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
@@ -112,7 +112,7 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
               <div style={{ width: "100%", flex: 1, display: "flex", alignItems: "flex-end" }}>
                 <div style={{
                   width: "100%", height: hauteur,
-                  background: j.mots > 0 ? couleurAccent : "var(--color-border-tertiary)",
+                  background: j.mots > 0 ? couleurAccent : "var(--color-border-tertiary, #e5e5e5)",
                   borderRadius: "4px 4px 0 0",
                   opacity: j.estAujourd ? 1 : j.mots > 0 ? 0.65 : 0.3,
                   transition: "height 0.4s ease",
@@ -120,7 +120,7 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
               </div>
               <span style={{
                 fontSize: 10,
-                color: j.estAujourd ? couleurAccent : "var(--color-text-tertiary)",
+                color: j.estAujourd ? couleurAccent : "var(--color-text-tertiary, #888)",
                 fontWeight: j.estAujourd ? 500 : 400,
               }}>{j.label}</span>
             </div>
@@ -128,7 +128,7 @@ function GraphiqueSemaine({ sessions, couleurAccent }) {
         })}
       </div>
       {aucuneSession && (
-        <div style={{ fontSize: 11, color: "var(--color-text-tertiary)", marginTop: 10, textAlign: "center" }}>
+        <div style={{ fontSize: 11, color: "var(--color-text-tertiary, #888)", marginTop: 10, textAlign: "center" }}>
           Le suivi des sessions d'écriture n'est pas encore actif.
         </div>
       )}
@@ -165,9 +165,9 @@ function CarteSuggestion({ projets, onOuvrirProjet }) {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
         <div style={{ width: 10, height: 10, borderRadius: "50%", background: suggestion.couleur, flexShrink: 0 }} />
-        <span style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text-primary)" }}>{suggestion.titre}</span>
+        <span style={{ fontSize: 15, fontWeight: 500, color: "var(--color-text-primary, #222)" }}>{suggestion.titre}</span>
       </div>
-      <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 14 }}>
+      <div style={{ fontSize: 12, color: "var(--color-text-secondary, #555)", marginBottom: 14 }}>
         {suggestion.pct}% complété
       </div>
       <button
@@ -189,15 +189,15 @@ function CarteSuggestion({ projets, onOuvrirProjet }) {
 function ListeProjets({ projets, onOuvrirProjet }) {
   return (
     <div style={{
-      background: "var(--color-background-primary)",
-      border: "0.5px solid var(--color-border-tertiary)",
+      background: "var(--color-background-primary, #fff)",
+      border: "0.5px solid var(--color-border-tertiary, #e5e5e5)",
       borderRadius: 12, overflow: "hidden",
     }}>
-      <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>Tous les projets</span>
+      <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--color-border-tertiary, #e5e5e5)" }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary, #222)" }}>Tous les projets</span>
       </div>
       {projets.length === 0 ? (
-        <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 }}>
+        <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-tertiary, #888)", fontSize: 13 }}>
           Aucun projet. Créez-en un pour commencer.
         </div>
       ) : (
@@ -210,16 +210,16 @@ function ListeProjets({ projets, onOuvrirProjet }) {
               onClick={() => onOuvrirProjet(p.id)}
               style={{
                 padding: "12px 16px",
-                borderBottom: i < projets.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
+                borderBottom: i < projets.length - 1 ? "0.5px solid var(--color-border-tertiary, #e5e5e5)" : "none",
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-background-secondary)"}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-background-secondary, #f5f5f5)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
             >
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.couleur, flexShrink: 0 }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary, #222)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {p.titre}
                   </span>
                   <span style={{ fontSize: 11, color: p.couleur, fontWeight: 500, flexShrink: 0, marginLeft: 8 }}>
@@ -227,18 +227,18 @@ function ListeProjets({ projets, onOuvrirProjet }) {
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <div style={{ flex: 1, height: 3, background: "var(--color-border-tertiary)", borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{ flex: 1, height: 3, background: "var(--color-border-tertiary, #e5e5e5)", borderRadius: 4, overflow: "hidden" }}>
                     <div style={{ width: `${pct}%`, height: "100%", background: p.couleur, borderRadius: 4 }} />
                   </div>
-                  <span style={{ fontSize: 10, color: "var(--color-text-tertiary)", flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, color: "var(--color-text-tertiary, #888)", flexShrink: 0 }}>
                     {mots.toLocaleString("fr-FR")} / {p.objectifMots.toLocaleString("fr-FR")} mots
                   </span>
                 </div>
               </div>
               <span style={{
                 fontSize: 11, padding: "2px 8px", borderRadius: 20,
-                background: p.statut === "En cours" ? "#EEEDFE" : p.statut === "Terminé" ? "#EAF3DE" : "var(--color-background-secondary)",
-                color: p.statut === "En cours" ? "#534AB7" : p.statut === "Terminé" ? "#3B6D11" : "var(--color-text-tertiary)",
+                background: p.statut === "En cours" ? "#EEEDFE" : p.statut === "Terminé" ? "#EAF3DE" : "var(--color-background-secondary, #f5f5f5)",
+                color: p.statut === "En cours" ? "#534AB7" : p.statut === "Terminé" ? "#3B6D11" : "var(--color-text-tertiary, #888)",
                 flexShrink: 0,
               }}>
                 {p.statut}
@@ -267,37 +267,37 @@ function HistoriqueSessions({ sessions }) {
 
   return (
     <div style={{
-      background: "var(--color-background-primary)",
-      border: "0.5px solid var(--color-border-tertiary)",
+      background: "var(--color-background-primary, #fff)",
+      border: "0.5px solid var(--color-border-tertiary, #e5e5e5)",
       borderRadius: 12, overflow: "hidden",
     }}>
-      <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--color-border-tertiary)" }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)" }}>Sessions récentes</span>
+      <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--color-border-tertiary, #e5e5e5)" }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary, #222)" }}>Sessions récentes</span>
       </div>
       {récentes.length === 0 ? (
-        <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-tertiary)", fontSize: 13 }}>
+        <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-tertiary, #888)", fontSize: 13 }}>
           Le suivi des sessions d'écriture n'est pas encore actif — chantier à venir.
         </div>
       ) : (
         récentes.map((s, i) => (
           <div key={s.id} style={{
             padding: "10px 16px",
-            borderBottom: i < récentes.length - 1 ? "0.5px solid var(--color-border-tertiary)" : "none",
+            borderBottom: i < récentes.length - 1 ? "0.5px solid var(--color-border-tertiary, #e5e5e5)" : "none",
             display: "flex", alignItems: "center", gap: 12,
           }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: s.projetCouleur, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontSize: 12, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-secondary, #555)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
                 {s.projetTitre}
               </span>
             </div>
             <span style={{ fontSize: 12, fontWeight: 500, color: s.projetCouleur, flexShrink: 0 }}>
               +{s.mots} mots
             </span>
-            <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", flexShrink: 0, minWidth: 50, textAlign: "right" }}>
+            <span style={{ fontSize: 11, color: "var(--color-text-tertiary, #888)", flexShrink: 0, minWidth: 50, textAlign: "right" }}>
               {formaterDurée(s.durée)}
             </span>
-            <span style={{ fontSize: 11, color: "var(--color-text-tertiary)", flexShrink: 0, minWidth: 60, textAlign: "right" }}>
+            <span style={{ fontSize: 11, color: "var(--color-text-tertiary, #888)", flexShrink: 0, minWidth: 60, textAlign: "right" }}>
               {formaterDate(s.date)}
             </span>
           </div>
@@ -314,6 +314,13 @@ export default function TableauDeBord({ projets = [], onOuvrirProjet }) {
   // localStorage. Tableau vide tant que le vrai suivi (Supabase) n'existe
   // pas — voir note en tête de fichier.
   const [sessions] = useState([]);
+  // Sur mobile (≤ 768 px) : une seule colonne, marges réduites.
+  const [mobile, setMobile] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const f = () => setMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
 
   // Statistiques globales
   const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
@@ -343,33 +350,33 @@ export default function TableauDeBord({ projets = [], onOuvrirProjet }) {
     .reduce((acc, s) => acc + (s.mots || 0), 0);
 
   return (
-    <div style={{ padding: "28px 32px", overflowY: "auto" }}>
+    <div style={{ padding: mobile ? "16px 12px" : "28px 32px", overflowY: "auto", minWidth: 0 }}>
       {/* En-tête */}
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 4 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--color-text-primary, #222)", marginBottom: 4 }}>
           Tableau de bord
         </h1>
-        <p style={{ fontSize: 13, color: "var(--color-text-tertiary)" }}>
+        <p style={{ fontSize: 13, color: "var(--color-text-tertiary, #888)" }}>
           {new Date().toLocaleDateString("fr-BE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
       {/* Statistiques globales */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-        <CarteStats label="Mots écrits au total" valeur={totalMots.toLocaleString("fr-FR")} sous="dans tous les projets" couleur="var(--color-text-primary)" />
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+        <CarteStats label="Mots écrits au total" valeur={totalMots.toLocaleString("fr-FR")} sous="dans tous les projets" couleur="var(--color-text-primary, #222)" />
         <CarteStats label="Cette semaine" valeur={totalMotsSemaine.toLocaleString("fr-FR")} sous="mots (suivi à venir)" couleur="#7F77DD" />
-        <CarteStats label="Projets actifs" valeur={projetsActifs} sous={`sur ${projets.length} projets`} couleur="var(--color-text-primary)" />
-        <CarteStats label="Série actuelle" valeur={`${série} jour${série !== 1 ? "s" : ""}`} sous="suivi à venir" couleur="var(--color-text-primary)" />
+        <CarteStats label="Projets actifs" valeur={projetsActifs} sous={`sur ${projets.length} projets`} couleur="var(--color-text-primary, #222)" />
+        <CarteStats label="Série actuelle" valeur={`${série} jour${série !== 1 ? "s" : ""}`} sous="suivi à venir" couleur="var(--color-text-primary, #222)" />
       </div>
 
       {/* Ligne principale : graphique + suggestion */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "minmax(0, 1fr)" : "1fr 320px", gap: 16, marginBottom: 16 }}>
         <GraphiqueSemaine sessions={sessions} couleurAccent="#7F77DD" />
         <CarteSuggestion projets={projets} onOuvrirProjet={onOuvrirProjet} />
       </div>
 
       {/* Ligne secondaire : projets + sessions */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "minmax(0, 1fr)" : "1fr 1fr", gap: 16 }}>
         <ListeProjets projets={projets} onOuvrirProjet={onOuvrirProjet} />
         <HistoriqueSessions sessions={sessions} />
       </div>
