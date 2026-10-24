@@ -1151,3 +1151,22 @@ lecture des paragraphes TipTap, partagée avec CorrectionRapide).
 - Vérifié : extraction/lecture, calcul (700 000 km / 10 000 ans ≈ 7,99 m/h, cohérent avec « 8 »), rétrogradation d'une source
   inventée, localisation d'un extrait, `vite build`. **NON TESTÉ en conditions réelles** : appels IA, outil `web_search` dans un appel
   à sortie texte structurée (déjà utilisé ainsi par CopiloteIA), délai réel, qualité des verdicts.
+
+## Éditeur compact sur mobile : plus de place pour le texte (24/10/2026)
+
+Retour de Joseph (capture GSM, ~392×665 px utiles) : « la mise en page sur l'écran du GSM laisse peu de place pour le texte ». Mesure : l'en-tête
+(titre du projet + du chapitre sur 2 lignes + 4 rangées de boutons), la barre d'outils (3 rangées) et le pied de page ne laissaient que ≈ 140 px
+au texte. Corrigé dans `Editeur.jsx` (état local `mobile`, seuil ≤ 768 px comme App.jsx ; le BUREAU est inchangé, vérifié à 1280 px) :
+- **En-tête sur UNE ligne** : ← · pastille · titre du chapitre (une ligne, « … ») · témoin de sauvegarde réduit à son icône (`court`) ·
+  bouton « ⋯ » (`aria-label="Actions du chapitre"`) qui déplie, au besoin, format de page, copier, Correction rapide, Vérifier le fond,
+  lecture à voix haute + voix + vitesse + solde, historique. Titre du projet masqué (le chapitre suffit). Pendant une lecture, un ⏹ reste
+  visible dans la ligne même menu fermé.
+- **Barre d'outils réduite à l'essentiel** (G, I, S, H2, listes, annuler/rétablir) + « Plus ▾ » qui déplie la barre complète (surlignage, couleurs,
+  images, etc., inchangée : ses palettes s'ouvrent normalement, d'où pas de rangée défilante qui les rognerait).
+- **Pied de page compact** (une ligne : caractères de la session, chapitre, durée, ⚙) ; l'édition des objectifs garde l'ancienne présentation.
+- Marges du texte : 32 px → 10 px en haut ; 40/40 → 40/12 px (la gouttière des numéros de ligne reste à gauche).
+- Bouton flottant « 🤖 Co-pilote » remonté à `bottom: 40` (au lieu de 64, ancien réglage du paragraphe « Éditeur de texte sur mobile ») et
+  `right: 12`, pour couvrir moins de texte.
+- Résultat mesuré (app complète, Supabase simulé) : zone de texte visible 140 px → 514 px à 392×665, largeur de ligne 312 → 340 px, aucune
+  erreur JS, le gras fonctionne depuis la barre compacte. NON testé : clavier virtuel réel ouvert, tablette en portrait.
+- Piste non faite : masquer automatiquement en-tête et barre quand le clavier est ouvert (mode « écriture pure »).
