@@ -1180,3 +1180,6 @@ Choix de Joseph sur une planche de propositions : « surligner pour analyser » 
 
 ## Tableau de bord sur mobile (24/10/2026)
 Retour de Joseph (capture GSM) : à l'ouverture de Cursus (vue « Tableau de bord »), les TITRES des livres étaient invisibles (seuls % et « En cours » visibles), page décalée, réapparaissant dans le tiroir. Cause : `TableauDeBord.jsx` n'avait aucune variante mobile (grilles 4 col / `1fr 320px` / `1fr 1fr`, marges 32 px) et utilisait des `var(--color-*)` non définies → couleur de texte héritée, inversée en blanc sur fond clair par le mode sombre forcé. Corrigé : valeurs de repli explicites dans chaque `var()`, une colonne sur mobile. Vérifié à 392 px (rendu isolé, `scrollWidth == innerWidth`) ; PAS dans l'app complète. Autres composants utilisant `var(--color-*)` sans repli : même risque (à vérifier si signalé).
+
+### Barre d'outils mobile : plus de doublons (24/10/2026)
+Quand « Plus ▾ » est ouvert, la rangée compacte ne garde que « Moins ▴ » (G/I/S/listes/↩↪ sont déjà dans la barre complète, dont ↩↪ agrandis sur mobile). « Vérifier le fond » reste dans l'en-tête (⋯) : il porte sur la sélection OU tout le chapitre (choix dans la fenêtre), donc pas un outil de mise en forme. Vérifié : `vite build` seulement.
