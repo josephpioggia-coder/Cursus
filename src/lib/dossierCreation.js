@@ -91,7 +91,8 @@ export function construireDossier(projet, versions = [], aujourdhui = new Date()
 
 export const NOMS_OUTILS_IA = {
   correction_rapide: "Correction rapide (fautes, fluidité, bilan de relecture)",
-  verifier_le_fond: "Vérifier le fond (affirmations, chiffres, sources)",
+  verifier_le_fond: "Vérifier les faits (affirmations, chiffres, sources)",
+  avis_fond: "Vérifier le fond (avis éditorial sur le récit ou le propos)",
   copilote: "Co-pilote (analyses et suggestions)",
 };
 

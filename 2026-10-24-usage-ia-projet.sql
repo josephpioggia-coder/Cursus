@@ -8,6 +8,8 @@
 --   action 'applique' : des modifications proposées par l'outil ont été APPLIQUÉES
 --                       au texte (`nb` = nombre de passages modifiés).
 -- Ne contient JAMAIS de texte du livre. Ne couvre pas ce qui se fait hors de Cursus.
+-- 'verifier_le_fond' = vérification des FAITS (recherche web) ; 'avis_fond' = avis éditorial sur le fond.
+-- Si la table a déjà été créée avec l'ancienne liste, voir le correctif en bas de fichier.
 -- À EXÉCUTER par Joseph dans l'éditeur SQL de Supabase.
 
 create table if not exists usage_ia_projet (
@@ -15,7 +17,7 @@ create table if not exists usage_ia_projet (
   user_id    uuid not null references auth.users(id) on delete cascade,
   projet_id  uuid not null,
   noeud_id   uuid,
-  outil      text not null check (outil in ('correction_rapide', 'verifier_le_fond', 'copilote')),
+  outil      text not null check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'copilote')),
   action     text not null check (action in ('lance', 'applique')),
   nb         integer,
   cree_le    timestamptz not null default now()
@@ -29,3 +31,8 @@ create policy "usage_ia_projet : lecture par le propriétaire"
   on usage_ia_projet for select using (auth.uid() = user_id);
 create policy "usage_ia_projet : écriture par le propriétaire"
   on usage_ia_projet for insert with check (auth.uid() = user_id);
+
+-- CORRECTIF si la table existe déjà (créée avant le 24/10/2026 soir) : élargir la liste des outils.
+-- alter table usage_ia_projet drop constraint if exists usage_ia_projet_outil_check;
+-- alter table usage_ia_projet add constraint usage_ia_projet_outil_check
+--   check (outil in ('correction_rapide', 'verifier_le_fond', 'avis_fond', 'copilote'));
