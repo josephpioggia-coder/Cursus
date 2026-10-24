@@ -831,3 +831,30 @@ rang sont alors périmées (elles disent « semaine 39 »).
   (plus de ligne vide au-dessus) ; titre et explication retirés pendant la partie ; cases de la grille jusqu'à 17 px (3 colonnes en
   difficile) ; boutons compacts. Vérifié à 392×640, 360×600, 360×740 (facile et difficile) : cercle et boutons visibles sans défiler.
   Test automatique : les messages n'étant plus du texte DOM, ne plus les chercher avec `getByText`.
+
+## Pauses « bouger » : rappel discret quand on écrit longtemps (24/10/2026)
+
+Idée de Joseph (GSM) : quand on reste longtemps assis à écrire on ne voit pas le temps passer ; proposer des mouvements (inspirés du
+tai chi sur chaise dont il avait une liste, restée sur son ordinateur — non retrouvée par Claude : à lui redemander). Accord : « Ok ».
+- `src/lib/pauseBouger.js` (PUR) : réglages (`localStorage` `cursus-pause-bouger-v1` : `actif` — par défaut OUI —, `minutes` — 30, choix
+  20/30/45/60 —, `jours` = pauses terminées par date, 60 jours gardés) ; règles : `avancer()` (≥ 2 min sans geste ne comptent plus, ≥ 5 min
+  sans geste = pause réelle, compteur à zéro, onglet caché = rien) ; `doitInviter()` (échéance atteinte ET silence de 5 s — jamais en
+  pleine phrase — ou échéance dépassée de 5 min ; report « dans 10 min » respecté). Testées à part (node).
+- `PauseBouger.jsx` (monté une fois dans `AppConnectée`) : minuteur (gestes `keydown/pointer*/touch/wheel/scroll`, tic 1 s), bandeau
+  d'invitation en bas (« Oui, on y va » · « Dans 10 min » · « Pas maintenant » · « Ne plus me proposer »), ne vole ni focus ni curseur ;
+  communique avec la page par les événements `cursus-pause-reglages` et `cursus-pause-demarrer` (detail `{ ids }` facultatif).
+- `SessionPause.jsx` : séance plein écran (pause express = 3 mouvements : souffle + haut du corps + bas/se lever ; ou un seul mouvement
+  depuis la page), figure animée, consigne, décompte, « mouvement suivant » manuel ; fin = pause comptée (`noterPause`).
+- `FigureChaise.jsx` : personnage assis/debout dessiné sur CANVAS (mode sombre forcé) et animé depuis les images clés de
+  `src/lib/exercicesPause.js` (8 mouvements : souffle du ciel, ouvrir les bras « inspiré du tai chi », épaules, cou, torsion, mains et
+  poignets, chevilles, se lever). **Dessin 100 % original** : les schémas de tai chi sur chaise trouvés en ligne sont payants (Jo Deluk,
+  livre de Liuhe Chen) ou sous droits (fiche PDF taichi.help) — NE PAS les copier. Respecte `prefers-reduced-motion`.
+- `PagePauseBouger.jsx` + entrée de menu « 🧘 Pauses bien-être » (`id: "pause"` dans la navigation, donc aussi dans le tiroir mobile) :
+  activer/désactiver, intervalle, « faire une pause maintenant », liste des mouvements à essayer, compteur du jour / des 7 jours.
+- Texte de prudence (`AVERTISSEMENT`) affiché en fin de séance et sur la page : mouvements doux, arrêter au moindre inconfort, pas un avis
+  médical. Pas de chiffres de santé (l'infographie LinkedIn de Joseph est non sourcée : on n'a pas repris ses statistiques).
+- Vérifié dans l'app complète à 360 px (Supabase simulé, minutes = 0,1 dans le localStorage pour le test) : pas de bandeau pendant l'activité,
+  bandeau après un silence, report, séance express complète, compteur incrémenté, page de réglages, aucun débordement, aucune erreur JS ;
+  toutes les images clés de chaque mouvement contrôlées visuellement. NON testé : téléphone réel, usage sur plusieurs heures.
+- Pistes non faites : illustrations plus riches (Æncre qui montre les gestes), lecture à voix haute du texte PENDANT la pause (utilise la
+  synthèse vocale payante), liste de mouvements de Joseph à intégrer, voix guidée, rappel quand l'app est en arrière-plan.
