@@ -50,6 +50,7 @@ import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
 import VerifierLeFond from "./VerifierLeFond.jsx";
+import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -741,13 +742,7 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         <BoutonOutil actif={editor.isActive("highlight", { color: COULEUR_SURLIGNAGE_ANALYSE })}
           titre="Surligneur pour analyses"
           onClick={basculerSurlignageAnalyse}>
-          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
-            <span>🔍</span>
-            <span style={{
-              width: 12, height: 2.5, marginTop: 1, borderRadius: 1,
-              background: COULEUR_SURLIGNAGE_ANALYSE,
-            }} />
-          </span>
+          <IconeLoupe type="analyse" taille={20} />
         </BoutonOutil>
         {/* CORRECTIF 24/09/2026 — accept="image/*" seul faisait apparaître un
             dossier vide dans le sélecteur de fichiers sur le poste de
@@ -1536,7 +1531,7 @@ export default function Editeur({
               }}
               title="Vérifie les faits et les chiffres du texte (calculs refaits, recherche web, sources) et propose des reformulations"
             >
-              🔎 Vérifier le fond
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="fond" taille={16} />Vérifier le fond</span>
             </button>
           )}
           {voixDisponible() && (
