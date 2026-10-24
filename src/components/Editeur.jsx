@@ -809,10 +809,10 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
       <Sep />
 
       {/* Historique */}
-      <BoutonOutil actif={false} titre="Annuler (Ctrl+Z)"
+      <BoutonOutil grand={mobile} actif={false} titre="Annuler (Ctrl+Z)"
         désactivé={!editor.can().undo()}
         onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
-      <BoutonOutil actif={false} titre="Rétablir (Ctrl+Y)"
+      <BoutonOutil grand={mobile} actif={false} titre="Rétablir (Ctrl+Y)"
         désactivé={!editor.can().redo()}
         onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
 
@@ -830,6 +830,7 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "3px 8px", borderBottom: "0.5px solid #e5e5e5", background: "#fafafa", opacity: modeFocus ? 0.3 : 1 }}>
+        {!plus && (<>
         <BoutonOutil actif={editor.isActive("bold")} titre="Gras" onClick={() => editor.chain().focus().toggleBold().run()}><b>G</b></BoutonOutil>
         <BoutonOutil actif={editor.isActive("italic")} titre="Italique" onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
         <BoutonOutil actif={editor.isActive("underline")} titre="Souligné" onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
@@ -838,6 +839,7 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         <BoutonOutil actif={editor.isActive("orderedList")} titre="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</BoutonOutil>
         <BoutonOutil grand désactivé={!editor.can().undo()} titre="Annuler" onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
         <BoutonOutil grand désactivé={!editor.can().redo()} titre="Rétablir" onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
+        </>)}
         <div style={{ flex: 1 }} />
         <button onClick={() => setPlus((v) => !v)} aria-expanded={plus}
           style={{ fontSize: 12, color: plus ? "#534AB7" : "#666", background: plus ? "#EEEDFE" : "none", border: "none", borderRadius: 6, padding: "5px 9px", fontFamily: "inherit", cursor: "pointer" }}>
