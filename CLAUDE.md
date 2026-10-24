@@ -1183,3 +1183,11 @@ Retour de Joseph (capture GSM) : à l'ouverture de Cursus (vue « Tableau de bor
 
 ### Barre d'outils mobile : plus de doublons (24/10/2026)
 Quand « Plus ▾ » est ouvert, la rangée compacte ne garde que « Moins ▴ » (G/I/S/listes/↩↪ sont déjà dans la barre complète, dont ↩↪ agrandis sur mobile). « Vérifier le fond » reste dans l'en-tête (⋯) : il porte sur la sélection OU tout le chapitre (choix dans la fenêtre), donc pas un outil de mise en forme. Vérifié : `vite build` seulement.
+
+## Dossier de création d'un livre (24/10/2026)
+
+Demande de Joseph (après l'article sur Coral Hart et les livres générés par IA) : « pour chaque nouveau livre une trace, tant pour moi que pour mes clients, avec l'historique du livre et de sa production : avancées, dates, mots… ». Bouton « 🧾 Dossier de création » à côté de « Exporter en Word » (vue projet, `App.jsx`) → `src/lib/dossierCreation.js` (calcul PUR) + `src/lib/exportDossierWord.js` (lit `versions_noeuds` : date + mots SEULEMENT, jamais le texte ; génère le .docx).
+- Contenu : synthèse (création, première/dernière trace, jours d'écriture, mots, objectif %, nombre d'instantanés), progression jour par jour (total de mots à la fin du jour = somme, par chapitre, du dernier instantané ≤ ce jour ; variation), détail par chapitre, encadré « ce que ce document est et n'est pas ».
+- Limites assumées, écrites dans le document : instantanés pas à chaque frappe (≥ 50 mots d'écart, ou toutes les 5 min depuis le 24/10/2026 → historique des livres antérieurs clairsemé) ; indice de processus, PAS une preuve juridique ; l'usage d'IA n'est pas enregistré (aucun journal de ce type côté éditeur — piste : tracer Correction rapide / Co-pilote par projet).
+- Vérifié : calcul (test node), génération du .docx dans un navigateur avec réponse Supabase simulée (contenu relu). NON testé : sur un vrai projet, grand volume (> 1000 instantanés : pagination prévue mais non exercée).
+- Pistes non faites : version à l'écran, intégration à l'export Word du manuscrit, horodatage externe (tiers de confiance) pour valeur probante, journal d'usage de l'IA par projet.
