@@ -209,7 +209,7 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
           {étape === "encours" && <button style={bouton(false)} onClick={annuler}>Annuler</button>}
           {étape === "revue" && !appliqué && (
             <>
-              <button style={bouton(false)} onClick={onFermer}>Tout refuser</button>
+              <button style={bouton(false)} onClick={onFermer}>{résultat?.cartes?.length ? "Tout refuser" : "Fermer"}</button>
               {(résultat?.échecs > 0 || résultat?.échecsBilan > 0) && <button style={bouton(false)} onClick={lancer}>Relancer</button>}
               {retenues.length > 0 && <button style={bouton(true)} onClick={appliquer}>Appliquer {retenues.length === résultat.cartes.length ? "tout" : `les ${retenues.length} retenus`}</button>}
             </>
