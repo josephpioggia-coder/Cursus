@@ -9,12 +9,12 @@
 ## 0. En une page
 
 1. **Le diagnostic du brief est juste.** CursAudit analyse aujourd'hui la *nature épistémique* de chaque énoncé (fait, jugement, besoin de preuve, source…). Il ne mesure nulle part *l'effort que le texte impose au lecteur*. Un manuscrit peut être « recevable » énoncé par énoncé et pourtant épuisant à lire : c'est exactement le cas décrit.
-2. **Ce n'est pas un nouveau produit, c'est une nouvelle lentille + un parcours.** Une lentille de lecture (« profil de lisibilité ») branchée sur le pré-audit approfondi, et un parcours de travail dans CursEdit quand la lentille conclut que de simples corrections ne suffiront pas.
+2. **Ce n'est pas un nouveau produit, c'est une nouvelle lentille + un parcours.** Une lentille de lecture (« profil de lisibilité ») **branchée sur l'Aperçu gratuit** (phase 1, qui lit déjà le manuscrit entier en un seul appel), et un parcours de travail dans CursEdit quand la lentille conclut que de simples corrections ne suffiront pas. *(Révisé le 24/10/2026 à la suggestion de Joseph : première version = pré-audit approfondi, payant. L'Aperçu est le bon endroit : si l'écriture est le problème, il ne sert à rien de passer au pré-audit ni à l'audit.)*
 3. **Trois précautions que je recommande par rapport au brief** :
    - ne **pas** créer de score chiffré « CRL » : afficher un *profil* (six dimensions, niveau qualitatif, fréquence mesurée sur un échantillon, exemples cités) ;
    - déclencher le DREM par une **règle explicite et lisible** appliquée par le code aux observations de l'IA, pas par un jugement global de l'IA ;
    - ne **jamais** produire de réécriture avant que le sens soit établi : *questions d'abord*, réécriture ensuite, uniquement sur ce qui est confirmé.
-4. **MVP proposé** : une phase 0 sans réécriture (profil de lisibilité + indicateur DREM + texte de restitution respectueux), puis une « démonstration sur extrait » (§9 du brief). Le reste (parcours complet dans CursEdit) vient après validation sur de vrais manuscrits.
+4. **MVP proposé** : une phase 0 sans réécriture, **dans l'Aperçu existant, sans étape supplémentaire ni coût pour l'auteur** (profil de lisibilité + indicateur DREM + texte de restitution respectueux), puis une « démonstration sur extrait » (§9 du brief). Le reste (parcours complet dans CursEdit) vient après validation sur de vrais manuscrits.
 
 ---
 
@@ -47,11 +47,14 @@
 
 ## 3. Module, parcours ou extension ?
 
-**Recommandation : une extension du pré-audit approfondi (la lentille) + un parcours (le traitement).** Pas un module séparé, pas un nouveau produit.
+**Recommandation : une extension de l'Aperçu gratuit (la lentille, qui joue le rôle de porte d'entrée) + un parcours (le traitement).** Pas un module séparé, pas un nouveau produit, pas une étape de plus.
 
+- *Pourquoi l'Aperçu et pas le pré-audit approfondi* (correction proposée par Joseph) : l'Aperçu est la **première** chose que voit l'auteur, elle est **gratuite**, et elle lit déjà le manuscrit **entier** en un seul appel (`preaudit-global-cursaudit`, fenêtre de 1 M de jetons) pour produire nature du texte, colonne vertébrale, tension, risques et palier recommandé. Y ajouter la lisibilité ne crée aucun appel, aucune étape, aucun écran de plus. Surtout : si l'écriture est le problème, lancer ensuite un pré-audit payant puis un audit détaillé serait un gaspillage pour l'auteur et une promesse trompeuse de notre part. C'est exactement le rôle d'une **porte d'orientation**.
 - *Pourquoi pas un 31ᵉ critère par énoncé* : mauvais grain (§2.2), coût (1 475 appels de plus) et risque de bruit.
-- *Pourquoi dans le pré-audit approfondi* : il lit déjà le manuscrit chapitre par chapitre, produit déjà une ampleur de réécriture et un plan d'intervention. Le profil de lisibilité est la pièce manquante de cette chaîne ; le DREM en est la *conclusion* quand les observations convergent.
 - *Pourquoi un parcours distinct ensuite* : l'exécution (questions, structure, révision, contrôle de fidélité) est un travail d'écriture, qui relève de CursEdit. Le brief demande lui-même de ne pas confondre diagnostic et exécution.
+- *Ce que devient le pré-audit approfondi* : il reprend le profil de lisibilité de l'Aperçu comme point de départ (comme il reprend déjà `colonne_vertebrale` et `risques_globaux`), et sa propre `ampleur_reecriture` doit rester cohérente avec lui.
+
+**Porte, pas barrière.** Si le DREM est signalé, l'Aperçu *recommande fortement* de commencer par le parcours de reconstruction plutôt que par l'audit, et l'écran de lancement du pré-audit/audit affiche l'avertissement (« les difficultés d'écriture observées risquent de limiter fortement l'utilité de cette analyse »). Je déconseille un **blocage dur** : le jugement vient d'une lecture automatique, il peut se tromper (§4.6), et l'auteur reste libre de son achat une fois informé.
 
 ## 4. Méthode de détection et ses limites
 
@@ -65,9 +68,15 @@ Pour chaque dimension : *absente / ponctuelle / fréquente / dominante*, **calcu
 
 **Pas de score chiffré global.** Le brief le dit lui-même (« aucun seuil chiffré validé ») ; je vais plus loin : même un « CRL = 7/10 » serait une fausse précision. On affiche des fréquences observées (« 9 passages sur 12 ») qui ne prétendent rien de plus que ce qu'elles sont.
 
-### 4.2 Échantillonnage (contrôle du coût)
+### 4.2 Lecture par l'Aperçu : tout le texte, observations par chapitre, citations vérifiées par le code
 
-Lire tout le livre à ce niveau de finesse serait cher et inutile pour *détecter*. Proposition : **échantillon stratifié** — passages d'environ 1 500–2 000 caractères pris au début, au milieu et à la fin de chaque partie/chapitre (12 à 20 passages au total, nombre fixé par la taille du livre), plus tout passage que l'auteur ou le pré-audit a déjà signalé. La part des passages affectés est annoncée **avec la taille de l'échantillon** (« sur 15 passages lus »). Le résultat est un indice sur le manuscrit, pas un recensement.
+L'Aperçu lit déjà le livre entier : **pas besoin d'échantillonner** tant que le texte tient dans la fenêtre de l'IA (au-delà, échantillon stratifié début / milieu / fin de chaque partie, avec la taille annoncée). Mais une IA qui lit 60 000 mots d'un coup est **peu fiable pour compter des fréquences** ; on lui demande donc des observations *structurées et vérifiables*, pas un pourcentage :
+
+- **par chapitre ou partie** : niveau pour chacune des six dimensions (absente / ponctuelle / fréquente / dominante) ;
+- **pour chaque dimension relevée** : 2 à 3 citations *exactes* avec leur localisation et une phrase d'explication ;
+- **par passage difficile** : une attribution A / B / C et, dans les cas ambigus, la raison de l'hésitation.
+
+Puis le **code** : (1) **vérifie mécaniquement que chaque citation figure telle quelle dans le manuscrit** (même principe que la rétrogradation des « sources » dans Références / Vérifier les faits : une citation introuvable est écartée et signalée, jamais crue sur parole) ; (2) calcule la part des chapitres touchés par dimension ; (3) applique la règle du §4.5. Le résultat est un **indice sur le manuscrit**, avec ce qui le fonde — pas un recensement.
 
 ### 4.3 Signaux objectifs peu coûteux (sans IA)
 
@@ -115,8 +124,8 @@ Briques existantes réutilisables : le **pont `audits.projet_id`** (prévu, jama
 
 ## 6. Parcours utilisateur proposé
 
-1. **Audit (palier au choix)** → le pré-audit approfondi inclut le profil de lisibilité.
-2. **Restitution** : si DREM, un écran explique avec le texte respectueux du brief (§10), les observations citées, l'incertitude, et propose *deux* suites : « démonstration sur un extrait » ou « parcours complet » (avec estimation du volume de travail et du coût, **avant** tout engagement).
+1. **Aperçu gratuit** (déjà le premier geste de l'auteur) → il inclut maintenant le profil de lisibilité.
+2. **Restitution** : si DREM, l'Aperçu affiche, *à la place* de la proposition habituelle de pré-audit/audit, le texte respectueux du brief (§10), les observations citées, l'incertitude, et propose *deux* suites : « démonstration sur un extrait » ou « parcours complet » (avec estimation du volume de travail et du coût, **avant** tout engagement). Le pré-audit et l'audit restent accessibles, avec avertissement, pour un auteur qui souhaite quand même les lancer.
 3. **Démonstration** (extrait représentatif choisi avec l'auteur) : texte original → difficultés et effet sur la compréhension → **questions à l'auteur** → proposition de révision *uniquement là où le sens est établi* (le reste marqué « à confirmer ») → comparaison commentée → estimation prudente du travail restant.
 4. **Parcours complet** dans CursEdit, étape par étape, avec validation de l'auteur à chaque étape structurante ; l'auteur peut s'arrêter ou revenir en arrière.
 5. **Livrable** : version de travail + journal des décisions (Dossier de création enrichi) ; l'original reste intact.
@@ -136,12 +145,12 @@ Briques existantes réutilisables : le **pont `audits.projet_id`** (prévu, jama
 
 ## 8. Proposition de MVP puis d'évolutions
 
-**MVP — phase 0 (lecture seule, aucune réécriture)** — *à valider d'abord sur 2–3 manuscrits réels, dont celui qui a motivé le brief*
-- Échantillonnage stratifié + signaux objectifs.
+**MVP — phase 0 (lecture seule, aucune réécriture, dans l'Aperçu existant)** — *à valider d'abord sur 2–3 manuscrits réels, dont celui qui a motivé le brief*
+- Nouveaux champs dans le schéma de sortie de `preaudit-global-cursaudit` (profil de lisibilité par chapitre, citations, A/B/C, valeur du fond à confirmer) + vérification mécanique des citations + règle DREM appliquée par le code ; signaux objectifs calculés côté client.
 - Profil de lisibilité (6 dimensions, fréquences, exemples cités), classification A/B/C, statut « valeur du fond à confirmer ».
 - Indicateur d'orientation à 3 niveaux avec règle de déclenchement explicite (§4.5).
 - Section dans le rapport (écran + export Word) avec le texte de restitution respectueux.
-- Coût : un passage d'IA sur l'échantillon (de l'ordre de grandeur d'un pré-audit approfondi, à mesurer) ; tarif à fixer avec Joseph.
+- Coût : **aucun appel supplémentaire** (mêmes jetons d'entrée qu'aujourd'hui, un peu plus de sortie : à mesurer sur un livre réel). L'Aperçu reste gratuit. Risque à surveiller : le dépassement du délai d'une Edge Function si la sortie s'allonge trop (l'Aperçu actuel tient déjà dans un seul appel).
 
 **Phase 1 — démonstration sur extrait**
 - Génération du dossier de démonstration (§9 du brief) dans CursEdit : original, difficultés, questions, révision partielle, comparaison, estimation. Réutilise Correction rapide / Vérifier le fond / propositions insérables.
@@ -175,7 +184,7 @@ Critère de succès de la phase 0 : T1–T4 correctement séparés, T8 stable, T
 ## Points à trancher par Joseph avant développement
 
 1. **Nom affiché à l'auteur** : « DREM » reste un terme interne ; propose-t-on « reconstruction éditoriale approfondie recommandée » ? (je le recommande)
-2. **Tarification** de la phase 0 : incluse dans le palier approfondi, ou option séparée ?
+2. **Tarification** : la phase 0 reste incluse dans l'Aperçu gratuit (recommandé). Reste à décider si la *démonstration sur extrait* (phase 1) est gratuite ou payante.
 3. **Manuscrit témoin** : accord pour utiliser le manuscrit qui a motivé le brief (anonymisé) comme premier cas d'essai ?
-4. **Démonstration** : gratuite, ou payante déduite du travail ultérieur ?
+4. **Blocage ou avertissement** : confirmer qu'un DREM *recommande fortement* d'éviter le pré-audit/audit, sans l'interdire (mon avis, §3).
 5. **Seuils du DREM** : accord pour les présenter comme « repères de travail non validés » dans l'interface et les rapports ?
