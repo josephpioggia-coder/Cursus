@@ -52,6 +52,7 @@ import { noterUsageIA } from "../lib/usageIA.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
 import VerifierLeFond from "./VerifierLeFond.jsx";
 import AvisSurLeFond from "./AvisSurLeFond.jsx";
+import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -1123,6 +1124,7 @@ export default function Editeur({
   const [correctionOuverte, setCorrectionOuverte] = useState(false);
   const [vérificationOuverte, setVérificationOuverte] = useState(false);
   const [avisOuvert, setAvisOuvert] = useState(false);
+  const [nettoyageOuvert, setNettoyageOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1427,6 +1429,16 @@ export default function Editeur({
     return () => clearTimeout(timer);
   }, [modeFocus, formatRéférence, recalculerNumérosDeLigne]);
 
+  // Instantané juste avant une modification en masse (nettoyage mécanique) : permet de revenir en arrière même après rechargement.
+  const sauvegarderAvant = useCallback(async () => {
+    if (!editor || !nœud?.id) return;
+    const html = editor.getHTML();
+    const apercu = "Avant nettoyage mécanique — " + html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) + "…";
+    const { data } = await supabase.from("versions_noeuds")
+      .insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
+    if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
+  }, [editor, nœud?.id]);
+
   const restaurerVersion = useCallback(async (contenu) => {
     // Filet de sécurité : le texte actuel est gardé dans l'historique avant d'être remplacé.
     if (editor && nœud?.id) {
@@ -1564,6 +1576,19 @@ export default function Editeur({
           </button>
           {!lectureSeule && (
             <button
+              onClick={() => setNettoyageOuvert(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Étape 0, sans IA : typographie (règles à cocher, aperçu), répétitions, tics et rythme du texte"
+            >
+              🧹 Nettoyage mécanique
+            </button>
+          )}
+          {!lectureSeule && (
+            <button
               onClick={() => setCorrectionOuverte(true)}
               style={{
                 fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
@@ -1673,6 +1698,10 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {nettoyageOuvert && editor && (
+        <NettoyageMecanique editor={editor} couleur={projetCouleur} onFermer={() => setNettoyageOuvert(false)} onAvantModification={sauvegarderAvant} />
       )}
 
       {avisOuvert && editor && (
