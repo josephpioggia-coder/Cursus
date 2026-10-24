@@ -348,6 +348,45 @@ function BoutonOutil({ actif, désactivé, onClick, titre, children, grand }) {
 // une erreur de reconnaissance non relue serait bien plus difficile à
 // repérer qu'une faute de frappe.
 
+// Dictée (24/10/2026) — « Audio file might be corrupted or unsupported » : les
+// enregistrements MediaRecorder (webm/opus sans durée dans l'en-tête, ou mp4
+// selon le navigateur) sont parfois refusés par l'API de transcription, et le
+// blob était de toute façon étiqueté « audio/webm » quel que soit son vrai format.
+// On le convertit donc en WAV mono 16 kHz (lisible partout) ; si le décodage
+// échoue, on envoie l'original avec sa VRAIE extension.
+async function versWav16k(blob) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) throw new Error("AudioContext indisponible");
+  const ctx = new Ctx();
+  try {
+    const decode = await ctx.decodeAudioData(await blob.arrayBuffer());
+    const cible = 16000;
+    const hors = new OfflineAudioContext(1, Math.max(1, Math.ceil(decode.duration * cible)), cible);
+    const src = hors.createBufferSource();
+    src.buffer = decode;
+    src.connect(hors.destination);
+    src.start();
+    const pcm = (await hors.startRendering()).getChannelData(0);
+    const octets = new ArrayBuffer(44 + pcm.length * 2);
+    const v = new DataView(octets);
+    const ecrire = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    ecrire(0, "RIFF"); v.setUint32(4, 36 + pcm.length * 2, true); ecrire(8, "WAVE"); ecrire(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, cible, true); v.setUint32(28, cible * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    ecrire(36, "data"); v.setUint32(40, pcm.length * 2, true);
+    for (let i = 0; i < pcm.length; i++) {
+      const x = Math.max(-1, Math.min(1, pcm[i]));
+      v.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true);
+    }
+    return new Blob([octets], { type: "audio/wav" });
+  } finally {
+    ctx.close?.();
+  }
+}
+
+const extensionAudio = (type = "") =>
+  type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : type.includes("wav") ? "wav" : "webm";
+
 function BoutonDictee({ editor }) {
   const [ouvert, setOuvert] = useState(false);
   const [statut, setStatut] = useState("idle"); // idle | enregistrement | transcription | relecture | erreur
@@ -379,8 +418,11 @@ function BoutonDictee({ editor }) {
     }
     setStatut("transcription");
     try {
+      let envoi = blob;
+      try { envoi = await versWav16k(blob); }
+      catch (e) { console.warn("[dictée] conversion WAV impossible, envoi de l'original :", e?.message); }
       const formulaire = new FormData();
-      formulaire.append("audio", blob, "dictee.webm");
+      formulaire.append("audio", envoi, `dictee.${extensionAudio(envoi.type)}`);
       formulaire.append("langue", "fr");
       const { data, error } = await supabase.functions.invoke("transcrire-audio", { body: formulaire });
       if (error) {
@@ -420,7 +462,7 @@ function BoutonDictee({ editor }) {
       enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceauxRef.current.push(e.data); };
       enregistreur.onstop = () => {
         flux.getTracks().forEach((piste) => piste.stop());
-        transcrire(new Blob(morceauxRef.current, { type: "audio/webm" }));
+        transcrire(new Blob(morceauxRef.current, { type: enregistreur.mimeType || "audio/webm" }));
       };
       enregistreur.start();
       enregistreurRef.current = enregistreur;
