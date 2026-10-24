@@ -962,10 +962,12 @@ function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier
 // MODIF 21/07/2026 : "Historique de session" renommé "Historique des versions" —
 // ce n'est plus limité à la session en cours, c'est désormais permanent.
 
-function PanneauHistorique({ historique, chargement, onRestaurer, onFermer, couleur }) {
+function PanneauHistorique({ historique, chargement, onRestaurer, onFermer, couleur, mobile }) {
   return (
     <div style={{
-      width: 260, borderLeft: "0.5px solid #e5e5e5",
+      ...(mobile
+        ? { position: "fixed", top: 48, left: 0, right: 0, bottom: 0, zIndex: 60 }
+        : { width: 260, borderLeft: "0.5px solid #e5e5e5" }),
       display: "flex", flexDirection: "column",
       background: "#fafafa", overflowY: "auto",
     }}>
@@ -1109,6 +1111,8 @@ export default function Editeur({
   // dans le callback différé de sauvegarde, sans dépendre d'une closure
   // React potentiellement obsolète. Ajouté 21/07/2026.
   const dernierMotsHistoriqueRef = useRef(null);
+  const dernierInstantanéTemps = useRef(0);
+  const dernierInstantanéHtml = useRef(null);
   // Numéros de ligne — ajouté 24/07/2026.
   const wrapperLigneRef = useRef(null);
   const [numérosDeLigne, setNumérosDeLigne] = useState([]);
@@ -1260,7 +1264,13 @@ export default function Editeur({
         const motsCourants = compterMots(html);
         const dernierConnu = dernierMotsHistoriqueRef.current;
         const diffMots = dernierConnu === null ? motsCourants : Math.abs(motsCourants - dernierConnu);
-        if (diffMots < 50 && dernierConnu !== null) return;
+        // 24/10/2026 : en plus du seuil de 50 mots, un instantané toutes les 5 min
+        // si le texte a changé (une suppression de quelques lignes restait sinon
+        // introuvable dans l'historique).
+        const récent = Date.now() - dernierInstantanéTemps.current < 5 * 60 * 1000;
+        if (dernierConnu !== null && diffMots < 50 && (récent || html === dernierInstantanéHtml.current)) return;
+        dernierInstantanéTemps.current = Date.now();
+        dernierInstantanéHtml.current = html;
 
         const apercu = html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) + "…";
         const { data, error } = await supabase
@@ -1367,10 +1377,18 @@ export default function Editeur({
     return () => clearTimeout(timer);
   }, [modeFocus, formatRéférence, recalculerNumérosDeLigne]);
 
-  const restaurerVersion = useCallback((contenu) => {
+  const restaurerVersion = useCallback(async (contenu) => {
+    // Filet de sécurité : le texte actuel est gardé dans l'historique avant d'être remplacé.
+    if (editor && nœud?.id) {
+      const html = editor.getHTML();
+      const apercu = "Avant restauration — " + html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) + "…";
+      const { data } = await supabase.from("versions_noeuds")
+        .insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
+      if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
+    }
     editor?.commands.setContent(contenu);
     setVoirHistorique(false);
-  }, [editor]);
+  }, [editor, nœud?.id]);
 
   // Lecture à voix haute (01/10/2026) — lit la sélection en cours dans
   // l'éditeur si elle n'est pas vide, sinon tout le texte du chapitre.
@@ -1701,6 +1719,7 @@ export default function Editeur({
             onRestaurer={restaurerVersion}
             onFermer={() => setVoirHistorique(false)}
             couleur={projetCouleur}
+            mobile={mobile}
           />
         )}
       </div>
