@@ -39,6 +39,8 @@ import { MentionsLegales, CGV, PolitiqueConfidentialite } from "./components/Pag
 import ModeEmploi from "./components/ModeEmploi.jsx";
 import CarnetIdees from "./components/CarnetIdees.jsx";
 import SalleDesJeux from "./components/SalleDesJeux.jsx";
+import PauseBouger from "./components/PauseBouger.jsx";
+import PagePauseBouger from "./components/PagePauseBouger.jsx";
 import CopiloteIA from "./components/CopiloteIA.jsx";
 import ImportDocx from "./components/ImportDocx.jsx";
 import IncorporerMatiere from "./components/IncorporerMatiere.jsx";
@@ -2360,6 +2362,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             // Solveur Scrabble — 29/09/2026, demande de Joseph (jouer avec les
             // lettres et les mots). Libellé en dur, comme "Mes audits".
             { id: "scrabble",     label: "Jeux de mots",                  icone: "🔤" },
+            // Pauses bien-être — 24/10/2026, idée de Joseph : rappel discret de bouger quand on écrit longtemps.
+            { id: "pause",        label: "Pauses bien-être",              icone: "🧘" },
             // Précision "(CursEdit)" ajoutée le 22/08/2026 : cet onglet reste
             // visible même dans l'espace CursAudit (la navigation n'est pas
             // encore séparée par espace), et affiche exclusivement les
@@ -2538,6 +2542,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : solveur Scrabble (29/09/2026) */}
         {vue === "scrabble" && <SalleDesJeux jeuInitial={jeuParLien} />}
+
+        {/* Vue : pauses bien-être (24/10/2026) */}
+        {vue === "pause" && <PagePauseBouger />}
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (
@@ -2976,6 +2983,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
           </div>
         )}
       </div>
+
+      {/* Rappel « bouger » (24/10/2026) : minuteur discret + bandeau + séance guidée, monté une fois pour toute l'app connectée */}
+      <PauseBouger />
 
       {/* Centre d'aide — accessible depuis n'importe quel écran */}
       {aideOuverte && (
