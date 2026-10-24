@@ -16,7 +16,7 @@ import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireParagraphes } from "../lib/paragraphesEditeur.js";
 import { NIVEAUX, CATEGORIES_BILAN, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
 
-export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer }) {
+export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
   const [étape, setÉtape] = useState("choix"); // choix | encours | revue
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
@@ -32,6 +32,7 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
     localStorage.setItem("cursus-correction-niveau", niveau);
     const { liste, ignorés } = lireParagraphes(editor, portée === "sélection");
     if (!liste.length) { setErreur("Aucun texte à corriger."); return; }
+    onUsage?.("lance");
     setErreur(null);
     setÉtape("encours");
     const lots = decouperEnLots(liste);
@@ -86,6 +87,7 @@ export default function CorrectionRapide({ editor, couleur = "#7F77DD", onFermer
       else tr.delete(r.de, r.à);
     }
     if (remplacements.length) editor.view.dispatch(tr);
+    if (remplacements.length) onUsage?.("applique", retenues.length - périmés);
     setAppliqué({ n: retenues.length - périmés, périmés });
   };
 

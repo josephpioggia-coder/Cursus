@@ -48,6 +48,7 @@ import Image from "@tiptap/extension-image";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { noterUsageIA } from "../lib/usageIA.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
 import VerifierLeFond from "./VerifierLeFond.jsx";
 import IconeLoupe from "./IconeLoupe.jsx";
@@ -1611,11 +1612,11 @@ export default function Editeur({
       )}
 
       {vérificationOuverte && editor && (
-        <VerifierLeFond editor={editor} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
+        <VerifierLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "verifier_le_fond", action, nb })} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
       )}
 
       {correctionOuverte && editor && (
-        <CorrectionRapide editor={editor} couleur={projetCouleur} onFermer={() => setCorrectionOuverte(false)} />
+        <CorrectionRapide editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "correction_rapide", action, nb })} couleur={projetCouleur} onFermer={() => setCorrectionOuverte(false)} />
       )}
 
       {!modeFocus && erreurLecture && (

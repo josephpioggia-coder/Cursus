@@ -32,6 +32,7 @@ import { supabase } from "../lib/supabase.js";
 import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { noterUsageIA } from "../lib/usageIA.js";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
 // la seule limite est ce que l'auteur choisit lui-même — la sélection
@@ -1964,6 +1965,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
     }
+    noterUsageIA({ projetId, noeudId: nœudId, outil: "copilote", action: "lance" });
 
     // Images du CHAPITRE (24/09/2026, phase 2 ; CORRECTIF le jour même,
     // signalé en usage réel : passées en mode "Surligné pour analyse", ça
