@@ -145,10 +145,10 @@ export default function CursAudit({ onVoirAudits } = {}) {
   // changement de niveauxRetenus. chapitresDétectés reste `null` si import
   // non-.docx (texte collé, pas de style Word à lire) ou si aucune
   // structure de titres répétée n'a été trouvée, comme avant.
-  const { unitésDocx, chapitresDétectés } = useMemo(() => {
-    if (!infosDocx) return { unitésDocx: null, chapitresDétectés: null };
-    const { unités: u, chapitres } = regrouperParNiveaux(infosDocx, niveauxRetenus);
-    return { unitésDocx: u, chapitresDétectés: chapitres.length > 0 ? chapitres : null };
+  const { unitésDocx, imagesDocx, chapitresDétectés } = useMemo(() => {
+    if (!infosDocx) return { unitésDocx: null, imagesDocx: null, chapitresDétectés: null };
+    const { unités: u, images: img, chapitres } = regrouperParNiveaux(infosDocx, niveauxRetenus);
+    return { unitésDocx: u, imagesDocx: img, chapitresDétectés: chapitres.length > 0 ? chapitres : null };
   }, [infosDocx, niveauxRetenus]);
   const [nomFichier, setNomFichier] = useState(null);
   const [importEnCours, setImportEnCours] = useState(false);
@@ -257,6 +257,15 @@ export default function CursAudit({ onVoirAudits } = {}) {
     if (source === "docx") return unitésDocx || [];
     return segmenterTexte(texte);
   }, [source, texte, unitésDocx]);
+
+  // Images Word associées à chaque unité (17/10/2026, point 2 de l'audit de
+  // préparation à la commercialisation — voir CLAUDE.md) — tableau
+  // PARALLÈLE à `unités` ; jamais d'image pour du texte collé (aucun style
+  // Word à lire dans ce cas).
+  const images = useMemo(() => {
+    if (source === "docx") return imagesDocx || unités.map(() => []);
+    return unités.map(() => []);
+  }, [source, imagesDocx, unités]);
 
   // Aperçu de confirmation (12/09/2026) — début et fin du texte RÉELLEMENT
   // soumis (unités jointes, pas `texte` brut : pour un import .docx, `texte`
@@ -388,6 +397,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
     const { data, error } = await auditsAPI.créer({
       titre: titre.trim(),
       unités,
+      images,
       palierDimensions: palier,
       nombreDimensions: palierChoisi.dimensions,
       modeIA,
@@ -465,15 +475,20 @@ export default function CursAudit({ onVoirAudits } = {}) {
       </div>
 
       {/* Précision ajoutée le 24/09/2026, demande de Joseph après le
-          chantier "images dans le co-pilote" : CursAudit segmente le texte
-          en unités brutes (audit_sections.texte_source) — aucune image
-          n'est extraite ni analysée ici, contrairement au Co-pilote IA de
-          CursEdit, qui voit désormais le contenu des images insérées dans
-          un chapitre. Éviter qu'un·e auteur·ice découvre cette limite
-          après coup, comme ça a été le cas en interne sur "Oracle du
-          Sermon sur la montagne". */}
+          chantier "images dans le co-pilote" — à l'époque, CursAudit
+          segmentait le texte en unités brutes (audit_sections.texte_source)
+          sans jamais extraire ni analyser la moindre image, contrairement
+          au Co-pilote IA de CursEdit. CORRIGÉE le 17/10/2026 (point 2 de
+          l'audit de préparation à la commercialisation — CLAUDE.md) :
+          un import .docx lit désormais aussi les images intégrées
+          (segmenterCursAudit.js) et les transmet à l'analyse détaillée.
+          Limite réelle restante, reformulée ici pour ne pas induire en
+          erreur : le texte COLLÉ (pas de style Word à lire) ne peut
+          toujours porter aucune image, par nature. */}
       <div style={{ fontSize: 11, color: "#888", background: "#F5F5F7", borderRadius: 6, padding: "6px 10px", marginBottom: 8, lineHeight: 1.5 }}>
-        ℹ️ CursAudit analyse uniquement le texte — les images de votre document (Word ou texte collé) ne sont pas prises en compte. Pour une analyse qui tient compte des images, utilisez le Co-pilote IA directement dans CursEdit.
+        ℹ️ {source === "docx"
+          ? "CursAudit lit aussi les images intégrées à votre fichier Word et en tient compte dans l'analyse détaillée."
+          : "Le texte collé ne peut pas contenir d'image. Pour une analyse qui tient compte d'images, importez un fichier Word (.docx) qui en contient."}
       </div>
 
       {source === "coller" ? (

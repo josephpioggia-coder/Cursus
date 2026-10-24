@@ -19,8 +19,7 @@
 
 import { useState, useRef } from "react";
 import { nœudsAPI } from "../lib/api.js";
-import { supabase } from "../lib/supabase.js";
-import { journaliserErreur } from "../lib/journalErreurs.js";
+import { idsImagesDuParagraphe, téléverserImagesDocx } from "../lib/segmenterCursAudit.js";
 
 // ─── Lecture du .docx via JSZip (chargé une fois) ────────────────────────────
 
@@ -92,77 +91,11 @@ function niveauDepuisNomStyle(styleId) {
   return m ? parseInt(m[1], 10) - 1 : undefined;
 }
 
-// ─── Images intégrées au .docx (24/09/2026, demande de Joseph : "comment
+// Images intégrées au .docx (24/09/2026, demande de Joseph : "comment
 // importer un texte qui comprend déjà des images dans le fichier word ?")
-// ─────────────────────────────────────────────────────────────────────────
-// Un .docx est un zip : le texte est dans word/document.xml, les images
-// sont des fichiers binaires séparés dans word/media/, référencés par un
-// identifiant de relation (r:embed="rIdN") plutôt que par leur chemin
-// direct — la correspondance rId → fichier vit dans
-// word/_rels/document.xml.rels. Recherche par NAMESPACE (getAttributeNS),
-// pas par préfixe littéral ("a:blip", "r:embed") : Word peut réutiliser
-// des préfixes différents selon l'outil qui a produit le fichier, la
-// résolution par URI de namespace est fiable dans tous les cas.
-const NS_RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
-// Identifiants de relation (rId) de toutes les images dans un paragraphe,
-// dans l'ordre où elles apparaissent — un paragraphe peut être un mélange
-// de texte et d'image(s) inline, ou une image seule sans texte.
-function idsImagesDuParagraphe(p) {
-  return Array.from(p.getElementsByTagName("*"))
-    .filter((el) => el.localName === "blip")
-    .map((el) => el.getAttributeNS(NS_RELATIONSHIPS, "embed"))
-    .filter(Boolean);
-}
-
-// rId → chemin dans le zip (ex. "rId4" → "word/media/image1.png").
-async function chargerRelationsImages(zip) {
-  const relsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
-  if (!relsXml) return {};
-  const doc = new DOMParser().parseFromString(relsXml, "text/xml");
-  const relations = {};
-  for (const rel of Array.from(doc.getElementsByTagName("Relationship"))) {
-    const id = rel.getAttribute("Id");
-    const cible = rel.getAttribute("Target");
-    if (id && cible) relations[id] = cible.startsWith("media/") ? `word/${cible}` : cible;
-  }
-  return relations;
-}
-
-const MIME_PAR_EXTENSION = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", bmp: "image/bmp", webp: "image/webp", emf: "image/x-emf", wmf: "image/x-wmf" };
-
-// Extrait chaque image UNE SEULE FOIS (un même rId peut apparaître dans
-// plusieurs paragraphes si l'auteur·ice a copié-collé) et l'envoie vers le
-// même bucket que le bouton 🖼️ de l'éditeur (images-manuscrits) — même
-// stockage, même politique d'accès, pas de code dupliqué côté base.
-// Retourne { rId: urlPublique }. Une image qui échoue (fichier manquant
-// dans le zip, upload en échec) est simplement omise plutôt que de faire
-// échouer tout l'import — le texte reste prioritaire.
-async function téléverserImagesDocx(zip, idsUtilisés) {
-  if (!idsUtilisés.size) return {};
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return {};
-  const relations = await chargerRelationsImages(zip);
-  const urlParId = {};
-  await Promise.all(Array.from(idsUtilisés).map(async (rId) => {
-    try {
-      const cheminZip = relations[rId];
-      const fichierZip = cheminZip && zip.file(cheminZip);
-      if (!fichierZip) return;
-      const extension = (cheminZip.split(".").pop() || "png").toLowerCase();
-      const contentType = MIME_PAR_EXTENSION[extension] || "application/octet-stream";
-      const blob = await fichierZip.async("blob");
-      const chemin = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-      const { error } = await supabase.storage.from("images-manuscrits").upload(chemin, blob, { contentType, upsert: false });
-      if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from("images-manuscrits").getPublicUrl(chemin);
-      urlParId[rId] = publicUrl;
-    } catch (err) {
-      journaliserErreur("ImportDocx:téléverserImagesDocx", `${rId} — ${err.message}`);
-    }
-  }));
-  return urlParId;
-}
+// — idsImagesDuParagraphe/téléverserImagesDocx déplacées dans
+// src/lib/segmenterCursAudit.js le 17/10/2026 (reprises pour CursAudit,
+// voir son en-tête) : importées ci-dessus plutôt que dupliquées.
 
 // niveauPartie / niveauChapitre : niveaux de titre (1 à 6) choisis à l'écran
 // de sélection pour représenter les Parties et les Chapitres — ajouté
@@ -386,6 +319,26 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
   // réglables avant l'analyse (par défaut Titre 1 / Titre 2, comme avant).
   const [niveauPartie, setNiveauPartie] = useState(1);
   const [niveauChapitre, setNiveauChapitre] = useState(2);
+  // Sommaire de travail (ajouté 14/10/2026, demande de Joseph : un document
+  // d'architecture éditoriale — objectif/angle/sources par chapitre, texte
+  // pas encore rédigé — importé tel quel atterrissait dans le corps du
+  // chapitre, au même titre qu'un texte définitif. Avec cette case cochée,
+  // chaque nœud "nouveau" PORTANT RÉELLEMENT DU TEXTE est créé avec un corps
+  // VIDE (prêt à écrire) et le contenu importé part dans un nœud enfant
+  // dédié, zone "methodo" (donc jamais exporté comme texte du livre, jamais
+  // confondu avec du texte rédigé) — voir aussi CopiloteIA.jsx
+  // (noteDeCadrage) qui lit ce nœud comme contexte de rédaction.
+  // CORRECTIF 14/10/2026 (même jour, constaté sur un import réel) : au
+  // départ restreint aux CHAPITRES, en supposant qu'une Partie n'a jamais de
+  // texte propre — faux pour un Avant-propos, une Introduction générale ou
+  // une Partie avec un paragraphe de cadrage : leur texte atterrissait
+  // encore directement dans le corps. S'applique maintenant à tout type de
+  // nœud dès qu'il porte du texte (ch.mots > 0) — une Partie réellement vide
+  // (simple conteneur de chapitres) n'obtient pas de note inutile. Les
+  // chapitres déjà EXISTANTS (associés à un nœud) ne sont pas concernés par
+  // cette bascule — limite assumée, à traiter séparément si le besoin se
+  // présente.
+  const [sommaireDeTravail, setSommaireDeTravail] = useState(false);
   const inputRef = useRef(null);
   const couleur = projet?.couleur || "#7F77DD";
 
@@ -520,14 +473,37 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
 
         if (décision.statut === "nouveau") {
           const parentId = ch.type === "partie" ? null : dernièrePartieId;
+          // CORRECTIF 14/10/2026 — constaté sur un import réel : une "Partie"
+          // n'est pas toujours un simple conteneur vide. "Avant-propos",
+          // "Introduction générale" ou une "PARTIE I" peuvent porter leur
+          // propre texte d'objectif/angle, exactement comme un chapitre.
+          // Restreindre la bascule au seul type "chapitre" laissait ce texte
+          // atterrir tel quel dans le corps d'une Partie — le même problème
+          // que le mode "sommaire de travail" existe pour éviter. S'applique
+          // désormais à tout nœud "nouveau", quel que soit son type ; la
+          // note n'est créée que s'il y a réellement du texte à y mettre
+          // (ch.mots > 0), pour ne pas encombrer les Parties qui sont de
+          // vrais conteneurs vides.
+          const enModeSommaire = sommaireDeTravail && ch.mots > 0;
           const { data, error } = await nœudsAPI.créer({
             type: ch.type,
             titre: ch.titre,
             parentId,
-            texte: ch.html,
+            texte: enModeSommaire ? "" : ch.html,
           }, projet.id);
           if (error || !data) throw error || new Error("Échec de création du nœud « " + ch.titre + " »");
           nœudId = data.id;
+
+          if (enModeSommaire) {
+            const { error: erreurNote } = await nœudsAPI.créer({
+              type: "scene",
+              titre: "Note de cadrage",
+              parentId: nœudId,
+              texte: ch.html,
+              zone: "methodo",
+            }, projet.id);
+            if (erreurNote) throw erreurNote;
+          }
 
           const clé = parentId || "__racine__";
           (groupesParParent[clé] ||= []).push(nœudId);
@@ -613,6 +589,12 @@ export default function ImportDocx({ projet, nœudsExistants = [], onTerminé, o
                   Les Parties et les Chapitres utilisent le même niveau de titre — tout sera importé comme Partie.
                 </div>
               )}
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 16, padding: "10px 12px", background: `${couleur}08`, border: `0.5px solid ${couleur}30`, borderRadius: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={sommaireDeTravail} onChange={(e) => setSommaireDeTravail(e.target.checked)} style={{ marginTop: 2 }} />
+                <span style={{ fontSize: 12.5, color: "#333", lineHeight: 1.5 }}>
+                  <strong>Importer comme sommaire de travail</strong> — le texte de chaque section (objectif, angle, sources…) devient une note de cadrage, pas le texte définitif, qu'il s'agisse d'une Partie ou d'un Chapitre. Chaque nouveau nœud est créé avec un corps vide, prêt à écrire ; la note reste disponible à côté (zone "méthodo") et sert de repère au Co-pilote.
+                </span>
+              </label>
               <div onClick={() => inputRef.current?.click()}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => { e.preventDefault(); analyser(e.dataTransfer.files[0]); }}

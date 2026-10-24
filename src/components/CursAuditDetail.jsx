@@ -306,6 +306,7 @@ function ConfirmationChapitres({ audit, onTermine }) {
     setErreur(null);
     const { error } = await auditsAPI.remplacerContenu(audit.id, {
       unités: aperçuRéimport.unités,
+      images: aperçuRéimport.images,
       chapitresDétectés: aperçuRéimport.chapitres.length > 0 ? aperçuRéimport.chapitres : null,
     });
     if (error) setErreur(error.message);

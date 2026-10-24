@@ -55,6 +55,8 @@ export const VITESSES_DISPONIBLES = [0.75, 1, 1.25, 1.5, 2];
 // suivante pendant la lecture de la courante (voir `lire()`) pour que les
 // tranches 2+ n'introduisent plus aucun silence audible.
 const TAILLE_MAX_TRANCHE = 700;
+// Première tranche seulement : courte, pour un premier son rapide (voir lire()).
+const TAILLE_PREMIÈRE_TRANCHE = 200;
 
 // Découpe par paragraphes puis, si besoin, par phrases — pour que chaque
 // tranche s'arrête sur une frontière naturelle (silence audible propre)
@@ -142,8 +144,18 @@ async function récupérerAudioTranche(texte, voix, vitesse) {
  */
 export async function lire(texte, { voix = "nova", vitesse = 1, onDébut, onTranche, onFin, onErreur } = {}) {
   arrêterLecture();
-  const tranches = découperTexteTTS(texte);
+  let tranches = découperTexteTTS(texte);
   if (!tranches.length) return;
+  // 22/10/2026 — "très long avant de lire à haute voix" (retour de Joseph,
+  // 2 tranches pour 1 062 caractères) : le délai avant le premier son est
+  // celui de la génération COMPLÈTE de la première tranche (voir plus haut,
+  // gpt-4o-mini-tts ne renvoie rien avant la fin), donc proportionnel à sa
+  // taille. La première est coupée courte (~1-2 phrases) pour démarrer vite ;
+  // le reste suit en une seule tranche, préchargée pendant cette lecture.
+  if (tranches[0].length > TAILLE_PREMIÈRE_TRANCHE * 1.3) {
+    const découpe = découperTexteTTS(tranches[0], TAILLE_PREMIÈRE_TRANCHE);
+    if (découpe.length > 1) tranches = [découpe[0], découpe.slice(1).join("\n"), ...tranches.slice(1)];
+  }
 
   const maSession = ++sessionId;
   fileAttente = tranches;
@@ -184,6 +196,33 @@ export async function lire(texte, { voix = "nova", vitesse = 1, onDébut, onTran
   };
 
   jouerTranche(0);
+}
+
+/**
+ * Solde de lecture à voix haute du mois (22/10/2026, voir lire-texte :
+ * quota du palier + crédits). → { utilise, quota_inclus, credits, disponible,
+ * restant } ou null si indisponible (pas d'abonnement, fonction pas à jour,
+ * réseau) — le compteur est une aide, jamais bloquant.
+ */
+export async function soldeVoix() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return null;
+    const réponse = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`,
+        "apikey": SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ solde: true }),
+    });
+    if (!réponse.ok) return null;
+    const données = await réponse.json();
+    return typeof données?.disponible === "number" ? données : null;
+  } catch {
+    return null;
+  }
 }
 
 export function basculerPause() {

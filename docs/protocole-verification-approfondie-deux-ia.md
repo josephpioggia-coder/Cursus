@@ -330,7 +330,9 @@ Réponse attendue :
 ```json
 {
   "tour": "A1",
-  "claims": [],
+  "claims": [
+    { "affirmation": "...", "registre": "theorique_general", "source_verification": null }
+  ],
   "analyse": "...",
   "corrections_bloquantes": [],
   "corrections_non_bloquantes": [],
@@ -339,6 +341,12 @@ Réponse attendue :
   "reponse_optimale_auteur": null
 }
 ```
+Depuis le 17/10/2026 (voir section dédiée plus bas), ce tour dispose aussi
+de l'outil `web_search` natif d'Anthropic dans le même appel : `claims[].
+source_verification` n'est rempli que pour un registre `theorique_general`
+ou `symbolique_spirituel` que la recherche a réellement confirmée, jamais
+inventé. Cursus recoupe ce champ mécaniquement après coup et ajoute
+`claims[].source_confirmée` — qu'aucune IA ne remplit elle-même.
 
 **Appel à GPT (critique)** :
 ```json
@@ -513,3 +521,52 @@ l'auteur·e attend le résultat dans le panneau).
   déclarée de l'étape 0 — la fonction accepte `intention_declaree` en
   paramètre d'entrée, mais rien ne l'alimente automatiquement depuis
   `QuestionnaireIntention.jsx` pour l'instant.
+- Recherche web indépendante côté GPT : l'outil `web_search` hébergé
+  d'OpenAI n'existe que sur l'API Responses, pas sur Chat Completions
+  (utilisée ici pour sa sortie JSON stricte) — voir section suivante.
+
+## Vérification externe des affirmations théoriques/factuelles (17/10/2026)
+
+Point 1 du GO/NO-GO fiabilité des IA (CLAUDE.md, 03/10/2026) : ce protocole
+ne donnait jusqu'ici à Claude et GPT aucun accès à une source extérieure à
+eux-mêmes — deux IA qui débattent entre elles, jamais une preuve
+indépendante. Le cas nommé explicitement dans la note de décision :
+l'attribution correcte d'une idée à un théoricien nommé (ex. Jung).
+
+Traitement ajouté, mécanique (pas une "3e IA"), même principe que
+CopiloteIA pour l'onglet Références (CLAUDE.md, 03/10/2026) :
+- Le tour Claude (A1/A2, "analyseur_initial") dispose de l'outil
+  `web_search` natif d'Anthropic dans le MÊME appel que celui qui produit
+  la sortie structurée (`tool_choice` passe de forcé à `"auto"` dès que la
+  recherche est activée, pour laisser Claude chercher server-side puis
+  conclure dans le même tour).
+- Chaque `claim` de registre `theorique_general` ou `symbolique_spirituel`
+  porte `source_verification` (URL revendiquée par Claude, jamais inventée
+  d'après la consigne) puis, après coup, `source_confirmée` : calculé par
+  une fonction pure (`recouperClaimsAvecRecherche`, aucun appel IA) contre
+  les résultats RÉELLEMENT renvoyés par l'outil pendant ce tour — peut
+  seulement rétrograder vers `false`, jamais confirmer sur la seule parole
+  du modèle.
+- GPT (le critique) voit ce signal dans `tour_precedent` et est
+  explicitement averti de ne jamais le traiter comme acquis s'il est absent
+  ou faux — c'est une raison légitime de désaccord, pas un détail à ignorer.
+- La sortie finale (étape 7) ajoute `claims_theoriques_non_confirmees` :
+  la liste, tous tours confondus, des affirmations factuelles/théoriques
+  jamais confirmées mécaniquement — distincte de
+  `alertes_a_verifier_sur_source` (qui vise un artefact de numérisation, pas
+  une affirmation théorique non sourcée). Affichée côté UI
+  (`PanneauVerification`, CopiloteIA.jsx) comme un badge rouge dédié, dans
+  le même esprit que celui des Références.
+
+**Limite assumée, pas corrigée ici** : GPT n'a toujours aucun accès à une
+recherche indépendante — migrer uniquement pour ça vers l'API Responses
+d'OpenAI était jugé hors périmètre de ce premier correctif. GPT bénéficie
+malgré tout d'un vrai signal non auto-déclaré (celui de Claude, recoupé
+mécaniquement), ce qu'il n'avait jamais eu avant. Pas de "Layer 2" non plus
+(relire soi-même la page confirmée pour vérifier que la citation exacte y
+figure) — seule l'existence réelle de l'URL est confirmée, pas le contenu
+précis de la page, comme pour les Références de CopiloteIA. Combinaison
+`tool_choice: "auto"` + outil de sortie structurée forcé par ailleurs
+ailleurs dans Cursus : non testée ailleurs dans ce dépôt, à surveiller au
+premier usage réel (CopiloteIA utilise la recherche web uniquement avec une
+sortie texte libre, jamais combinée à un second outil).

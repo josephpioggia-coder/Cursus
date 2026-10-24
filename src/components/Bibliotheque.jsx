@@ -441,7 +441,22 @@ function FicheLivre({ livre, projets, onMàj, onSupprimer }) {
 
 // ─── Composant principal : Bibliothèque ──────────────────────────────────────────
 
-export default function Bibliotheque({ projets = [] }) {
+// `estMobile`, 17/10/2026 (point 3 de l'audit de préparation à la
+// commercialisation — CLAUDE.md) : cette vue n'avait jamais eu de variante
+// mobile, contrairement à la règle déjà établie ailleurs ("toute vue à
+// plusieurs colonnes fixes doit avoir sa variante estMobile"). Vérifié à
+// 360 px : la grille `280px 1fr` ne débordait pas (`scrollWidth ==
+// innerWidth`, pas de défilement horizontal) mais le panneau droit
+// (fiche d'un livre, formulaire d'ajout) se retrouvait écrasé dans les
+// ~80 px restants — titre et auteur du livre COUPÉS net par l'`overflow:
+// hidden` du panneau (pas même un retour à la ligne), citation entière
+// réduite à un mot par ligne, bouton "+ Nouvelle citation" à peine
+// lisible. Corrigé sur le même principe que Editeur.jsx/CopiloteIA
+// (panneau plein écran plutôt que deux colonnes pressées l'une contre
+// l'autre) : sur mobile, liste ET fiche ne sont JAMAIS affichées en même
+// temps — la fiche (ou le formulaire d'ajout) prend toute la largeur,
+// avec un bouton "← Retour" pour revenir à la liste.
+export default function Bibliotheque({ projets = [], estMobile = false }) {
   // CORRECTIF 02/08/2026 — la bibliothèque se préchargeait avec 3 livres de
   // démonstration factices (Mead, Lewin, Kahneman) dès que le localStorage
   // était vide, sans lien avec le contenu réel de l'auteur ni indication
@@ -483,12 +498,19 @@ export default function Bibliotheque({ projets = [] }) {
 
   const totalCitations = livres.reduce((acc, l) => acc + (l.citations?.length || 0), 0);
 
+  // Sur mobile, liste et fiche ne partagent plus l'écran (voir note
+  // d'en-tête du 17/10/2026) : un seul des deux panneaux est affiché à la
+  // fois, le panneau droit prenant alors toute la largeur.
+  const panneauDroitActif = ajouterLivre || !!livreActif;
+  const afficherListe = !estMobile || !panneauDroitActif;
+  const afficherPanneauDroit = !estMobile || panneauDroitActif;
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "grid", gridTemplateColumns: estMobile ? "1fr" : "280px 1fr", height: "100%", overflow: "hidden" }}>
 
       {/* ── Panneau gauche : liste des livres ── */}
-      <div style={{
-        borderRight: "0.5px solid var(--color-border-tertiary)",
+      {afficherListe && <div style={{
+        borderRight: estMobile ? "none" : "0.5px solid var(--color-border-tertiary)",
         display: "flex", flexDirection: "column", overflow: "hidden",
         background: "var(--color-background-secondary)",
       }}>
@@ -541,10 +563,22 @@ export default function Bibliotheque({ projets = [] }) {
             ))
           )}
         </div>
-      </div>
+      </div>}
 
       {/* ── Panneau droit : fiche ou formulaire ── */}
-      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      {afficherPanneauDroit && <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {estMobile && (
+          <button
+            onClick={() => { setLivreActifId(null); setAjouterLivre(false); }}
+            style={{
+              alignSelf: "flex-start", margin: "10px 0 0 14px", background: "none",
+              border: "0.5px solid var(--color-border-tertiary)", borderRadius: 7,
+              padding: "5px 10px", fontSize: 12, color: "var(--color-text-secondary)",
+              cursor: "pointer", fontFamily: "inherit",
+            }}>
+            ← Retour
+          </button>
+        )}
         {ajouterLivre ? (
           <div style={{ padding: "24px 28px", overflowY: "auto" }}>
             <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--color-text-primary)", marginBottom: 20 }}>Ajouter un livre</h2>
@@ -582,7 +616,7 @@ export default function Bibliotheque({ projets = [] }) {
             Sélectionnez un livre pour voir sa fiche.
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

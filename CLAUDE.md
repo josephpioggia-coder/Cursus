@@ -858,3 +858,296 @@ tai chi sur chaise dont il avait une liste, restée sur son ordinateur — non r
   toutes les images clés de chaque mouvement contrôlées visuellement. NON testé : téléphone réel, usage sur plusieurs heures.
 - Pistes non faites : illustrations plus riches (Æncre qui montre les gestes), lecture à voix haute du texte PENDANT la pause (utilise la
   synthèse vocale payante), liste de mouvements de Joseph à intégrer, voix guidée, rappel quand l'app est en arrière-plan.
+
+## Audit de préparation à la commercialisation de CursEdit/CursAudit (17/10/2026)
+
+Joseph : « je pense qu'à présent CursEdit et Cursaudit sont suffisamment au point que pour être
+commercialisé... Peux tu en faire un audit ? ». Audit mené par lecture réelle du code (pas une
+réponse de principe), 5 points relevés, dont un déjà explicitement non refermé par Joseph lui-même :
+le point 1 du GO/NO-GO fiabilité des IA (03/10/2026) notait que `verification-deux-ia` n'avait
+toujours aucun accès à une source externe pour les affirmations théoriques/factuelles — resté « le
+chantier suivant si Joseph le confirme » depuis le correctif des Références de CopiloteIA. Joseph :
+« oui, commence par le point 1 ». Les points 2 à 5 (lecture d'image par CursAudit encore incomplète,
+revérification mobile de CursAudit/Bibliothèque, suivi de coût par caractère pour la voix,
+"Layer 2" de citation exacte) restent non traités, signalés mais pas corrigés dans cette passe.
+
+## Point 1 traité : vérification externe des affirmations théoriques dans verification-deux-ia (17/10/2026)
+
+Même principe que les Références de CopiloteIA (03/10/2026) : un statut ou une affirmation jamais
+recoupés contre une source EXTÉRIEURE à l'IA qui les énonce ne sont que sa propre parole — et une
+seconde IA d'accord ne compte toujours pas comme preuve indépendante (c'est le risque même du
+protocole à deux IA). Détail complet : voir la note en tête de
+`supabase/functions/verification-deux-ia/index.ts` et la nouvelle section du
+15/08/2026 du protocole (`docs/protocole-verification-approfondie-deux-ia.md`).
+
+- Le tour Claude (A1/A2, rôle « analyseur_initial ») dispose maintenant de l'outil `web_search`
+  natif d'Anthropic dans le MÊME appel que celui qui produit la sortie structurée (`tool_choice`
+  passe de forcé à `"auto"` dès que la recherche est activée). Combinaison non testée ailleurs dans
+  ce dépôt — CopiloteIA utilise la recherche web uniquement avec une sortie texte libre, jamais
+  combinée à un second outil forcé — à surveiller au premier usage réel.
+- Chaque `claim` de registre `theorique_general` ou `symbolique_spirituel` (le cas nommé dans le
+  GO/NO-GO : attribution d'une idée à un théoricien nommé) porte `source_verification` (URL
+  revendiquée par Claude, jamais inventée d'après la consigne), puis `source_confirmée`, calculé
+  par une fonction pure (`recouperClaimsAvecRecherche`, aucun appel IA, le même module existe aussi
+  dans `_shared/moteur-ia-structure.ts` pour un futur déploiement par CLI) contre les résultats
+  RÉELLEMENT renvoyés par l'outil pendant ce tour — ne peut que RÉTROGRADER vers `false`, jamais
+  confirmer sur la seule parole du modèle.
+- GPT (le critique) voit `source_confirmée` dans `tour_precedent` et est explicitement averti par
+  son system prompt de ne jamais le traiter comme acquis s'il est absent ou faux.
+- Sortie finale : nouveau champ `claims_theoriques_non_confirmees` (toutes les affirmations
+  factuelles/théoriques jamais confirmées, tous tours confondus) — affiché côté client
+  (`PanneauVerification`, `CopiloteIA.jsx`) en badge rouge dédié, sur le même principe que le badge
+  « IA affirme vérifié — non confirmé par Cursus » des Références.
+
+**Limite assumée, pas corrigée ici** : GPT n'a toujours aucun accès à une recherche indépendante —
+l'outil `web_search` hébergé d'OpenAI n'existe que sur l'API Responses, pas sur Chat Completions
+(utilisée ici pour sa sortie JSON stricte) ; migrer uniquement pour ça était jugé hors périmètre de
+ce premier correctif. GPT bénéficie malgré tout, pour la première fois, d'un signal non
+auto-déclaré (celui de Claude, recoupé mécaniquement) plutôt que de juger une affirmation
+théorique sur sa seule plausibilité. Pas de "Layer 2" non plus (relire soi-même la page confirmée
+pour vérifier que la citation exacte y figure) — seule l'existence réelle de l'URL est confirmée,
+pas le contenu précis de la page, comme pour les Références de CopiloteIA. NON TESTÉ EN CONDITIONS
+RÉELLES (ni le couple `web_search` + outil de sortie structurée forcé dans le même appel Claude, ni
+le comportement du badge côté UI sur un vrai cas théorique/factuel).
+
+## Point 2 traité : CursAudit lit enfin les images intégrées au .docx (17/10/2026)
+
+Suite de l'audit de préparation à la commercialisation : point 2, "lecture d'image par CursAudit
+encore incomplète" (`docs/liste-attente.md` #4). En creusant AVANT d'écrire du code, le diagnostic
+s'est révélé plus profond que prévu : la note de la liste d'attente pensait que CursAudit relisait
+les images de CursEdit — en réalité CursAudit a son propre pipeline, totalement séparé (un .docx
+téléversé spécifiquement pour l'audit, lu par `segmenterCursAudit.js`), qui ne lisait QUE le texte
+des paragraphes Word (`<w:t>`) : aucune image n'était jamais extraite, ni côté client ni côté
+serveur, même pour un fichier qui en contient. Soumis à Joseph avant de se lancer (ampleur du
+chantier, bien au-delà d'un correctif ciblé) : « Chantier complet maintenant ».
+
+- `src/lib/segmenterCursAudit.js` récupère EXACTEMENT la lecture OOXML déjà éprouvée dans
+  `ImportDocx.jsx` pour CursEdit (24/09/2026) — `idsImagesDuParagraphe`/`téléverserImagesDocx`
+  déplacées là plutôt que dupliquées (même bucket `images-manuscrits`) ; `ImportDocx.jsx` les
+  importe désormais d'ici au lieu d'en garder sa propre copie.
+- `analyserStructureDocx` associe à chaque paragraphe ses images (URLs publiques, téléversées une
+  seule fois pour tout le document) ; `regrouperParNiveaux` les reporte vers la bonne unité —
+  même principe que `titresEnAttente` pour un titre non retenu comme frontière : un paragraphe
+  qui ne porte qu'une image (sans texte propre) n'est plus silencieusement perdu par le filtre
+  `!texte`, exactement le cas d'origine ("Oracle du Sermon sur la montagne", une image par carte,
+  souvent sans texte propre).
+- `audit_sections.images` (colonne jsonb, migration `2026-10-17-audit-sections-images.sql` — **à
+  exécuter par Joseph dans l'éditeur SQL de Supabase**) : tableau parallèle à `texte_source`,
+  rempli par `auditsAPI.créer()` et `auditsAPI.remplacerContenu()` (réimport après correction).
+- `orchestrer-audit-cursaudit` — le pipeline RÉELLEMENT exécuté par "Lancer/Continuer l'analyse"
+  (voir son propre commentaire "FICHIER AUTONOME") — et `analyser-unite-cursaudit` (même correctif
+  par cohérence, bien que ce second fichier semble non relié à l'UI actuelle, cf. note du
+  01/10/2026 sur le correctif `thinking`) transmettent désormais les images de l'unité analysée
+  (plafonnées à 3, même limite que CopiloteIA) à Claude ET à GPT, en blocs image natifs — jamais
+  celles des unités voisines (le voisinage ne sert qu'à SITUER le texte, jamais à être noté
+  lui-même, règle déjà en place pour le texte).
+
+**Limite assumée, pas corrigée ici** : GPT (`gpt-4o`) reçoit les images via l'API Chat Completions
+(vision native, pas besoin de l'API Responses pour ça, à la différence de `web_search` — voir
+point 1 ci-dessus) — pas de limite nouvelle de ce côté. **NON TESTÉ EN CONDITIONS RÉELLES** : la
+migration SQL n'est pas encore exécutée au moment de ce correctif, donc la chaîne complète (import
+.docx avec images → audit créé → analyse par Claude/GPT) n'a pas pu être vérifiée de bout en bout
+sur un vrai fichier contenant des images — seul `npm run build` (compilation du bundle client) a
+été vérifié.
+
+## Point 3 traité : revérification mobile CursAudit/Bibliothèque (17/10/2026)
+
+Vérifié RÉELLEMENT en conditions mobiles — pas une relecture de code seule : serveur Vite local +
+Playwright (Chromium pré-installé, `/opt/pw-browsers`), fenêtre fixe 360×760 px (jamais l'émulation
+mobile de Playwright, qui élargit la fenêtre au contenu et masque le problème — piège déjà noté le
+30/09/2026), session Supabase et tables REST simulées (aucun identifiant réel nécessaire).
+
+- **CursAudit** (écran de création, questionnaire inclus) : déjà propre, `scrollWidth == innerWidth`
+  sur tout le formulaire (brouillon restauré, titre, texte collé/import Word, palier, mode IA, prix,
+  consentement). Rien à corriger.
+- **Bibliothèque — bug réel trouvé et corrigé** : seule vue de tout le dépôt avec une grille à colonne
+  FIXE (`gridTemplateColumns: "280px 1fr"`) sans aucune variante `estMobile`, contrairement à la règle
+  déjà établie ailleurs. Pas de défilement horizontal (donc invisible au seul test `scrollWidth`), mais
+  le panneau droit (fiche d'un livre, formulaire d'ajout) s'écrasait dans les ~80 px restants à 360 px :
+  titre et auteur du livre COUPÉS net par l'`overflow: hidden` du panneau (ex. "L'interprétation des
+  rêves" tronqué en "L'interp…" / "des rêv…"), citation réduite à un mot par ligne, bouton "+ Nouvelle
+  citation" à peine lisible. Trouvé seulement en peuplant un vrai livre (l'état vide par défaut ne
+  l'aurait jamais montré) — leçon à retenir : un écran vide ne suffit pas à vérifier une mise en page.
+  Corrigé sur le même principe que Editeur.jsx/CopiloteIA (panneau plein écran plutôt que deux colonnes
+  pressées) : `Bibliotheque.jsx` reçoit maintenant `estMobile` (passé depuis `App.jsx`, qui le calcule
+  déjà) ; sur mobile, liste ET fiche ne sont JAMAIS affichées en même temps — un seul panneau à la fois,
+  plein écran, avec un bouton "← Retour" pour revenir à la liste depuis la fiche ou le formulaire
+  d'ajout. Revérifié après correctif : titre/auteur/tags entièrement lisibles, citation sur toute la
+  largeur, formulaire d'ajout de livre lisible de bout en bout.
+- **Corrigé au passage** : en testant l'écran de création d'un audit, repéré un message maintenant FAUX
+  ("CursAudit analyse uniquement le texte — les images... ne sont pas prises en compte") laissé par le
+  24/09/2026, jamais mis à jour par le correctif du point 2 ci-dessus le même jour. Reformulé selon la
+  source choisie : vrai pour le texte collé (aucune image possible par nature), mais plus pour un import
+  .docx (images désormais lues et transmises à l'analyse, voir point 2).
+- **Non revérifié** dans cette passe : CursAuditDetail.jsx (écran de résultat d'un audit déjà traité) et
+  CursAuditListe.jsx — lecture statique du code seulement (aucune grille à colonne fixe sans variante
+  mobile trouvée, seulement des `1fr 1fr` déjà sans risque de débordement), pas de capture d'écran réelle
+  faute d'un audit déjà terminé à charger dans ce test. Si un signalement mobile touche ces deux écrans,
+  refaire le même test (serveur local + Playwright + Supabase simulé) plutôt que de supposer qu'ils sont
+  sains par analogie.
+
+## Point 4 traité : suivi de consommation voix (17/10/2026)
+
+Gap documenté depuis le 01/10/2026 (section "Lecture à voix haute" ci-dessus) : `lire-texte` et
+`transcrire-audio` ont chacune un coût réel chez OpenAI à chaque appel, mais rien n'en gardait
+trace — seule la vérification "abonnement actif" existait côté `lire-texte`. Jusqu'ici
+surveillable uniquement via platform.openai.com/usage, qui confond cette consommation avec tout
+autre usage OpenAI du compte Cursus.
+
+- `usage_voix` (table, migration `2026-10-17-usage-voix.sql` — **à exécuter par Joseph dans
+  l'éditeur SQL de Supabase**) : une ligne par appel réussi. `caracteres` (lecture à voix haute :
+  longueur EXACTE du texte envoyé) et `taille_octets` (dictée vocale : poids du fichier audio reçu)
+  sont indépendants, seul le champ pertinent à la fonctionnalité est rempli. **Volontairement AUCUN
+  coût en euros calculé nulle part** (ni dans la table, ni dans l'écran) : les tarifs OpenAI ne sont
+  fixés nulle part dans ce dépôt, un chiffre figé ici deviendrait faux en silence au premier
+  changement de tarif — le volume brut reste exact quoi qu'il arrive, à rapprocher de
+  platform.openai.com/pricing pour obtenir un coût.
+- `lire-texte`/`transcrire-audio` : écrivent chacune leur ligne APRÈS un appel OpenAI réussi,
+  jamais avant — un échec d'écriture dans `usage_voix` (table pas encore créée, etc.) est journalisé
+  en console mais ne fait JAMAIS échouer la lecture/dictée elle-même pour l'auteur·ice.
+- `taille_octets` pour la dictée est un PROXY du volume, pas une mesure exacte : OpenAI facture
+  cette API à la DURÉE de l'audio, pas à son poids, mais `gpt-4o-mini-transcribe` ne renvoie pas
+  cette durée de façon confirmée (contrairement à whisper-1 et `verbose_json`) — non demandé ici
+  pour ne pas risquer de casser un appel qui fonctionne déjà pour un champ non garanti sur ce
+  modèle. `duree_secondes` existe déjà en base pour le jour où une source fiable serait disponible.
+- `admin-usage-voix` (nouvelle Edge Function, service_role, réservée à
+  `joseph.pioggia@gmail.com` — même principe que `admin-journal-erreurs`) agrège le mois civil en
+  cours : totaux par fonctionnalité + détail par compte (email résolu). Nouvel écran
+  `UsageVoix.jsx`, entrée de menu "Usage voix" à côté d'Administration/Supervision/Journal des
+  erreurs (visible seulement pour Joseph).
+- **Repéré au passage, PAS corrigé** : contrairement à `lire-texte`, `transcrire-audio` n'a JAMAIS
+  vérifié d'abonnement actif — tout compte authentifié peut consommer cette API sans palier payant.
+  C'est un gap d'ACCÈS, distinct du suivi construit ici (changer qui peut utiliser une
+  fonctionnalité n'est pas un simple ajout d'observabilité, à traiter séparément si Joseph le
+  confirme).
+- **NON TESTÉ EN CONDITIONS RÉELLES** (migration pas encore exécutée au moment de ce correctif) :
+  seul `npm run build` a été vérifié — l'écriture réelle dans `usage_voix` depuis un vrai appel
+  OpenAI, et l'agrégation dans l'écran "Usage voix", restent à confirmer après la migration.
+
+## Mise en place du paiement (17/10/2026) — pas un chantier à construire, déjà largement fait
+
+Dernier point de l'audit de préparation à la commercialisation. Avant d'écrire du code, vérifié
+l'état réel : `creer-session-checkout`/`stripe-webhook` forment déjà un pipeline Stripe Checkout
+mature, durci par plusieurs correctifs réels au fil des mois (recalcul du prix CursAudit côté
+serveur contre la fraude, anti-doublon d'abonnement, codes promo consommés atomiquement sur
+paiement confirmé) ; `prix-stripe-config.mjs` porte un vrai catalogue à 5 paliers ; trois pages
+légales détaillées existent déjà (`PagesLegales.jsx` : Mentions légales, CGV, Politique de
+confidentialité, avec références au Code de droit économique belge). Ce n'est donc pas "à mettre
+en place" au sens de construire — c'est déjà construit. Trois points bloquent réellement un
+lancement, confirmés directement avec Joseph :
+
+1. **Stripe est toujours en mode TEST** (compte pas encore vérifié pour de vrais paiements —
+   KYC/coordonnées bancaires, une démarche sur le dashboard Stripe, rien que du code ne peut
+   faire). Avant de passer en live : vérifier le compte, probablement recréer les Prix en mode
+   live (test et live sont deux catalogues Stripe séparés malgré des ID de forme identique), puis
+   mettre à jour `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` (secrets Supabase) ET les deux
+   mappings price_id → palier qui doivent rester synchronisés : `prix-stripe-config.mjs` (client)
+   et `PALIERS` dans `stripe-webhook/index.ts` (serveur).
+2. **La structure juridique reste en suspens.** `PagesLegales.jsx` utilise "HMS-i SA" explicitement
+   marqué provisoire le 14/09/2026 ("une nouvelle entité à créer sous un mois") — ce délai est
+   dépassé depuis près de trois semaines au 17/10/2026. Tant que ce n'est pas tranché,
+   `IDENTITE_EDITEUR` (le seul endroit à modifier) reste provisoire — risqué d'encaisser de vrais
+   paiements sous un nom qui pourrait encore changer. Les pages elles-mêmes recommandaient déjà
+   une relecture par un avocat avant mise en ligne publique définitive, pas faite non plus.
+3. **Bug réel trouvé et corrigé** : `creer-session-checkout` redirigeait après paiement
+   (`success_url`/`cancel_url`) vers `cursus-seven.vercel.app`, pas `cursus.pro` — déjà le domaine
+   réellement utilisé par l'auteur·ice (voir `ModeEmploi.jsx`, les commentaires d'`App.jsx` sur
+   "quand je clique sur cursus.pro"). Un client qui paie depuis cursus.pro se serait retrouvé
+   redirigé vers une AUTRE origine après paiement — session Supabase (`localStorage`, propre à
+   chaque origine) absente là-bas, l'écran de retour de paiement (`?abonnement=succes` /
+   `?audit=succes`, lu dans `App.jsx`) risquant de s'afficher à un visiteur apparemment déconnecté
+   plutôt qu'au client qui vient de payer. `URL_BASE` pointe maintenant vers `https://cursus.pro`.
+   Cause : un correctif du 03/08/2026 avait déjà aligné ce fichier sur "la bonne adresse de
+   production" de l'époque (cursus-seven.vercel.app) — cursus.pro l'a remplacée depuis sans que ce
+   fichier ne suive.
+
+**Prochaine étape, pas commencée** : vérifier le compte Stripe ensemble (dashboard) pour confirmer
+l'état exact avant toute bascule en mode live — rien d'autre n'a été changé côté paiement dans
+cette passe que le correctif de redirection ci-dessus.
+
+## Correction rapide dans CursEdit (22/10/2026)
+
+Demande de Joseph : le Co-pilote (suggestions par passage, à trancher une à une) prend des heures sur un
+texte brut, alors qu'une seule passe de correction prend quelques minutes. Bouton à part « ✨ Correction
+rapide » dans l'en-tête de l'éditeur (`Editeur.jsx`, masqué en lecture seule) → `CorrectionRapide.jsx` +
+moteur `src/lib/correctionRapide.js`.
+- Flux : sélection ou chapitre entier → paragraphes en lots de 4000 car. (3 appels `claude-prox` en parallèle,
+  `thinking: disabled`) → l'IA renvoie chaque paragraphe corrigé (`[[n]] texte`) + `[[REMARQUES]]` → diff mot à
+  mot → revue (cartes décochables) → application en UNE transaction TipTap (un Ctrl+Z annule tout).
+- Deux niveaux : fautes seulement / fautes + fluidité légère (défaut, mémorisé). Jamais de réécriture ni d'ajout :
+  fragments et faits douteux sont SIGNALÉS (encadré « À regarder vous-même »), pas modifiés.
+- Garde-fous : un paragraphe renvoyé vide ou dont la longueur varie de plus de 30 %/35 % est ignoré ; seuls les
+  paragraphes ne contenant QUE du texte sont traités (images, notes, sauts de ligne = ignorés et comptés) ; à
+  l'application, un paragraphe modifié entre-temps est sauté. Remplacements ciblés → gras/italique conservés.
+- Vérifié : diff + reconstruction exacte, lecture de la réponse, découpage en lots, application sur un vrai
+  document ProseMirror (marques conservées) ; `vite build` OK. NON TESTÉ en conditions réelles : l'appel IA
+  (abonnement + session requis) et l'interface dans le navigateur.
+
+## Voix : premier son rapide, quota par palier, crédits (22/10/2026)
+
+Retours/demandes de Joseph : « très long avant de lire à haute voix » ; « une idée du coût de ce luxe ? » ; « me
+permettre de facturer ce service » ; « cette info fait partie du pack » (= la voix figure dans la liste de
+fonctionnalités de chaque palier, avec son plafond).
+- **Premier son** : `lire()` coupe la 1re tranche à ~200 car. (`TAILLE_PREMIÈRE_TRANCHE`), le reste suit en une tranche
+  préchargée — le délai est celui de la génération COMPLÈTE de la 1re tranche. Gain non mesuré (dépend d'OpenAI).
+- **Coût** (estimation web, NON exacte, l'API ne renvoie pas d'usage) : ≈ 1,5 centime par minute d'audio ≈ 1 000 car.
+  (0,60 $/M jetons texte + 12 $/M jetons audio). Un livre de 400 000 car. ≈ 6 €. Vrai coût : platform.openai.com/usage.
+- **Quota par palier** : `quotas_paliers.caracteres_voix_mensuels` (migration `2026-10-22-quota-voix.sql`, **à exécuter par
+  Joseph**) — valeurs PROPOSÉES : Découverte 10 000, Essentiel 30 000, Initié 60 000, Auteur/Studio 150 000 (modifiables par
+  UPDATE). Sans la migration, `QUOTA_DEFAUT = 30000` pour tous (la fonction dégrade proprement). Le texte marketing est dans
+  `CONTENU_PALIERS` (`contenuPaliers.js`) : **à garder synchronisé à la main** avec ces valeurs (même principe que « 200
+  analyses IA / mois » vs `tokens_mensuels`).
+- **`lire-texte`** (à REDÉPLOYER) calcule le solde (`calculerSolde`) : refus 429 + message quand le mois est à/au-dessus du
+  disponible (l'appel qui franchit la limite passe) ; `{ solde: true }` renvoie `{ utilise, quota_inclus, credits, disponible,
+  restant }`. Affiché dans l'en-tête de l'éditeur (« N k car. restants », rouge sous 10 %), rafraîchi après chaque lecture.
+- **Crédits (recharges)** : table `credits_voix` créée, PAS reliée à Stripe (ni écran d'achat, ni webhook). Contrairement à
+  `credits_ia` (additionné à chaque mois sans s'épuiser), ils se CONSOMMENT : ils ne couvrent que le dépassement du quota
+  (mois courant et mois passés). Offrir des caractères à la main : voir l'exemple en bas de la migration. Limite connue :
+  PostgREST plafonne à 1 000 lignes par requête — sans effet pour le calcul du mois, mais l'historique complet (utilisé
+  seulement si le compte a des crédits) pourrait être sous-compté au-delà de ~1 000 appels.
+- Vendre une recharge reste bloqué par : Stripe en mode test, structure juridique provisoire (voir « Mise en place du paiement »).
+- NON TESTÉ en conditions réelles (migration + redéploiement non faits au moment de ce correctif) : seul `vite build` a été vérifié.
+
+### Correction rapide — premier retour d'usage (22/10/2026, « pas du tout ce que j'attendais »)
+Capture de Joseph sur un chapitre réel : l'IA changeait les traits d'union en tirets (« Faut–il »), les guillemets droits
+en « », les apostrophes ; elle signalait des numéros de paragraphes « absents » (trous dus aux paragraphes écartés) et des
+icônes d'interface. Corrigé : (1) `sansChangementsDeStyle()` supprime MÉCANIQUEMENT tout changement de pure typographie
+(tirets, apostrophes, guillemets, « ... » → « … », espaces insécables), quelle que soit la réponse de l'IA ; un changement
+qui touche une lettre ou un espace simple est conservé ; (2) la consigne le dit aussi ; (3) numérotation continue envoyée
+à l'IA puis ré-associée aux vrais paragraphes ; (4) paragraphes de moins de 3 mots (icônes, « Envoyer ») non envoyés.
+Ce que Joseph attendait exactement n'est pas encore confirmé : à redemander s'il reste insatisfait.
+
+### Correction rapide — 2e retour : ce que Joseph attendait vraiment (22/10/2026)
+« Je m'attendais à une correction du type de celle que tu m'as proposée [dans le chat, sur son texte des rayons du soleil
+réfléchis par la lune] et non cette correction orthographique qui existe déjà par ailleurs » = une RELECTURE ÉDITORIALE, pas
+seulement des fautes : texte corrigé + liste de ce qu'il doit regarder lui-même (fragments orphelins et où les replacer,
+phrases lourdes, faits/chiffres douteux, incohérences). Ajouté : `bilanDuTexte()` (`correctionRapide.js`), UN appel
+séparé sur le texte ENTIER (parties de 30 000 car. au-delà), hors lots (un fragment n'est « orphelin » que par rapport au
+reste) → rubriques `CATEGORIES_BILAN`, affichées sous les corrections (« Bilan de relecture »). Les remarques par lot sont
+supprimées (le bilan les remplace). Règles du bilan : citer un extrait exact, aucune interprétation psychologique, et
+SURTOUT aucun fait tranché : l'IA n'a pas accès au web, ses doutes sont affichés comme « à vérifier, pas à croire »
+(même principe que le GO/NO-GO fiabilité du 03/10/2026). NON TESTÉ en conditions réelles (appel IA) : vérifié seulement le
+parsing du bilan et `vite build`. Si la qualité du bilan déçoit, ajuster `construireConsigneBilan()` en premier.
+
+## « Vérifier le fond » — second bouton de CursEdit (22/10/2026)
+
+Demande de Joseph (« allons pour celui-là, si le client le veut c'est lui qui payera ») : après la Correction rapide (fautes +
+bilan qui SIGNALE sans trancher), un bouton séparé « 🔎 Vérifier le fond » qui fait ce que Claude avait fait en conversation sur le
+texte des photons et de la lune. `src/lib/verifierLeFond.js` + `src/components/VerifierLeFond.jsx` (+ `src/lib/paragraphesEditeur.js`,
+lecture des paragraphes TipTap, partagée avec CorrectionRapide).
+- Deux temps (pour tenir dans le délai d'une Edge Function) : (1) extraction des affirmations vérifiables (≤ 8, sans web) ;
+  (2) UNE vérification par affirmation avec l'outil `web_search` (max 3 recherches, 3 affirmations en parallèle).
+- **Calculs refaits par le CODE** (`evaluerCalcul`, évaluateur restreint : chiffres et + - * / ( ) seulement) : l'IA ne fournit
+  que l'expression et le résultat annoncé, les deux restent visibles ; ils ne passent pas par le web. Écart > 25 % = « écart
+  important ». Si l'expression est mal posée le résultat est faux : l'écran demande de la relire.
+- **Verdict recoupé mécaniquement** (même principe que les Références du Co-pilote, GO/NO-GO du 03/10/2026) : « confirmé » ou
+  « contredit » sans URL parmi les `web_search_tool_result` réellement renvoyés → rétrogradé « incertain », et sa reformulation
+  n'est pas proposée. Seule l'EXISTENCE de la source est confirmée, pas son contenu exact (pas de « Layer 2 ») : le lien est là
+  pour que l'auteur·ice tranche.
+- Reformulations jamais cochées par défaut ; appliquées en une transaction (Ctrl+Z annule), à l'endroit où l'extrait exact est
+  retrouvé UNE seule fois dans le document actuel (sinon à reporter à la main).
+- Coût : une recherche web par affirmation (≤ 8) + 1 appel d'extraction : nettement plus cher que la Correction rapide ; action à la
+  demande, pas de quota séparé (compté dans les tokens du palier via claude-prox).
+- Vérifié : extraction/lecture, calcul (700 000 km / 10 000 ans ≈ 7,99 m/h, cohérent avec « 8 »), rétrogradation d'une source
+  inventée, localisation d'un extrait, `vite build`. **NON TESTÉ en conditions réelles** : appels IA, outil `web_search` dans un appel
+  à sortie texte structurée (déjà utilisé ainsi par CopiloteIA), délai réel, qualité des verdicts.

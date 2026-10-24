@@ -51,6 +51,7 @@ import CursAuditDetail from "./components/CursAuditDetail.jsx";
 import Administration from "./components/Administration.jsx";
 import Supervision from "./components/Supervision.jsx";
 import JournalErreurs from "./components/JournalErreurs.jsx";
+import UsageVoix from "./components/UsageVoix.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -2112,6 +2113,15 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     ? trouverContexteHiérarchique(projetActif.structure, nœudActif.id)
     : { titrePartieParente: null, titresChapitresVoisins: [] };
 
+  // Note de cadrage (réf. 14/10/2026) — nœud enfant "methodo" du chapitre
+  // actif (ex. objectif/angle importé via ImportDocx en mode "sommaire de
+  // travail"), transmis à CopiloteIA comme contexte de rédaction. `enfants`
+  // porte déjà tous les champs du nœud (voir construireArbre), pas besoin
+  // d'un chargement séparé. S'il y a plusieurs notes "methodo" (cas rare,
+  // pas encore d'UI pour en ajouter plusieurs), seule la première trouvée
+  // est transmise.
+  const noteDeCadrageActive = (nœudActif?.enfants || []).find((e) => (e.zone || "corps") === "methodo")?.texte || "";
+
   // ── Actions projets ──
 
   const créerProjet = async (données) => {
@@ -2377,6 +2387,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                   { id: "administration", label: "Administration", icone: "⚙️" },
                   { id: "supervision", label: "Supervision", icone: "🛡️" },
                   { id: "journal-erreurs", label: "Journal des erreurs", icone: "🪵" },
+                  { id: "usage-voix", label: "Usage voix", icone: "🔊" },
                 ]
               : []),
           ].map((item) => (
@@ -2537,7 +2548,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
         {/* Vue : bibliothèque */}
         {vue === "bibliotheque" && (
-          <Bibliotheque projets={projets} />
+          <Bibliotheque projets={projets} estMobile={estMobile} />
         )}
 
         {/* Pages légales (15/09/2026) — accessibles aussi une fois connecté,
@@ -2615,6 +2626,11 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         {/* Vue : Journal des erreurs — 01/10/2026 */}
         {vue === "journal-erreurs" && user.email === "joseph.pioggia@gmail.com" && (
           <JournalErreurs />
+        )}
+
+        {/* Vue : Usage voix — 17/10/2026, point 4 de l'audit de commercialisation */}
+        {vue === "usage-voix" && user.email === "joseph.pioggia@gmail.com" && (
+          <UsageVoix />
         )}
 
         {/* Vue : liste des projets */}
@@ -2948,6 +2964,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}
+                noteDeCadrage={noteDeCadrageActive}
+                descriptionProjet={projetActif.description || ""}
               />
             </div>
             </div>

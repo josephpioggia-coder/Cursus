@@ -794,7 +794,13 @@ export const auditsAPI = {
    * extraireParagraphesDocx() — voir src/lib/segmenterCursAudit.js).
    */
   async créer({
-    titre, unités, palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null,
+    titre, unités,
+    // Images Word associées à chaque unité (17/10/2026, point 2 de l'audit
+    // de préparation à la commercialisation — voir segmenterCursAudit.js)
+    // — tableau PARALLÈLE à `unités`, [] ou absent pour un audit sans
+    // image (texte collé, ou .docx créé avant ce correctif).
+    images = null,
+    palierDimensions, nombreDimensions, modeIA, typeRapport, nombrePages, prixTTC, projetId = null,
     // Questionnaire de qualification (référence 60816-01, suite, 22/08/2026)
     // — voir questionnaire-cursaudit-v1-specification.md et
     // CursAuditQuestionnaire.jsx. Optionnels : un appel existant sans ces
@@ -896,6 +902,7 @@ export const auditsAPI = {
     const lignes = unités.map((texteSource, i) => ({
       audit_id: audit.id, ordre: i + 1, texte_source: texteSource,
       chapitre_index: chapitreIndexParUnité(i),
+      images: images?.[i]?.length ? images[i] : null,
     }));
     const { error: erreurSections } = await supabase.from("audit_sections").insert(lignes);
     if (erreurSections) return { data: null, error: erreurSections };
@@ -1147,7 +1154,7 @@ export const auditsAPI = {
    * transmettre les règles de tarification jusqu'ici. À corriger si
    * l'écart s'avère réellement gênant en usage.
    */
-  async remplacerContenu(auditId, { unités, chapitresDétectés }) {
+  async remplacerContenu(auditId, { unités, images = null, chapitresDétectés }) {
     if (!unités || unités.length === 0) return { error: { message: "Aucune unité détectée." } };
 
     const { data: audit, error: erreurLecture } = await supabase
@@ -1175,6 +1182,7 @@ export const auditsAPI = {
     const lignes = unités.map((texteSource, i) => ({
       audit_id: auditId, ordre: i + 1, texte_source: texteSource,
       chapitre_index: chapitreIndexParUnité(i),
+      images: images?.[i]?.length ? images[i] : null,
     }));
     const { error: erreurInsertion } = await supabase.from("audit_sections").insert(lignes);
     if (erreurInsertion) return { error: erreurInsertion };
