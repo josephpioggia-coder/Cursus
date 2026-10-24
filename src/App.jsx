@@ -2917,7 +2917,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             {/* Panneau contextuel droit : Citations / IA / Idées */}
             {estMobile && !copiloteMobileOuvert && (
               <button onClick={() => setCopiloteMobileOuvert(true)} style={{
-                position: "fixed", right: 14, bottom: 64, zIndex: 50,
+                position: "fixed", right: 12, bottom: 40, zIndex: 50,
                 background: "#1D9E75", color: "#fff", border: "none", borderRadius: 24,
                 padding: "11px 16px", fontSize: 14, fontWeight: 500, fontFamily: "inherit",
                 boxShadow: "0 2px 10px rgba(0,0,0,0.3)", cursor: "pointer",

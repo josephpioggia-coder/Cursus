@@ -505,7 +505,8 @@ function BoutonDictee({ editor }) {
 
 // ─── Composant : Barre d'outils ──────────────────────────────────────────────────
 
-function BarreOutils({ editor, modeFocus, onToggleFocus }) {
+function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
+  const [plus, setPlus] = useState(false); // mobile : le reste de la barre derrière « Plus »
   // Sélecteurs de couleur — surlignage (16/09/2026) puis couleur de police
   // (18/09/2026, même demande de liste d'attente #2, complétée après coup :
   // "j'aurais voulu avoir une palette de couleur pour le texte"). Un seul
@@ -629,7 +630,7 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
     <div style={{ width: 0.5, height: 18, background: "#e5e5e5", margin: "0 4px" }} />
   );
 
-  return (
+  const barreComplete = (
     <div style={{
       display: "flex", alignItems: "center", gap: 2,
       padding: "6px 16px",
@@ -828,11 +829,33 @@ function BarreOutils({ editor, modeFocus, onToggleFocus }) {
       </BoutonOutil>
     </div>
   );
+
+  if (!mobile) return barreComplete;
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 2, padding: "3px 8px", borderBottom: "0.5px solid #e5e5e5", background: "#fafafa", opacity: modeFocus ? 0.3 : 1 }}>
+        <BoutonOutil actif={editor.isActive("bold")} titre="Gras" onClick={() => editor.chain().focus().toggleBold().run()}><b>G</b></BoutonOutil>
+        <BoutonOutil actif={editor.isActive("italic")} titre="Italique" onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
+        <BoutonOutil actif={editor.isActive("underline")} titre="Souligné" onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
+        <BoutonOutil actif={editor.isActive("heading", { level: 2 })} titre="Titre 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
+        <BoutonOutil actif={editor.isActive("bulletList")} titre="Liste à puces" onClick={() => editor.chain().focus().toggleBulletList().run()}>≡</BoutonOutil>
+        <BoutonOutil actif={editor.isActive("orderedList")} titre="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</BoutonOutil>
+        <BoutonOutil désactivé={!editor.can().undo()} titre="Annuler" onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
+        <BoutonOutil désactivé={!editor.can().redo()} titre="Rétablir" onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setPlus((v) => !v)} aria-expanded={plus}
+          style={{ fontSize: 12, color: plus ? "#534AB7" : "#666", background: plus ? "#EEEDFE" : "none", border: "none", borderRadius: 6, padding: "5px 9px", fontFamily: "inherit", cursor: "pointer" }}>
+          {plus ? "Moins ▴" : "Plus ▾"}
+        </button>
+      </div>
+      {plus && barreComplete}
+    </>
+  );
 }
 
 // ─── Composant : Panneau objectifs ───────────────────────────────────────────────
 
-function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier, objectifChapitre, durée, couleur, onMàjObjectifs }) {
+function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier, objectifChapitre, durée, couleur, onMàjObjectifs, mobile = false }) {
   const [édition, setÉdition] = useState(false);
   const [tempJ, setTempJ] = useState(objectifJournalier);
   const [tempC, setTempC] = useState(objectifChapitre);
@@ -843,12 +866,24 @@ function PanneauObjectifs({ caractèresSession, motsChapitre, objectifJournalier
     ? Math.min(100, Math.round((motsChapitre / objectifChapitre) * 100))
     : null;
 
+  if (mobile && !édition) {
+    return (
+      <div style={{ borderTop: "0.5px solid #e5e5e5", padding: "4px 12px", background: "#fafafa", display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#888", whiteSpace: "nowrap", overflow: "hidden", flexShrink: 0 }}>
+        <span style={{ color: couleur, fontWeight: 500 }}>{caractèresSession.toLocaleString("fr-FR")} / {objectifJournalier.toLocaleString("fr-FR")} car.</span>
+        {pctChapitre !== null && <span style={{ color: "#1D9E75" }}>Chap. {motsChapitre}/{objectifChapitre}</span>}
+        <span>⏱ {formaterDurée(durée)}</span>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setÉdition(true)} aria-label="Objectifs" title="Objectifs" style={{ fontSize: 14, color: "#888", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit" }}>⚙</button>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       borderTop: "0.5px solid #e5e5e5",
       padding: "8px 20px",
       background: "#fafafa",
-      display: "flex", alignItems: "center", gap: 20,
+      display: "flex", alignItems: "center", gap: 20, flexWrap: mobile ? "wrap" : "nowrap",
       fontSize: 12,
     }}>
       {/* CORRECTIF 28/07/2026 — l'étiquette "Session" laissait croire à un
@@ -981,7 +1016,7 @@ function PanneauHistorique({ historique, chargement, onRestaurer, onFermer, coul
 
 // ─── Composant : Indicateur de sauvegarde ────────────────────────────────────────
 
-function IndicateurSauvegarde({ état }) {
+function IndicateurSauvegarde({ état, court = false }) {
   const configs = {
     sauvegardé: { couleur: "#1D9E75", label: "Sauvegardé", icone: "✓" },
     en_cours: { couleur: "#BA7517", label: "Modification…", icone: "●" },
@@ -989,8 +1024,8 @@ function IndicateurSauvegarde({ état }) {
   };
   const c = configs[état] || configs.sauvegardé;
   return (
-    <span style={{ fontSize: 11, color: c.couleur, display: "flex", alignItems: "center", gap: 4 }}>
-      {c.icone} {c.label}
+    <span title={c.label} style={{ fontSize: 11, color: c.couleur, display: "flex", alignItems: "center", gap: 4 }}>
+      {c.icone}{court ? "" : ` ${c.label}`}
     </span>
   );
 }
@@ -1020,6 +1055,16 @@ export default function Editeur({
   lectureSeule = false,
 }) {
   const [modeFocus, setModeFocus] = useState(false);
+  // Mobile (24/10/2026, retour de Joseph : « la mise en page sur le GSM laisse peu de place pour le texte ») : en-tête sur UNE ligne
+  // (les actions secondaires sont derrière « ⋯ »), barre d'outils réduite à l'essentiel (le reste derrière « Plus »), pied de page
+  // compact, marges du texte réduites. Même seuil que App.jsx (≤ 768 px).
+  const [mobile, setMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 768);
+  const [actionsOuvertes, setActionsOuvertes] = useState(false);
+  useEffect(() => {
+    const f = () => setMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
   const [formatRéférence, setFormatRéférence] = useState("a4");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
@@ -1395,8 +1440,8 @@ export default function Editeur({
       {/* ── En-tête ── */}
       {!modeFocus && (
         <div style={{
-          padding: "10px 20px", borderBottom: "0.5px solid #e5e5e5",
-          display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+          padding: mobile ? "6px 10px" : "10px 20px", borderBottom: "0.5px solid #e5e5e5",
+          display: "flex", alignItems: "center", gap: mobile ? 8 : 10, flexWrap: "wrap",
           background: "#fafafa",
           flexShrink: 0,
         }}>
@@ -1404,11 +1449,24 @@ export default function Editeur({
             style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#999", fontFamily: "inherit" }}
             title="Retour à la structure">←</button>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: projetCouleur }} />
-          <span style={{ fontSize: 13, color: "#999" }}>{projetTitre}</span>
-          <span style={{ fontSize: 13, color: "#ccc" }}>›</span>
-          <span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>{nœud.titre}</span>
-          <div style={{ flex: 1 }} />
-          <IndicateurSauvegarde état={statutSauvegarde} />
+          {!mobile && <span style={{ fontSize: 13, color: "#999" }}>{projetTitre}</span>}
+          {!mobile && <span style={{ fontSize: 13, color: "#ccc" }}>›</span>}
+          <span style={mobile
+            ? { fontSize: 14, fontWeight: 500, color: "#333", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+            : { fontSize: 13, fontWeight: 500, color: "#333" }}>{nœud.titre}</span>
+          {!mobile && <div style={{ flex: 1 }} />}
+          <IndicateurSauvegarde état={statutSauvegarde} court={mobile} />
+          {mobile && étatLecture !== "arrêté" && !actionsOuvertes && (
+            <button onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); setProgressionLecture(null); }}
+              style={{ fontSize: 14, color: "#7F77DD", background: "#F5F4FD", border: "none", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit", cursor: "pointer" }}
+              title="Arrêter la lecture">⏹</button>
+          )}
+          {mobile && (
+            <button onClick={() => setActionsOuvertes((o) => !o)} aria-expanded={actionsOuvertes} aria-label="Actions du chapitre"
+              style={{ fontSize: 18, lineHeight: 1, color: actionsOuvertes ? projetCouleur : "#777", background: actionsOuvertes ? `${projetCouleur}15` : "none", border: "none", borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", cursor: "pointer" }}>⋯</button>
+          )}
+          {mobile && actionsOuvertes && <div style={{ flexBasis: "100%", height: 0 }} />}
+          {(!mobile || actionsOuvertes) && (<>
           <select
             value={formatRéférence}
             onChange={(e) => setFormatRéférence(e.target.value)}
@@ -1532,6 +1590,7 @@ export default function Editeur({
           >
             ↺ Historique ({historique.length})
           </button>
+          </>)}
         </div>
       )}
 
@@ -1554,7 +1613,7 @@ export default function Editeur({
       )}
 
       {/* ── Barre d'outils ── */}
-      <BarreOutils editor={editor} modeFocus={modeFocus} onToggleFocus={() => setModeFocus(!modeFocus)} />
+      <BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />
 
       {/* ── Zone centrale : éditeur + historique ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
@@ -1562,13 +1621,13 @@ export default function Editeur({
         {/* Zone d'écriture */}
         <div style={{
           flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto",
-          padding: modeFocus ? "60px 0" : "32px 0",
+          padding: modeFocus ? "60px 0" : mobile ? "10px 0 24px" : "32px 0",
           display: "flex", justifyContent: "center",
         }}>
           <div style={{
             width: "100%",
             maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx,
-            padding: "0 40px",
+            padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {/* Titre du chapitre en mode focus */}
             {modeFocus && (
@@ -1655,6 +1714,7 @@ export default function Editeur({
         durée={duréeSession}
         couleur={projetCouleur}
         onMàjObjectifs={(j, c) => { setObjectifJournalier(j); setObjectifChapitre(c); }}
+        mobile={mobile}
       />
     </div>
   );
