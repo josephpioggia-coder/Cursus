@@ -313,19 +313,20 @@ const STYLES_EDITEUR = `
 
 // ─── Composant : Bouton de barre d'outils ────────────────────────────────────────
 
-function BoutonOutil({ actif, désactivé, onClick, titre, children }) {
+function BoutonOutil({ actif, désactivé, onClick, titre, children, grand }) {
   return (
     <button
+      onMouseDown={(e) => e.preventDefault()} /* garde le clavier ouvert et la sélection */
       onClick={onClick}
       disabled={désactivé}
       title={titre}
       style={{
         display: "flex", alignItems: "center", justifyContent: "center",
-        width: 28, height: 28, borderRadius: 6,
+        width: grand ? 38 : 28, height: grand ? 34 : 28, borderRadius: 6,
         border: "none", cursor: désactivé ? "default" : "pointer",
         background: actif ? "#EEEDFE" : "transparent",
         color: actif ? "#534AB7" : désactivé ? "#ccc" : "#555",
-        fontSize: 13, fontWeight: actif ? 600 : 400,
+        fontSize: grand ? 20 : 13, fontWeight: actif ? 600 : 400,
         fontFamily: "inherit", transition: "all 0.1s",
       }}
       onMouseEnter={(e) => { if (!actif && !désactivé) e.currentTarget.style.background = "#f5f5f5"; }}
@@ -840,8 +841,8 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         <BoutonOutil actif={editor.isActive("heading", { level: 2 })} titre="Titre 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
         <BoutonOutil actif={editor.isActive("bulletList")} titre="Liste à puces" onClick={() => editor.chain().focus().toggleBulletList().run()}>≡</BoutonOutil>
         <BoutonOutil actif={editor.isActive("orderedList")} titre="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</BoutonOutil>
-        <BoutonOutil désactivé={!editor.can().undo()} titre="Annuler" onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
-        <BoutonOutil désactivé={!editor.can().redo()} titre="Rétablir" onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
+        <BoutonOutil grand désactivé={!editor.can().undo()} titre="Annuler" onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
+        <BoutonOutil grand désactivé={!editor.can().redo()} titre="Rétablir" onClick={() => editor.chain().focus().redo().run()}>↪</BoutonOutil>
         <div style={{ flex: 1 }} />
         <button onClick={() => setPlus((v) => !v)} aria-expanded={plus}
           style={{ fontSize: 12, color: plus ? "#534AB7" : "#666", background: plus ? "#EEEDFE" : "none", border: "none", borderRadius: 6, padding: "5px 9px", fontFamily: "inherit", cursor: "pointer" }}>
