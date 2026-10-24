@@ -1,6 +1,6 @@
 // Icônes de loupe dessinées sur <canvas> (le mode sombre forcé des navigateurs
 // mobiles inverserait un emoji ou un SVG texte, jamais un canvas).
-// type "analyse" : A surligné en jaune + loupe ; type "fond" : loupe + coche verte.
+// type "analyse" : A surligné en jaune + loupe ; "fond" : loupe + coche verte ; "faits" : loupe + chiffres.
 import { useEffect, useRef } from "react";
 
 export default function IconeLoupe({ type, taille = 18 }) {
@@ -25,6 +25,10 @@ export default function IconeLoupe({ type, taille = 18 }) {
       g.fillStyle = "#444"; g.font = "bold 14px Arial, sans-serif"; g.textAlign = "center";
       g.fillText("A", 11.5, 18.5);
       loupe(21, 19, 6, 6);
+    } else if (type === "faits") {
+      loupe(13, 13, 8.5, 7);
+      g.fillStyle = "#185FA5"; g.font = "bold 12px Arial, sans-serif"; g.textAlign = "center";
+      g.fillText("12", 13, 17.2);
     } else {
       loupe(13, 13, 8.5, 7);
       g.strokeStyle = "#1D9E75"; g.lineWidth = 2.8;

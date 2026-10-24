@@ -51,6 +51,7 @@ import { journaliserErreur } from "../lib/journalErreurs.js";
 import { noterUsageIA } from "../lib/usageIA.js";
 import CorrectionRapide from "./CorrectionRapide.jsx";
 import VerifierLeFond from "./VerifierLeFond.jsx";
+import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -1121,6 +1122,7 @@ export default function Editeur({
   // Correction rapide (22/10/2026) — voir CorrectionRapide.jsx.
   const [correctionOuverte, setCorrectionOuverte] = useState(false);
   const [vérificationOuverte, setVérificationOuverte] = useState(false);
+  const [avisOuvert, setAvisOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1575,6 +1577,19 @@ export default function Editeur({
           )}
           {!lectureSeule && (
             <button
+              onClick={() => setAvisOuvert(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Avis d'éditeur sur le fond : est-ce que ça tient la route, ce qui fonctionne, ce qu'il y a lieu de changer (cohérence, vraisemblance, rythme, logique)"
+            >
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="fond" taille={16} />Vérifier le fond</span>
+            </button>
+          )}
+          {!lectureSeule && (
+            <button
               onClick={() => setVérificationOuverte(true)}
               style={{
                 fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
@@ -1583,7 +1598,7 @@ export default function Editeur({
               }}
               title="Vérifie les faits et les chiffres du texte (calculs refaits, recherche web, sources) et propose des reformulations"
             >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="fond" taille={16} />Vérifier le fond</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="faits" taille={16} />Vérifier les faits</span>
             </button>
           )}
           {voixDisponible() && (
@@ -1658,6 +1673,10 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {avisOuvert && editor && (
+        <AvisSurLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "avis_fond", action, nb })} couleur={projetCouleur} onFermer={() => setAvisOuvert(false)} />
       )}
 
       {vérificationOuverte && editor && (

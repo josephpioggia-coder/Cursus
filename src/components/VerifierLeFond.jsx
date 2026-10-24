@@ -111,7 +111,7 @@ export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", o
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 760, maxHeight: "92vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>🔎 Vérifier le fond</span>
+          <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>Vérifier les faits</span>
           <button onClick={onFermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer">✕</button>
         </div>
 
@@ -152,7 +152,7 @@ export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", o
 
           {étape === "revue" && résultats && !appliqué && (
             <>
-              {résultats.length === 0 && <div style={{ fontSize: 13, color: "#555" }}>Aucune affirmation factuelle ou chiffrée à vérifier dans ce texte.</div>}
+              {résultats.length === 0 && <div style={{ fontSize: 13, color: "#555" }}>Aucune affirmation factuelle ou chiffrée à vérifier dans ce texte. (Pour un avis sur le récit lui-même, utilisez « Vérifier le fond ».)</div>}
               {résultats.map((r) => {
                 const v = r.verification ? VERDICTS[r.verification.verdict] : null;
                 const c = r.calculRefait;

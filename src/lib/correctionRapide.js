@@ -244,7 +244,7 @@ export function analyserBilan(reponse) {
   return bilan;
 }
 
-async function appelClaude(system, user, maxTokens, signal) {
+export async function appelClaude(system, user, maxTokens, signal) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error("Session expirée — reconnectez-vous.");
