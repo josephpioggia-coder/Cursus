@@ -54,6 +54,7 @@ import VerifierLeFond from "./VerifierLeFond.jsx";
 import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import LirePhoto from "./LirePhoto.jsx";
+import ProfilLisibilite from "./ProfilLisibilite.jsx";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -1127,6 +1128,7 @@ export default function Editeur({
   const [avisOuvert, setAvisOuvert] = useState(false);
   const [nettoyageOuvert, setNettoyageOuvert] = useState(false);
   const [photoOuverte, setPhotoOuverte] = useState(false);
+  const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
   // "arrêté" | "lecture" | "pause".
   const [étatLecture, setÉtatLecture] = useState("arrêté");
@@ -1591,6 +1593,19 @@ export default function Editeur({
           )}
           {!lectureSeule && (
             <button
+              onClick={() => setProfilOuvert(true)}
+              style={{
+                fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+                border: "none", cursor: "pointer", borderRadius: 6,
+                padding: "4px 8px", fontFamily: "inherit",
+              }}
+              title="Mesure l'effort que le texte impose au lecteur (référents, liens logiques, structure…), avec citations vérifiées ; ne modifie rien"
+            >
+              📊 Profil de lisibilité
+            </button>
+          )}
+          {!lectureSeule && (
+            <button
               onClick={() => setNettoyageOuvert(true)}
               style={{
                 fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
@@ -1713,6 +1728,10 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {profilOuvert && editor && (
+        <ProfilLisibilite editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "profil_lisibilite", action, nb })} couleur={projetCouleur} onFermer={() => setProfilOuvert(false)} />
       )}
 
       {photoOuverte && editor && (
