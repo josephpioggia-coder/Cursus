@@ -79,18 +79,29 @@ Deno.serve(async (req) => {
 
     const langue = String(formulaireEntrant.get("langue") || "fr");
 
-    const formulaireOpenAI = new FormData();
-    formulaireOpenAI.append("file", fichierAudio, "dictee.webm");
-    formulaireOpenAI.append("model", "gpt-4o-mini-transcribe");
-    formulaireOpenAI.append("language", langue);
+    // 24/10/2026 — « Audio file might be corrupted or unsupported » : le nom de
+    // fichier doit refléter le VRAI format (le client envoie désormais du WAV,
+    // ou l'original avec sa vraie extension) ; avant, tout était forcé en
+    // « dictee.webm ». Si le modèle rapide refuse le fichier, on retente avec
+    // whisper-1, plus tolérant sur les enregistrements de navigateur.
+    const nomFichier = (fichierAudio instanceof File && fichierAudio.name) ? fichierAudio.name : "dictee.webm";
+    const appeler = async (modele: string) => {
+      const f = new FormData();
+      f.append("file", fichierAudio, nomFichier);
+      f.append("model", modele);
+      f.append("language", langue);
+      const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
+        body: f,
+      });
+      return { réponseOpenAI: r, résultat: await r.json() };
+    };
 
-    const réponseOpenAI = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
-      body: formulaireOpenAI,
-    });
-
-    const résultat = await réponseOpenAI.json();
+    let { réponseOpenAI, résultat } = await appeler("gpt-4o-mini-transcribe");
+    if (!réponseOpenAI.ok && /corrupted|unsupported/i.test(résultat?.error?.message || "")) {
+      ({ réponseOpenAI, résultat } = await appeler("whisper-1"));
+    }
     if (!réponseOpenAI.ok) {
       return réponse({ error: résultat.error?.message || "Échec de la transcription." }, réponseOpenAI.status);
     }
