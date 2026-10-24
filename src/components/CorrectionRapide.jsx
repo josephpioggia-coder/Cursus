@@ -14,6 +14,7 @@
 import { useMemo, useRef, useState } from "react";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireParagraphes } from "../lib/paragraphesEditeur.js";
+import RemarqueAvecProposition from "./RemarqueAvecProposition.jsx";
 import { NIVEAUX, CATEGORIES_BILAN, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
 
 export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
@@ -177,13 +178,13 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
                 <div style={{ marginTop: 18 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#333", marginBottom: 4 }}>Bilan de relecture</div>
                   <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
-                    Rien de tout ceci n'est modifié : c'est à vous de décider. Les doutes sur les faits viennent de l'IA seule, sans recherche : à vérifier, pas à croire.
+                    Rien n'est modifié sans votre clic : quand l'IA propose un remplacement, vous pouvez le copier ou l'insérer à la place du passage. Les doutes sur les faits viennent de l'IA seule, sans recherche : à vérifier, pas à croire.
                   </div>
                   {Object.entries(CATEGORIES_BILAN).map(([clé, titre]) => résultat.bilan[clé].length > 0 && (
                     <div key={clé} style={{ marginBottom: 10, background: clé === "FAITS" ? "#FFF8E6" : "#F5F4FD", border: `0.5px solid ${clé === "FAITS" ? "#F0D98A" : "#D8D5F5"}`, borderRadius: 8, padding: "10px 12px" }}>
                       <div style={{ fontSize: 12.5, fontWeight: 500, color: clé === "FAITS" ? "#7A5B00" : "#4B44A8", marginBottom: 6 }}>{titre}</div>
                       <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#333", lineHeight: 1.55 }}>
-                        {résultat.bilan[clé].map((r, i) => <li key={i}>{r}</li>)}
+                        {résultat.bilan[clé].map((r, i) => <li key={i} style={{ marginBottom: 6 }}><RemarqueAvecProposition ligne={r} editor={editor} onRemplace={() => onUsage?.("applique", 1)} /></li>)}
                       </ul>
                     </div>
                   ))}

@@ -5,7 +5,8 @@
  */
 import { useRef, useState } from "react";
 import { journaliserErreur } from "../lib/journalErreurs.js";
-import { lireParagraphes } from "../lib/paragraphesEditeur.js";
+import { lireTexteComplet } from "../lib/paragraphesEditeur.js";
+import RemarqueAvecProposition from "./RemarqueAvecProposition.jsx";
 import { avisSurLeFond, RUBRIQUES_AVIS, TAILLE_PARTIE } from "../lib/avisSurLeFond.js";
 
 const COULEURS = { TIENT: "#0F6E56", FAIBLE: "#A32D2D", PISTES: "#185FA5", QUESTIONS: "#7A5B00" };
@@ -20,7 +21,7 @@ export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", on
   const contrôleur = useRef(null);
 
   const lancer = async () => {
-    const { liste } = lireParagraphes(editor, portée === "sélection");
+    const { liste } = lireTexteComplet(editor, portée === "sélection");
     if (!liste.length) { setErreur("Aucun texte à lire."); return; }
     onUsage?.("lance");
     setErreur(null);
@@ -94,7 +95,7 @@ export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", on
                 <div key={clé} style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: COULEURS[clé], marginBottom: 6 }}>{RUBRIQUES_AVIS[clé]}</div>
                   {a[clé].map((ligne, j) => (
-                    <div key={j} style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6, borderLeft: `3px solid ${COULEURS[clé]}`, padding: "4px 0 4px 10px", marginBottom: 6, overflowWrap: "anywhere" }}>{ligne}</div>
+                    <div key={j} style={{ fontSize: 13.5, color: "#333", lineHeight: 1.6, borderLeft: `3px solid ${COULEURS[clé]}`, padding: "4px 0 4px 10px", marginBottom: 6, overflowWrap: "anywhere" }}><RemarqueAvecProposition ligne={ligne} editor={editor} couleur={COULEURS[clé]} onRemplace={() => onUsage?.("applique", 1)} /></div>
                   ))}
                 </div>
               ))}

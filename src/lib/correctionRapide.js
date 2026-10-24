@@ -216,13 +216,16 @@ Quatre rubriques (n'en écris une que si elle a de vrais éléments) :
 [[FRAGMENTS]] — phrases ou paragraphes incomplets, coupés net, notes de travail laissées dans le texte, passages visiblement mal placés. Dis ce que c'est ET où ça semble devoir aller (ou ce qui manque).
 [[A_RETRAVAILLER]] — phrases très lourdes, confuses, ou à la syntaxe bancale que de simples corrections ne règlent pas. Propose une piste de reformulation courte, sans réécrire le passage.
 [[FAITS]] — chiffres, calculs, dates, affirmations scientifiques ou historiques qui te paraissent douteux, imprécis ou qui demandent une source. Tu n'as PAS accès au web : ne tranche jamais, écris précisément ce qu'il faut vérifier et pourquoi tu en doutes (« à vérifier : … »). N'affirme jamais qu'un fait est faux ou vrai avec certitude.
-[[COHERENCE]] — répétitions gênantes, contradictions entre passages, changement de temps ou de point de vue non voulu, rupture de logique.
+[[COHERENCE]] — REDONDANCES (la même information dite deux fois, parfois dans la même phrase : « il y a des décennies encore, le siècle dernier »), répétitions gênantes, contradictions entre passages, changement de temps ou de point de vue non voulu, rupture de logique. Le texte vient parfois d'une dictée : les redondances et les reprises de l'oral y sont fréquentes, cherche-les attentivement.
 
-RÈGLES : cite un extrait court EXACT du texte entre « ». Une remarque = une ligne commençant par « - ». 5 remarques maximum par rubrique, les plus utiles. N'invente rien : si le texte est sain, écris seulement « [[RIEN]] ». Pas d'interprétation psychologique de l'auteur·ice ; ne juge pas le style tant qu'il n'est pas fautif. Rien d'autre que les rubriques (pas d'introduction, pas de conclusion).
+RÈGLES : cite un extrait court EXACT du texte entre « ». Une remarque = une ligne commençant par « - ».
+PROPOSITION DE REMPLACEMENT (rubriques FRAGMENTS, A_RETRAVAILLER et COHERENCE seulement, jamais FAITS) : quand tu peux proposer une courte réécriture qui remplace EXACTEMENT l'extrait cité, ajoute-la en fin de ligne après « ⟹ », entre « » : « extrait » : explication ⟹ « texte de remplacement ». Le remplacement doit pouvoir être collé tel quel à la place de l'extrait (même voix, même temps, rien d'ajouté qui ne soit dans le texte). Si tu ne peux pas, n'écris pas de « ⟹ ». 5 remarques maximum par rubrique, les plus utiles. N'invente rien : si le texte est sain, écris seulement « [[RIEN]] ». Pas d'interprétation psychologique de l'auteur·ice ; ne juge pas le style tant qu'il n'est pas fautif. Rien d'autre que les rubriques (pas d'introduction, pas de conclusion).
 
 FORMAT :
 [[FRAGMENTS]]
 - « extrait » : ce que c'est — où le replacer ou quoi faire
+[[A_RETRAVAILLER]]
+- « il y a des décennies encore, le siècle dernier » : même idée dite deux fois ⟹ « il y a des décennies »
 [[FAITS]]
 - « extrait » : à vérifier : …
 
