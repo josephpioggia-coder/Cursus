@@ -1177,3 +1177,6 @@ Question de Joseph (GSM) : « si une partie du texte a été effacée par erreur
 
 ### Icônes des deux loupes (24/10/2026)
 Choix de Joseph sur une planche de propositions : « surligner pour analyser » = A surligné en jaune + loupe (S4), « Vérifier le fond » = loupe + coche verte (F2). Dessinées sur canvas (`IconeLoupe.jsx`, mode sombre forcé). Vérifié : `vite build` seulement, pas de rendu visuel.
+
+## Tableau de bord sur mobile (24/10/2026)
+Retour de Joseph (capture GSM) : à l'ouverture de Cursus (vue « Tableau de bord »), les TITRES des livres étaient invisibles (seuls % et « En cours » visibles), page décalée, réapparaissant dans le tiroir. Cause : `TableauDeBord.jsx` n'avait aucune variante mobile (grilles 4 col / `1fr 320px` / `1fr 1fr`, marges 32 px) et utilisait des `var(--color-*)` non définies → couleur de texte héritée, inversée en blanc sur fond clair par le mode sombre forcé. Corrigé : valeurs de repli explicites dans chaque `var()`, une colonne sur mobile. Vérifié à 392 px (rendu isolé, `scrollWidth == innerWidth`) ; PAS dans l'app complète. Autres composants utilisant `var(--color-*)` sans repli : même risque (à vérifier si signalé).
