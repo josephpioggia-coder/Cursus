@@ -56,6 +56,7 @@ import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
+import { exporterDossierCreation } from "./lib/exportDossierWord.js";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -2727,6 +2728,29 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 }}
               >
                 {exportEnCours ? "Génération…" : "📄 Exporter en Word"}
+              </button>
+              <button
+                title="Fichier Word daté : avancées, mots par jour et par chapitre — sans le texte du livre"
+                onClick={async () => {
+                  setExportEnCours(true);
+                  try {
+                    await exporterDossierCreation(projetActif);
+                  } catch (err) {
+                    journaliserErreur("App:exporterDossierCreation", err.message, projetActif.id);
+                    window.alert("Impossible de générer le dossier de création. Réessayez, ou contactez le support si le problème persiste.");
+                  } finally {
+                    setExportEnCours(false);
+                  }
+                }}
+                disabled={exportEnCours}
+                style={{
+                  background: "#fff", color: "#C0392B", border: "0.5px solid #C0392B",
+                  borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 500,
+                  cursor: exportEnCours ? "default" : "pointer", fontFamily: "inherit",
+                  opacity: exportEnCours ? 0.6 : 1,
+                }}
+              >
+                🧾 Dossier de création
               </button>
               {/* Sélecteur des zones à inclure dans l'export Word — chantier
                   28/07/2026. "Un nœud exclu exclut tout ce qu'il contient."
