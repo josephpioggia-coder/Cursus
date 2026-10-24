@@ -1174,3 +1174,6 @@ au texte. Corrigé dans `Editeur.jsx` (état local `mobile`, seuil ≤ 768 px co
 ## Retrouver un texte effacé par erreur (24/10/2026)
 
 Question de Joseph (GSM) : « si une partie du texte a été effacée par erreur, je fais quoi ? ». Deux filets existent : ↩ Annuler / ↪ Rétablir (barre compacte, TipTap, perdu au rechargement de la page) et « ↺ Historique » (versions permanentes dans `versions_noeuds`, derrière le menu « ⋯ » sur mobile). Lacunes corrigées dans `Editeur.jsx` : (1) un instantané n'était pris qu'à ≥ 50 mots d'écart → une suppression plus courte n'était jamais retrouvable : désormais AUSSI un instantané toutes les 5 min si le texte a changé ; (2) « Restaurer » écrasait le texte sans trace → le texte actuel est d'abord enregistré (« Avant restauration — … ») ; (3) le panneau d'historique (260 px fixes) écrasait le texte sur mobile → plein écran (`mobile`). NON testé dans le navigateur (seul `vite build`).
+
+### Icônes des deux loupes (24/10/2026)
+Choix de Joseph sur une planche de propositions : « surligner pour analyser » = A surligné en jaune + loupe (S4), « Vérifier le fond » = loupe + coche verte (F2). Dessinées sur canvas (`IconeLoupe.jsx`, mode sombre forcé). Vérifié : `vite build` seulement, pas de rendu visuel.
