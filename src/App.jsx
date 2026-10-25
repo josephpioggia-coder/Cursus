@@ -57,6 +57,7 @@ import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
 import { exporterDossierCreation } from "./lib/exportDossierWord.js";
+import { construirePlan } from "./lib/planDuLivre.js";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 // Valeurs canoniques internes — NE PAS traduire ici (voir note de fin de fichier).
@@ -2114,6 +2115,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     ? trouverContexteHiérarchique(projetActif.structure, nœudActif.id)
     : { titrePartieParente: null, titresChapitresVoisins: [] };
 
+  // Plan du livre + chapitre précédent pour le Co-pilote (25/10/2026) — voir
+  // src/lib/planDuLivre.js : sans eux, le Co-pilote ne connaît que le chapitre
+  // ouvert (ni sommaire, ni titres, ni contenu des autres chapitres).
+  const planDuLivreActif = (projetActif && nœudActif)
+    ? construirePlan(projetActif.structure, nœudActif.id)
+    : { plan: null, précédent: null };
+
   // Note de cadrage (réf. 14/10/2026) — nœud enfant "methodo" du chapitre
   // actif (ex. objectif/angle importé via ImportDocx en mode "sommaire de
   // travail"), transmis à CopiloteIA comme contexte de rédaction. `enfants`
@@ -2985,6 +2993,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 titresEnfants={(nœudActif.enfants || []).map((e) => e.titre)}
                 titrePartieParente={contexteHiérarchiqueActif.titrePartieParente}
                 titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
+                planDuLivre={planDuLivreActif.plan}
+                chapitrePrécédent={planDuLivreActif.précédent}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}

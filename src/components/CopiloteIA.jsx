@@ -33,6 +33,7 @@ import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI, direct
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { noterUsageIA } from "../lib/usageIA.js";
+import { extraitPourJoindre } from "../lib/planDuLivre.js";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
 // la seule limite est ce que l'auteur choisit lui-même — la sélection
@@ -814,6 +815,8 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse
 
 MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
 
+CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, le plan du livre (titres uniquement, quand il est fourni dans le contexte du projet) et, SEULEMENT si l'auteur·ice l'a joint explicitement, le texte du chapitre précédent. Tu ne connais JAMAIS le contenu des autres chapitres : ne le devine pas, ne l'invente pas, ne le résume pas d'après leur titre. Si une demande exige ce contenu (introduction qui reprend les chapitres précédents, rappel, continuité), dis précisément ce qu'il te manque et propose à l'auteur·ice de te le fournir (joindre le chapitre précédent, ou te donner quelques lignes de résumé) ; tu peux proposer une introduction qui s'appuie sur les titres du plan ou sur le chapitre joint, en le disant clairement.
+
 DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
@@ -1472,7 +1475,7 @@ function CarteBlocage({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "" }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "", planDuLivre = null, chapitrePrécédent = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADNBrut, setContexteADNBrut] = useState(null);
   // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
@@ -1506,6 +1509,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       noteDeCadrageTexte ? `OBJECTIF DE CADRAGE DE CE CHAPITRE PRÉCIS (note de travail de l'auteur·ice — angle, sources, intention — sert de boussole pour tes suggestions sur CE chapitre ; ce n'est pas du texte rédigé, ne le recopie jamais tel quel) :\n${noteDeCadrageTexte}` : null,
     ].filter(Boolean).join("\n\n");
   }, [contexteADNBrut, notesProjet, noteDeCadrageTexte, descriptionProjetTexte]);
+  // Plan du livre (25/10/2026, voir src/lib/planDuLivre.js) : ajouté au contexte
+  // des seuls FILS DE DISCUSSION et d'« Aide-moi à avancer ». Volontairement
+  // séparé de `contexteADN` : celui-ci conditionne l'activation de l'aide au
+  // démarrage (`!contexteADN`), un plan ne doit pas la débloquer à lui seul.
+  const contexteADNEtPlan = useMemo(() => {
+    if (!planDuLivre) return contexteADN;
+    const bloc = `PLAN DU LIVRE (titres seulement, dans l'ordre de lecture — tu ne connais PAS le contenu des chapitres autres que celui qui t'est fourni ; ne le devine jamais d'après un titre) :\n${planDuLivre}`;
+    return contexteADN ? `${contexteADN}\n\n${bloc}` : bloc;
+  }, [contexteADN, planDuLivre]);
+  // Pièces jointes par fil (clé de carte → { titre, texte }) : le chapitre
+  // précédent joint par l'auteur·ice depuis le Guide directif. Une ref (pas un
+  // état) : lue au moment de l'envoi, ne doit rien re-rendre.
+  const pièceJointeRef = useRef({});
+  const chapitrePrécédentRef = useRef(null);
+  chapitrePrécédentRef.current = chapitrePrécédent;
   // Consommation IA réelle du compte (60803-03) — remontée par
   // CompteurUsageIA, sert à désactiver le bouton d'analyse une fois le
   // quota du palier épuisé (le compteur affiche lui-même l'avertissement
@@ -1724,10 +1742,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const noteImagesDialogue = imagesDialogue.length
         ? `\n\n(${imagesDialogue.length} image${imagesDialogue.length > 1 ? "s" : ""} du ${typeNœud} jointe${imagesDialogue.length > 1 ? "s" : ""} — observe-${imagesDialogue.length > 1 ? "les" : "la"} si l'auteur·ice t'interroge dessus.)`
         : "";
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
+      const pj = pièceJointeRef.current[cléCarte];
+      const blocPièceJointe = pj
+        ? `\n\nCHAPITRE PRÉCÉDENT « ${pj.titre} » — joint par l'auteur·ice (tu peux t'appuyer dessus ; tu ne connais toujours PAS les autres chapitres) :\n"""\n${pj.texte}\n"""`
+        : "";
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${blocPièceJointe}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
-        promptDialogue(langueProjet, typeProjet, contexteADN),
+        promptDialogue(langueProjet, typeProjet, contexteADNEtPlan),
         userContent,
         null,
         DIALOGUE_MAX_TOKENS,
@@ -1760,7 +1782,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId, contexteADN]);
+  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId, contexteADNEtPlan]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
@@ -2276,7 +2298,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
         : "";
       const résultat = await appelClaude(
-        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADN),
+        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADNEtPlan),
         (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage,
         sig, 1024, null, false, imagesBlocage
       );
@@ -2293,7 +2315,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargementBlocage(false);
     }
-  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, langueProjet, contexteADN, messageErreur, diagnosticBlocage]);
+  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
@@ -2334,6 +2356,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [guideEnregistrée, setGuideEnregistrée] = useState(null);
   const [guideChargée, setGuideChargée] = useState(false);
   const [guideMessage, setGuideMessage] = useState(null);
+  // Chapitre précédent à joindre à l'envoi (25/10/2026) : "non" par défaut —
+  // consomme des jetons, donc jamais joint sans choix explicite.
+  const [guideJoindre, setGuideJoindre] = useState("non");
 
   useEffect(() => {
     setGuideChargée(false);
@@ -2365,9 +2390,15 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       ? { ...d, [cléCarteGuide]: { ...d[cléCarteGuide], ouvert: true } }
       : { ...d, [cléCarteGuide]: { ouvert: true, contexteCarte, messages: [], enCours: false, erreur: null } }));
     setGuideOuvert(false);
+    // Pièce jointe : lue au moment de l'envoi par envoyerQuestionDialogue, et
+    // conservée pour les messages de suivi de CE fil (retirée si « non »).
+    const précédent = chapitrePrécédentRef.current;
+    const extrait = précédent ? extraitPourJoindre(extraireTexte(précédent.texte).texte, guideJoindre) : null;
+    if (extrait) pièceJointeRef.current[cléCarteGuide] = { titre: précédent.titre, texte: extrait };
+    else delete pièceJointeRef.current[cléCarteGuide];
     noterUsageIA({ projetId, noeudId: nœudId, outil: "copilote", action: "lance" });
     envoyerQuestionDialogue(cléCarteGuide, `${MARQUEUR_DIRECTIVE} ${texte}`, false, contexteCarte);
-  }, [guideTexte, typeNœud, titreNœud, projetId, nœudId, envoyerQuestionDialogue]);
+  }, [guideTexte, guideJoindre, typeNœud, titreNœud, projetId, nœudId, envoyerQuestionDialogue]);
 
   const enregistrerGuide = useCallback(async () => {
     const texte = guideTexte.trim();
@@ -2539,6 +2570,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
               rows={7}
               style={{ width: "100%", boxSizing: "border-box", fontSize: 12, lineHeight: 1.5, padding: "6px 8px", border: "0.5px solid #ccc", borderRadius: 6, fontFamily: "inherit", resize: "vertical" }}
             />
+            {chapitrePrécédent && (
+              <div style={{ marginTop: 6, fontSize: 11.5, color: "#555", lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 500 }}>Joindre le chapitre précédent : « {chapitrePrécédent.titre} »</div>
+                {[
+                  { v: "non", l: "Non (le plan du livre est déjà connu)" },
+                  { v: "fin", l: "Sa fin seulement (≈ 3 000 caractères) — pour la continuité" },
+                  { v: "tout", l: "En entier (plafonné à 12 000 caractères) — consomme davantage" },
+                ].map((o) => (
+                  <label key={o.v} style={{ display: "flex", alignItems: "flex-start", gap: 6, cursor: "pointer" }}>
+                    <input type="radio" name="guide-joindre" checked={guideJoindre === o.v} onChange={() => setGuideJoindre(o.v)} style={{ marginTop: 3 }} />
+                    <span>{o.l}</span>
+                  </label>
+                ))}
+              </div>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
               <button onClick={lancerGuide} disabled={!guideTexte.trim() || usageBloqué}
                 style={{ fontSize: 11.5, padding: "5px 12px", background: couleurProjet, color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
