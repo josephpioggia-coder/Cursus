@@ -29,7 +29,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
-import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI } from "../lib/api.js";
+import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI, directivesCopiloteAPI } from "../lib/api.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { noterUsageIA } from "../lib/usageIA.js";
@@ -792,6 +792,18 @@ const DIALOGUE_MAX_TOKENS = 2048;
 // promptDialogue le même mécanisme que systemAvecLangue (bloc contexteADN
 // séparé, avec cache_control), sans reprendre son texte de fin spécifique
 // au JSON (promptDialogue répond en texte libre, pas en JSON).
+// « 🧭 Guide directif » (25/10/2026, demande de Joseph : un bouton à côté de
+// « Aide-moi à avancer » qui lance le mode guidé d'office, avec une directive
+// visible et modifiable avant envoi). Le texte ci-dessous est la directive PAR
+// DÉFAUT, affichée dans un cadre modifiable ; l'auteur·ice peut la modifier
+// pour une fois, l'enregistrer pour le projet (table directives_copilote) ou
+// revenir à ce texte. Les garde-fous de fond (pas de fait inventé, pas de
+// psychologie de l'auteur·ice) NE sont PAS dans ce texte : ils restent dans
+// le prompt système (promptDialogue), donc non supprimables en réécrivant la
+// directive.
+const DIRECTIVE_GUIDE_PAR_DEFAUT = `Tu prends la direction. À partir de ce qui est déjà écrit, propose-moi deux ou trois directions possibles pour la suite du récit : pour chacune, ce qu'elle apporte et ce qu'elle coûte. Distingue clairement ce qui vient de mon texte et de mes intentions déjà mémorisées de ce qui est ton hypothèse. N'interprète pas ma psychologie.`;
+const MARQUEUR_DIRECTIVE = "[DIRECTIVE DE GUIDAGE]";
+
 function promptDialogue(langueProjet, typeProjet, contexteADN) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
   const corps = `Tu es le co-pilote d'un écrivain. Tu as déjà produit une analyse précise (fournie ci-dessous) sur un passage de son texte. L'auteur te pose maintenant une question de suivi sur CETTE analyse précise — il veut creuser, comprendre ton raisonnement, ou te challenger sur ce point exact. Réponds directement à sa question, de façon conversationnelle et précise, en t'appuyant sur l'analyse d'origine sans la répéter intégralement.
@@ -801,6 +813,8 @@ RÈGLE NON NÉGOCIABLE sur toute reformulation proposée — signalé en usage r
 RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse d'origine que tu développes) mentionne une personne nommée dans le texte de l'auteur, ne lui attribue jamais de trait de caractère, de qualité ou de fait que l'auteur n'a pas lui-même écrit — que ce soit dans ta première réponse ou dans une reformulation que tu proposes ici. Si l'auteur te fait remarquer que tu as inventé une caractérisation, reconnais-le sans détour : ne cherche pas à justifier ou à minimiser l'invention.
 
 MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
+
+DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
 
@@ -982,7 +996,9 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
           <span style={{ fontWeight: 600, color: m.role === "auteur" ? couleur : "#4C6FE7" }}>
             {m.role === "auteur" ? t("dialogue.vous", "Vous") : t("dialogue.copilote", "Co-pilote")}
           </span>
-          {" — "}{m.contenu}
+          {" — "}{m.role === "auteur" && m.contenu?.startsWith(MARQUEUR_DIRECTIVE)
+            ? `🧭 Directive : ${m.contenu.slice(MARQUEUR_DIRECTIVE.length).trim()}`
+            : m.contenu}
           {/* CORRECTIF 30/08/2026, retour d'usage réel : une réponse coupée
               en plein milieu d'une phrase (max_tokens atteint) obligeait à
               retaper "continue !" à la main. Bouton dédié sur le DERNIER
@@ -2307,6 +2323,78 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     envoyerQuestionDialogue(cléCarteBlocage, message, false, contexteCarte);
   }, [diagnosticBlocage, texteAnalyséBlocage, ouvrirDialogue, envoyerQuestionDialogue]);
 
+  // « 🧭 Guide directif » (25/10/2026) — voir DIRECTIVE_GUIDE_PAR_DEFAUT.
+  // Le bouton n'envoie RIEN tout de suite : il ouvre un cadre avec la
+  // directive (modifiable) ; « Lancer » l'envoie dans un fil de discussion
+  // dédié (clé "guide:0", persisté comme les autres fils). La directive
+  // enregistrée est propre au (compte, projet), stockée en base.
+  const cléCarteGuide = "guide:0";
+  const [guideOuvert, setGuideOuvert] = useState(false);
+  const [guideTexte, setGuideTexte] = useState(DIRECTIVE_GUIDE_PAR_DEFAUT);
+  const [guideEnregistrée, setGuideEnregistrée] = useState(null);
+  const [guideChargée, setGuideChargée] = useState(false);
+  const [guideMessage, setGuideMessage] = useState(null);
+
+  useEffect(() => {
+    setGuideChargée(false);
+    setGuideEnregistrée(null);
+    setGuideTexte(DIRECTIVE_GUIDE_PAR_DEFAUT);
+    setGuideMessage(null);
+  }, [projetId]);
+
+  const basculerGuide = useCallback(() => {
+    setGuideOuvert((o) => !o);
+    if (guideChargée || !projetId) return;
+    directivesCopiloteAPI.lire(projetId).then(({ data, error }) => {
+      if (error) {
+        console.error("[directives_copilote] échec de la lecture :", error);
+        setGuideMessage({ ok: false, texte: `Directive enregistrée illisible (${error.message}) — texte par défaut affiché.` });
+      } else if (data) {
+        setGuideEnregistrée(data);
+        setGuideTexte(data);
+      }
+      setGuideChargée(true);
+    });
+  }, [guideChargée, projetId]);
+
+  const lancerGuide = useCallback(() => {
+    const texte = guideTexte.trim();
+    if (!texte) return;
+    const contexteCarte = `Demande de guidage (Guide directif) sur ce ${typeNœud}${titreNœud ? ` « ${titreNœud} »` : ""}. Le texte actuel est joint à chaque message.`;
+    setDialogues((d) => (d[cléCarteGuide]
+      ? { ...d, [cléCarteGuide]: { ...d[cléCarteGuide], ouvert: true } }
+      : { ...d, [cléCarteGuide]: { ouvert: true, contexteCarte, messages: [], enCours: false, erreur: null } }));
+    setGuideOuvert(false);
+    noterUsageIA({ projetId, noeudId: nœudId, outil: "copilote", action: "lance" });
+    envoyerQuestionDialogue(cléCarteGuide, `${MARQUEUR_DIRECTIVE} ${texte}`, false, contexteCarte);
+  }, [guideTexte, typeNœud, titreNœud, projetId, nœudId, envoyerQuestionDialogue]);
+
+  const enregistrerGuide = useCallback(async () => {
+    const texte = guideTexte.trim();
+    if (!texte || !projetId) return;
+    const { error } = await directivesCopiloteAPI.enregistrer(projetId, texte);
+    if (error) {
+      console.error("[directives_copilote] échec de l'enregistrement :", error);
+      journaliserErreur("CopiloteIA:enregistrerGuide", `${error.message} (code ${error.code || "?"})`, projetId);
+      setGuideMessage({ ok: false, texte: `Rien n'a été enregistré (${error.message}).` });
+      return;
+    }
+    setGuideEnregistrée(texte);
+    setGuideMessage({ ok: true, texte: "Directive enregistrée pour ce projet." });
+  }, [guideTexte, projetId]);
+
+  const oublierGuide = useCallback(async () => {
+    if (!projetId) return;
+    const { error } = await directivesCopiloteAPI.supprimer(projetId);
+    if (error) {
+      setGuideMessage({ ok: false, texte: `Suppression impossible (${error.message}).` });
+      return;
+    }
+    setGuideEnregistrée(null);
+    setGuideTexte(DIRECTIVE_GUIDE_PAR_DEFAUT);
+    setGuideMessage({ ok: true, texte: "Directive enregistrée supprimée ; texte d'origine rétabli." });
+  }, [projetId]);
+
   useEffect(() => {
     // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
     // action délibérée sur un passage choisi, jamais un cycle automatique
@@ -2406,18 +2494,84 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             Toujours visible, quel que soit l'onglet actif ou l'état du
             texte — contrairement à "Page blanche", accessible pendant
             toute l'écriture, pas seulement au démarrage. */}
-        <button
-          onClick={() => demanderJeSuisBloqué()}
-          disabled={chargementBlocage || usageBloqué}
-          title="Idée, blocage, doute ou difficulté d'écriture"
-          style={{
-            width: "100%", marginTop: 8, padding: "7px", background: "#fff", color: couleurProjet,
-            border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
-            cursor: (chargementBlocage || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
-            opacity: usageBloqué ? 0.5 : 1,
-          }}>
-          {chargementBlocage ? t("bouton.enCours") : "🛟 Aide-moi à avancer"}
-        </button>
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          <button
+            onClick={() => demanderJeSuisBloqué()}
+            disabled={chargementBlocage || usageBloqué}
+            title="Idée, blocage, doute ou difficulté d'écriture"
+            style={{
+              flex: 1, minWidth: 0, padding: "7px", background: "#fff", color: couleurProjet,
+              border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: (chargementBlocage || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
+              opacity: usageBloqué ? 0.5 : 1,
+            }}>
+            {chargementBlocage ? t("bouton.enCours") : "🛟 Aide-moi à avancer"}
+          </button>
+          <button
+            onClick={basculerGuide}
+            disabled={usageBloqué}
+            title="Vous voyez d'abord la directive envoyée au Co-pilote, que vous pouvez modifier, enregistrer ou rétablir — rien n'est envoyé avant « Lancer »."
+            style={{
+              flex: 1, minWidth: 0, padding: "7px", background: guideOuvert ? `${couleurProjet}12` : "#fff", color: couleurProjet,
+              border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: usageBloqué ? "default" : "pointer", fontFamily: "inherit",
+              opacity: usageBloqué ? 0.5 : 1,
+            }}>
+            🧭 Guide directif
+          </button>
+        </div>
+
+        {dialogues[cléCarteGuide] && !dialogues[cléCarteGuide].ouvert && (dialogues[cléCarteGuide].messages || []).length > 0 && (
+          <button onClick={() => ouvrirDialogue(cléCarteGuide)}
+            style={{ display: "block", marginTop: 4, fontSize: 11, color: couleurProjet, background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+            ↳ Rouvrir le dernier échange du Guide directif
+          </button>
+        )}
+
+        {guideOuvert && (
+          <div style={{ marginTop: 6, padding: "8px 10px", background: "#fafafa", border: `0.5px solid ${couleurProjet}30`, borderRadius: 7 }}>
+            <div style={{ fontSize: 11, color: "#777", marginBottom: 6, lineHeight: 1.5 }}>
+              Directive envoyée au Co-pilote — modifiable. Rien n'est envoyé avant « Lancer ». Les règles de fond (pas de fait inventé, pas de psychologie de l'auteur·ice) s'appliquent toujours.
+            </div>
+            <textarea
+              value={guideTexte}
+              onChange={(e) => setGuideTexte(e.target.value)}
+              rows={7}
+              style={{ width: "100%", boxSizing: "border-box", fontSize: 12, lineHeight: 1.5, padding: "6px 8px", border: "0.5px solid #ccc", borderRadius: 6, fontFamily: "inherit", resize: "vertical" }}
+            />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+              <button onClick={lancerGuide} disabled={!guideTexte.trim() || usageBloqué}
+                style={{ fontSize: 11.5, padding: "5px 12px", background: couleurProjet, color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>
+                Lancer
+              </button>
+              <button onClick={enregistrerGuide} disabled={!guideTexte.trim() || !projetId || guideTexte.trim() === guideEnregistrée}
+                title="Garde cette directive pour ce projet (elle réapparaîtra la prochaine fois, sur tous vos appareils)."
+                style={{ fontSize: 11.5, padding: "5px 10px", background: "transparent", color: couleurProjet, border: `0.5px solid ${couleurProjet}50`, borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                Enregistrer pour ce projet
+              </button>
+              <button onClick={() => setGuideTexte(DIRECTIVE_GUIDE_PAR_DEFAUT)} disabled={guideTexte === DIRECTIVE_GUIDE_PAR_DEFAUT}
+                style={{ fontSize: 11.5, padding: "5px 10px", background: "transparent", color: "#888", border: "0.5px solid #ccc", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                Texte d'origine
+              </button>
+              {guideEnregistrée && (
+                <button onClick={oublierGuide}
+                  style={{ fontSize: 11.5, padding: "5px 10px", background: "transparent", color: "#A32D2D", border: "0.5px solid #E24B4A50", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                  Oublier l'enregistrée
+                </button>
+              )}
+              <button onClick={() => setGuideOuvert(false)}
+                style={{ fontSize: 11.5, padding: "5px 10px", background: "transparent", color: "#888", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
+                Annuler
+              </button>
+            </div>
+            {guideEnregistrée && guideTexte.trim() === guideEnregistrée && (
+              <div style={{ fontSize: 10.5, color: "#1D9E75", marginTop: 6 }}>Directive enregistrée pour ce projet.</div>
+            )}
+            {guideMessage && (
+              <div style={{ fontSize: 11, marginTop: 6, color: guideMessage.ok ? "#1D9E75" : "#A32D2D" }}>{guideMessage.ok ? "✓ " : "⚠ "}{guideMessage.texte}</div>
+            )}
+          </div>
+        )}
 
         {/* "🧩 Conseils de recomposition" — voir lancerConseilsRecomposition
             plus haut. Toujours visible, contrairement à "Analyser
@@ -2603,6 +2757,21 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
                 />
               ))
             )}
+          </div>
+        )}
+        {dialogues[cléCarteGuide]?.ouvert && (
+          <div style={{ background: "#fff", border: `0.5px solid ${couleurProjet}30`, borderLeft: `3px solid ${couleurProjet}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 10, color: couleurProjet, fontWeight: 600, textTransform: "uppercase" }}>🧭 Guide directif</div>
+              <button onClick={() => ouvrirDialogue(cléCarteGuide)} title="Replier"
+                style={{ fontSize: 11, color: "#888", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}>✕</button>
+            </div>
+            <FilDialogue
+              dialogue={dialogues[cléCarteGuide]} couleur={couleurProjet} langueProjet={langueProjet}
+              onEnvoyer={(q, continuer) => envoyerQuestionDialogue(cléCarteGuide, q, continuer)}
+              onMémoriser={() => mémoriserIntention(cléCarteGuide, dialogues[cléCarteGuide]?.contexteCarte || "")}
+              mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteGuide]}
+            />
           </div>
         )}
         {erreurBlocage && (
