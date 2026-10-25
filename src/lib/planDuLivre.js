@@ -33,18 +33,42 @@ export function aplatirPlan(structure, niveau = 0, sortie = []) {
 
 const texteBrut = (html) => String(html || "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 
+/** Chemin (racine → nœud) vers `id` dans l'arbre COMPLET, toutes zones confondues ; null si absent. */
+function cheminVers(structure, id, chemin = []) {
+  for (const n of structure || []) {
+    if (n.id === id) return [...chemin, n];
+    const trouvé = cheminVers(n.enfants, id, [...chemin, n]);
+    if (trouvé) return trouvé;
+  }
+  return null;
+}
+
 /**
  * @returns {{ plan: string|null, précédent: {id: string, titre: string, texte: string}|null }}
  */
 export function construirePlan(structure, idActif, { maxLignes = 150 } = {}) {
   const liste = aplatirPlan(structure);
-  const position = liste.findIndex((n) => n.id === idActif);
+  let position = liste.findIndex((n) => n.id === idActif);
+  // Le nœud ouvert peut être une NOTE d'une autre zone (ex. « note de cadrage », zone « methodo », enfant d'un
+  // chapitre) : elle n'est pas dans la liste du corps. On la situe alors par son chapitre PARENT (l'ancêtre le plus
+  // proche qui figure dans le plan) — sans quoi le Co-pilote n'avait NI sommaire NI chapitre précédent (cas réel,
+  // 25/10/2026 : « je n'ai ni le sommaire du livre, ni le texte du chapitre précédent »).
+  let noteOuverte = null;
+  if (position === -1) {
+    const chemin = cheminVers(structure, idActif);
+    if (chemin) {
+      for (let k = chemin.length - 2; k >= 0 && position === -1; k--) {
+        position = liste.findIndex((n) => n.id === chemin[k].id);
+      }
+      if (position !== -1) noteOuverte = chemin[chemin.length - 1];
+    }
+  }
   if (liste.length === 0 || position === -1) return { plan: null, précédent: null };
 
   const libellé = { partie: "Partie", chapitre: "Chapitre", scene: "Scène", section: "Section" };
   let lignes = liste.map((n, i) => {
     const titre = n.titre.trim() || "(sans titre)";
-    const marque = i === position ? "   ← CHAPITRE OUVERT" : "";
+    const marque = i === position ? (noteOuverte ? "   ← CHAPITRE OUVERT (la note ouverte, « " + (noteOuverte.titre || "note").trim() + " », est rattachée à ce chapitre)" : "   ← CHAPITRE OUVERT") : "";
     return `${"  ".repeat(n.niveau)}- ${libellé[n.type] || "Chapitre"} : ${titre}${marque}`;
   });
   // Plan très long : on garde une fenêtre autour du chapitre ouvert.
