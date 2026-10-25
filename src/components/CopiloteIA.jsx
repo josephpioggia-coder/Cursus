@@ -897,6 +897,7 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
   // par chargerNotesEtCitations) — relue automatiquement lors des
   // prochaines sessions, sans que l'auteur·ice ait à la retaper.
   const [vientDeMémoriser, setVientDeMémoriser] = useState(false);
+  const [résultatMémo, setRésultatMémo] = useState(null);
   const [enÉcoute, setEnÉcoute] = useState(false);
   const zoneRef = useRef(null);
   const reconnaissanceRef = useRef(null);
@@ -1011,17 +1012,30 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
 
       {onMémoriser && (dialogue.messages || []).length > 0 && (
         <button
-          onClick={async () => { await onMémoriser(); setVientDeMémoriser(true); setTimeout(() => setVientDeMémoriser(false), 2500); }}
+          onClick={async () => {
+            setRésultatMémo(null);
+            const r = await onMémoriser();
+            setRésultatMémo(r || { ok: false, raison: "Aucune réponse de la mémorisation." });
+            setVientDeMémoriser(!!r?.ok);
+            setTimeout(() => setVientDeMémoriser(false), 2500);
+          }}
           disabled={mémorisationEnCours}
           style={{
             fontSize: 10.5, padding: "3px 8px", marginBottom: 6, background: "transparent",
             color: vientDeMémoriser ? "#1D9E75" : "#888", border: `0.5px solid ${vientDeMémoriser ? "#1D9E75" : "#ccc"}`,
             borderRadius: 20, cursor: mémorisationEnCours ? "default" : "pointer", fontFamily: "inherit",
           }}
-          title="Enregistre l'intention narrative de cet échange dans le Carnet d'idées du projet, relue automatiquement lors des prochaines sessions."
+          title="Résume TOUT ce fil (analyse d'origine + échanges) en une note, enregistrée dans la Mémoire du projet (bouton « Mémoire »), relue lors des prochaines analyses."
         >
-          {mémorisationEnCours ? "…" : vientDeMémoriser ? "✓ Mémorisé dans le Carnet d'idées" : "💾 Mémoriser cette intention"}
+          {mémorisationEnCours ? "…" : vientDeMémoriser ? "✓ Enregistré dans la Mémoire" : "💾 Mémoriser cette intention"}
         </button>
+      )}
+      {résultatMémo && (
+        <div style={{ fontSize: 11, marginBottom: 6, color: résultatMémo.ok ? "#1D9E75" : "#A32D2D", lineHeight: 1.5 }}>
+          {résultatMémo.ok
+            ? <>Note enregistrée (statut « proposée ») : « {résultatMémo.note} »</>
+            : <>⚠ Rien n'a été enregistré. {résultatMémo.raison}</>}
+        </div>
       )}
 
       {/* Cadre renforcé — fond distinct + bordure colorée, pour que le champ
@@ -1751,25 +1765,35 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const contenuÀDistiller = `Analyse ou diagnostic d'origine :\n${contexteCarte}` + (historique ? `\n\nÉchange :\n${historique}` : "");
       const résultat = await appelClaude(promptDistillerIntention(langueProjet), contenuÀDistiller, null, 300);
       const p = parserJSON(résultat);
-      if (p.note) {
-        const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
-        // Même lien automatique vers le chapitre/scène actif que
-        // ajouterMémoireManuelle — voir ce commentaire pour le détail.
-        const { data } = await mémoireNarrativeAPI.créer({
-          type, contenu: p.note, statut: "proposee", sourceType: "copiloteia",
-          portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
-          projetId,
-        });
-        setNotesProjet((n) => {
-          const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
-          return n ? `${n}\n${ligne}` : ligne;
-        });
-        if (data) setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
+      if (!p.note) return { ok: false, raison: "L'IA n'a pas formulé de note à partir de cet échange." };
+      const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
+      // Même lien automatique vers le chapitre/scène actif que
+      // ajouterMémoireManuelle — voir ce commentaire pour le détail.
+      const { data, error } = await mémoireNarrativeAPI.créer({
+        type, contenu: p.note, statut: "proposee", sourceType: "copiloteia",
+        portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
+        projetId,
+      });
+      // CORRECTIF 25/10/2026, signalé par Joseph : `créer` renvoie
+      // { data, error } sans lever d'exception (même piège que
+      // ajouterMémoireManuelle, corrigé le 30/08/2026) ; l'erreur était
+      // ignorée, le bouton affichait « ✓ Mémorisé » alors que rien n'était
+      // enregistré (liste « Mémoire » vide). Ne rien ajouter aux notes de
+      // la session si la sauvegarde a échoué.
+      if (error || !data) {
+        console.error("[memoire_narrative] échec de l'enregistrement :", error);
+        journaliserErreur("CopiloteIA:mémoriserIntention", `${error?.message || "aucune ligne renvoyée"} (code ${error?.code || "?"})`, projetId);
+        return { ok: false, raison: `Enregistrement refusé (${error?.message || "aucune ligne créée"}).` };
       }
-    } catch {
-      // Non bloquant — l'auteur·ice peut toujours noter lui-même dans le
-      // Carnet d'idées si la distillation échoue ; pas la peine d'afficher
-      // une erreur pour une action de confort.
+      setNotesProjet((n) => {
+        const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
+        return n ? `${n}\n${ligne}` : ligne;
+      });
+      setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
+      return { ok: true, note: p.note };
+    } catch (err) {
+      console.error("[memoire_narrative] échec de la mémorisation :", err);
+      return { ok: false, raison: `Échec de la mémorisation (${err?.message || "erreur inconnue"}).` };
     } finally {
       setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: false }));
     }
