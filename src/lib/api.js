@@ -510,6 +510,40 @@ export const dialoguesCopiloteAPI = {
   },
 };
 
+// ─── DIRECTIVE DU GUIDE DIRECTIF (25/10/2026) ───────────────────────────────
+// Voir 2026-10-25-directives-copilote.sql — une directive par (compte, projet).
+export const directivesCopiloteAPI = {
+
+  async lire(projetId) {
+    const uid = await userId();
+    const { data, error } = await supabase
+      .from("directives_copilote")
+      .select("texte")
+      .eq("user_id", uid)
+      .eq("projet_id", projetId)
+      .maybeSingle();
+    return { data: data?.texte ?? null, error };
+  },
+
+  async enregistrer(projetId, texte) {
+    const uid = await userId();
+    const { error } = await supabase
+      .from("directives_copilote")
+      .upsert([{ user_id: uid, projet_id: projetId, texte }], { onConflict: "user_id,projet_id" });
+    return { error };
+  },
+
+  async supprimer(projetId) {
+    const uid = await userId();
+    const { error } = await supabase
+      .from("directives_copilote")
+      .delete()
+      .eq("user_id", uid)
+      .eq("projet_id", projetId);
+    return { error };
+  },
+};
+
 // ─── ANALYSES CO-PILOTE (persistance des résultats d'analyse, réf.
 // 60816-01, suite, 16/09/2026) ──────────────────────────────────────────
 // Voir 2026-09-16-analyses-copilote.sql — suite directe de
