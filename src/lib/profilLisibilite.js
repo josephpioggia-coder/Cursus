@@ -30,7 +30,19 @@ export const NATURES = {
   C: "rédaction qui complique un contenu simple",
 };
 
-export function construireConsigneProfil() {
+/** Sous ce nombre de paragraphes, aucune orientation n'est donnée (une part « 1 sur 1 » ne veut rien dire). */
+export const SEUIL_COURT = 5;
+
+const BLOC_FICTION = `
+TEXTE DE FICTION — règles propres au récit (priment sur les règles générales ci-dessus quand elles divergent) :
+- La retenue, le mystère, l'allusion, le non-dit, l'ellipse, une ouverture « in medias res », un souvenir, un lieu ou un personnage introduits SANS être expliqués sont des PROCÉDÉS NARRATIFS, pas des défauts. Ne les signale pas comme difficulté de lecture.
+- Une image ou une métaphore (par ex. un froid qui gagne « le corps ») est une figure, pas une ambiguïté logique.
+- En REFERENTIELLE, LOGIQUE, CONTEXTUELLE et INTERPRETATIVE, ne signale que ce qui ne peut PAS être voulu : confusion réelle sur QUI agit ou parle, contradiction, chronologie incohérente, information indispensable à comprendre la scène et absente sans raison apparente.
+- Si un détail te paraît laissé volontairement en suspens, ne l'écris pas comme observation : mentionne-le dans FOND (« un souvenir est suggéré sans être développé »), sans exiger qu'il soit précisé.
+- Tu ne juges pas si l'histoire « avance » ou si elle est assez tendue : ce n'est pas l'objet de cet outil.
+`;
+
+export function construireConsigneProfil({ fiction = false } = {}) {
   return `Tu es éditeur littéraire. On te donne un texte en français dont les paragraphes sont numérotés [1], [2], [3]… Tu n'évalues NI la valeur littéraire, NI l'auteur·ice, NI les fautes de surface (orthographe, typographie : un autre outil s'en charge). Tu mesures l'EFFORT que le texte impose au lecteur pour en retrouver le sens : sa « charge de reconstruction ».
 
 SIX DIMENSIONS (code → ce que tu cherches) :
@@ -53,8 +65,10 @@ RÈGLES :
 - N'invente aucun lien manquant, ne devine pas ce que l'auteur·ice « voulait dire » : pose une QUESTION.
 - Aucune hypothèse sur la psychologie, la vie ou les intentions de l'auteur·ice. Aucun jugement de valeur sur sa personne ni sur son talent.
 - Le texte peut contenir « [?] » (mot illisible d'une photo) : ignore-les.
-- Si le texte est trop court pour juger, dis-le dans FOND.
-
+- Si le texte est trop court pour juger (moins de ${SEUIL_COURT} paragraphes), dis-le dans FOND et ne signale que des difficultés réelles : un court extrait ne permet aucune conclusion sur l'ensemble.
+- Dans FOND, n'écris que ce que le texte écrit : n'attribue ni âge, ni état, ni passé, ni intention qu'il ne mentionne pas. Si tu fais une déduction, formule-la comme telle (« le texte laisse penser que… »).
+- Dans QUESTIONS et A_PRESERVER, tout ce que tu mets entre « » doit être une citation EXACTE du texte, recopiée mot pour mot (ne change ni un article, ni un démonstratif : « du chalet » ne devient pas « ce chalet »). Sans citation exacte, n'utilise pas de guillemets.
+${fiction ? BLOC_FICTION : ""}
 FORMAT EXACT, rien d'autre :
 [[OBSERVATIONS]]
 - [3] REFERENTIELLE | « il » | on ne sait pas si « il » désigne le cerveau ou la personne | C | non
@@ -119,6 +133,36 @@ export function verifierObservations(observations, paragraphes) {
   return { retenues, ecartees };
 }
 
+const CITATION_LIBRE = /«\s*([^»]{2,}?)\s*»/g;
+
+/** Les morceaux d'une citation (coupée par « … » ou « [...] ») doivent chacun figurer dans le texte. */
+function citationPresente(citation, toutLeTexte) {
+  return citation.split(/…|\[\s*\.\.\.\s*\]|\.\.\./).map((m) => norm(m)).filter((m) => m.length >= 2).every((m) => toutLeTexte.includes(m));
+}
+
+/**
+ * Vérifie mécaniquement les citations « … » contenues dans des lignes libres (questions, points à
+ * préserver) : si l'une d'elles ne figure NULLE PART dans le texte, la ligne est écartée et comptée
+ * (cas réel : une question citait « ce chalet » alors que le texte disait « du chalet »).
+ * Une ligne sans guillemets n'affirme rien de vérifiable : elle est conservée.
+ */
+export function verifierCitationsLibres(lignes, paragraphes) {
+  const tout = paragraphes.map((p) => norm(p.texte)).join(" ");
+  const retenues = [];
+  let ecartees = 0;
+  for (const ligne of lignes) {
+    const cites = [...ligne.matchAll(CITATION_LIBRE)].map((m) => m[1]);
+    if (cites.every((c) => citationPresente(c, tout))) retenues.push(ligne); else ecartees++;
+  }
+  return { retenues, ecartees };
+}
+
+/** Nombre de citations « … » d'un texte libre (ex. le fond) introuvables dans le texte. */
+export function citationsIntrouvables(texteLibre, paragraphes) {
+  const tout = paragraphes.map((p) => norm(p.texte)).join(" ");
+  return [...String(texteLibre || "").matchAll(CITATION_LIBRE)].filter((m) => !citationPresente(m[1], tout)).length;
+}
+
 // ─── Niveaux et orientation (calculés par le code) ─────────────────────────
 
 export const NIVEAUX = ["absente", "ponctuelle", "fréquente", "dominante"];
@@ -135,7 +179,7 @@ export function niveauDepuisPart(touches, total) {
 /**
  * @returns { dimensions: {CODE:{niveau,touches,observations[]}}, nature:{A,B,C}, orientation:1|2|3, indicatif:boolean, raisons:[] }
  */
-export function evaluerProfil(observations, nbParagraphes) {
+export function evaluerProfil(observations, nbParagraphes, { fiction = false } = {}) {
   const dimensions = {};
   for (const code of Object.keys(DIMENSIONS)) {
     const obs = observations.filter((o) => o.dimension === code);
@@ -169,7 +213,13 @@ export function evaluerProfil(observations, nbParagraphes) {
   const indicatif = nbParagraphes < 15;
   const pressenti3 = indicatif && orientation === 3;
   if (pressenti3) orientation = 2;
-  return { dimensions, nature, orientation, indicatif, pressenti3, raisons, touchesTous: touchesTous.length, nbParagraphes };
+  // Récit de fiction : la « reconstruction éditoriale approfondie » est une notion de non-fiction (DREM) ;
+  // pour un roman, l'outil décrit l'effort de lecture mais ne conclut pas à une reconstruction.
+  const plafonneFiction = fiction && orientation === 3;
+  if (plafonneFiction) orientation = 2;
+  // Trop peu de paragraphes : une part « 1 sur 1 » ne signifie rien → aucune orientation, seulement les points relevés.
+  const tropCourt = nbParagraphes < SEUIL_COURT;
+  return { dimensions, nature, orientation: tropCourt ? null : orientation, tropCourt, fiction, plafonneFiction, indicatif, pressenti3: tropCourt ? false : pressenti3, raisons: tropCourt ? [] : raisons, touchesTous: touchesTous.length, nbParagraphes };
 }
 
 export const ORIENTATIONS = {
@@ -189,27 +239,31 @@ export function texteRestitution(orientation) {
  * Lit le texte (une ou plusieurs parties) → profil complet, citations vérifiées.
  * @param paragraphes [{ texte }] (lecture tolérante)
  */
-export async function profilDeLisibilite(paragraphes, { signal, surProgres } = {}) {
+export async function profilDeLisibilite(paragraphes, { signal, surProgres, fiction = false } = {}) {
   const parties = decouperEnParties(paragraphes);
   let decalage = 0;
   const observations = [], aPreserver = [], questions = [], fonds = [];
-  let ecartees = 0, ignorees = 0, tronque = false;
+  let ecartees = 0, ignorees = 0, tronque = false, questionsEcartees = 0, fondNonVerifie = 0;
   for (let i = 0; i < parties.length; i++) {
     surProgres?.(i, parties.length);
     const partie = parties[i];
     const numerote = partie.map((p, k) => `[${k + 1}] ${p.texte}`).join("\n\n");
-    const { texte, tronque: t } = await appelClaude(construireConsigneProfil(), numerote, 4000, signal);
+    const { texte, tronque: t } = await appelClaude(construireConsigneProfil({ fiction }), numerote, 4000, signal);
     tronque = tronque || t;
     const lu = analyserProfil(texte);
     const { retenues, ecartees: e } = verifierObservations(lu.observations, partie);
     ecartees += e; ignorees += lu.ignorees;
     observations.push(...retenues.map((o) => ({ ...o, n: o.n + decalage })));
-    aPreserver.push(...lu.aPreserver);
-    questions.push(...lu.questions.map((q) => q.replace(/^\[(\d+)\]/, (m, n) => `[${Number(n) + decalage}]`)));
+    const vq = verifierCitationsLibres(lu.questions, partie);
+    const vp = verifierCitationsLibres(lu.aPreserver, partie);
+    questionsEcartees += vq.ecartees + vp.ecartees;
+    fondNonVerifie += citationsIntrouvables(lu.fond, partie);
+    aPreserver.push(...vp.retenues);
+    questions.push(...vq.retenues.map((q) => q.replace(/^\[(\d+)\]/, (m, n) => `[${Number(n) + decalage}]`)));
     if (lu.fond) fonds.push(lu.fond);
     decalage += partie.length;
   }
   surProgres?.(parties.length, parties.length);
   const toutes = parties.flat();
-  return { ...evaluerProfil(observations, toutes.length), observations, aPreserver, questions, fonds, ecartees, ignorees, tronque, paragraphes: toutes };
+  return { ...evaluerProfil(observations, toutes.length, { fiction }), observations, aPreserver, questions, fonds, ecartees, ignorees, tronque, questionsEcartees, fondNonVerifie, paragraphes: toutes };
 }
