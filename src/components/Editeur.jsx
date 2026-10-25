@@ -1107,6 +1107,7 @@ export default function Editeur({
   // mais ni modifiables ni importables. Voir abonnementsAPI.statutAccès
   // (api.js) et App.jsx, qui calcule cette valeur.
   lectureSeule = false,
+  typeProjet = "non-fiction", // "fiction" | "non-fiction" — sert au Profil de lisibilité (récit ou non)
 }) {
   const [modeFocus, setModeFocus] = useState(false);
   // Mobile (24/10/2026, retour de Joseph : « la mise en page sur le GSM laisse peu de place pour le texte ») : en-tête sur UNE ligne
@@ -1731,7 +1732,7 @@ export default function Editeur({
       )}
 
       {profilOuvert && editor && (
-        <ProfilLisibilite editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "profil_lisibilite", action, nb })} couleur={projetCouleur} onFermer={() => setProfilOuvert(false)} />
+        <ProfilLisibilite editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "profil_lisibilite", action, nb })} couleur={projetCouleur} typeProjet={typeProjet} onFermer={() => setProfilOuvert(false)} />
       )}
 
       {photoOuverte && editor && (

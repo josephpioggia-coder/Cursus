@@ -605,11 +605,15 @@ Réponds UNIQUEMENT en JSON valide, même format que les listes reçues :
   // doit PAS produire un texte de remplacement par défaut : le diagnostic
   // vient d'abord, le texte seulement si l'auteur·ice choisit ensuite
   // "Propose-moi un exemple" (fil de dialogue par carte existant).
-  jeSuisBloqué: (typeNœud, titreNœud, complémentAuteur = null) => `Tu es un coach d'écriture qui connaît déjà ce livre (contexte fourni ci-dessus) et le texte déjà écrit dans ce ${typeNœud} intitulé "${titreNœud || "(sans titre)"}". L'auteur·ice a cliqué sur "Aide-moi à avancer"${complémentAuteur ? " ; un premier diagnostic lui a été proposé, qu'il/elle a jugé inexact, et voici ce qu'il/elle précise sur ce qui se passe réellement : \"" + complémentAuteur + "\" — tiens-en compte impérativement pour ce nouveau diagnostic, ne répète pas la même hypothèse" : " sans donner aucun autre détail — c'est à toi de comprendre la nature du blocage à partir d'où le texte s'arrête et de ce qu'il devait accomplir selon le contexte du projet"}.
+  jeSuisBloqué: (typeNœud, titreNœud, complémentAuteur = null, typeProjet = "non-fiction") => `Tu es un coach d'écriture qui connaît déjà ce livre (contexte fourni ci-dessus) et le texte déjà écrit dans ce ${typeNœud} intitulé "${titreNœud || "(sans titre)"}". L'auteur·ice a cliqué sur "Aide-moi à avancer"${complémentAuteur ? " ; un premier diagnostic lui a été proposé, qu'il/elle a jugé inexact, et voici ce qu'il/elle précise sur ce qui se passe réellement : \"" + complémentAuteur + "\" — tiens-en compte impérativement pour ce nouveau diagnostic, ne répète pas la même hypothèse" : " sans donner aucun autre détail — c'est à toi de comprendre la nature du blocage à partir d'où le texte s'arrête et de ce qu'il devait accomplir selon le contexte du projet"}.
 
 Ne commence JAMAIS par demander "comment puis-je t'aider ?" ni par faire choisir une catégorie de blocage à l'auteur·ice — identifie toi-même, en interne, la ou les natures les plus probables parmi (ne montre jamais cette liste, elle sert seulement à orienter ton diagnostic ; un blocage peut combiner plusieurs de ces natures à la fois, ne force pas une étiquette unique si ce n'est pas le cas) : idéation (aucune idée), direction (ne sait plus ce qui doit arriver ensuite), choix (plusieurs options, indécision), structure (des éléments mais pas de tenue — que veut le personnage, qu'est-ce qui l'en empêche, qu'est-ce qui change entre l'entrée et la sortie de la scène, pourquoi cette scène doit-elle exister), personnage (ne sait pas comment il/elle réagirait ici), scène inerte (il se passe quelque chose mais c'est plat), articulation (sait quoi dire, n'arrive pas à l'écrire), voix (ne ressemble plus au reste du livre), perfectionnisme (rejette tout ce qu'il/elle écrit), révision paralysante (ne sait plus quoi garder), perte de sens (n'a plus envie), saturation (tourne en rond depuis un moment), documentation (il manque une information factuelle), reprise après interruption (ne sait plus où il/elle en était), blocage émotionnel (sait exactement ce qu'il faudrait raconter mais n'arrive pas à poser les mots — pas de la lassitude, pas un problème narratif ; n'écris alors surtout pas la scène à sa place, propose plutôt de raconter les faits bruts sans chercher à bien écrire, de noter seulement les faits, d'écrire à la troisième personne, de commencer par juste avant/après, ou de laisser un marqueur et continuer ailleurs), doute global (pense que son texte ne marche plus — dans ce cas NE PROPOSE PAS de réécrire, aide à situer si le problème est local, dans l'arc, dans un personnage ou dans la promesse du texte), faux blocage (le vrai problème n'est peut-être pas de trouver comment continuer, mais que ce passage n'a pas besoin d'exister tel quel — une ellipse suffirait, le chapitre était déjà fini plus tôt, ou l'action demandée est incohérente avec le personnage tel qu'il a été construit ; si tu soupçonnes ce cas, dis-le directement et explique pourquoi, avant de chercher comment continuer).
 
-Réponds directement par un diagnostic court et concret, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et en quoi ton hypothèse sur la nature du blocage (une ou plusieurs, si combinées) en découle. Propose ensuite 2 à 3 directions concrètes et distinctes pour en sortir, SANS en développer aucune complètement — ce sont des pistes qui ouvrent des choix, pas un texte fini. Reste bref : 120 à 200 mots au total, ton direct et concret, jamais générique. Réponds UNIQUEMENT en JSON valide :
+RÈGLE SUR CE QUE TU AFFIRMES DE L'AUTEUR·ICE (non négociable, signalé en usage réel : un premier message disait « tes idées t'arrivent en vrac » et diagnostiquait un « blocage de structure » alors que l'auteur·ice n'avait rien dit de tel) : ton diagnostic porte sur LE TEXTE — où il s'arrête, ce qu'il a déjà établi, ce qui reste ouvert — jamais sur la personne. N'attribue JAMAIS à l'auteur·ice un état, une cause psychologique ou une manière de travailler (idées en vrac, perfectionnisme, saturation, perte de sens, peur, fatigue…) qu'il/elle n'a pas exprimé lui-même/elle-même dans son complément ci-dessus. Les natures de blocage psychologiques ou émotionnelles de la liste ne se nomment que si l'auteur·ice les a exprimées ; sinon reste sur ce que le texte montre. Ne suppose pas non plus qu'il/elle est « bloqué·e » : le bouton s'appelle « Aide-moi à avancer », il/elle cherche peut-être seulement des idées, un avis ou du recul. Présente toute lecture comme une lecture (« le texte s'arrête sur… ; ce qui reste ouvert, c'est… »), et ne décris que ce qui est réellement écrit dans le texte fourni (rien d'un objet, d'un geste ou d'un fait absent du texte : si le livre est ouvert ou fermé, vérifie-le dans le texte).
+
+${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
+
+Réponds directement, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et ce qui reste ouvert. Propose ensuite 2 à 3 directions concrètes et distinctes, SANS en développer aucune comme texte fini : ce sont des pistes qui ouvrent des choix. Sois complet et développé plutôt que bref (une réponse complète d'environ 200 à 400 mots est préférable à une réponse tronquée), ton direct et concret, jamais générique. Si tu poses des questions à l'auteur·ice, numérote-les (1., 2., 3.). Réponds UNIQUEMENT en JSON valide :
 {"diagnostic":"...","type_blocage":"..."}`,
 };
 
@@ -815,6 +819,12 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si ta réponse (ou l'analyse
 
 MISE EN FORME — signalé en usage réel (16/09/2026) : une réponse de plusieurs points distincts affichée comme un seul bloc compact, sans paragraphes, rend la lecture lourde. Structure toujours ta réponse en paragraphes séparés par un saut de ligne vide dès qu'elle aborde plusieurs points, exemples ou idées distincts — jamais un unique pavé de texte continu. Une réponse courte et ciblée sur un seul point peut rester un paragraphe unique.
 
+QUESTIONS NUMÉROTÉES — quand tu poses une ou plusieurs questions à l'auteur·ice, numérote-les (1., 2., 3.) et CONTINUE la numérotation d'un message à l'autre dans ce fil (ne recommence jamais à 1), afin qu'aucune question ne se perde. Au début de ta réponse suivante, rappelle toute question numérotée restée sans réponse (« Il reste la question 2 : … ») avant d'en ouvrir de nouvelles. Si l'auteur·ice répond par des numéros, réponds point par point dans le même ordre. Ne pose que les questions utiles.
+
+TU NE MÉMORISES RIEN TOI-MÊME — tu n'as aucun moyen d'enregistrer quoi que ce soit : ne dis jamais « je mémorise », « je retiens », « c'est noté pour la suite » ni « intention mémorisée ». Quand une décision ou une intention est arrêtée, reformule-la en une phrase claire et invite l'auteur·ice à l'enregistrer lui-même avec le bouton « 💾 Mémoriser cette intention » sous cet échange (ou « + Ajouter » dans la Mémoire) ; précise qu'elle ne sera relue lors des prochaines analyses qu'une fois enregistrée.
+
+RÉPONSES COMPLÈTES — l'auteur·ice préfère une réponse complète et développée à une réponse tronquée : ne résume pas par souci de brièveté ce qui mérite d'être détaillé.
+
 CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, le plan du livre (titres uniquement, quand il est fourni dans le contexte du projet) et, SEULEMENT si l'auteur·ice l'a joint explicitement, le texte du chapitre précédent. Tu ne connais JAMAIS le contenu des autres chapitres : ne le devine pas, ne l'invente pas, ne le résume pas d'après leur titre. Si une demande exige ce contenu (introduction qui reprend les chapitres précédents, rappel, continuité), dis précisément ce qu'il te manque et propose à l'auteur·ice de te le fournir (joindre le chapitre précédent, ou te donner quelques lignes de résumé) ; tu peux proposer une introduction qui s'appuie sur les titres du plan ou sur le chapitre joint, en le disant clairement.
 
 DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
@@ -871,8 +881,11 @@ const OPTIONS_TYPE_MÉMOIRE = [
 
 function promptDistillerIntention(langueProjet) {
   const instruction = INSTRUCTION_LANGUE[langueProjet] || INSTRUCTION_LANGUE.fr;
-  return `Tu résumes un échange entre un·e écrivain·e et son co-pilote IA en UNE note courte (1 à 3 phrases), destinée à être relue dans une future session SANS le contexte de cet échange. N'écris pas un résumé de la conversation — extrais la décision ou l'intention narrative concrète qui s'en dégage, formulée de façon autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). Classe aussi cette note dans EXACTEMENT une de ces catégories (${TYPES_MÉMOIRE_NARRATIVE.join(", ")}) — par exemple une trajectoire de personnage est "arc", un choix ferme de l'auteur·ice est "decision_auteur", un point de vigilance à surveiller est "vigilance", une idée encore floue est "fragment". ${instruction} Réponds UNIQUEMENT en JSON valide :
-{"note":"...","type":"..."}`;
+  return `Tu extrais d'un échange entre un·e écrivain·e et son co-pilote IA les INTENTIONS ou DÉCISIONS que l'auteur·ice a arrêtées ou confirmées, pour qu'elles soient relues dans une future session SANS le contexte de cet échange. Écris UNE note par intention distincte (1 à 4 notes), chacune en 1 à 3 phrases, autonome et actionnable (ex. "Scalpa est sublimé par le regard de Clara (narrateur externe) ; l'arc prévu va vers une réaction opposante de Clara — geste, retrait ou désaccord exprimé."). Ne fais PAS un résumé de la conversation.
+
+RÈGLES : (1) ne retiens que ce que l'auteur·ice a lui-même/elle-même dit, décidé ou confirmé ; une simple proposition du co-pilote que l'auteur·ice n'a pas reprise n'est PAS une intention ; (2) n'ajoute aucun fait, aucune interprétation ni aucune psychologie qui ne soit pas dans l'échange ; (3) si l'auteur·ice a indiqué qu'une intention devra être revue ou précisée plus tard, dis-le dans la note ; (4) si rien n'a été arrêté, renvoie une liste vide.
+Classe chaque note dans EXACTEMENT une de ces catégories (${TYPES_MÉMOIRE_NARRATIVE.join(", ")}) — par exemple une trajectoire de personnage est "arc", un choix ferme de l'auteur·ice est "decision_auteur", un point de vigilance à surveiller est "vigilance", une idée encore floue est "fragment". ${instruction} Réponds UNIQUEMENT en JSON valide :
+{"notes":[{"note":"...","type":"..."}]}`;
 }
 
 function BoutonDialogue({ ouvert, onClick, couleur }) {
@@ -915,6 +928,10 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
   // prochaines sessions, sans que l'auteur·ice ait à la retaper.
   const [vientDeMémoriser, setVientDeMémoriser] = useState(false);
   const [résultatMémo, setRésultatMémo] = useState(null);
+  // Brouillons de notes proposés par « 💾 Mémoriser » (25/10/2026) : relus, modifiés puis enregistrés
+  // par l'auteur·ice — rien n'est enregistré avant son « Enregistrer ».
+  const [brouillons, setBrouillons] = useState(null);
+  const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
   const [enÉcoute, setEnÉcoute] = useState(false);
   const zoneRef = useRef(null);
   const reconnaissanceRef = useRef(null);
@@ -1029,14 +1046,13 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
         <div style={{ fontSize: 11, color: "#A32D2D", marginBottom: 6 }}>{dialogue.erreur}</div>
       )}
 
-      {onMémoriser && (dialogue.messages || []).length > 0 && (
+      {onMémoriser && (dialogue.messages || []).length > 0 && !brouillons && (
         <button
           onClick={async () => {
             setRésultatMémo(null);
             const r = await onMémoriser();
-            setRésultatMémo(r || { ok: false, raison: "Aucune réponse de la mémorisation." });
-            setVientDeMémoriser(!!r?.ok);
-            setTimeout(() => setVientDeMémoriser(false), 2500);
+            if (r?.ok && Array.isArray(r.notes)) setBrouillons(r.notes.map((n) => ({ ...n, garder: true })));
+            else setRésultatMémo(r || { ok: false, raison: "Aucune réponse de la mémorisation." });
           }}
           disabled={mémorisationEnCours}
           style={{
@@ -1044,16 +1060,63 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
             color: vientDeMémoriser ? "#1D9E75" : "#888", border: `0.5px solid ${vientDeMémoriser ? "#1D9E75" : "#ccc"}`,
             borderRadius: 20, cursor: mémorisationEnCours ? "default" : "pointer", fontFamily: "inherit",
           }}
-          title="Résume TOUT ce fil (analyse d'origine + échanges) en une note, enregistrée dans la Mémoire du projet (bouton « Mémoire »), relue lors des prochaines analyses."
+          title="Propose une ou plusieurs notes tirées de CE fil (analyse d'origine + échanges). Vous les relisez, les modifiez, puis vous les enregistrez dans la Mémoire du projet : rien n'est enregistré avant votre « Enregistrer »."
         >
           {mémorisationEnCours ? "…" : vientDeMémoriser ? "✓ Enregistré dans la Mémoire" : "💾 Mémoriser cette intention"}
         </button>
       )}
+      {brouillons && (
+        <div style={{ background: "#F7FBF9", border: "0.5px solid #BFE6D6", borderRadius: 8, padding: "8px 10px", marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "#0F6E56", fontWeight: 600, marginBottom: 4 }}>À enregistrer dans la Mémoire du projet</div>
+          <div style={{ fontSize: 10.5, color: "#666", lineHeight: 1.5, marginBottom: 6 }}>
+            Relisez, corrigez le texte ou le type, décochez ce que vous ne voulez pas garder. Rien n'est enregistré avant « Enregistrer ».
+          </div>
+          {brouillons.map((b, i) => (
+            <div key={i} style={{ marginBottom: 8, opacity: b.garder ? 1 : 0.5 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10.5, color: "#555", marginBottom: 3 }}>
+                <input type="checkbox" checked={b.garder} onChange={(e) => setBrouillons((l) => l.map((x, k) => (k === i ? { ...x, garder: e.target.checked } : x)))} />
+                <select value={b.type} onChange={(e) => setBrouillons((l) => l.map((x, k) => (k === i ? { ...x, type: e.target.value } : x)))}
+                  style={{ fontSize: 10.5, fontFamily: "inherit", maxWidth: "100%", minWidth: 0 }}>
+                  {OPTIONS_TYPE_MÉMOIRE.map((o) => <option key={o.valeur} value={o.valeur}>{o.label}</option>)}
+                </select>
+              </label>
+              <textarea value={b.note} rows={3}
+                onChange={(e) => setBrouillons((l) => l.map((x, k) => (k === i ? { ...x, note: e.target.value } : x)))}
+                style={{ width: "100%", boxSizing: "border-box", fontSize: 11.5, lineHeight: 1.5, padding: "5px 7px", border: "0.5px solid #ccc", borderRadius: 6, fontFamily: "inherit", resize: "vertical" }} />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <button
+              disabled={enregistrementEnCours || !brouillons.some((b) => b.garder && b.note.trim())}
+              onClick={async () => {
+                const àGarder = brouillons.filter((b) => b.garder && b.note.trim()).map((b) => ({ note: b.note.trim(), type: b.type }));
+                setEnregistrementEnCours(true);
+                const r = await onMémoriser(àGarder);
+                setEnregistrementEnCours(false);
+                if (r?.ok) {
+                  setBrouillons(null);
+                  setRésultatMémo({ ok: true, texte: `${r.enregistrées} note${r.enregistrées > 1 ? "s" : ""} enregistrée${r.enregistrées > 1 ? "s" : ""} dans la Mémoire (validée${r.enregistrées > 1 ? "s" : ""}).` });
+                  setVientDeMémoriser(true);
+                  setTimeout(() => setVientDeMémoriser(false), 2500);
+                } else {
+                  setRésultatMémo(r || { ok: false, raison: "Aucune réponse de la mémorisation." });
+                }
+              }}
+              style={{ fontSize: 11, padding: "4px 12px", background: "#0F6E56", color: "#fff", border: "none", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              {enregistrementEnCours ? "…" : "Enregistrer"}
+            </button>
+            <button onClick={() => { setBrouillons(null); setRésultatMémo(null); }}
+              style={{ fontSize: 11, padding: "4px 10px", background: "transparent", color: "#888", border: "0.5px solid #ccc", borderRadius: 14, cursor: "pointer", fontFamily: "inherit" }}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
       {résultatMémo && (
         <div style={{ fontSize: 11, marginBottom: 6, color: résultatMémo.ok ? "#1D9E75" : "#A32D2D", lineHeight: 1.5 }}>
           {résultatMémo.ok
-            ? <>Note enregistrée (statut « proposée ») : « {résultatMémo.note} »</>
-            : <>⚠ Rien n'a été enregistré. {résultatMémo.raison}</>}
+            ? <>✓ {résultatMémo.texte}</>
+            : <>⚠ {résultatMémo.raison}</>}
         </div>
       )}
 
@@ -1147,7 +1210,7 @@ function CarteSuggestion({ s, couleur, cléCarte, dialogue, onOuvrirDialogue, on
       </div>
       <div style={{ fontSize: 12, fontWeight: 500, color: "#1a1a1a", marginBottom: 4 }}>{s.titre}</div>
       <div style={{ fontSize: 12, color: "#555", lineHeight: 1.6 }}>{s.texte}</div>
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, `${s.titre}\n${s.texte}`) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={couleur} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? (...a) => onMémoriserCarte(cléCarte, `${s.titre}\n${s.texte}`, ...a) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -1174,7 +1237,7 @@ function CartePersonnage({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQu
       <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>{p.rôle}</div>
       {p.traits?.map(t => <span key={t} style={{ display: "inline-block", fontSize: 10, padding: "1px 6px", borderRadius: 20, background: "#f0f0f0", color: "#666", marginRight: 4 }}>{t}</span>)}
       {p.note && <div style={{ fontSize: 11, color: c, marginTop: 4 }}>{p.note}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? (...a) => onMémoriserCarte(cléCarte, texteÀCopier, ...a) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -1274,7 +1337,7 @@ function CarteCoherence({ p, cléCarte, dialogue, onOuvrirDialogue, onEnvoyerQue
       </div>
       <div style={{ fontSize: 12, color: "#1a1a1a", margin: "6px 0", lineHeight: 1.6 }}>{p.description}</div>
       {p.suggestion && <div style={{ fontSize: 12, color: "#1D9E75", fontStyle: "italic" }}>💡 {p.suggestion}</div>}
-      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? () => onMémoriserCarte(cléCarte, texteÀCopier) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
+      {dialogue?.ouvert && <FilDialogue dialogue={dialogue} couleur={s.c} langueProjet={langueProjet} onEnvoyer={(q, continuer) => onEnvoyerQuestion(cléCarte, q, continuer)} onMémoriser={onMémoriserCarte ? (...a) => onMémoriserCarte(cléCarte, texteÀCopier, ...a) : null} mémorisationEnCours={mémorisationEnCours?.[cléCarte]} />}
     </div>
   );
 }
@@ -1793,42 +1856,59 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // dès la prochaine analyse de CETTE session, sans attendre un
   // rechargement complet de la page.
   const [mémorisationEnCoursParCarte, setMémorisationEnCoursParCarte] = useState({});
-  const mémoriserIntention = useCallback(async (cléCarte, contexteCarte) => {
+  // Deux temps (25/10/2026, demande de Joseph : voir et corriger ce qui est retenu, et pouvoir garder
+  // plusieurs intentions d'un même fil) :
+  //  1. sans 3e argument → PROPOSE des notes (1 à 4), n'enregistre RIEN ;
+  //  2. avec la liste des notes relues/modifiées par l'auteur·ice → les enregistre. Validées par lui/elle
+  //     avant l'enregistrement, elles sont créées en statut "validee".
+  const mémoriserIntention = useCallback(async (cléCarte, contexteCarte, notesÀEnregistrer = null) => {
+    if (Array.isArray(notesÀEnregistrer)) {
+      const enregistrées = [];
+      const échecs = [];
+      for (const n of notesÀEnregistrer) {
+        const type = TYPES_MÉMOIRE_NARRATIVE.includes(n.type) ? n.type : "fragment";
+        const { data, error } = await mémoireNarrativeAPI.créer({
+          type, contenu: n.note, statut: "validee", sourceType: "copiloteia",
+          portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
+          projetId,
+        });
+        if (error || !data) {
+          console.error("[memoire_narrative] échec de l'enregistrement :", error);
+          journaliserErreur("CopiloteIA:mémoriserIntention", `${error?.message || "aucune ligne renvoyée"} (code ${error?.code || "?"})`, projetId);
+          échecs.push(error?.message || "aucune ligne créée");
+          continue;
+        }
+        enregistrées.push({ ...n, type, data });
+      }
+      if (enregistrées.length) {
+        setNotesProjet((n0) => {
+          const lignes = enregistrées.map((e) => `- [${e.type}] ${e.note}`).join("\n");
+          return n0 ? `${n0}\n${lignes}` : lignes;
+        });
+        setMémoireListe((liste) => (liste === null ? liste : [...enregistrées.map((e) => e.data), ...liste]));
+      }
+      if (échecs.length) {
+        return { ok: false, raison: enregistrées.length ? `${enregistrées.length}/${notesÀEnregistrer.length} note(s) enregistrée(s). Refus : ${échecs[0]}.` : `Rien n'a été enregistré. Refus : ${échecs[0]}.` };
+      }
+      return { ok: true, enregistrées: enregistrées.length };
+    }
+
     setMémorisationEnCoursParCarte((m) => ({ ...m, [cléCarte]: true }));
     try {
       const état = dialogues[cléCarte];
       const historique = (état?.messages || [])
-        .map((m) => `${m.role === "auteur" ? "Auteur" : "Co-pilote"} : ${m.contenu}`)
+        .map((m) => `${m.role === "auteur" ? "Auteur" : "Co-pilote"} : ${m.contenu.startsWith(MARQUEUR_DIRECTIVE) ? m.contenu.slice(MARQUEUR_DIRECTIVE.length).trim() : m.contenu}`)
         .join("\n");
       const contenuÀDistiller = `Analyse ou diagnostic d'origine :\n${contexteCarte}` + (historique ? `\n\nÉchange :\n${historique}` : "");
-      const résultat = await appelClaude(promptDistillerIntention(langueProjet), contenuÀDistiller, null, 300);
+      const résultat = await appelClaude(promptDistillerIntention(langueProjet), contenuÀDistiller, null, 700);
       const p = parserJSON(résultat);
-      if (!p.note) return { ok: false, raison: "L'IA n'a pas formulé de note à partir de cet échange." };
-      const type = TYPES_MÉMOIRE_NARRATIVE.includes(p.type) ? p.type : "fragment";
-      // Même lien automatique vers le chapitre/scène actif que
-      // ajouterMémoireManuelle — voir ce commentaire pour le détail.
-      const { data, error } = await mémoireNarrativeAPI.créer({
-        type, contenu: p.note, statut: "proposee", sourceType: "copiloteia",
-        portée: nœudId ? { noeud_id: nœudId, noeud_titre: titreNœud || null } : {},
-        projetId,
-      });
-      // CORRECTIF 25/10/2026, signalé par Joseph : `créer` renvoie
-      // { data, error } sans lever d'exception (même piège que
-      // ajouterMémoireManuelle, corrigé le 30/08/2026) ; l'erreur était
-      // ignorée, le bouton affichait « ✓ Mémorisé » alors que rien n'était
-      // enregistré (liste « Mémoire » vide). Ne rien ajouter aux notes de
-      // la session si la sauvegarde a échoué.
-      if (error || !data) {
-        console.error("[memoire_narrative] échec de l'enregistrement :", error);
-        journaliserErreur("CopiloteIA:mémoriserIntention", `${error?.message || "aucune ligne renvoyée"} (code ${error?.code || "?"})`, projetId);
-        return { ok: false, raison: `Enregistrement refusé (${error?.message || "aucune ligne créée"}).` };
-      }
-      setNotesProjet((n) => {
-        const ligne = `- [${type}] ${p.note} (proposée, non confirmée par l'auteur·ice)`;
-        return n ? `${n}\n${ligne}` : ligne;
-      });
-      setMémoireListe((liste) => (liste === null ? liste : [data, ...liste]));
-      return { ok: true, note: p.note };
+      const brutes = Array.isArray(p.notes) ? p.notes : (p.note ? [{ note: p.note, type: p.type }] : []);
+      const notes = brutes
+        .filter((n) => n && typeof n.note === "string" && n.note.trim())
+        .slice(0, 4)
+        .map((n) => ({ note: n.note.trim(), type: TYPES_MÉMOIRE_NARRATIVE.includes(n.type) ? n.type : "fragment" }));
+      if (!notes.length) return { ok: false, raison: "Aucune intention arrêtée n'a été trouvée dans cet échange (rien n'a été décidé ou confirmé). Utilisez « + Ajouter » dans la Mémoire pour la formuler vous-même." };
+      return { ok: true, notes };
     } catch (err) {
       console.error("[memoire_narrative] échec de la mémorisation :", err);
       return { ok: false, raison: `Échec de la mémorisation (${err?.message || "erreur inconnue"}).` };
@@ -2298,7 +2378,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
         : "";
       const résultat = await appelClaude(
-        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur), langueProjet, contexteADNEtPlan),
+        systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur, typeProjet), langueProjet, contexteADNEtPlan),
         (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage,
         sig, 1024, null, false, imagesBlocage
       );
@@ -2315,7 +2395,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     } finally {
       setChargementBlocage(false);
     }
-  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
+  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
@@ -2815,7 +2895,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             <FilDialogue
               dialogue={dialogues[cléCarteGuide]} couleur={couleurProjet} langueProjet={langueProjet}
               onEnvoyer={(q, continuer) => envoyerQuestionDialogue(cléCarteGuide, q, continuer)}
-              onMémoriser={() => mémoriserIntention(cléCarteGuide, dialogues[cléCarteGuide]?.contexteCarte || "")}
+              onMémoriser={(...a) => mémoriserIntention(cléCarteGuide, dialogues[cléCarteGuide]?.contexteCarte || "", ...a)}
               mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteGuide]}
             />
           </div>
@@ -2839,7 +2919,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             dialogue={dialogues[cléCarteBlocage]}
             onOuvrirDialogue={(ctx) => ouvrirDialogue(cléCarteBlocage, ctx)}
             onEnvoyerQuestion={(q, continuer) => envoyerQuestionDialogue(cléCarteBlocage, q, continuer)}
-            onMémoriser={diagnosticBlocage ? () => mémoriserIntention(cléCarteBlocage, `Diagnostic : ${diagnosticBlocage.diagnostic}`) : null}
+            onMémoriser={diagnosticBlocage ? (...a) => mémoriserIntention(cléCarteBlocage, `Diagnostic : ${diagnosticBlocage.diagnostic}`, ...a) : null}
             mémorisationEnCours={mémorisationEnCoursParCarte[cléCarteBlocage]}
             historique={historiqueBlocage}
             couleur={couleurProjet}

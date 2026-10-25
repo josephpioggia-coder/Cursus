@@ -7,13 +7,16 @@ import { useRef, useState } from "react";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireTexteComplet } from "../lib/paragraphesEditeur.js";
 import { analyserRepetitions } from "../lib/nettoyageMecanique.js";
-import { DIMENSIONS, NATURES, ORIENTATIONS, profilDeLisibilite, texteRestitution } from "../lib/profilLisibilite.js";
+import { DIMENSIONS, NATURES, ORIENTATIONS, SEUIL_COURT, profilDeLisibilite, texteRestitution } from "../lib/profilLisibilite.js";
 
 const COULEUR_NIVEAU = { absente: "#9a9a9a", ponctuelle: "#0F6E56", fréquente: "#7A5B00", dominante: "#A32D2D" };
 
-export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
+export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD", typeProjet = "non-fiction", onFermer }) {
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
+  // Récit de fiction ou non (25/10/2026) : en fiction, la retenue narrative n'est pas une difficulté de lecture
+  // et l'outil ne conclut jamais à une « reconstruction ». Valeur par défaut = genre du projet, modifiable ici.
+  const [fiction, setFiction] = useState(typeProjet === "fiction");
   const [étape, setÉtape] = useState("choix"); // choix | encours | revue
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
@@ -31,7 +34,7 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
     setÉtape("encours");
     contrôleur.current = new AbortController();
     try {
-      const r = await profilDeLisibilite(liste, { signal: contrôleur.current.signal, surProgres: (faits, total) => setProgrès({ faits, total }) });
+      const r = await profilDeLisibilite(liste, { signal: contrôleur.current.signal, surProgres: (faits, total) => setProgrès({ faits, total }), fiction });
       setSignaux(analyserRepetitions(liste));
       setProfil(r);
       setÉtape("revue");
@@ -49,10 +52,14 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
   const texteQuestions = () => (profil?.questions || []).map((q, i) => `${i + 1}. ${q.replace(/^\[\d+\]\s*/, "")}`).join("\n");
   const texteCompteRendu = () => {
     if (!profil) return "";
-    const o = ORIENTATIONS[profil.orientation];
-    const lignes = [`PROFIL DE LISIBILITÉ — ${o.titre}${profil.indicatif ? " (indicatif : extrait court)" : ""}`, "", texteRestitution(profil.orientation), ""];
+    const lignes = profil.tropCourt
+      ? [`PROFIL DE LISIBILITÉ — extrait trop court pour une orientation (${profil.nbParagraphes} paragraphe${profil.nbParagraphes > 1 ? "s" : ""} ; au moins ${SEUIL_COURT} sont nécessaires). Points relevés, à confirmer sur un passage plus large.`, ""]
+      : [`PROFIL DE LISIBILITÉ — ${ORIENTATIONS[profil.orientation].titre}${profil.indicatif ? " (indicatif : extrait court)" : ""}`, "", texteRestitution(profil.orientation), ""];
     for (const [code, d] of Object.entries(profil.dimensions)) {
-      lignes.push(`${DIMENSIONS[code].label} : ${d.niveau}${d.touches ? ` (${d.touches} paragraphe${d.touches > 1 ? "s" : ""} sur ${profil.nbParagraphes})` : ""}`);
+      if (profil.tropCourt && !d.observations.length) continue;
+      lignes.push(profil.tropCourt
+        ? `${DIMENSIONS[code].label} : ${d.observations.length} point${d.observations.length > 1 ? "s" : ""} relevé${d.observations.length > 1 ? "s" : ""}`
+        : `${DIMENSIONS[code].label} : ${d.niveau}${d.touches ? ` (${d.touches} paragraphe${d.touches > 1 ? "s" : ""} sur ${profil.nbParagraphes})` : ""}`);
       for (const ob of d.observations.slice(0, 3)) lignes.push(`  - « ${ob.citation} » : ${ob.explication}`);
     }
     if (profil.fonds.length) lignes.push("", "Fond : " + profil.fonds.join(" "));
@@ -66,7 +73,7 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
     border: principal ? "none" : "0.5px solid #ccc", background: principal ? couleur : "#fff", color: principal ? "#fff" : "#555",
   });
   const carte = { border: "0.5px solid #e5e5e5", borderRadius: 8, padding: "10px 12px", marginBottom: 10 };
-  const o = profil ? ORIENTATIONS[profil.orientation] : null;
+  const o = profil && profil.orientation ? ORIENTATIONS[profil.orientation] : null;
   const totalNature = profil ? profil.nature.A + profil.nature.B + profil.nature.C : 0;
 
   return (
@@ -94,6 +101,16 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
               <label style={{ display: "block", fontSize: 13 }}>
                 <input type="radio" checked={portée === "tout"} onChange={() => setPortée("tout")} /> Tout le chapitre
               </label>
+              <div style={{ fontSize: 12.5, color: "#777", margin: "14px 0 6px" }}>Ce texte est :</div>
+              <label style={{ display: "block", fontSize: 13, marginBottom: 4 }}>
+                <input type="radio" checked={fiction} onChange={() => setFiction(true)} /> un récit de fiction (la retenue, le mystère et le non-dit ne sont pas comptés comme des défauts)
+              </label>
+              <label style={{ display: "block", fontSize: 13 }}>
+                <input type="radio" checked={!fiction} onChange={() => setFiction(false)} /> un essai, un document ou un témoignage
+              </label>
+              <p style={{ fontSize: 12, color: "#777", margin: "12px 0 0", lineHeight: 1.5 }}>
+                Moins de {SEUIL_COURT} paragraphes : Cursus ne donne pas d'orientation (trop court pour juger) et se limite aux points relevés.
+              </p>
               {erreur && <div style={{ marginTop: 12, fontSize: 12.5, color: "#A32D2D", background: "#FBE9E9", padding: "8px 10px", borderRadius: 6 }}>{erreur}</div>}
             </>
           )}
@@ -102,20 +119,32 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
 
           {étape === "revue" && profil && (
             <>
-              <div style={{ background: o.fond, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+              {profil.tropCourt && (
+                <div style={{ background: "#F2F2F2", borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#666", letterSpacing: 0.4 }}>PAS D'ORIENTATION : EXTRAIT TROP COURT</div>
+                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.6, marginTop: 4 }}>
+                    Ce passage compte {profil.nbParagraphes} paragraphe{profil.nbParagraphes > 1 ? "s" : ""} : c'est trop peu pour dire si la difficulté est fréquente ou ponctuelle (une part « 1 sur 1 » ne signifie rien).
+                    Voici seulement les points relevés dans ce passage, à confirmer sur un extrait plus large (au moins {SEUIL_COURT} paragraphes).
+                  </div>
+                </div>
+              )}
+              {o && <div style={{ background: o.fond, borderRadius: 8, padding: "12px 14px", marginBottom: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: o.couleur, letterSpacing: 0.4 }}>ORIENTATION{profil.indicatif ? " (INDICATIVE : EXTRAIT COURT)" : ""}</div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: o.couleur, margin: "2px 0 6px" }}>{o.titre}</div>
                 <div style={{ fontSize: 13, color: "#333", lineHeight: 1.6 }}>{texteRestitution(profil.orientation)}</div>
                 {profil.raisons.length > 0 && <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>Pourquoi : {profil.raisons.join(" ; ")}.</div>}
                 {profil.pressenti3 && <div style={{ fontSize: 12.5, color: "#A32D2D", marginTop: 6, fontWeight: 600 }}>Les observations vont dans le sens d'une reconstruction éditoriale approfondie : à confirmer sur un extrait plus large (au moins 15 paragraphes).</div>}
                 {profil.indicatif && <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Sur un extrait de {profil.nbParagraphes} paragraphes, une conclusion sur l'ensemble de l'ouvrage serait hâtive : c'est un indice, pas un verdict.</div>}
-              </div>
+                {profil.plafonneFiction && <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Pour un récit de fiction, Cursus ne conclut pas à une « reconstruction » : il décrit l'effort de lecture, le jugement éditorial reste le vôtre.</div>}
+              </div>}
 
               {Object.entries(profil.dimensions).map(([code, d]) => (
                 <div key={code} style={carte}>
                   <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: "#333", flex: 1, minWidth: 160 }}>{DIMENSIONS[code].label}</span>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: COULEUR_NIVEAU[d.niveau] }}>{d.niveau}{d.touches ? ` · ${d.touches}/${profil.nbParagraphes} paragraphe${d.touches > 1 ? "s" : ""}` : ""}</span>
+                    {profil.tropCourt
+                      ? <span style={{ fontSize: 12, fontWeight: 600, color: d.observations.length ? "#7A5B00" : "#9a9a9a" }}>{d.observations.length ? `${d.observations.length} point${d.observations.length > 1 ? "s" : ""} relevé${d.observations.length > 1 ? "s" : ""}` : "rien relevé"}</span>
+                      : <span style={{ fontSize: 12, fontWeight: 600, color: COULEUR_NIVEAU[d.niveau] }}>{d.niveau}{d.touches ? ` · ${d.touches}/${profil.nbParagraphes} paragraphe${d.touches > 1 ? "s" : ""}` : ""}</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: "#999", marginBottom: d.observations.length ? 6 : 0 }}>{DIMENSIONS[code].aide}</div>
                   {d.observations.slice(0, 3).map((ob, i) => (
@@ -162,7 +191,8 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
                 </div>
               )}
               <div style={{ fontSize: 11.5, color: "#999", lineHeight: 1.5, borderTop: "0.5px solid #eee", paddingTop: 8 }}>
-                Niveaux et orientation calculés par Cursus à partir des seules citations retrouvées dans votre texte ({profil.ecartees} observation{profil.ecartees > 1 ? "s" : ""} écartée{profil.ecartees > 1 ? "s" : ""} car la citation était introuvable).
+                Niveaux et orientation calculés par Cursus à partir des seules citations retrouvées dans votre texte ({profil.ecartees} observation{profil.ecartees > 1 ? "s" : ""} écartée{profil.ecartees > 1 ? "s" : ""} car la citation était introuvable{profil.questionsEcartees > 0 ? `, ${profil.questionsEcartees} question${profil.questionsEcartees > 1 ? "s" : ""} ou point${profil.questionsEcartees > 1 ? "s" : ""} écarté${profil.questionsEcartees > 1 ? "s" : ""} pour la même raison` : ""}).
+                {profil.fondNonVerifie > 0 && " ⚠ Une citation du résumé « Le fond » n'a pas été retrouvée dans votre texte : lisez ce résumé avec prudence."}
                 Repères de travail non validés scientifiquement ; une seule lecture automatique : relancez pour vérifier la stabilité. Le profil décrit l'effort de lecture, il ne juge pas la valeur de l'auteur·ice.
                 {profil.tronque && " La réponse a été coupée : relancez sur une sélection plus courte."}
               </div>

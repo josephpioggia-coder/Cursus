@@ -2940,6 +2940,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               nœud={nœudActif}
               projetCouleur={projetActif.couleur}
               projetTitre={projetActif.titre}
+              typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
               onSauvegarder={sauvegarderNœud}
               onTexteChange={màjTexteLocal}
               onSelectionChange={setTexteSélectionné}
