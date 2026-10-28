@@ -59,6 +59,7 @@ import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
+import RubanEditeur from "./RubanEditeur.jsx";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -772,6 +773,12 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
   // "voient" pas encore le contenu de l'image (voir commentaire sur
   // Image.configure plus bas dans useEditor).
   const inputImageRef = useRef(null);
+  // Le ruban (onglet Insertion) demande l'insertion d'une image par un événement.
+  useEffect(() => {
+    const ouvrir = () => inputImageRef.current?.click();
+    window.addEventListener("cursus-inserer-image", ouvrir);
+    return () => window.removeEventListener("cursus-inserer-image", ouvrir);
+  }, []);
   const [téléversementImage, setTéléversementImage] = useState(false);
   const [erreurImage, setErreurImage] = useState(null);
   const TAILLE_MAX_IMAGE = 8 * 1024 * 1024; // 8 Mo
@@ -1786,6 +1793,102 @@ export default function Editeur({
     </div>
   );
 
+  // Actions du ruban (voir src/lib/rubanCatalogue.js : une fonction « fait » doit avoir son entrée ici).
+  const actionsRuban = {
+    copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
+    photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
+    image: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-inserer-image")), desactive: lectureSeule },
+    styles: { onClick: () => setGalerieOuverte(true) },
+    regle: { onClick: () => { if (!vuePage) basculerVuePage(); }, actif: vuePage },
+    vuepage: { onClick: basculerVuePage, actif: vuePage },
+    focus: { onClick: () => setModeFocus(true) },
+    note: { onClick: () => editor?.chain().focus().insertContent({ type: "note", attrs: { texte: "" } }).run(), desactive: lectureSeule },
+    table_matieres: { onClick: () => "La table des matières se génère automatiquement à l'export Word (Parties, Chapitres, Scènes)." },
+    correction: { onClick: () => setCorrectionOuverte(true), desactive: lectureSeule },
+    fond: { onClick: () => setAvisOuvert(true), desactive: lectureSeule },
+    faits: { onClick: () => setVérificationOuverte(true), desactive: lectureSeule },
+    profil: { onClick: () => setProfilOuvert(true), desactive: lectureSeule },
+    nettoyage: { onClick: () => setNettoyageOuvert(true), desactive: lectureSeule },
+    historique: { onClick: () => setVoirHistorique(!voirHistorique), actif: voirHistorique, libelle: `Historique (${historique.length})` },
+    lire: { onClick: basculerLecture },
+    aide: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-aide")) },
+    mode_emploi: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-mode-emploi")) },
+  };
+
+  // Contrôles partagés entre le menu « ⋯ » du mobile et le ruban du bureau.
+  const lectureJSX = (<>
+  {voixDisponible() && (
+    <button
+      onClick={basculerLecture}
+      disabled={étatLecture === "chargement"}
+      style={{
+        fontSize: 12, color: étatLecture !== "arrêté" ? "#7F77DD" : "#999",
+        background: étatLecture !== "arrêté" ? "#F5F4FD" : "none",
+        border: "none", cursor: étatLecture === "chargement" ? "default" : "pointer", borderRadius: 6,
+        padding: "4px 8px", fontFamily: "inherit",
+        opacity: étatLecture === "chargement" ? 0.7 : 1,
+      }}
+      title="Lit la sélection en cours, ou tout le texte si rien n'est sélectionné"
+    >
+      {étatLecture === "chargement" ? "⏳ Préparation…" : étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
+      {progressionLecture ? ` (${progressionLecture})` : ""}
+    </button>
+  )}
+  {voixDisponible() && (
+    <>
+      <select
+        value={voixLecture}
+        onChange={(e) => setVoixLecture(e.target.value)}
+        title="Voix de lecture — le changement s'applique à la prochaine lecture lancée"
+        style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+      >
+        {VOIX_DISPONIBLES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+      </select>
+      <select
+        value={vitesseLecture}
+        onChange={(e) => setVitesseLecture(Number(e.target.value))}
+        title="Vitesse de lecture — le changement s'applique à la prochaine lecture lancée"
+        style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+      >
+        {VITESSES_DISPONIBLES.map((v) => <option key={v} value={v}>{v}×</option>)}
+      </select>
+    </>
+  )}
+  {voixDisponible() && solde && (
+    <span
+      title={`Lecture à voix haute ce mois-ci : ${solde.utilise.toLocaleString("fr-FR")} caractères lus sur ${solde.disponible.toLocaleString("fr-FR")} disponibles (${solde.quota_inclus.toLocaleString("fr-FR")} inclus dans votre formule${solde.credits ? `, plus ${solde.credits.toLocaleString("fr-FR")} de crédit` : ""}). Se renouvelle le 1er du mois.`}
+      style={{ fontSize: 11, color: solde.restant < solde.disponible * 0.1 ? "#A32D2D" : "#999", whiteSpace: "nowrap" }}
+    >
+      {Math.round(solde.restant / 1000).toLocaleString("fr-FR")} k car. restants
+    </span>
+  )}
+  {étatLecture !== "arrêté" && (
+    <button
+      onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); setProgressionLecture(null); }}
+      style={{
+        fontSize: 12, color: "#999", background: "none",
+        border: "none", cursor: "pointer", borderRadius: 6,
+        padding: "4px 6px", fontFamily: "inherit",
+      }}
+      title="Arrêter la lecture"
+    >
+      ⏹
+    </button>
+  )}
+  </>);
+  const formatSelectJSX = (
+  <select
+    value={formatRéférence}
+    onChange={(e) => setFormatRéférence(e.target.value)}
+    title="Format de référence pour la largeur de colonne et les numéros de ligne — les numéros restent stables tant que ce choix ne change pas"
+    style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
+  >
+    {Object.entries(FORMATS_RÉFÉRENCE).map(([clé, f]) => (
+      <option key={clé} value={clé}>{f.label}</option>
+    ))}
+  </select>
+  );
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
@@ -1823,17 +1926,8 @@ export default function Editeur({
               style={{ fontSize: 18, lineHeight: 1, color: actionsOuvertes ? projetCouleur : "#777", background: actionsOuvertes ? `${projetCouleur}15` : "none", border: "none", borderRadius: 6, padding: "4px 9px", fontFamily: "inherit", cursor: "pointer" }}>⋯</button>
           )}
           {mobile && actionsOuvertes && <div style={{ flexBasis: "100%", height: 0 }} />}
-          {(!mobile || actionsOuvertes) && (<>
-          <select
-            value={formatRéférence}
-            onChange={(e) => setFormatRéférence(e.target.value)}
-            title="Format de référence pour la largeur de colonne et les numéros de ligne — les numéros restent stables tant que ce choix ne change pas"
-            style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
-          >
-            {Object.entries(FORMATS_RÉFÉRENCE).map(([clé, f]) => (
-              <option key={clé} value={clé}>{f.label}</option>
-            ))}
-          </select>
+          {mobile && actionsOuvertes && (<>
+          {formatSelectJSX}
           {!mobile && (
             <button onClick={basculerVuePage} aria-pressed={vuePage}
               title="Vue page : afficher la feuille avec ses limites et ses marges (celles de l'export Word)"
@@ -1947,64 +2041,7 @@ export default function Editeur({
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="faits" taille={16} />Vérifier les faits</span>
             </button>
           )}
-          {voixDisponible() && (
-            <button
-              onClick={basculerLecture}
-              disabled={étatLecture === "chargement"}
-              style={{
-                fontSize: 12, color: étatLecture !== "arrêté" ? "#7F77DD" : "#999",
-                background: étatLecture !== "arrêté" ? "#F5F4FD" : "none",
-                border: "none", cursor: étatLecture === "chargement" ? "default" : "pointer", borderRadius: 6,
-                padding: "4px 8px", fontFamily: "inherit",
-                opacity: étatLecture === "chargement" ? 0.7 : 1,
-              }}
-              title="Lit la sélection en cours, ou tout le texte si rien n'est sélectionné"
-            >
-              {étatLecture === "chargement" ? "⏳ Préparation…" : étatLecture === "lecture" ? "⏸ Lecture…" : étatLecture === "pause" ? "▶ Reprendre" : "🔊 Lire à voix haute"}
-              {progressionLecture ? ` (${progressionLecture})` : ""}
-            </button>
-          )}
-          {voixDisponible() && (
-            <>
-              <select
-                value={voixLecture}
-                onChange={(e) => setVoixLecture(e.target.value)}
-                title="Voix de lecture — le changement s'applique à la prochaine lecture lancée"
-                style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
-              >
-                {VOIX_DISPONIBLES.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-              </select>
-              <select
-                value={vitesseLecture}
-                onChange={(e) => setVitesseLecture(Number(e.target.value))}
-                title="Vitesse de lecture — le changement s'applique à la prochaine lecture lancée"
-                style={{ fontSize: 11, color: "#777", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 4px", fontFamily: "inherit", background: "#fff", cursor: "pointer" }}
-              >
-                {VITESSES_DISPONIBLES.map((v) => <option key={v} value={v}>{v}×</option>)}
-              </select>
-            </>
-          )}
-          {voixDisponible() && solde && (
-            <span
-              title={`Lecture à voix haute ce mois-ci : ${solde.utilise.toLocaleString("fr-FR")} caractères lus sur ${solde.disponible.toLocaleString("fr-FR")} disponibles (${solde.quota_inclus.toLocaleString("fr-FR")} inclus dans votre formule${solde.credits ? `, plus ${solde.credits.toLocaleString("fr-FR")} de crédit` : ""}). Se renouvelle le 1er du mois.`}
-              style={{ fontSize: 11, color: solde.restant < solde.disponible * 0.1 ? "#A32D2D" : "#999", whiteSpace: "nowrap" }}
-            >
-              {Math.round(solde.restant / 1000).toLocaleString("fr-FR")} k car. restants
-            </span>
-          )}
-          {étatLecture !== "arrêté" && (
-            <button
-              onClick={() => { arrêterLecture(); setÉtatLecture("arrêté"); setProgressionLecture(null); }}
-              style={{
-                fontSize: 12, color: "#999", background: "none",
-                border: "none", cursor: "pointer", borderRadius: 6,
-                padding: "4px 6px", fontFamily: "inherit",
-              }}
-              title="Arrêter la lecture"
-            >
-              ⏹
-            </button>
-          )}
+          {lectureJSX}
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
             style={{
@@ -2061,7 +2098,12 @@ export default function Editeur({
       )}
 
       {/* ── Barre d'outils ── */}
-      <BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />
+      {mobile || modeFocus ? (
+        <BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />
+      ) : (
+        <RubanEditeur couleur={projetCouleur} actions={actionsRuban} controles={{ format: formatSelectJSX, lecture: <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center", maxWidth: 230 }}>{lectureJSX}</div> }}
+          accueil={<BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />} lectureSeule={lectureSeule} />
+      )}
 
       {/* ── Zone centrale : éditeur + historique ── */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>

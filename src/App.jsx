@@ -1854,6 +1854,14 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [erreurCréationProjet, setErreurCréationProjet] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);
+  // Ruban de CursEdit : boutons « Aide » et « Mode d'emploi » (événements émis depuis l'éditeur).
+  useEffect(() => {
+    const aide = () => setAideOuverte(true);
+    const mode = () => setVue("mode-emploi");
+    window.addEventListener("cursus-aide", aide);
+    window.addEventListener("cursus-mode-emploi", mode);
+    return () => { window.removeEventListener("cursus-aide", aide); window.removeEventListener("cursus-mode-emploi", mode); };
+  }, []);
   const [exportEnCours, setExportEnCours]                 = useState(false);
   const [formatExport, setFormatExport]                   = useState("a4");
   // Zones de visibilité incluses à l'export Word — chantier 28/07/2026.
