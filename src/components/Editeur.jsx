@@ -47,7 +47,7 @@ import TextStyle from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
 import {
   PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe,
-  POLICES, TAILLES_PT, TAILLE_DEFAUT_PT, INTERLIGNES, taillePtDepuisCss, tailleVoisine, changerCasse,
+  POLICES, TAILLES_PT, TAILLE_DEFAUT_PT, INTERLIGNES, taillePtDepuisCss, tailleVoisine, changerCasse, PAS_RETRAIT_CM,
 } from "../lib/miseEnFormeEditeur.js";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
@@ -134,7 +134,7 @@ const FORMATS_RÉFÉRENCE = {
 // graduations au demi-cm. RÉGLABLE comme dans Word : glisser la marge gauche / droite (carrés sous la règle) et le retrait de
 // première ligne (triangle du haut). Marges enregistrées par projet ET par format (styles_projet.page), reprises à l'export Word.
 const PX_PAR_CM = 96 / 2.54;
-function RegleCm({ largeurPage, gauchePx, droitePx, alineaCm, editable, onChange }) {
+function RegleCm({ largeurPage, gauchePx, droitePx, retraitGaucheCm = 0, alineaCm, editable, onChange }) {
   const refRegle = useRef(null);
   const total = largeurPage;
   const traits = [];
@@ -159,7 +159,7 @@ function RegleCm({ largeurPage, gauchePx, droitePx, alineaCm, editable, onChange
       const mm = (v) => Math.round(v * 10) / 10;
       if (quoi === "gauche") return { gauche: mm(Math.min(Math.max(xPx, 0.5 * PX_PAR_CM), total - droitePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
       if (quoi === "droite") return { droite: mm(Math.min(Math.max(total - xPx, 0.5 * PX_PAR_CM), total - gauchePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
-      return { alinea: mm(Math.min(Math.max((xPx - gauchePx) / PX_PAR_CM, 0), 5)) };
+      return { alinea: mm(Math.min(Math.max((xPx - gauchePx) / PX_PAR_CM - retraitGaucheCm, 0), 5)) };
     };
     const bouge = (ev) => onChange(calc(ev), false);
     const fin = (ev) => { cible.removeEventListener("pointermove", bouge); cible.removeEventListener("pointerup", fin); cible.removeEventListener("pointercancel", fin); onChange(calc(ev), true); };
@@ -177,8 +177,8 @@ function RegleCm({ largeurPage, gauchePx, droitePx, alineaCm, editable, onChange
       <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: droitePx, background: "#e3e1ea", pointerEvents: "none" }} />
       <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>{traits}</div>
       {/* retrait de première ligne (triangle du haut) */}
-      <div onPointerDown={glisser("alinea")} title="Retrait de première ligne"
-        style={{ ...poignee, left: gauchePx + alineaCm * PX_PAR_CM - 5, top: -1, width: 10, height: 8, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid #7F77DD", boxSizing: "border-box" }} />
+      <div onPointerDown={glisser("alinea")} title="Retrait de première ligne du paragraphe où se trouve le curseur"
+        style={{ ...poignee, left: gauchePx + (retraitGaucheCm + alineaCm) * PX_PAR_CM - 5, top: -1, width: 10, height: 8, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid #7F77DD", boxSizing: "border-box" }} />
       {/* marges gauche et droite (carrés du bas) */}
       <div onPointerDown={glisser("gauche")} title="Marge gauche"
         style={{ ...poignee, left: gauchePx - 4, bottom: -1, width: 9, height: 8, background: "#7F77DD", borderRadius: 1 }} />
@@ -1277,11 +1277,13 @@ export default function Editeur({
   const gauchePx = margesFormat.gauche ? margesFormat.gauche * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
   const droitePx = margesFormat.droite ? margesFormat.droite * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
   const [erreurRègle, setErreurRègle] = useState(null);
+  const [retraitCurseur, setRetraitCurseur] = useState({ gauche: 0, premiere: null });
   // `fin` = relâché : enregistrement en base (pendant le glissement, seulement l'aperçu).
   const changerRègle = (changement, fin) => {
     const { alinea, ...marges } = changement;
+    // Triangle = retrait de première ligne du/des PARAGRAPHE(S) sélectionné(s) seulement (pas du livre : celui-là se règle dans « Styles »).
+    if (alinea !== undefined) { editor?.commands.setPremiereLigne(alinea); return; }
     const suivant = { ...stylesProjet };
-    if (alinea !== undefined) suivant.normal = { ...(stylesProjet.normal || {}), alinea };
     if (Object.keys(marges).length) suivant.page = { ...(stylesProjet.page || {}), [formatRéférence]: { ...margesFormat, ...marges } };
     const propre = nettoyerStyles(suivant);
     setStylesProjet(propre);
@@ -1544,6 +1546,18 @@ export default function Editeur({
       }, 2000);
     },
   });
+  // Retrait du paragraphe sous le curseur (pour placer le triangle de la règle) : lui-même, sinon celui du style Normal.
+  useEffect(() => {
+    if (!editor) return;
+    const lire = () => {
+      const a = editor.state.selection.$from.parent.attrs || {};
+      setRetraitCurseur({ gauche: (a.indent || 0) * PAS_RETRAIT_CM, premiere: a.firstLine ?? null });
+    };
+    lire();
+    editor.on("selectionUpdate", lire);
+    editor.on("update", lire);
+    return () => { editor.off("selectionUpdate", lire); editor.off("update", lire); };
+  }, [editor]);
 
   // Sauvegarde automatique forcée toutes les 30s
   useEffect(() => {
@@ -2006,7 +2020,7 @@ export default function Editeur({
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {pageVisible && (<>
-              <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} alineaCm={stylesProjet?.normal?.alinea || 0}
+              <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} retraitGaucheCm={retraitCurseur.gauche} alineaCm={retraitCurseur.premiere ?? (stylesProjet?.normal?.alinea || 0)}
                 editable={!lectureSeule && !!projetIdStyles} onChange={changerRègle} />
               {erreurRègle && <div style={{ position: "absolute", top: -36, right: 0, fontSize: 10.5, color: "#A32D2D" }}>⚠ {erreurRègle}</div>}
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: gauchePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
