@@ -59,6 +59,9 @@ import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
+import GalerieStyles from "./GalerieStyles.jsx";
+import { stylesProjetAPI } from "../lib/api.js";
+import { cssDesStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -1200,6 +1203,11 @@ export default function Editeur({
   const [vérificationOuverte, setVérificationOuverte] = useState(false);
   const [avisOuvert, setAvisOuvert] = useState(false);
   const [nettoyageOuvert, setNettoyageOuvert] = useState(false);
+  // Styles du projet (28/10/2026) — galerie « à la Word » : chargés par projet, injectés sous forme de
+  // feuille de style APRÈS celle de l'éditeur (voir src/lib/stylesProjet.js).
+  const [galerieOuverte, setGalerieOuverte] = useState(false);
+  const [stylesProjet, setStylesProjet] = useState({});
+  const projetIdStyles = nœud?.projet_id || null;
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
@@ -1257,6 +1265,28 @@ export default function Editeur({
       document.head.appendChild(style);
     }
   }, []);
+
+  useEffect(() => {
+    setStylesProjet({});
+    if (!projetIdStyles) return;
+    let annulé = false;
+    stylesProjetAPI.lire(projetIdStyles).then(({ data, error }) => {
+      if (error) { console.error("[styles_projet] lecture impossible :", error); return; }
+      if (!annulé && data) setStylesProjet(data);
+    });
+    return () => { annulé = true; };
+  }, [projetIdStyles]);
+
+  useEffect(() => {
+    let balise = document.getElementById("atelier-editeur-styles-projet");
+    if (!balise) {
+      balise = document.createElement("style");
+      balise.id = "atelier-editeur-styles-projet";
+      document.head.appendChild(balise);
+    }
+    balise.textContent = cssDesStyles(stylesProjet);
+  }, [stylesProjet]);
+  useEffect(() => () => { document.getElementById("atelier-editeur-styles-projet")?.remove(); }, []);
 
   // Chronomètre de session
   useEffect(() => {
@@ -1671,6 +1701,17 @@ export default function Editeur({
               📷 Lire une photo
             </button>
           )}
+          <button
+            onClick={() => setGalerieOuverte(true)}
+            style={{
+              fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+              border: "none", cursor: "pointer", borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit",
+            }}
+            title="Styles du projet : régler une fois la police, la taille, l'interligne… de Normal, Titres, Citation (comme les Styles de Word)"
+          >
+            🎨 Styles
+          </button>
           {!lectureSeule && (
             <button
               onClick={() => setProfilOuvert(true)}
@@ -1808,6 +1849,11 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {galerieOuverte && (
+        <GalerieStyles projetId={projetIdStyles} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
+          onEnregistre={setStylesProjet} onFermer={() => setGalerieOuverte(false)} />
       )}
 
       {profilOuvert && editor && (

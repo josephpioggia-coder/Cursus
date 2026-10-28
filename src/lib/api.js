@@ -544,6 +544,31 @@ export const directivesCopiloteAPI = {
   },
 };
 
+// ─── STYLES DU PROJET (28/10/2026) ──────────────────────────────────────────
+// Voir 2026-10-28-styles-projet.sql et src/lib/stylesProjet.js — une ligne par (compte, projet),
+// `styles` = propriétés MODIFIÉES seulement.
+export const stylesProjetAPI = {
+
+  async lire(projetId) {
+    const uid = await userId();
+    const { data, error } = await supabase
+      .from("styles_projet")
+      .select("styles")
+      .eq("user_id", uid)
+      .eq("projet_id", projetId)
+      .maybeSingle();
+    return { data: data?.styles ?? null, error };
+  },
+
+  async enregistrer(projetId, styles) {
+    const uid = await userId();
+    const { error } = await supabase
+      .from("styles_projet")
+      .upsert([{ user_id: uid, projet_id: projetId, styles }], { onConflict: "user_id,projet_id" });
+    return { error };
+  },
+};
+
 // ─── ANALYSES CO-PILOTE (persistance des résultats d'analyse, réf.
 // 60816-01, suite, 16/09/2026) ──────────────────────────────────────────
 // Voir 2026-09-16-analyses-copilote.sql — suite directe de

@@ -32,6 +32,7 @@ import {
   PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun, ShadingType, LineRuleType,
 } from "docx";
 import { premierePolice, taillePtDepuisCss } from "./miseEnFormeEditeur.js";
+import { nettoyerStyles, paragrapheDepuisStyle, runDepuisStyle, stylesPourDocx } from "./stylesProjet.js";
 
 const NIVEAU_STRUCTURE = {
   partie: HeadingLevel.HEADING_1,
@@ -112,7 +113,8 @@ function avecPropsBloc(base, n) {
   const resultat = { ...base, ...p };
   const spacing = { ...(base.spacing || {}), ...(p.spacing || {}) };
   if (Object.keys(spacing).length) resultat.spacing = spacing; else delete resultat.spacing;
-  const indent = p.indent && base.indent ? { left: base.indent.left + p.indent.left } : (p.indent || base.indent);
+  const indent = (p.indent || base.indent) ? { ...(base.indent || {}), ...(p.indent || {}) } : null;
+  if (indent && (base.indent?.left || p.indent?.left)) indent.left = (base.indent?.left || 0) + (p.indent?.left || 0);
   if (indent) resultat.indent = indent; else delete resultat.indent;
   return resultat;
 }
@@ -193,7 +195,10 @@ function runsDepuisNœudDOM(nœudDOM, styleInitial = {}, registreNotes = []) {
 // Convertit le HTML d'un nœud (produit par TipTap) en une liste de
 // paragraphes Word. Un seul niveau de balises est géré (pas de récursion
 // dans les listes) — suffisant pour le contenu réel observé à ce jour.
-export function paragraphesDepuisHTML(html, registreNotes = []) {
+export function paragraphesDepuisHTML(html, registreNotes = [], styles = {}) {
+  // Styles du projet (28/10/2026, galerie « Styles ») : propriétés modifiées par l'auteur·ice, voir stylesProjet.js.
+  const parN = paragrapheDepuisStyle(styles.normal);
+  const runN = runDepuisStyle(styles.normal);
   const dom = new DOMParser().parseFromString(html || "", "text/html");
   const paragraphes = [];
 
@@ -202,7 +207,11 @@ export function paragraphesDepuisHTML(html, registreNotes = []) {
     const tag = n.tagName.toLowerCase();
 
     if (tag === "p") {
-      paragraphes.push(new Paragraph(avecPropsBloc({ children: runsDepuisNœudDOM(n, {}, registreNotes), spacing: { after: 160 } }, n)));
+      paragraphes.push(new Paragraph(avecPropsBloc({
+        ...parN,
+        children: runsDepuisNœudDOM(n, { gras: runN.bold || undefined, italique: runN.italics || undefined }, registreNotes),
+        spacing: { after: 160, ...(parN.spacing || {}) },
+      }, n)));
     } else if (tag === "h1" || tag === "h2" || tag === "h3") {
       paragraphes.push(new Paragraph(avecPropsBloc({ heading: NIVEAU_TITRE_CORPS[tag], children: runsDepuisNœudDOM(n, {}, registreNotes) }, n)));
     } else if (tag === "h4" || tag === "h5" || tag === "h6") {
@@ -212,15 +221,21 @@ export function paragraphesDepuisHTML(html, registreNotes = []) {
       // (gras, taille décroissante) plutôt que de risquer une valeur
       // HeadingLevel non garantie par la librairie. Ajouté 24/07/2026.
       const taille = { h4: 26, h5: 24, h6: 22 }[tag]; // en demi-points (26 = 13pt)
+      const r = runDepuisStyle(styles[tag]);
+      const par = paragrapheDepuisStyle(styles[tag]);
       paragraphes.push(new Paragraph(avecPropsBloc({
-        spacing: { before: 200, after: 100 },
-        children: runsDepuisNœudDOM(n, { gras: true, taille }, registreNotes),
+        ...par,
+        spacing: { before: 200, after: 100, ...(par.spacing || {}) },
+        children: runsDepuisNœudDOM(n, { gras: r.bold ?? true, italique: r.italics || undefined, taille: r.size ?? taille, police: r.font, couleur: r.color }, registreNotes),
       }, n)));
     } else if (tag === "blockquote") {
+      const r = runDepuisStyle(styles.quote);
+      const par = paragrapheDepuisStyle(styles.quote);
       paragraphes.push(new Paragraph(avecPropsBloc({
-        indent: { left: 720 },
-        spacing: { before: 120, after: 160 },
-        children: runsDepuisNœudDOM(n, { italique: true }, registreNotes),
+        ...par,
+        indent: { left: 720, ...(par.indent || {}) },
+        spacing: { before: 120, after: 160, ...(par.spacing || {}) },
+        children: runsDepuisNœudDOM(n, { italique: r.italics ?? true, gras: r.bold || undefined, taille: r.size, police: r.font, couleur: r.color }, registreNotes),
       }, n)));
     } else if (tag === "ul") {
       n.querySelectorAll(":scope > li").forEach((li) => {
@@ -287,8 +302,9 @@ export function nomDeFichierSûr(titre) {
  *   seul — un export sans autre indication produit exactement le même
  *   document qu'avant le chantier zones. Ajouté 28/07/2026.
  */
-export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluses = ["corps"]) {
+export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluses = ["corps"], stylesProjet = {}) {
   const format = FORMATS_PAGE[formatPage] || FORMATS_PAGE.a4;
+  const styles = nettoyerStyles(stylesProjet); // propriétés modifiées dans la galerie « Styles » (vide = export inchangé)
 
   const pageDeTitre = [
     new Paragraph({
@@ -321,7 +337,7 @@ export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluse
         pageBreakBefore: n.type === "partie" || n.type === "chapitre" || n.type === "scene",
       }));
       if (n.texte && n.texte.trim()) {
-        contenu.push(...paragraphesDepuisHTML(n.texte, registreNotes));
+        contenu.push(...paragraphesDepuisHTML(n.texte, registreNotes, styles));
       }
       if (n.enfants?.length) parcourirStructure(n.enfants);
     }
@@ -348,9 +364,10 @@ export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluse
     }],
     footnotes,
     styles: {
-      default: {
-        document: { run: { font: "Georgia", size: 24 } },
-      },
+      default: (() => {
+        const doc = stylesPourDocx(styles);
+        return { ...doc, document: { run: { font: "Georgia", size: 24, ...(doc.document?.run || {}) } } };
+      })(),
     },
   });
 
