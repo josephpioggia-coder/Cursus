@@ -3055,6 +3055,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
       {/* Centre d'aide — accessible depuis n'importe quel écran */}
       {aideOuverte && (
         <AideFAQ
+          estAdmin={user?.email === "joseph.pioggia@gmail.com"}
           onFermer={() => setAideOuverte(false)}
           onVoirModeEmploi={() => { setAideOuverte(false); setVue("mode-emploi"); }}
         />
