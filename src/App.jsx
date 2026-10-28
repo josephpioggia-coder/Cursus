@@ -1711,6 +1711,10 @@ const btnSecondaryStyle = {
 // localStorage — à rétablir si l'auteur le redemande : remplacer sessionStorage par localStorage ci-dessous).
 // L'ancienne clé localStorage est supprimée au chargement (sinon elle renverrait encore dans l'ancien espace).
 const lireEspace = () => { try { return sessionStorage.getItem("cursus_espace") || null; } catch { return null; } };
+// Position de travail (28/10/2026) : après F5 / mise à jour de la page, on revient sur le chapitre ouvert au lieu de la page de garde.
+// sessionStorage (comme l'espace) : une nouvelle visite repart de la page de garde.
+const lirePosition = () => { try { const p = JSON.parse(sessionStorage.getItem("cursus_position") || "null"); return p && (p.vue === "editeur" || p.vue === "projet") && p.projetId ? p : null; } catch { return null; } };
+const ecrirePosition = (p) => { try { if (p) sessionStorage.setItem("cursus_position", JSON.stringify(p)); else sessionStorage.removeItem("cursus_position"); } catch { /* stockage indisponible */ } };
 const ecrireEspace = (id) => { try { sessionStorage.setItem("cursus_espace", id); } catch { /* stockage indisponible */ } };
 const effacerEspace = () => { try { sessionStorage.removeItem("cursus_espace"); } catch { /* idem */ } };
 try { localStorage.removeItem("cursus_espace"); } catch { /* idem */ }
@@ -1789,8 +1793,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [chargement, setChargement] = useState(true);
   const [jeuParLien] = useState(JEU_PAR_LIEN);
   useEffect(() => { JEU_PAR_LIEN = null; }, []);
-  const [vue, setVue]           = useState(jeuParLien ? "scrabble" : espaceActif === "cursaudit" ? "cursaudit" : "tableau");
-  const [projetActifId, setProjetActifId] = useState(null);
+  const [positionSauvée] = useState(() => (JEU_PAR_LIEN || espaceActif !== "cursedit") ? null : lirePosition());
+  const [vue, setVue]           = useState(jeuParLien ? "scrabble" : espaceActif === "cursaudit" ? "cursaudit" : (positionSauvée?.vue || "tableau"));
+  const [projetActifId, setProjetActifId] = useState(positionSauvée?.projetId || null);
   const [auditActifId, setAuditActifId] = useState(null);
   // Retour vers CursAudit depuis l'éditeur (12/09/2026) — demandé par
   // l'auteur du projet : quand un chapitre a été créé depuis un rapport
@@ -1842,7 +1847,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   // fermée ; sinon { id, titre, mots, caseCochée }. Remplace window.confirm
   // pour permettre la mise en garde en rouge demandée par Joseph.
   const [confirmationSuppression, setConfirmationSuppression] = useState(null);
-  const [nœudActifId, setNœudActifId]     = useState(null);
+  const [nœudActifId, setNœudActifId]     = useState(positionSauvée?.nœudId || null);
   const [importOuvert, setImportOuvert]   = useState(false);
   const [incorporerOuvert, setIncorporerOuvert] = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
@@ -2083,6 +2088,14 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   };
 
   const nœudActif = projetActif ? trouverNœud(projetActif.structure, nœudActifId) : null;
+
+  // Mémorise la position de travail ; si le livre mémorisé n'existe plus (supprimé, autre compte), retour à la page de garde.
+  useEffect(() => {
+    if (chargement) return;
+    if ((vue === "editeur" || vue === "projet") && projetActifId && !projetActif) { setVue("tableau"); setProjetActifId(null); ecrirePosition(null); return; }
+    if ((vue === "editeur" || vue === "projet") && projetActif) ecrirePosition({ vue, projetId: projetActifId, nœudId: vue === "editeur" ? nœudActifId : null });
+    else if (vue !== "editeur" && vue !== "projet") ecrirePosition(null);
+  }, [chargement, vue, projetActifId, nœudActifId, projetActif]);
 
   // Calcule le contexte hiérarchique d'un nœud (titre de la partie parente,
   // titres des chapitres frères déjà nommés) — utilisé par le co-pilote pour
