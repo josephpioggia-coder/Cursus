@@ -29,7 +29,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
-import { projetsAPI, nœudsAPI, abonnementsAPI } from "./lib/api.js";
+import { projetsAPI, nœudsAPI, abonnementsAPI, stylesProjetAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
 import { journaliserErreur } from "./lib/journalErreurs.js";
 import Editeur from "./components/Editeur.jsx";
@@ -2718,7 +2718,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 onClick={async () => {
                   setExportEnCours(true);
                   try {
-                    await exporterProjetWord(projetActif, formatExport, zonesExport);
+                    const { data: stylesExport } = await stylesProjetAPI.lire(projetActif.id); // table absente → export inchangé
+                    await exporterProjetWord(projetActif, formatExport, zonesExport, stylesExport || {});
                   } catch (err) {
                     journaliserErreur("App:exporterProjetWord", err.message, projetActif.id);
                     window.alert("Impossible de générer le fichier Word. Réessayez, ou contactez le support si le problème persiste.");

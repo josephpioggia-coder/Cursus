@@ -45,6 +45,10 @@ import Highlight from "@tiptap/extension-highlight";
 import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
+import {
+  PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe,
+  POLICES, TAILLES_PT, TAILLE_DEFAUT_PT, INTERLIGNES, taillePtDepuisCss, tailleVoisine, changerCasse,
+} from "../lib/miseEnFormeEditeur.js";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
@@ -55,6 +59,9 @@ import AvisSurLeFond from "./AvisSurLeFond.jsx";
 import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
+import GalerieStyles from "./GalerieStyles.jsx";
+import { stylesProjetAPI } from "../lib/api.js";
+import { cssDesStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -686,6 +693,27 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
     <div style={{ width: 0.5, height: 18, background: "#e5e5e5", margin: "0 4px" }} />
   );
 
+  // Style de paragraphe, police, taille, interligne (28/10/2026) — valeurs lues dans l'éditeur à chaque rendu.
+  const styleSélecteur = (largeur) => ({
+    width: largeur, maxWidth: "100%", fontSize: 12, padding: "3px 4px", fontFamily: "inherit", color: "#444",
+    border: "0.5px solid #ddd", borderRadius: 6, background: "#fff", cursor: "pointer", minWidth: 0,
+  });
+  const styleActuel = [1, 2, 3, 4, 5, 6].map((n) => (editor.isActive("heading", { level: n }) ? `h${n}` : null)).find(Boolean)
+    || (editor.isActive("blockquote") ? "quote" : "p");
+  const policeActuelle = editor.getAttributes("textStyle").fontFamily || "";
+  const tailleActuelle = editor.getAttributes("textStyle").fontSize || "";
+  const interligneActuel = editor.getAttributes("paragraph").lineHeight || editor.getAttributes("heading").lineHeight || "";
+  const appliquerStyle = (v) => {
+    const c = editor.chain().focus();
+    if (v === "p") { if (editor.isActive("blockquote")) c.lift("blockquote"); c.setParagraph().run(); }
+    else if (v === "quote") { if (!editor.isActive("blockquote")) c.setParagraph().toggleBlockquote().run(); }
+    else { if (editor.isActive("blockquote")) c.lift("blockquote"); c.setHeading({ level: Number(v.slice(1)) }).run(); }
+  };
+  const appliquerPolice = (v) => (v ? editor.chain().focus().setFontFamily(v).run() : editor.chain().focus().unsetFontFamily().run());
+  const appliquerTaille = (v) => (v ? editor.chain().focus().setFontSize(v).run() : editor.chain().focus().unsetFontSize().run());
+  const appliquerInterligne = (v) => (v ? editor.chain().focus().setLineHeight(v).run() : editor.chain().focus().unsetLineHeight().run());
+  const appliquerCasse = (mode) => { changerCasse(editor, mode); editor.commands.focus(); };
+
   const barreComplete = (
     <div style={{
       display: "flex", alignItems: "center", gap: 2,
@@ -699,19 +727,47 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
       onMouseEnter={(e) => { if (modeFocus) e.currentTarget.style.opacity = 1; }}
       onMouseLeave={(e) => { if (modeFocus) e.currentTarget.style.opacity = 0.3; }}
     >
-      {/* Titres */}
-      <BoutonOutil actif={editor.isActive("heading", { level: 1 })} titre="Titre 1"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>H1</BoutonOutil>
-      <BoutonOutil actif={editor.isActive("heading", { level: 2 })} titre="Titre 2"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
-      <BoutonOutil actif={editor.isActive("heading", { level: 3 })} titre="Titre 3"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>H3</BoutonOutil>
-      <BoutonOutil actif={editor.isActive("heading", { level: 4 })} titre="Titre 4"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}>H4</BoutonOutil>
-      <BoutonOutil actif={editor.isActive("heading", { level: 5 })} titre="Titre 5"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 5 }).run()}>H5</BoutonOutil>
-      <BoutonOutil actif={editor.isActive("heading", { level: 6 })} titre="Titre 6"
-        onClick={() => editor.chain().focus().toggleHeading({ level: 6 }).run()}>H6</BoutonOutil>
+      {/* Style de paragraphe, police, taille (28/10/2026) — à la façon du ruban Word : « Normal »
+          existe enfin (avant : seulement six boutons Titre qui basculaient). */}
+      <select value={styleActuel} onChange={(e) => appliquerStyle(e.target.value)} title="Style du paragraphe"
+        style={styleSélecteur(118)}>
+        <option value="p">Normal</option>
+        <option value="h1">Titre 1</option>
+        <option value="h2">Titre 2</option>
+        <option value="h3">Titre 3</option>
+        <option value="h4">Titre 4</option>
+        <option value="h5">Titre 5</option>
+        <option value="h6">Titre 6</option>
+        <option value="quote">Citation</option>
+      </select>
+      <select value={policeActuelle} onChange={(e) => appliquerPolice(e.target.value)} title="Police de caractères"
+        style={styleSélecteur(132)}>
+        <option value="">Police (défaut)</option>
+        {POLICES.map((p) => <option key={p.nom} value={p.valeur} style={{ fontFamily: p.valeur }}>{p.nom}</option>)}
+        {policeActuelle && !POLICES.some((p) => p.valeur === policeActuelle) && <option value={policeActuelle}>{policeActuelle.split(",")[0]}</option>}
+      </select>
+      <select value={tailleActuelle} onChange={(e) => appliquerTaille(e.target.value)} title="Taille des caractères (points)"
+        style={styleSélecteur(86)}>
+        <option value="">{`Taille (${TAILLE_DEFAUT_PT})`}</option>
+        {TAILLES_PT.map((t) => <option key={t} value={`${t}pt`}>{t}</option>)}
+        {tailleActuelle && !TAILLES_PT.some((t) => `${t}pt` === tailleActuelle) && <option value={tailleActuelle}>{tailleActuelle}</option>}
+      </select>
+      <BoutonOutil actif={false} titre="Agrandir les caractères"
+        onClick={() => editor.chain().focus().setFontSize(`${tailleVoisine(taillePtDepuisCss(tailleActuelle), 1)}pt`).run()}><span style={{ fontSize: 14 }}>A</span><sup style={{ fontSize: 9 }}>+</sup></BoutonOutil>
+      <BoutonOutil actif={false} titre="Réduire les caractères"
+        onClick={() => editor.chain().focus().setFontSize(`${tailleVoisine(taillePtDepuisCss(tailleActuelle), -1)}pt`).run()}><span style={{ fontSize: 11 }}>A</span><sup style={{ fontSize: 9 }}>−</sup></BoutonOutil>
+      <select value="" onChange={(e) => { if (e.target.value) appliquerCasse(e.target.value); e.target.value = ""; }} title="Changer la casse (sélectionnez d'abord du texte)"
+        style={styleSélecteur(54)}>
+        <option value="">Aa</option>
+        <option value="phrase">Majuscule en début de phrase</option>
+        <option value="min">minuscules</option>
+        <option value="maj">MAJUSCULES</option>
+        <option value="mots">Première Lettre De Chaque Mot</option>
+      </select>
+      <BoutonOutil actif={false} titre="Effacer la mise en forme (police, taille, couleur, gras, italique… et retour au style Normal)"
+        onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().unsetLineHeight().run()}>
+        <span style={{ fontSize: 12 }}>A</span><span style={{ fontSize: 10, color: "#D32F2F" }}>✕</span>
+      </BoutonOutil>
 
       <Sep />
 
@@ -722,6 +778,12 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
       <BoutonOutil actif={editor.isActive("underline")} titre="Souligné (Ctrl+U)"
         onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("strike")} titre="Barré"
+        onClick={() => editor.chain().focus().toggleStrike().run()}><s>ab</s></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("subscript")} titre="Indice (x₂)"
+        onClick={() => editor.chain().focus().toggleSubscript().run()}>x<sub style={{ fontSize: 9 }}>2</sub></BoutonOutil>
+      <BoutonOutil actif={editor.isActive("superscript")} titre="Exposant (x²)"
+        onClick={() => editor.chain().focus().toggleSuperscript().run()}>x<sup style={{ fontSize: 9 }}>2</sup></BoutonOutil>
       {/* Couleur de texte + surlignage (16-18/09/2026, liste d'attente #2) —
           regroupés dans une même zone (ref commune pour le clic-extérieur).
           Icônes choisies pour être reconnaissables sans légende : "A"
@@ -850,6 +912,16 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         onClick={() => editor.chain().focus().setTextAlign("right").run()}>⇥</BoutonOutil>
       <BoutonOutil actif={editor.isActive({ textAlign: "justify" })} titre="Justifier (étiré)"
         onClick={() => editor.chain().focus().setTextAlign("justify").run()}>☰</BoutonOutil>
+      <BoutonOutil actif={false} titre="Diminuer le retrait"
+        onClick={() => (editor.isActive("listItem") ? editor.chain().focus().liftListItem("listItem").run() : editor.chain().focus().changerRetrait(-1).run())}>⇠</BoutonOutil>
+      <BoutonOutil actif={false} titre="Augmenter le retrait"
+        onClick={() => (editor.isActive("listItem") ? editor.chain().focus().sinkListItem("listItem").run() : editor.chain().focus().changerRetrait(1).run())}>⇢</BoutonOutil>
+      <select value={interligneActuel} onChange={(e) => appliquerInterligne(e.target.value)} title="Interligne"
+        style={styleSélecteur(90)}>
+        <option value="">Interligne</option>
+        {INTERLIGNES.map((v) => <option key={v} value={v}>{v.replace(".", ",")}</option>)}
+        {interligneActuel && !INTERLIGNES.includes(interligneActuel) && <option value={interligneActuel}>{interligneActuel}</option>}
+      </select>
 
       <Sep />
 
@@ -888,7 +960,10 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
         <BoutonOutil actif={editor.isActive("bold")} titre="Gras" onClick={() => editor.chain().focus().toggleBold().run()}><b>G</b></BoutonOutil>
         <BoutonOutil actif={editor.isActive("italic")} titre="Italique" onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></BoutonOutil>
         <BoutonOutil actif={editor.isActive("underline")} titre="Souligné" onClick={() => editor.chain().focus().toggleUnderline().run()}><u>S</u></BoutonOutil>
-        <BoutonOutil actif={editor.isActive("heading", { level: 2 })} titre="Titre 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</BoutonOutil>
+        <select value={styleActuel} onChange={(e) => appliquerStyle(e.target.value)} title="Style du paragraphe" style={styleSélecteur(92)}>
+          <option value="p">Normal</option><option value="h1">Titre 1</option><option value="h2">Titre 2</option><option value="h3">Titre 3</option>
+          <option value="h4">Titre 4</option><option value="h5">Titre 5</option><option value="h6">Titre 6</option><option value="quote">Citation</option>
+        </select>
         <BoutonOutil actif={editor.isActive("bulletList")} titre="Liste à puces" onClick={() => editor.chain().focus().toggleBulletList().run()}>≡</BoutonOutil>
         <BoutonOutil actif={editor.isActive("orderedList")} titre="Liste numérotée" onClick={() => editor.chain().focus().toggleOrderedList().run()}>1.</BoutonOutil>
         <BoutonOutil grand désactivé={!editor.can().undo()} titre="Annuler" onClick={() => editor.chain().focus().undo().run()}>↩</BoutonOutil>
@@ -1128,6 +1203,11 @@ export default function Editeur({
   const [vérificationOuverte, setVérificationOuverte] = useState(false);
   const [avisOuvert, setAvisOuvert] = useState(false);
   const [nettoyageOuvert, setNettoyageOuvert] = useState(false);
+  // Styles du projet (28/10/2026) — galerie « à la Word » : chargés par projet, injectés sous forme de
+  // feuille de style APRÈS celle de l'éditeur (voir src/lib/stylesProjet.js).
+  const [galerieOuverte, setGalerieOuverte] = useState(false);
+  const [stylesProjet, setStylesProjet] = useState({});
+  const projetIdStyles = nœud?.projet_id || null;
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
@@ -1185,6 +1265,28 @@ export default function Editeur({
       document.head.appendChild(style);
     }
   }, []);
+
+  useEffect(() => {
+    setStylesProjet({});
+    if (!projetIdStyles) return;
+    let annulé = false;
+    stylesProjetAPI.lire(projetIdStyles).then(({ data, error }) => {
+      if (error) { console.error("[styles_projet] lecture impossible :", error); return; }
+      if (!annulé && data) setStylesProjet(data);
+    });
+    return () => { annulé = true; };
+  }, [projetIdStyles]);
+
+  useEffect(() => {
+    let balise = document.getElementById("atelier-editeur-styles-projet");
+    if (!balise) {
+      balise = document.createElement("style");
+      balise.id = "atelier-editeur-styles-projet";
+      document.head.appendChild(balise);
+    }
+    balise.textContent = cssDesStyles(stylesProjet);
+  }, [stylesProjet]);
+  useEffect(() => () => { document.getElementById("atelier-editeur-styles-projet")?.remove(); }, []);
 
   // Chronomètre de session
   useEffect(() => {
@@ -1262,6 +1364,13 @@ export default function Editeur({
       // color (voir doc TipTap, Color ne fonctionne pas seul).
       TextStyle,
       Color,
+      // Police, taille, indice/exposant, interligne, retrait (28/10/2026, demande de Joseph :
+      // « comme dans Word ») — voir src/lib/miseEnFormeEditeur.js. Après TextStyle : police et
+      // taille sont portées par la même marque que la couleur.
+      PoliceEtTaille,
+      Indice,
+      Exposant,
+      MiseEnFormeParagraphe,
       // Images (24/09/2026, demande de Joseph : "pouvoir intégrer des
       // schémas ou des photos dans le texte, dans CursEdit") — phase 1
       // (insertion + affichage) uniquement : le pipeline d'analyse
@@ -1592,6 +1701,17 @@ export default function Editeur({
               📷 Lire une photo
             </button>
           )}
+          <button
+            onClick={() => setGalerieOuverte(true)}
+            style={{
+              fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`,
+              border: "none", cursor: "pointer", borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit",
+            }}
+            title="Styles du projet : régler une fois la police, la taille, l'interligne… de Normal, Titres, Citation (comme les Styles de Word)"
+          >
+            🎨 Styles
+          </button>
           {!lectureSeule && (
             <button
               onClick={() => setProfilOuvert(true)}
@@ -1729,6 +1849,11 @@ export default function Editeur({
           </button>
           </>)}
         </div>
+      )}
+
+      {galerieOuverte && (
+        <GalerieStyles projetId={projetIdStyles} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
+          onEnregistre={setStylesProjet} onFermer={() => setGalerieOuverte(false)} />
       )}
 
       {profilOuvert && editor && (
