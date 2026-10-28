@@ -123,10 +123,11 @@ const BLOCS_DE_LIGNE = new Set(["P", "H1", "H2", "H3", "BLOCKQUOTE", "LI", "PRE"
 // format cible, les numéros de ligne n'ont aucune valeur de référence
 // stable — ils changeraient à chaque redimensionnement de la fenêtre.
 const FORMATS_RÉFÉRENCE = {
-  a4:     { label: "A4",               largeurPx: 602, hauteurPx: 931 },
-  a5:     { label: "A5",               largeurPx: 446, hauteurPx: 680 },
-  poche:  { label: "Poche",            largeurPx: 333, hauteurPx: 598 },
-  broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720 },
+  // margePx = marge de l'export Word (FORMATS_PAGE.margin, DXA → px) : sert à la « Vue page » (feuille + marges visibles).
+  a4:     { label: "A4",               largeurPx: 602, hauteurPx: 931, margePx: 96 },
+  a5:     { label: "A5",               largeurPx: 446, hauteurPx: 680, margePx: 57 },
+  poche:  { label: "Poche",            largeurPx: 333, hauteurPx: 598, margePx: 41 },
+  broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720, margePx: 72 },
 };
 
 // Regroupe des positions verticales proches (à `seuil` pixels près) en une
@@ -1196,6 +1197,10 @@ export default function Editeur({
     return () => window.removeEventListener("resize", f);
   }, []);
   const [formatRéférence, setFormatRéférence] = useState("a4");
+  // « Vue page » (28/10/2026) : le texte s'affiche sur une feuille aux limites visibles, marges de l'export Word en pointillés.
+  const [vuePage, setVuePage] = useState(() => { try { return localStorage.getItem("cursus-vue-page") !== "0"; } catch { return true; } });
+  const basculerVuePage = () => setVuePage((v) => { try { localStorage.setItem("cursus-vue-page", v ? "0" : "1"); } catch { /* sans stockage */ } return !v; });
+  const pageVisible = vuePage && !mobile && !modeFocus;
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
   // Correction rapide (22/10/2026) — voir CorrectionRapide.jsx.
@@ -1541,7 +1546,7 @@ export default function Editeur({
   useEffect(() => {
     const timer = setTimeout(recalculerNumérosDeLigne, 60);
     return () => clearTimeout(timer);
-  }, [modeFocus, formatRéférence, recalculerNumérosDeLigne]);
+  }, [modeFocus, formatRéférence, vuePage, recalculerNumérosDeLigne]);
 
   // Instantané juste avant une modification en masse (nettoyage mécanique) : permet de revenir en arrière même après rechargement.
   const sauvegarderAvant = useCallback(async () => {
@@ -1671,6 +1676,13 @@ export default function Editeur({
               <option key={clé} value={clé}>{f.label}</option>
             ))}
           </select>
+          {!mobile && (
+            <button onClick={basculerVuePage} aria-pressed={vuePage}
+              title="Vue page : afficher la feuille avec ses limites et ses marges (celles de l'export Word)"
+              style={{ fontSize: 11, color: vuePage ? projetCouleur : "#777", background: vuePage ? `${projetCouleur}15` : "#fff", border: "0.5px solid #ddd", borderRadius: 6, padding: "3px 8px", fontFamily: "inherit", cursor: "pointer" }}>
+              📄 Vue page
+            </button>
+          )}
           <button
             onClick={() => {
               const texte = editor?.getText() || "";
@@ -1901,12 +1913,26 @@ export default function Editeur({
           flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto",
           padding: modeFocus ? "60px 0" : mobile ? "10px 0 24px" : "32px 0",
           display: "flex", justifyContent: "center",
+          ...(pageVisible ? { background: "#EEEDF0", padding: "24px 0" } : {}),
         }}>
-          <div style={{
+          <div style={pageVisible ? {
+            // Feuille : largeur de texte = largeur de l'export + marges de chaque côté ; limites en pointillés.
+            position: "relative", boxSizing: "border-box", width: "100%", alignSelf: "flex-start",
+            maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx + 2 * FORMATS_RÉFÉRENCE[formatRéférence].margePx,
+            padding: `${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px ${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px`,
+            background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", border: "0.5px solid #d8d8d8",
+            minHeight: FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx + 2 * FORMATS_RÉFÉRENCE[formatRéférence].margePx,
+          } : {
             width: "100%",
             maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx,
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
+            {pageVisible && (<>
+              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, right: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderRight: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+              <div aria-hidden style={{ position: "absolute", left: 0, right: 0, top: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderTop: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+              <div aria-hidden style={{ position: "absolute", left: 0, right: 0, top: FORMATS_RÉFÉRENCE[formatRéférence].margePx + FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx, borderTop: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+            </>)}
             {/* Titre du chapitre en mode focus */}
             {modeFocus && (
               <div style={{
