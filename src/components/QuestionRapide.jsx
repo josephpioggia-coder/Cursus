@@ -5,7 +5,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { poserQuestion } from "../lib/questionRapide.js";
-import { EFFORTS, chargerModeles, consoRelative, ecrireChoix, lireChoix, MODELES_PAR_DEFAUT } from "../lib/modelesIA.js";
+import { EFFORTS, PROFILS, STYLES, chargerModeles, consoRelative, ecrireChoix, lireChoix, modeleDuProfil, reglageRecommande, MODELES_PAR_DEFAUT } from "../lib/modelesIA.js";
+import { preferencesIAAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 
 const CLE_MODE = "cursus-question-rapide-mode";
@@ -13,9 +14,10 @@ const pastille = { fontSize: 10, border: "0.5px solid #bbb", borderRadius: 10, p
 
 export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeule = false, selectionInitiale = "", mobile = false, onFermer }) {
   const [modeles, setModeles] = useState(MODELES_PAR_DEFAUT);
-  const [modele, setModele] = useState(() => lireChoix(MODELES_PAR_DEFAUT).modele);
-  const [effort, setEffort] = useState(() => lireChoix(MODELES_PAR_DEFAUT).effort);
-  const [menu, setMenu] = useState(null); // null | "principal" | "modeles" | "effort"
+  const [reglage, setReglage] = useState(() => ({ ...lireChoix(MODELES_PAR_DEFAUT), profil: null }));
+  const [propose, setPropose] = useState(false); // réglage recommandé proposé (rien d'enregistré encore) — non bloquant
+  const [menu, setMenu] = useState(null); // null | "principal" | "effort" | "style" | "profils"
+  const { modele, effort, style } = reglage;
   const [question, setQuestion] = useState("");
   const [avecSources, setAvecSources] = useState(() => { try { return localStorage.getItem(CLE_MODE) === "sources"; } catch { return false; } });
   const [joindre, setJoindre] = useState(false);
@@ -28,12 +30,18 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
 
   useEffect(() => {
     let vivant = true;
-    chargerModeles().then((liste) => {
+    (async () => {
+      const liste = await chargerModeles();
       if (!vivant) return;
       setModeles(liste);
-      const c = lireChoix(liste);
-      setModele(c.modele); setEffort(c.effort);
-    });
+      // 1) réglage enregistré sur le compte ; 2) sinon celui de cet appareil ; 3) sinon le réglage RECOMMANDÉ, proposé sans bloquer.
+      const { data } = await preferencesIAAPI.lire().catch(() => ({ data: null }));
+      if (!vivant) return;
+      if (data) { setReglage({ profil: data.profil, modele: liste.some((m) => m.id === data.modele) ? data.modele : lireChoix(liste).modele, effort: data.effort || "moyen", style: data.style || "equilibre", consigne: data.consigne || "" }); return; }
+      const local = lireChoix(liste);
+      if (local.enregistre) { setReglage({ ...local, profil: null }); return; }
+      setReglage(reglageRecommande(liste)); setPropose(true);
+    })();
     champ.current?.focus();
     return () => { vivant = false; arret.current?.abort(); };
   }, []);
@@ -45,11 +53,20 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
 
   const modeleChoisi = modeles.find((m) => m.id === modele) || modeles[0];
   const effortChoisi = EFFORTS.find((e) => e.id === effort) || EFFORTS[1];
+  const styleChoisi = STYLES.find((x) => x.id === style) || STYLES[1];
   const conso = useMemo(() => consoRelative(modele, effort, modeles), [modele, effort, modeles]);
   const niveauConso = Math.min(5, Math.max(1, Math.round(Math.log2(Math.max(conso, 1)) * 1.3 + 1)));
 
-  const choisirModele = (id) => { setModele(id); ecrireChoix({ modele: id }); setMenu(null); };
-  const choisirEffort = (id) => { setEffort(id); ecrireChoix({ effort: id }); setMenu(null); };
+  // Enregistre le réglage : cet appareil tout de suite, le compte ensuite (table absente → l'appareil seul, sans message).
+  const sauver = (suite) => {
+    setReglage(suite); setPropose(false);
+    ecrireChoix(suite);
+    preferencesIAAPI.enregistrer({ profil: suite.profil || null, modele: suite.modele, effort: suite.effort, style: suite.style, consigne: (suite.consigne || "").slice(0, 500) }).catch(() => {});
+  };
+  const choisirModele = (id) => { sauver({ ...reglage, modele: id, profil: null }); setMenu(null); };
+  const choisirEffort = (id) => { sauver({ ...reglage, effort: id, profil: null }); setMenu(null); };
+  const choisirStyle = (id) => { sauver({ ...reglage, style: id, profil: null }); setMenu(null); };
+  const choisirProfil = (p) => { sauver({ ...reglage, profil: p.id, modele: modeleDuProfil(p, modeles), effort: p.effort, style: p.style }); setMenu(null); };
   const basculerMode = (sources) => { setAvecSources(sources); try { localStorage.setItem(CLE_MODE, sources ? "sources" : "memoire"); } catch { /* sans stockage */ } };
 
   const envoyer = async () => {
@@ -58,7 +75,8 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
     setEnCours(true); setErreur(null);
     const ctl = new AbortController(); arret.current = ctl;
     try {
-      const r = await poserQuestion({ question: q, modele, effort, avecSources, selection: joindre ? selectionInitiale : "", signal: ctl.signal });
+      if (propose) sauver(reglage); // on a posé une question sans toucher au réglage proposé : il est retenu
+      const r = await poserQuestion({ question: q, modele, effort, style, consignePerso: reglage.consigne, avecSources, selection: joindre ? selectionInitiale : "", signal: ctl.signal });
       setEchanges((liste) => [{ q, avecSources, ...r, poids: Math.round((r.entree + r.sortie) * (modeles.find((m) => m.id === r.modeleUtilise)?.poids ?? modeleChoisi?.poids ?? 1)) }, ...liste].slice(0, 6));
       setQuestion("");
     } catch (e) {
@@ -86,7 +104,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
         <button type="button" onClick={() => setMenu(menu ? null : "principal")} aria-haspopup="menu" aria-expanded={!!menu}
           title="Choisir le modèle et l'effort : ils déterminent la consommation de votre quota"
           style={{ fontSize: 12, padding: "4px 10px", border: "0.5px solid #ccc", borderRadius: 14, background: menu ? `${couleur}15` : "#fff", color: "#444", cursor: "pointer", fontFamily: "inherit" }}>
-          {modeleChoisi?.libelle} · {effortChoisi.libelle} ▾
+          {modeleChoisi?.libelle} · {effortChoisi.libelle} · {styleChoisi.libelle} ▾
         </button>
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "none", fontSize: 18, color: "#999", cursor: "pointer" }}>✕</button>
       </div>
@@ -97,6 +115,8 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
             {modeles.map((m) => ligneMenu(m.id === modele, () => choisirModele(m.id), (<>{m.libelle}{m.recommande && <span style={pastille}>Recommandé</span>}{m.credits_requis && <span style={pastille}>Nécessite des crédits</span>}</>), m.id === modele ? "✓" : `×${m.poids}`))}
             <div style={{ borderTop: "0.5px solid #eee", margin: "4px 0" }} />
             {ligneMenu(false, () => setMenu("effort"), <>Effort</>, <span style={{ color: "#666", fontSize: 13 }}>{effortChoisi.libelle} ›</span>)}
+            {ligneMenu(false, () => setMenu("style"), <>Style</>, <span style={{ color: "#666", fontSize: 13 }}>{styleChoisi.libelle} ›</span>)}
+            {ligneMenu(false, () => setMenu("profils"), <>Profils</>, <span style={{ color: "#666", fontSize: 13 }}>{(PROFILS.find((p) => p.id === reglage.profil) || {}).libelle || "Personnalisé"} ›</span>)}
             <div style={{ fontSize: 11, color: "#888", padding: "4px 12px 6px", lineHeight: 1.4 }}>{modeleChoisi?.description}</div>
           </>)}
           {menu === "effort" && (<>
@@ -104,6 +124,31 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
             {EFFORTS.map((e) => ligneMenu(e.id === effort, () => choisirEffort(e.id), (<>{e.libelle}{e.recommande && <span style={pastille}>Recommandé</span>}</>)))}
             <button type="button" onClick={() => setMenu("principal")} style={{ border: "none", background: "none", color: "#888", fontSize: 12, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>‹ Retour</button>
           </>)}
+          {menu === "style" && (<>
+            <div style={{ fontSize: 12, color: "#777", padding: "4px 12px 8px", lineHeight: 1.45 }}>La longueur et la manière de répondre. Les règles de fond (ne pas inventer, signaler ce qui est à vérifier) restent toujours appliquées.</div>
+            {STYLES.map((x) => ligneMenu(x.id === style, () => choisirStyle(x.id), (<span style={{ display: "flex", flexDirection: "column" }}><span>{x.libelle}{x.recommande && <span style={pastille}>Recommandé</span>}</span><span style={{ fontSize: 11, color: "#888" }}>{x.aide}</span></span>)))}
+            <div style={{ borderTop: "0.5px solid #eee", margin: "6px 0 0", padding: "8px 12px 4px" }}>
+              <label style={{ fontSize: 12, color: "#666" }}>Ma consigne personnelle (facultatif)</label>
+              <textarea defaultValue={reglage.consigne || ""} maxLength={500} rows={2}
+                onBlur={(e) => { if ((e.target.value || "") !== (reglage.consigne || "")) sauver({ ...reglage, consigne: e.target.value, profil: null }); }}
+                placeholder="Ex. : tutoie-moi ; cite toujours tes sources"
+                style={{ width: "100%", boxSizing: "border-box", marginTop: 4, fontSize: 12.5, padding: "6px 8px", border: "0.5px solid #ccc", borderRadius: 6, fontFamily: "inherit", resize: "vertical" }} />
+            </div>
+            <button type="button" onClick={() => setMenu("principal")} style={{ border: "none", background: "none", color: "#888", fontSize: 12, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>‹ Retour</button>
+          </>)}
+          {menu === "profils" && (<>
+            <div style={{ fontSize: 12, color: "#777", padding: "4px 12px 8px", lineHeight: 1.45 }}>Un profil règle d'un coup le modèle, l'effort et le style.</div>
+            {PROFILS.map((p) => ligneMenu(p.id === reglage.profil, () => choisirProfil(p), (<span style={{ display: "flex", flexDirection: "column" }}><span>{p.libelle}{p.recommande && <span style={pastille}>Recommandé</span>}</span><span style={{ fontSize: 11, color: "#888" }}>{p.aide}</span></span>)))}
+            <button type="button" onClick={() => setMenu("principal")} style={{ border: "none", background: "none", color: "#888", fontSize: 12, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>‹ Retour</button>
+          </>)}
+        </div>
+      )}
+
+      {propose && !menu && (
+        <div role="note" style={{ margin: "8px 14px 0", padding: "8px 10px", background: "#F5F4FD", border: `0.5px solid ${couleur}40`, borderRadius: 8, fontSize: 12.5, color: "#444", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ flex: 1, minWidth: 180 }}>Assistant recommandé : <b>{modeleChoisi?.libelle} · {effortChoisi.libelle} · {styleChoisi.libelle}</b>. Il est déjà appliqué.</span>
+          <button type="button" onClick={() => sauver(reglage)} style={{ fontSize: 12, border: "none", background: "none", color: couleur, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>Garder</button>
+          <button type="button" onClick={() => setMenu("principal")} style={{ fontSize: 12, border: `0.5px solid ${couleur}`, background: "#fff", color: couleur, borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontFamily: "inherit" }}>Modifier</button>
         </div>
       )}
 

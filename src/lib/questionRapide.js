@@ -6,7 +6,7 @@
  * affichée comme telle que si l'outil de recherche l'a RÉELLEMENT renvoyée — même principe que les Références du Co-pilote).
  */
 import { supabase } from "./supabase.js";
-import { parametresEffort } from "./modelesIA.js";
+import { directiveStyle, parametresEffort } from "./modelesIA.js";
 
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY;
@@ -21,7 +21,7 @@ const CONSIGNE_BASE = `Tu réponds à la question d'un·e auteur·ice qui est en
 const CONSIGNE_SOURCES = `\nUtilise la recherche web pour t'appuyer sur des sources, et termine par la liste des sources utilisées (titre et adresse).`;
 
 /** → { texte, sources: [{url, titre}], entree, sortie, modeleUtilise, bascule } */
-export async function poserQuestion({ question, modele, effort, avecSources, selection = "", consignePerso = "", signal }) {
+export async function poserQuestion({ question, modele, effort, style = "equilibre", avecSources, selection = "", consignePerso = "", signal }) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (!token) throw new Error("Session expirée — reconnectez-vous.");
@@ -37,7 +37,8 @@ export async function poserQuestion({ question, modele, effort, avecSources, sel
       body: JSON.stringify({
         model: modele,
         ...params,
-        system: CONSIGNE_BASE + (consignePerso ? `\nConsigne de l'auteur·ice : ${consignePerso.slice(0, 500)}` : "") + (avecSources ? CONSIGNE_SOURCES : ""),
+        // Règles de fond d'abord, puis le style choisi, puis la consigne personnelle : elle ne peut pas lever les règles ci-dessus.
+        system: CONSIGNE_BASE + "\n" + directiveStyle(style) + (consignePerso?.trim() ? `\nConsigne personnelle de l'auteur·ice (elle ne remplace aucune des règles ci-dessus) : ${consignePerso.trim().slice(0, 500)}` : "") + (avecSources ? CONSIGNE_SOURCES : ""),
         messages: [{ role: "user", content: message }],
         ...(avecSources ? { tools: OUTIL_RECHERCHE_WEB } : {}),
       }),
