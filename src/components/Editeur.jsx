@@ -46,7 +46,7 @@ import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
 import {
-  PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe,
+  PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe, Tabulation,
   POLICES, TAILLES_PT, TAILLE_DEFAUT_PT, INTERLIGNES, taillePtDepuisCss, tailleVoisine, changerCasse, PAS_RETRAIT_CM,
 } from "../lib/miseEnFormeEditeur.js";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -130,13 +130,33 @@ const FORMATS_RÉFÉRENCE = {
   broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720, margePx: 72 },
 };
 
-// Règle graduée en cm au-dessus de la feuille (« Vue page », 28/10/2026) : marges grisées, 0 au bord de la marge gauche,
-// graduations au demi-cm. RÉGLABLE comme dans Word : glisser la marge gauche / droite (carrés sous la règle) et le retrait de
-// première ligne (triangle du haut). Marges enregistrées par projet ET par format (styles_projet.page), reprises à l'export Word.
+// Règle graduée en cm au-dessus de la feuille (« Vue page », 28/10/2026), réglable comme celle de Word :
+//  - bord des marges (gris/blanc) : glisser pour régler les marges gauche / droite de la PAGE ;
+//  - ▽ du haut = retrait de première ligne ; △ du bas = retrait gauche du reste du paragraphe (le petit rectangle dessous
+//    déplace les deux ensemble) ; △ à droite = retrait droit — ces trois repères valent pour le(s) paragraphe(s) du curseur ;
+//  - clic sur la règle = nouveau taquet de tabulation du paragraphe (type choisi par le bouton à gauche : gauche, centre,
+//    droit, décimal) ; glisser un taquet = le déplacer ; le tirer hors de la règle = le supprimer.
 const PX_PAR_CM = 96 / 2.54;
-function RegleCm({ largeurPage, gauchePx, droitePx, retraitGaucheCm = 0, alineaCm, editable, onChange }) {
+const TYPES_TAQUET = ["l", "c", "r", "d"];
+const NOM_TAQUET = { l: "Tabulation gauche", c: "Tabulation centrée", r: "Tabulation droite", d: "Tabulation décimale" };
+function GlypheTaquet({ type, couleur = "#222" }) {
+  const t = 1.5;
+  const base = { position: "absolute", background: couleur };
+  return (
+    <span style={{ position: "relative", display: "inline-block", width: 9, height: 9 }}>
+      <span style={{ ...base, left: type === "r" ? "auto" : type === "c" || type === "d" ? 3.5 : 1, right: type === "r" ? 1 : "auto", top: 0, width: t, height: 8 }} />
+      <span style={{ ...base, bottom: 0, left: type === "l" ? 1 : type === "r" ? "auto" : 0, right: type === "r" ? 1 : "auto", width: type === "c" || type === "d" ? 9 : 7, height: t }} />
+      {type === "d" && <span style={{ ...base, left: 6, top: 2, width: 2, height: 2, borderRadius: 1 }} />}
+    </span>
+  );
+}
+function RegleCm({ largeurPage, gauchePx, droitePx, retrait, editable, onChange }) {
   const refRegle = useRef(null);
+  const [typeTaquet, setTypeTaquet] = useState("l");
   const total = largeurPage;
+  const largeurTexte = total - gauchePx - droitePx;
+  const { gauche: gaucheCm, premiere: premiereCm, droite: droiteCm, tabs } = retrait;
+  const mm = (v) => Math.round(v * 10) / 10;
   const traits = [];
   for (let i = Math.ceil(-gauchePx / PX_PAR_CM * 2); i <= Math.floor((total - gauchePx) / PX_PAR_CM * 2); i++) {
     const x = gauchePx + (i / 2) * PX_PAR_CM;
@@ -147,44 +167,82 @@ function RegleCm({ largeurPage, gauchePx, droitePx, retraitGaucheCm = 0, alineaC
       </div>
     );
   }
-  // Glissement d'un repère : `quoi` = "gauche" | "droite" | "alinea" ; valeurs en cm arrondies au mm.
-  const glisser = (quoi) => (e) => {
+  // Glissement générique : `calc(ev)` → changement { … } envoyé pendant (fin = false) puis au relâchement (fin = true).
+  const suivre = (e, calc) => {
     if (!editable) return;
-    e.preventDefault();
+    e.preventDefault(); e.stopPropagation();
     const bord = refRegle.current.getBoundingClientRect();
     const cible = e.currentTarget;
     try { cible.setPointerCapture(e.pointerId); } catch { /* sans capture */ }
-    const calc = (ev) => {
-      const xPx = ev.clientX - bord.left;
-      const mm = (v) => Math.round(v * 10) / 10;
-      if (quoi === "gauche") return { gauche: mm(Math.min(Math.max(xPx, 0.5 * PX_PAR_CM), total - droitePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
-      if (quoi === "droite") return { droite: mm(Math.min(Math.max(total - xPx, 0.5 * PX_PAR_CM), total - gauchePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
-      return { alinea: mm(Math.min(Math.max((xPx - gauchePx) / PX_PAR_CM - retraitGaucheCm, 0), 5)) };
-    };
-    const bouge = (ev) => onChange(calc(ev), false);
-    const fin = (ev) => { cible.removeEventListener("pointermove", bouge); cible.removeEventListener("pointerup", fin); cible.removeEventListener("pointercancel", fin); onChange(calc(ev), true); };
-    cible.addEventListener("pointermove", bouge);
-    cible.addEventListener("pointerup", fin);
-    cible.addEventListener("pointercancel", fin);
+    const lire = (ev) => calc(ev.clientX - bord.left, ev.clientY - bord.top);
+    const bouge = (ev) => onChange(lire(ev), false);
+    const fin = (ev) => { cible.removeEventListener("pointermove", bouge); cible.removeEventListener("pointerup", fin); cible.removeEventListener("pointercancel", fin); onChange(lire(ev), true); };
+    cible.addEventListener("pointermove", bouge); cible.addEventListener("pointerup", fin); cible.addEventListener("pointercancel", fin);
   };
-  const poignee = { position: "absolute", cursor: editable ? "ew-resize" : "default", touchAction: "none", pointerEvents: editable ? "auto" : "none" };
+  const cmDepuis = (x) => (x - gauchePx) / PX_PAR_CM;
+  const maxTexteCm = largeurTexte / PX_PAR_CM;
+  const bornes = (v, a, b) => Math.min(Math.max(v, a), b);
+  const ancre = { position: "absolute", touchAction: "none", pointerEvents: editable ? "auto" : "none" };
+
+  const marge = (cote) => (e) => suivre(e, (x) => cote === "gauche"
+    ? { margeGauche: mm(bornes(x, 0.5 * PX_PAR_CM, total - droitePx - 3 * PX_PAR_CM) / PX_PAR_CM) }
+    : { margeDroite: mm(bornes(total - x, 0.5 * PX_PAR_CM, total - gauchePx - 3 * PX_PAR_CM) / PX_PAR_CM) });
+  const premiereLigne = (e) => suivre(e, (x) => ({ premiere: mm(bornes(cmDepuis(x), 0, maxTexteCm - 1) - gaucheCm) }));
+  const gaucheSeul = (e) => { const absolu = gaucheCm + premiereCm; suivre(e, (x) => { const g = mm(bornes(cmDepuis(x), 0, maxTexteCm - 3)); return { gauche: g, premiere: mm(absolu - g) }; }); };
+  const gaucheEnsemble = (e) => suivre(e, (x) => ({ gauche: mm(bornes(cmDepuis(x), 0, maxTexteCm - 3)) }));
+  const droit = (e) => suivre(e, (x) => ({ droite: mm(bornes((total - droitePx - x) / PX_PAR_CM, 0, maxTexteCm - 3)) }));
+  const deplacerTaquet = (i) => (e) => suivre(e, (x, y) => {
+    const autres = (tabs || []).filter((_, k) => k !== i);
+    if (y < -16 || y > 34) return { tabs: autres }; // tiré hors de la règle : supprimé
+    const pos = mm(bornes(cmDepuis(x), 0.1, maxTexteCm));
+    return { tabs: [...autres, { pos, type: tabs[i].type }].sort((a, b) => a.pos - b.pos) };
+  });
+  const ajouterTaquet = (e) => {
+    if (!editable || e.target !== e.currentTarget) return;
+    const pos = mm(bornes(cmDepuis(e.clientX - refRegle.current.getBoundingClientRect().left), 0.1, maxTexteCm));
+    if ((tabs || []).some((t) => Math.abs(t.pos - pos) < 0.2)) return;
+    onChange({ tabs: [...(tabs || []), { pos, type: typeTaquet }].sort((a, b) => a.pos - b.pos) }, true);
+  };
   const cm1 = (px) => (px / PX_PAR_CM).toFixed(1).replace(".", ",");
+  const fleche = (couleur, versLeHaut) => ({ width: 0, height: 0, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", [versLeHaut ? "borderBottom" : "borderTop"]: `7px solid ${couleur}` });
   return (
-    <div ref={refRegle} aria-hidden
-      title={`Marges : gauche ${cm1(gauchePx)} cm, droite ${cm1(droitePx)} cm — largeur du texte ${cm1(total - gauchePx - droitePx)} cm${editable ? ". Glissez les repères pour régler." : ""}`}
-      style={{ position: "absolute", top: -22, left: 0, width: total, height: 18, userSelect: "none", background: "#fff", border: "0.5px solid #d8d8d8", boxSizing: "border-box" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: gauchePx, background: "#e3e1ea", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: droitePx, background: "#e3e1ea", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>{traits}</div>
-      {/* retrait de première ligne (triangle du haut) */}
-      <div onPointerDown={glisser("alinea")} title="Retrait de première ligne du paragraphe où se trouve le curseur"
-        style={{ ...poignee, left: gauchePx + (retraitGaucheCm + alineaCm) * PX_PAR_CM - 5, top: -1, width: 10, height: 8, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid #7F77DD", boxSizing: "border-box" }} />
-      {/* marges gauche et droite (carrés du bas) */}
-      <div onPointerDown={glisser("gauche")} title="Marge gauche"
-        style={{ ...poignee, left: gauchePx - 4, bottom: -1, width: 9, height: 8, background: "#7F77DD", borderRadius: 1 }} />
-      <div onPointerDown={glisser("droite")} title="Marge droite"
-        style={{ ...poignee, left: total - droitePx - 4, bottom: -1, width: 9, height: 8, background: "#7F77DD", borderRadius: 1 }} />
-    </div>
+    <>
+      {editable && (
+        <button type="button" onClick={() => setTypeTaquet((t) => TYPES_TAQUET[(TYPES_TAQUET.indexOf(t) + 1) % TYPES_TAQUET.length])}
+          title={`${NOM_TAQUET[typeTaquet]} — cliquer pour changer de type, puis cliquer sur la règle pour poser un taquet`}
+          style={{ position: "absolute", top: -22, left: -24, width: 20, height: 18, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", border: "0.5px solid #d8d8d8", borderRadius: 3, cursor: "pointer" }}>
+          <GlypheTaquet type={typeTaquet} />
+        </button>
+      )}
+      <div ref={refRegle} onPointerDown={ajouterTaquet}
+        title={`Marges : gauche ${cm1(gauchePx)} cm, droite ${cm1(droitePx)} cm — texte ${cm1(largeurTexte)} cm${editable ? ". Glissez les bords gris, les repères de retrait, ou cliquez pour poser une tabulation." : ""}`}
+        style={{ position: "absolute", top: -22, left: 0, width: total, height: 18, userSelect: "none", background: "#fff", border: "0.5px solid #d8d8d8", boxSizing: "border-box", cursor: editable ? "crosshair" : "default" }}>
+        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: gauchePx, background: "#e3e1ea", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: droitePx, background: "#e3e1ea", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>{traits}</div>
+        {/* bords des marges : zones de saisie de part et d'autre de la limite gris / blanc */}
+        <div onPointerDown={marge("gauche")} title="Marge gauche (glisser)" style={{ ...ancre, left: gauchePx - 4, top: 0, width: 8, height: 18, cursor: "ew-resize" }} />
+        <div onPointerDown={marge("droite")} title="Marge droite (glisser)" style={{ ...ancre, left: total - droitePx - 4, top: 0, width: 8, height: 18, cursor: "ew-resize" }} />
+        {/* taquets de tabulation du paragraphe */}
+        {(tabs || []).map((t, i) => (
+          <div key={`${t.pos}${t.type}`} onPointerDown={deplacerTaquet(i)} title={`${NOM_TAQUET[t.type]} à ${String(t.pos).replace(".", ",")} cm — glisser pour déplacer, tirer hors de la règle pour supprimer`}
+            style={{ ...ancre, left: gauchePx + t.pos * PX_PAR_CM - 5, bottom: 1, width: 10, height: 10, display: "flex", alignItems: "flex-end", justifyContent: "center", cursor: "ew-resize" }}>
+            <GlypheTaquet type={t.type} />
+          </div>
+        ))}
+        {/* retrait droit (△ à droite) */}
+        <div onPointerDown={droit} title="Retrait droit du paragraphe"
+          style={{ ...ancre, left: total - droitePx - droiteCm * PX_PAR_CM - 5, bottom: -1, cursor: "ew-resize", ...fleche("#555", true) }} />
+        {/* retrait gauche du reste du paragraphe (△) + rectangle qui déplace les deux repères ensemble */}
+        <div onPointerDown={gaucheSeul} title="Retrait gauche des lignes suivantes (retrait suspendu)"
+          style={{ ...ancre, left: gauchePx + gaucheCm * PX_PAR_CM - 5, bottom: 5, cursor: "ew-resize", ...fleche("#555", true) }} />
+        <div onPointerDown={gaucheEnsemble} title="Retrait gauche du paragraphe entier"
+          style={{ ...ancre, left: gauchePx + gaucheCm * PX_PAR_CM - 4, bottom: -1, width: 9, height: 5, background: "#555", cursor: "ew-resize" }} />
+        {/* retrait de première ligne (▽ en haut) */}
+        <div onPointerDown={premiereLigne} title="Retrait de première ligne"
+          style={{ ...ancre, left: gauchePx + (gaucheCm + premiereCm) * PX_PAR_CM - 5, top: -1, cursor: "ew-resize", ...fleche("#555", false) }} />
+      </div>
+    </>
   );
 }
 
@@ -365,6 +423,7 @@ const STYLES_EDITEUR = `
     border-radius: 8px;
     overflow-x: auto;
   }
+  .ProseMirror .cursus-tab { display: inline-block; width: 1.27cm; height: 1em; vertical-align: baseline; }
   .ProseMirror mark { background: #faeeda; border-radius: 2px; padding: 0 2px; }
   .ProseMirror hr { border: none; border-top: 1px solid #e5e5e5; margin: 2em 0; }
   .ProseMirror img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.8em 0; display: block; }
@@ -1277,12 +1336,18 @@ export default function Editeur({
   const gauchePx = margesFormat.gauche ? margesFormat.gauche * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
   const droitePx = margesFormat.droite ? margesFormat.droite * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
   const [erreurRègle, setErreurRègle] = useState(null);
-  const [retraitCurseur, setRetraitCurseur] = useState({ gauche: 0, premiere: null });
+  const [retraitCurseur, setRetraitCurseur] = useState({ gauche: 0, premiere: null, droite: 0, tabs: null });
   // `fin` = relâché : enregistrement en base (pendant le glissement, seulement l'aperçu).
   const changerRègle = (changement, fin) => {
-    const { alinea, ...marges } = changement;
-    // Triangle = retrait de première ligne du/des PARAGRAPHE(S) sélectionné(s) seulement (pas du livre : celui-là se règle dans « Styles »).
-    if (alinea !== undefined) { editor?.commands.setPremiereLigne(alinea); return; }
+    const { margeGauche, margeDroite, ...bloc } = changement;
+    // Retraits et taquets : réglages du/des PARAGRAPHE(S) sélectionné(s) seulement (celui du livre se règle dans « Styles »).
+    if (Object.keys(bloc).length) {
+      editor?.commands.setMiseEnFormeBloc(bloc);
+      if (margeGauche === undefined && margeDroite === undefined) return;
+    }
+    const marges = {};
+    if (margeGauche !== undefined) marges.gauche = margeGauche;
+    if (margeDroite !== undefined) marges.droite = margeDroite;
     const suivant = { ...stylesProjet };
     if (Object.keys(marges).length) suivant.page = { ...(stylesProjet.page || {}), [formatRéférence]: { ...margesFormat, ...marges } };
     const propre = nettoyerStyles(suivant);
@@ -1456,6 +1521,7 @@ export default function Editeur({
       Indice,
       Exposant,
       MiseEnFormeParagraphe,
+      Tabulation,
       // Images (24/09/2026, demande de Joseph : "pouvoir intégrer des
       // schémas ou des photos dans le texte, dans CursEdit") — phase 1
       // (insertion + affichage) uniquement : le pipeline d'analyse
@@ -1551,7 +1617,7 @@ export default function Editeur({
     if (!editor) return;
     const lire = () => {
       const a = editor.state.selection.$from.parent.attrs || {};
-      setRetraitCurseur({ gauche: (a.indent || 0) * PAS_RETRAIT_CM, premiere: a.firstLine ?? null });
+      setRetraitCurseur({ gauche: (a.indent || 0) * PAS_RETRAIT_CM, premiere: a.firstLine ?? null, droite: a.indentRight || 0, tabs: a.tabs || null });
     };
     lire();
     editor.on("selectionUpdate", lire);
@@ -2020,7 +2086,7 @@ export default function Editeur({
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {pageVisible && (<>
-              <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} retraitGaucheCm={retraitCurseur.gauche} alineaCm={retraitCurseur.premiere ?? (stylesProjet?.normal?.alinea || 0)}
+              <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} retrait={{ gauche: retraitCurseur.gauche, premiere: retraitCurseur.premiere ?? (stylesProjet?.normal?.alinea || 0), droite: retraitCurseur.droite, tabs: retraitCurseur.tabs }}
                 editable={!lectureSeule && !!projetIdStyles} onChange={changerRègle} />
               {erreurRègle && <div style={{ position: "absolute", top: -36, right: 0, fontSize: 10.5, color: "#A32D2D" }}>⚠ {erreurRègle}</div>}
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: gauchePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
