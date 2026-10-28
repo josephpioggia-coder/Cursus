@@ -657,6 +657,10 @@ export const sessionsAPI = {
 // absent de la table (ou null) vaut 1 par défaut : ne change RIEN pour
 // tout appel déjà en base avant ce correctif, tous passés par Sonnet 5.
 const POIDS_PAR_MODELE = {
+  // Modèles 5.5 proposés au client (28/10/2026) — valeurs de repli ; la table `modeles_ia` fait foi quand elle existe.
+  "claude-haiku-5-5": 0.5,
+  "claude-sonnet-5-5": 1,
+  "claude-opus-5-5": 2.5,
   "claude-haiku-4-5": 0.5,
   "claude-sonnet-5": 1,
   "gpt-4o": 1,
@@ -767,11 +771,18 @@ export const usageIAAPI = {
       .gte("created_at", débutMois.toISOString());
     if (erreurUsage) return { data: null, error: erreurUsage };
 
+    // Poids lus dans le registre des modèles (même source que le verdict serveur de claude-prox) ; repli sur la table ci-dessus.
+    const poidsTable = { ...POIDS_PAR_MODELE };
+    try {
+      const { data: lignesModeles } = await supabase.from("modeles_ia").select("id, poids");
+      (lignesModeles || []).forEach((m) => { if (Number(m.poids) > 0) poidsTable[m.id] = Number(m.poids); });
+    } catch { /* table absente : valeurs de repli */ }
+
     // Arrondi au final seulement (pas ligne par ligne) : des poids comme
     // 0,5 ou 2,5 produiraient sinon un total "tokens" à virgule, sans sens
     // pour l'affichage (CompteurUsageIA formate en tokens entiers).
     const consomme = Math.round((lignesUsage || []).reduce((total, ligne) => {
-      const poids = POIDS_PAR_MODELE[ligne.modele] ?? 1;
+      const poids = poidsTable[ligne.modele] ?? 1;
       return total + ((ligne.tokens_entree || 0) + (ligne.tokens_sortie || 0)) * poids;
     }, 0));
 

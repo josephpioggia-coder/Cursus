@@ -72,14 +72,24 @@ Deno.serve(async (req) => {
 
     const { data: usages } = await admin
       .from("usage_ia")
-      .select("tokens_entree, tokens_sortie")
+      .select("tokens_entree, tokens_sortie, modele")
       .eq("user_id", userId)
       .gte("created_at", debutMois.toISOString());
 
-    const consomme = (usages ?? []).reduce(
-      (sum, u) => sum + (u.tokens_entree ?? 0) + (u.tokens_sortie ?? 0),
-      0,
+    // REGISTRE DES MODÈLES (28/10/2026, table modeles_ia — voir 2026-10-28-modeles-ia.sql) : poids de chaque modèle dans le
+    // quota (Sonnet = 1) et modèle de SECOURS. Jusqu'ici ce verdict comptait les tokens à plat, quel que soit le modèle,
+    // alors que l'affichage côté client pondérait : avec un choix de modèle par le client, les deux doivent concorder.
+    // Table absente (migration pas encore exécutée) : poids 1 partout et aucun secours, comme avant.
+    const { data: lignesModeles } = await admin.from("modeles_ia").select("id, poids, actif, remplace_par");
+    const modeles = new Map<string, { poids: number; actif: boolean; remplace_par: string | null }>(
+      (lignesModeles ?? []).map((m: any) => [m.id, { poids: Number(m.poids) || 1, actif: m.actif !== false, remplace_par: m.remplace_par ?? null }]),
     );
+    const poidsDe = (id: string | null | undefined) => (id && modeles.get(id)?.poids) || 1;
+
+    const consomme = Math.round((usages ?? []).reduce(
+      (sum, u) => sum + ((u.tokens_entree ?? 0) + (u.tokens_sortie ?? 0)) * poidsDe(u.modele),
+      0,
+    ));
 
     // CORRECTIF 18/09/2026 — ce verdict ignorait totalement credits_ia
     // (recharges ponctuelles, crédits de test) : recupererConsommation()
@@ -112,16 +122,45 @@ Deno.serve(async (req) => {
 
     // 5. APPEL ANTHROPIC
     const body = await req.json();
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const appeler = (modele: string) => fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": ANTHROPIC_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, model: modele }),
     });
-    const data = await response.json();
+    // SECOURS (28/10/2026) : si le modèle demandé est retiré / inconnu du fournisseur (404 ou erreur « model »), on essaie
+    // son modèle de secours (modeles_ia.remplace_par), jusqu'à 3 tentatives, et on le dit dans la réponse (`x_cursus`).
+    // Un modèle marqué inactif dans le registre est contourné d'emblée. Les erreurs de surcharge / de quota ne basculent PAS.
+    const demande: string = body?.model;
+    let modeleAppele = demande;
+    const essayes = new Set<string>();
+    while (modeles.get(modeleAppele)?.actif === false && modeles.get(modeleAppele)?.remplace_par && !essayes.has(modeleAppele)) {
+      essayes.add(modeleAppele);
+      modeleAppele = modeles.get(modeleAppele)!.remplace_par!;
+    }
+    let response = await appeler(modeleAppele);
+    let data = await response.json();
+    for (let n = 0; n < 3 && !response.ok; n++) {
+      const msg = String(data?.error?.message ?? "").toLowerCase();
+      const modeleInconnu = response.status === 404 || data?.error?.type === "not_found_error" || (data?.error?.type === "invalid_request_error" && msg.includes("model"));
+      const secours = modeles.get(modeleAppele)?.remplace_par;
+      if (!modeleInconnu || !secours || essayes.has(secours)) break;
+      console.error(`[claude-prox] modèle indisponible : ${modeleAppele} → secours ${secours}`);
+      essayes.add(modeleAppele);
+      modeleAppele = secours;
+      response = await appeler(modeleAppele);
+      data = await response.json();
+    }
+    if (response.ok && modeleAppele !== demande) {
+      data = { ...data, x_cursus: { modele_demande: demande, modele_utilise: modeleAppele, bascule: true } };
+      await admin.from("journal_erreurs").insert({
+        user_id: userId, projet_id: null, contexte: "claude-prox:bascule-modele",
+        message: `Modèle « ${demande} » indisponible ou désactivé : « ${modeleAppele} » utilisé à la place.`,
+      });
+    }
 
     // CORRECTIF 01/10/2026 — une erreur d'Anthropic (surcharge, requête
     // invalide, limite de débit...) était renvoyée telle quelle avec un
@@ -171,7 +210,7 @@ Deno.serve(async (req) => {
         tokens_sortie: data.usage.output_tokens ?? 0,
         cache_creation_tokens: cacheCreation,
         cache_read_tokens: cacheRead,
-        modele: data.model ?? body?.model ?? null,
+        modele: modeleAppele ?? data.model ?? null, // identifiant du REGISTRE (pondération du quota), pas un éventuel nom daté du fournisseur
       });
       if (insertError) console.error("usage_ia insert:", insertError.message);
     }

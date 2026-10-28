@@ -60,6 +60,7 @@ import NettoyageMecanique from "./NettoyageMecanique.jsx";
 import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
 import RubanEditeur from "./RubanEditeur.jsx";
+import QuestionRapide from "./QuestionRapide.jsx";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -1325,6 +1326,8 @@ export default function Editeur({
   const [vuePage, setVuePage] = useState(() => { try { return localStorage.getItem("cursus-vue-page") !== "0"; } catch { return true; } });
   const basculerVuePage = () => setVuePage((v) => { try { localStorage.setItem("cursus-vue-page", v ? "0" : "1"); } catch { /* sans stockage */ } return !v; });
   const pageVisible = vuePage && !mobile && !modeFocus;
+  const [questionOuverte, setQuestionOuverte] = useState(false);
+  const [selectionQuestion, setSelectionQuestion] = useState("");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
   // Correction rapide (22/10/2026) — voir CorrectionRapide.jsx.
@@ -1632,6 +1635,22 @@ export default function Editeur({
     return () => { editor.off("selectionUpdate", lire); editor.off("update", lire); };
   }, [editor]);
 
+  // Question rapide (Ctrl+K) : la sélection courante est proposée comme pièce jointe facultative.
+  const ouvrirQuestion = () => {
+    const { from, to } = editor?.state?.selection || { from: 0, to: 0 };
+    setSelectionQuestion(to > from ? editor.state.doc.textBetween(from, to, " ") : "");
+    setQuestionOuverte(true);
+  };
+  const ouvrirQuestionRef = useRef(ouvrirQuestion);
+  ouvrirQuestionRef.current = ouvrirQuestion;
+  useEffect(() => {
+    const touche = (e) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); ouvrirQuestionRef.current(); }
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, []);
+
   // Sauvegarde automatique forcée toutes les 30s
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1795,6 +1814,7 @@ export default function Editeur({
 
   // Actions du ruban (voir src/lib/rubanCatalogue.js : une fonction « fait » doit avoir son entrée ici).
   const actionsRuban = {
+    question: { onClick: () => ouvrirQuestion() },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
     photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
     image: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-inserer-image")), desactive: lectureSeule },
@@ -2041,6 +2061,7 @@ export default function Editeur({
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><IconeLoupe type="faits" taille={16} />Vérifier les faits</span>
             </button>
           )}
+          <button onClick={ouvrirQuestion} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Poser une question à l'IA sans passer par le Co-pilote">💬 Question rapide</button>
           {lectureJSX}
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
@@ -2081,6 +2102,10 @@ export default function Editeur({
 
       {vérificationOuverte && editor && (
         <VerifierLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "verifier_le_fond", action, nb })} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
+      )}
+
+      {questionOuverte && (
+        <QuestionRapide editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} selectionInitiale={selectionQuestion} onFermer={() => setQuestionOuverte(false)} />
       )}
 
       {correctionOuverte && editor && (
