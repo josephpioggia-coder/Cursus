@@ -27,6 +27,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { RÈGLE_SCENES_INTIMES, detecterRefus, MESSAGE_REFUS } from "../lib/scenesIntimes.js";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../lib/supabase.js";
 import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI, directivesCopiloteAPI } from "../lib/api.js";
@@ -419,6 +420,7 @@ const PROMPTS = {
 RÈGLE NON NÉGOCIABLE sur les personnes nommées dans le texte (réelles ou identifiables) : n'attribue JAMAIS un trait de caractère, une qualité, une intention ou un fait à une personne nommée si l'auteur ne l'a pas déjà écrit lui-même. Une reformulation peut clarifier, alléger ou réorganiser ce que l'auteur a écrit sur cette personne — elle ne peut jamais AJOUTER une caractérisation nouvelle ("exigeant", "patient", "bienveillant"...) qui n'existait pas dans le texte source, même si elle semble plausible ou stylistiquement séduisante. En cas de doute sur ce qui est réellement affirmé par l'auteur, reste plus neutre et plus proche du texte plutôt que d'enrichir.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
+${RÈGLE_SCENES_INTIMES}
 
 Réponds UNIQUEMENT en JSON valide :
 {"suggestions":[{"type":"suite","titre":"...","texte":"..."},{"type":"approfondissement","titre":"...","texte":"..."},{"type":"reformulation","titre":"...","texte":"..."}]}`,
@@ -431,6 +433,7 @@ Réponds UNIQUEMENT en JSON valide :
   personnages: (type) => `Tu es assistant littéraire${type === "fiction" ? " spécialisé en fiction" : ""}. Extrait les ${type === "fiction" ? "personnages" : "personnes réellement nommées dans ce texte (ce n'est pas une fiction)"} du texte.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
+${RÈGLE_SCENES_INTIMES}
 
 Réponds UNIQUEMENT en JSON valide :
 {"personnages":[{"nom":"...","rôle":"...","traits":["..."],"cohérence":"ok","note":"..."}]}`,
@@ -476,6 +479,7 @@ RÈGLE NON NÉGOCIABLE sur les personnes nommées : si une suggestion mentionne 
 RÈGLE NON NÉGOCIABLE sur le ton du champ "suggestion" — signalé en usage réel (14/09/2026) : "Supprimer cette récapitulation ou la fondre directement dans la phrase suivante" est une INJONCTION (verbe à l'impératif), pas une recommandation, alors même que le diagnostic sous-jacent peut être faux (voir la règle sur le tressage délibéré ci-dessus — ça vient justement d'arriver). Le champ "suggestion" doit toujours être formulé comme une option proposée à l'auteur·ice, jamais comme un ordre à exécuter : pas de verbe à l'impératif en tête de phrase ("Supprimer...", "Corriger...", "Reformuler..."), mais une tournure qui laisse la décision ouverte ("Tu pourrais...", "Une option : ...", "Envisage de...", "Ça vaudrait peut-être la peine de..."). L'auteur·ice reste seul·e décisionnaire.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(type)}
+${RÈGLE_SCENES_INTIMES}
 
 Réponds UNIQUEMENT en JSON valide :
 {"points":[{"type":"incohérence","sévérité":"attention","description":"...","suggestion":"..."}]}`,
@@ -612,6 +616,7 @@ Ne commence JAMAIS par demander "comment puis-je t'aider ?" ni par faire choisir
 RÈGLE SUR CE QUE TU AFFIRMES DE L'AUTEUR·ICE (non négociable, signalé en usage réel : un premier message disait « tes idées t'arrivent en vrac » et diagnostiquait un « blocage de structure » alors que l'auteur·ice n'avait rien dit de tel) : ton diagnostic porte sur LE TEXTE — où il s'arrête, ce qu'il a déjà établi, ce qui reste ouvert — jamais sur la personne. N'attribue JAMAIS à l'auteur·ice un état, une cause psychologique ou une manière de travailler (idées en vrac, perfectionnisme, saturation, perte de sens, peur, fatigue…) qu'il/elle n'a pas exprimé lui-même/elle-même dans son complément ci-dessus. Les natures de blocage psychologiques ou émotionnelles de la liste ne se nomment que si l'auteur·ice les a exprimées ; sinon reste sur ce que le texte montre. Ne suppose pas non plus qu'il/elle est « bloqué·e » : le bouton s'appelle « Aide-moi à avancer », il/elle cherche peut-être seulement des idées, un avis ou du recul. Présente toute lecture comme une lecture (« le texte s'arrête sur… ; ce qui reste ouvert, c'est… »), et ne décris que ce qui est réellement écrit dans le texte fourni (rien d'un objet, d'un geste ou d'un fait absent du texte : si le livre est ouvert ou fermé, vérifie-le dans le texte).
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
+${RÈGLE_SCENES_INTIMES}
 
 Réponds directement, dans l'esprit de : "Je vois où tu t'es arrêté..." — nomme ce qui précède, ce que le contrat d'intention ou le contexte du projet demande à cet endroit, et ce qui reste ouvert. Propose ensuite 2 à 3 directions concrètes et distinctes, SANS en développer aucune comme texte fini : ce sont des pistes qui ouvrent des choix. Sois complet et développé plutôt que bref (une réponse complète d'environ 200 à 400 mots est préférable à une réponse tronquée), ton direct et concret, jamais générique. Si tu poses des questions à l'auteur·ice, numérote-les (1., 2., 3.). Réponds UNIQUEMENT en JSON valide :
 {"diagnostic":"...","type_blocage":"..."}`,
@@ -830,6 +835,7 @@ CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, 
 DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
 
 ${RÈGLE_INTERPRÉTATION_VS_FAIT(typeProjet)}
+${RÈGLE_SCENES_INTIMES}
 
 ${RÈGLE_COMPARAISON_FACTUELLE}
 
@@ -1024,6 +1030,11 @@ function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMémoriser,
               retaper "continue !" à la main. Bouton dédié sur le DERNIER
               message seulement — voir tronqué côté appelClaude/
               envoyerQuestionDialogue. */}
+          {m.role === "copilote" && detecterRefus(m.contenu) && (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: "#8a5a00", background: "#FFF6E0", border: "0.5px solid #E8C770", borderRadius: 8, padding: "6px 8px", lineHeight: 1.45 }}>
+              ⚠ {MESSAGE_REFUS}
+            </div>
+          )}
           {m.role === "copilote" && m.tronqué && i === dialogue.messages.length - 1 && !dialogue.enCours && (
             <button
               onClick={() => onEnvoyer(null, true)}
