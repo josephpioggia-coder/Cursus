@@ -1884,11 +1884,17 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   };
 
   // ── Largeur redimensionnable du panneau Co-pilote IA ──
-  const [largeurPanneau, setLargeurPanneau] = useState(280);
+  // 28/10/2026 : plus de plafond fixe (560 px) — sur grand écran la colonne restait coincée alors qu'il y avait
+  // beaucoup de place ; l'auteur·ice l'ajuste et la largeur est mémorisée sur cet appareil.
+  const [largeurPanneau, setLargeurPanneau] = useState(() => {
+    try { const v = parseInt(localStorage.getItem("cursus-largeur-copilote"), 10); return v >= 220 ? v : 280; } catch { return 280; }
+  });
   // Mobile (04/10/2026) : l'éditeur occupe toute la largeur, le Co-pilote s'ouvre par-dessus (bouton flottant).
   const [copiloteMobileOuvert, setCopiloteMobileOuvert] = useState(false);
   const [texteSélectionné, setTexteSélectionné] = useState("");
   const redimensionnementActif = useRef(false);
+  const largeurRef = useRef(largeurPanneau);
+  largeurRef.current = largeurPanneau;
   const positionDépart = useRef({ x: 0, largeur: 280 });
 
   const démarrerRedimensionnement = useCallback((e) => {
@@ -1904,11 +1910,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
       if (!redimensionnementActif.current) return;
       const delta = positionDépart.current.x - e.clientX;
       const nouvelleLargeur = positionDépart.current.largeur + delta;
-      setLargeurPanneau(Math.min(560, Math.max(220, nouvelleLargeur)));
+      // Seule borne haute : laisser ~360 px au texte pour qu'il reste utilisable.
+      setLargeurPanneau(Math.min(Math.max(220, window.innerWidth - 220 - 360), Math.max(220, nouvelleLargeur)));
     };
     const surRelâchement = () => {
       if (redimensionnementActif.current) {
         redimensionnementActif.current = false;
+        try { localStorage.setItem("cursus-largeur-copilote", String(largeurRef.current)); } catch { /* sans stockage */ }
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
       }
