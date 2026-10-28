@@ -569,6 +569,33 @@ export const stylesProjetAPI = {
   },
 };
 
+// ─── RÉGLAGE DE L'ASSISTANT IA (28/10/2026, voir 2026-10-28-preferences-ia.sql) ─────────
+// Une ligne par compte : { profil, modele, effort, style, consigne }. `lire` renvoie null si rien n'est enregistré
+// (l'application propose alors le réglage recommandé) ; table absente → erreur, l'application garde l'appareil.
+export const preferencesIAAPI = {
+
+  async lire() {
+    const uid = await userId();
+    if (!uid) return { data: null, error: new Error("Non connecté") };
+    const { data, error } = await supabase
+      .from("preferences_ia")
+      .select("profil, modele, effort, style, consigne")
+      .eq("user_id", uid)
+      .maybeSingle();
+    const ligne = Array.isArray(data) ? data[0] : data;
+    return { data: ligne && typeof ligne === "object" && !Array.isArray(ligne) && ligne.modele ? ligne : null, error };
+  },
+
+  async enregistrer(reglage) {
+    const uid = await userId();
+    if (!uid) return { error: new Error("Non connecté") };
+    const { error } = await supabase
+      .from("preferences_ia")
+      .upsert([{ user_id: uid, ...reglage, mis_a_jour: new Date().toISOString() }], { onConflict: "user_id" });
+    return { error };
+  },
+};
+
 // ─── ANALYSES CO-PILOTE (persistance des résultats d'analyse, réf.
 // 60816-01, suite, 16/09/2026) ──────────────────────────────────────────
 // Voir 2026-09-16-analyses-copilote.sql — suite directe de

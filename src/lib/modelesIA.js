@@ -30,6 +30,8 @@ export const EFFORTS = [
 
 const CLE_MODELE = "cursus-ia-modele";
 const CLE_EFFORT = "cursus-ia-effort";
+const CLE_STYLE = "cursus-ia-style";
+const CLE_CONSIGNE = "cursus-ia-consigne";
 
 /** Paramètres à joindre à l'appel : réflexion désactivée explicitement (voir la cause « thinking » du 01/10/2026) ou budget borné. */
 export function parametresEffort(effortId) {
@@ -56,14 +58,20 @@ export async function chargerModeles(force = false) {
 }
 
 export function lireChoix(modeles) {
-  let m = null, e = null;
-  try { m = localStorage.getItem(CLE_MODELE); e = localStorage.getItem(CLE_EFFORT); } catch { /* sans stockage */ }
+  let m = null, e = null, st = null, c = "";
+  try { m = localStorage.getItem(CLE_MODELE); e = localStorage.getItem(CLE_EFFORT); st = localStorage.getItem(CLE_STYLE); c = localStorage.getItem(CLE_CONSIGNE) || ""; } catch { /* sans stockage */ }
   const modele = modeles.some((x) => x.id === m) ? m : (modeles.find((x) => x.recommande) || modeles[0])?.id;
   const effort = EFFORTS.some((x) => x.id === e) ? e : "moyen";
-  return { modele, effort };
+  const style = STYLES.some((x) => x.id === st) ? st : "equilibre";
+  return { modele, effort, style, consigne: c, enregistre: !!(m || e || st) };
 }
-export function ecrireChoix({ modele, effort }) {
-  try { if (modele) localStorage.setItem(CLE_MODELE, modele); if (effort) localStorage.setItem(CLE_EFFORT, effort); } catch { /* sans stockage */ }
+export function ecrireChoix({ modele, effort, style, consigne }) {
+  try {
+    if (modele) localStorage.setItem(CLE_MODELE, modele);
+    if (effort) localStorage.setItem(CLE_EFFORT, effort);
+    if (style) localStorage.setItem(CLE_STYLE, style);
+    if (consigne !== undefined) localStorage.setItem(CLE_CONSIGNE, consigne);
+  } catch { /* sans stockage */ }
 }
 
 /** Consommation relative affichée avant l'envoi : poids du modèle × repère d'effort (1 = Haiku, effort faible). */
@@ -72,3 +80,32 @@ export function consoRelative(modele, effortId, modeles) {
   const e = EFFORTS.find((x) => x.id === effortId) || EFFORTS[1];
   return Math.round((poids / 0.5) * e.conso * 10) / 10;
 }
+
+// ─── Style de réponse et profils (28/10/2026) ─────────────────────────────
+// À l'ouverture un réglage RECOMMANDÉ est proposé et déjà appliqué ; l'auteur·ice peut le modifier tout de suite ou plus
+// tard. Un PROFIL règle d'un coup le modèle, l'effort et le style ; chaque outil n'applique que ce qu'il peut utiliser
+// (la Question rapide prend les trois ; les outils à format de réponse strict ne prennent pas le style).
+export const STYLES = [
+  { id: "concis", libelle: "Concis", aide: "Court et direct : l'essentiel en quelques phrases.", directive: "Style : très concis. Réponds en trois à cinq phrases au plus, sans digression." },
+  { id: "equilibre", libelle: "Équilibré", aide: "Complet mais sans longueurs.", recommande: true, directive: "Style : équilibré. Réponds de façon complète mais sans longueurs ; une courte liste si elle aide." },
+  { id: "detaille", libelle: "Détaillé", aide: "Développé : contexte, nuances, exemples.", directive: "Style : détaillé. Développe la réponse avec le contexte, les nuances et, si utile, des exemples ; structure-la clairement." },
+];
+
+export const PROFILS = [
+  { id: "economique", libelle: "Économe", aide: "Le plus léger pour votre quota.", modeleRecherche: "haiku", effort: "faible", style: "concis" },
+  { id: "equilibre", libelle: "Équilibré", aide: "Recommandé : qualité, vitesse et consommation.", recommande: true, modeleRecherche: "sonnet", effort: "moyen", style: "equilibre" },
+  { id: "approfondi", libelle: "Approfondi", aide: "Réponses plus poussées, consomme davantage.", modeleRecherche: "opus", effort: "eleve", style: "detaille" },
+];
+
+/** Identifiant du modèle d'un profil, retrouvé dans la liste du registre (le profil ne fige aucun nom de modèle). */
+export function modeleDuProfil(profil, modeles) {
+  return (modeles.find((m) => m.id.includes(profil.modeleRecherche)) || modeles.find((m) => m.recommande) || modeles[0])?.id;
+}
+
+/** Réglage recommandé : profil « Équilibré ». */
+export function reglageRecommande(modeles) {
+  const p = PROFILS.find((x) => x.recommande);
+  return { profil: p.id, modele: modeleDuProfil(p, modeles), effort: p.effort, style: p.style, consigne: "" };
+}
+
+export const directiveStyle = (styleId) => (STYLES.find((s) => s.id === styleId) || STYLES[1]).directive;
