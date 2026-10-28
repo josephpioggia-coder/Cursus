@@ -104,6 +104,8 @@ function propsBloc(n) {
   if (Object.keys(spacing).length) props.spacing = spacing;
   const cm = /^\s*([\d.]+)\s*cm\s*$/i.exec(st.marginLeft || "");
   if (cm) props.indent = { left: Math.round(parseFloat(cm[1]) * 567) }; // 1 cm = 567 twips
+  const premiere = /^\s*(-?[\d.]+)\s*cm\s*$/i.exec(st.textIndent || ""); // retrait de première ligne (triangle de la règle)
+  if (premiere) props.indent = { ...(props.indent || {}), firstLine: Math.round(parseFloat(premiere[1]) * 567) };
   return props;
 }
 

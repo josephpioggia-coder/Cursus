@@ -139,6 +139,15 @@ export const MiseEnFormeParagraphe = Extension.create({
           },
           renderHTML: (a) => (a.indent ? { style: `margin-left: ${Math.round(a.indent * PAS_RETRAIT_CM * 100) / 100}cm` } : {}),
         },
+        // Retrait de PREMIÈRE LIGNE du paragraphe (cm), réglé avec le triangle de la règle ; null = celui du style « Normal ».
+        firstLine: {
+          default: null,
+          parseHTML: (el) => {
+            const cm = /^\s*(-?[\d.]+)\s*cm\s*$/i.exec(el.style.textIndent || "");
+            return cm ? Math.min(8, Math.max(0, parseFloat(cm[1]))) : null;
+          },
+          renderHTML: (a) => (a.firstLine != null ? { style: `text-indent: ${a.firstLine}cm` } : {}),
+        },
       },
     }];
   },
@@ -146,6 +155,17 @@ export const MiseEnFormeParagraphe = Extension.create({
     return {
       setLineHeight: (valeur) => ({ commands }) => BLOCS_FORMATABLES.map((t) => commands.updateAttributes(t, { lineHeight: valeur })).some(Boolean),
       unsetLineHeight: () => ({ commands }) => BLOCS_FORMATABLES.map((t) => commands.updateAttributes(t, { lineHeight: null })).some(Boolean),
+      /** Retrait de première ligne (cm) des blocs de la sélection (le triangle de la règle). */
+      setPremiereLigne: (cm) => ({ state, tr, dispatch }) => {
+        const { from, to } = state.selection;
+        let modifie = false;
+        state.doc.nodesBetween(from, to, (node, pos) => {
+          if (!BLOCS_FORMATABLES.includes(node.type.name)) return;
+          if (node.attrs.firstLine !== cm) { tr.setNodeMarkup(pos, undefined, { ...node.attrs, firstLine: cm }); modifie = true; }
+        });
+        if (modifie && dispatch) dispatch(tr);
+        return modifie;
+      },
       /** delta = +1 (augmenter le retrait) ou −1 (le diminuer), sur tous les blocs de la sélection. */
       changerRetrait: (delta) => ({ state, tr, dispatch }) => {
         const { from, to } = state.selection;
