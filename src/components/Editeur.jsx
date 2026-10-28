@@ -130,6 +130,33 @@ const FORMATS_RÉFÉRENCE = {
   broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720, margePx: 72 },
 };
 
+// Règle graduée en cm au-dessus de la feuille (« Vue page », 28/10/2026) : zones de marge grisées, 0 au bord de la marge
+// gauche, graduations au demi-cm, repères de marge. Lecture seule : les marges viennent du format d'export.
+const PX_PAR_CM = 96 / 2.54;
+function RegleCm({ largeurPx, margePx }) {
+  const total = largeurPx + 2 * margePx;
+  const traits = [];
+  for (let i = Math.ceil(-margePx / PX_PAR_CM * 2); i <= Math.floor((largeurPx + margePx) / PX_PAR_CM * 2); i++) {
+    const x = margePx + (i / 2) * PX_PAR_CM;
+    const entier = i % 2 === 0;
+    traits.push(
+      <div key={i} style={{ position: "absolute", left: x, bottom: 0, width: 1, height: entier ? 7 : 4, background: "#8a8a99" }}>
+        {entier && i !== 0 && <span style={{ position: "absolute", bottom: 8, left: -8, width: 17, textAlign: "center", fontSize: 8.5, color: "#6b6b7a", fontFamily: "-apple-system, sans-serif" }}>{Math.abs(i / 2)}</span>}
+      </div>
+    );
+  }
+  return (
+    <div aria-hidden title={`Largeur du texte : ${(largeurPx / PX_PAR_CM).toFixed(1).replace(".", ",")} cm — marges : ${(margePx / PX_PAR_CM).toFixed(1).replace(".", ",")} cm`}
+      style={{ position: "absolute", top: -22, left: 0, width: total, height: 18, userSelect: "none", pointerEvents: "none", overflow: "hidden", background: "#fff", border: "0.5px solid #d8d8d8", boxSizing: "border-box" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: margePx, background: "#e3e1ea" }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: margePx, background: "#e3e1ea" }} />
+      {traits}
+      <div style={{ position: "absolute", left: margePx - 4, top: 0, width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: "6px solid #7F77DD" }} />
+      <div style={{ position: "absolute", left: margePx + largeurPx - 4, top: 0, width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: "6px solid #7F77DD" }} />
+    </div>
+  );
+}
+
 // Regroupe des positions verticales proches (à `seuil` pixels près) en une
 // seule valeur — corrige un artefact du navigateur observé dans les listes
 // à puces, où Range.getClientRects() peut renvoyer deux rectangles à
@@ -1913,7 +1940,7 @@ export default function Editeur({
           flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto",
           padding: modeFocus ? "60px 0" : mobile ? "10px 0 24px" : "32px 0",
           display: "flex", justifyContent: "center",
-          ...(pageVisible ? { background: "#EEEDF0", padding: "24px 0" } : {}),
+          ...(pageVisible ? { background: "#EEEDF0", padding: "36px 0 24px" } : {}),
         }}>
           <div style={pageVisible ? {
             // Feuille : largeur de texte = largeur de l'export + marges de chaque côté ; limites en pointillés.
@@ -1928,6 +1955,7 @@ export default function Editeur({
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {pageVisible && (<>
+              <RegleCm largeurPx={FORMATS_RÉFÉRENCE[formatRéférence].largeurPx} margePx={FORMATS_RÉFÉRENCE[formatRéférence].margePx} />
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, right: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderRight: "1px dashed #cfcfe0", pointerEvents: "none" }} />
               <div aria-hidden style={{ position: "absolute", left: 0, right: 0, top: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderTop: "1px dashed #cfcfe0", pointerEvents: "none" }} />
