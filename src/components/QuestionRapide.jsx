@@ -12,7 +12,7 @@ import { journaliserErreur } from "../lib/journalErreurs.js";
 const CLE_MODE = "cursus-question-rapide-mode";
 const pastille = { fontSize: 10, border: "0.5px solid #bbb", borderRadius: 10, padding: "0 6px", color: "#666", marginLeft: 6, whiteSpace: "nowrap" };
 
-export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeule = false, selectionInitiale = "", mobile = false, onFermer }) {
+export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeule = false, selectionInitiale = "", mobile = false, onFermer, onAide }) {
   const [modeles, setModeles] = useState(MODELES_PAR_DEFAUT);
   const [reglage, setReglage] = useState(() => ({ ...lireChoix(MODELES_PAR_DEFAUT), profil: null }));
   const [propose, setPropose] = useState(false); // réglage recommandé proposé (rien d'enregistré encore) — non bloquant
@@ -106,6 +106,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
           style={{ fontSize: 12, padding: "4px 10px", border: "0.5px solid #ccc", borderRadius: 14, background: menu ? `${couleur}15` : "#fff", color: "#444", cursor: "pointer", fontFamily: "inherit" }}>
           {modeleChoisi?.libelle} · {effortChoisi.libelle} · {styleChoisi.libelle} ▾
         </button>
+        {onAide && <button type="button" onClick={onAide} title="Questions sur le fonctionnement de Cursus : réponses connues, pointer un bouton" style={{ border: "0.5px solid #ccc", background: "#fff", borderRadius: 6, padding: "3px 8px", fontSize: 12, cursor: "pointer", fontFamily: "inherit", color: "#534AB7", marginRight: 8 }}>❓ Aide sur Cursus</button>}
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "none", fontSize: 18, color: "#999", cursor: "pointer" }}>✕</button>
       </div>
 
@@ -197,7 +198,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
             {x.bascule && <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>Le modèle demandé était indisponible : {x.modeleUtilise} a été utilisé.</div>}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               <button type="button" onClick={() => copier(x.texte, i)} style={{ fontSize: 12, border: "0.5px solid #ccc", background: "#fff", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", color: copie === i ? "#1D9E75" : "#555" }}>{copie === i ? "✓ Copié" : "📋 Copier"}</button>
-              {!lectureSeule && <button type="button" onClick={() => inserer(x.texte)} title="Insère la réponse comme note de bas de page au curseur" style={{ fontSize: 12, border: "0.5px solid #ccc", background: "#fff", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", color: "#555" }}>📝 En note de bas de page</button>}
+              {!lectureSeule && editor && <button type="button" onClick={() => inserer(x.texte)} title="Insère la réponse comme note de bas de page au curseur" style={{ fontSize: 12, border: "0.5px solid #ccc", background: "#fff", borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", color: "#555" }}>📝 En note de bas de page</button>}
               <span style={{ flex: 1 }} />
               <span title={`${x.entree} tokens envoyés + ${x.sortie} reçus, pondérés par le modèle`} style={{ fontSize: 11, color: "#aaa" }}>≈ {x.poids.toLocaleString("fr-FR")} tokens de votre quota</span>
             </div>

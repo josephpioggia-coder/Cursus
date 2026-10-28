@@ -55,6 +55,7 @@ import UsageVoix from "./components/UsageVoix.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import AideFAQ from "./components/AideFAQ.jsx";
+import QuestionRapide from "./components/QuestionRapide.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
 import { exporterDossierCreation } from "./lib/exportDossierWord.js";
 import { construirePlan } from "./lib/planDuLivre.js";
@@ -1853,7 +1854,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
   const [erreurCréationProjet, setErreurCréationProjet] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
-  const [aideOuverte, setAideOuverte]                     = useState(false);
+  const [aideOuverte, setAideOuverte]                     = useState(false);   // fenêtre « Question rapide » (boutons Aide)
+  const [centreAideOuvert, setCentreAideOuvert]           = useState(false);   // Centre d'aide (FAQ, pointeur de bouton)
   // Ruban de CursEdit : boutons « Aide » et « Mode d'emploi » (événements émis depuis l'éditeur).
   useEffect(() => {
     const aide = () => setAideOuverte(true);
@@ -3054,9 +3056,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
       {/* Centre d'aide — accessible depuis n'importe quel écran */}
       {aideOuverte && (
+        <QuestionRapide mobile={estMobile} onFermer={() => setAideOuverte(false)} onAide={() => { setAideOuverte(false); setCentreAideOuvert(true); }} />
+      )}
+      {centreAideOuvert && (
         <AideFAQ
-          onFermer={() => setAideOuverte(false)}
-          onVoirModeEmploi={() => { setAideOuverte(false); setVue("mode-emploi"); }}
+          estAdmin={user?.email === "joseph.pioggia@gmail.com"}
+          onFermer={() => setCentreAideOuvert(false)}
+          onVoirModeEmploi={() => { setCentreAideOuvert(false); setVue("mode-emploi"); }}
         />
       )}
 
