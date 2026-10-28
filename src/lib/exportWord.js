@@ -29,7 +29,7 @@
 
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
-  PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun, ShadingType, LineRuleType,
+  PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun, ShadingType, LineRuleType, Tab, TabStopType,
 } from "docx";
 import { premierePolice, taillePtDepuisCss } from "./miseEnFormeEditeur.js";
 import { margesReglees, nettoyerStyles, paragrapheDepuisStyle, runDepuisStyle, stylesPourDocx } from "./stylesProjet.js";
@@ -104,8 +104,18 @@ function propsBloc(n) {
   if (Object.keys(spacing).length) props.spacing = spacing;
   const cm = /^\s*([\d.]+)\s*cm\s*$/i.exec(st.marginLeft || "");
   if (cm) props.indent = { left: Math.round(parseFloat(cm[1]) * 567) }; // 1 cm = 567 twips
-  const premiere = /^\s*(-?[\d.]+)\s*cm\s*$/i.exec(st.textIndent || ""); // retrait de première ligne (triangle de la règle)
-  if (premiere) props.indent = { ...(props.indent || {}), firstLine: Math.round(parseFloat(premiere[1]) * 567) };
+  const premiere = /^\s*(-?[\d.]+)\s*cm\s*$/i.exec(st.textIndent || ""); // retrait de première ligne (triangle de la règle) ; négatif = suspendu
+  if (premiere) {
+    const tw = Math.round(parseFloat(premiere[1]) * 567);
+    props.indent = { ...(props.indent || {}), ...(tw < 0 ? { hanging: -tw } : { firstLine: tw }) };
+  }
+  const droite = /^\s*([\d.]+)\s*cm\s*$/i.exec(st.marginRight || ""); // retrait droit
+  if (droite) props.indent = { ...(props.indent || {}), right: Math.round(parseFloat(droite[1]) * 567) };
+  const taquets = (n.getAttribute && n.getAttribute("data-tabs")) || ""; // taquets de tabulation « 1.5l,10r »
+  const types = { l: TabStopType.LEFT, c: TabStopType.CENTER, r: TabStopType.RIGHT, d: TabStopType.DECIMAL };
+  const stops = taquets.split(",").map((x) => /^\s*([\d.]+)([lcrd])\s*$/.exec(x)).filter(Boolean)
+    .map((m) => ({ type: types[m[2]], position: Math.round(parseFloat(m[1]) * 567) }));
+  if (stops.length) props.tabStops = stops;
   return props;
 }
 
@@ -161,6 +171,12 @@ function runsDepuisNœudDOM(nœudDOM, styleInitial = {}, registreNotes = []) {
     if (n.hasAttribute && n.hasAttribute("data-note")) {
       registreNotes.push(n.getAttribute("data-texte") || "");
       runs.push(new FootnoteReferenceRun(registreNotes.length));
+      return;
+    }
+
+    // Tabulation de l'éditeur (span[data-tab]) → vraie tabulation Word, alignée sur les taquets du paragraphe.
+    if (n.hasAttribute && n.hasAttribute("data-tab")) {
+      runs.push(new TextRun({ children: [new Tab()] }));
       return;
     }
 

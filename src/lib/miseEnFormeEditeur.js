@@ -13,7 +13,8 @@
  *    1,27 cm comme Word) sur les paragraphes et les titres.
  * Tout est stocké dans le HTML du chapitre ; l'export Word (exportWord.js) relit ces mêmes styles.
  */
-import { Extension, Mark } from "@tiptap/core";
+import { Extension, Mark, Node as NoeudTiptap } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
 
 // ─── Listes proposées ─────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ export const MiseEnFormeParagraphe = Extension.create({
           default: 0,
           parseHTML: (el) => {
             const cm = /^\s*([\d.]+)\s*cm\s*$/i.exec(el.style.marginLeft || "");
-            return cm ? Math.min(RETRAIT_MAX, Math.max(0, Math.round(parseFloat(cm[1]) / PAS_RETRAIT_CM))) : 0;
+            return cm ? Math.min(RETRAIT_MAX, Math.max(0, Math.round(parseFloat(cm[1]) / PAS_RETRAIT_CM * 1000) / 1000)) : 0; // décimal : la règle règle au mm
           },
           renderHTML: (a) => (a.indent ? { style: `margin-left: ${Math.round(a.indent * PAS_RETRAIT_CM * 100) / 100}cm` } : {}),
         },
@@ -144,9 +145,21 @@ export const MiseEnFormeParagraphe = Extension.create({
           default: null,
           parseHTML: (el) => {
             const cm = /^\s*(-?[\d.]+)\s*cm\s*$/i.exec(el.style.textIndent || "");
-            return cm ? Math.min(8, Math.max(0, parseFloat(cm[1]))) : null;
+            return cm ? Math.min(8, Math.max(-8, parseFloat(cm[1]))) : null; // négatif = retrait suspendu
           },
           renderHTML: (a) => (a.firstLine != null ? { style: `text-indent: ${a.firstLine}cm` } : {}),
+        },
+        // Retrait DROIT du paragraphe (cm), triangle de droite de la règle.
+        indentRight: {
+          default: 0,
+          parseHTML: (el) => { const cm = /^\s*([\d.]+)\s*cm\s*$/i.exec(el.style.marginRight || ""); return cm ? Math.min(10, parseFloat(cm[1])) : 0; },
+          renderHTML: (a) => (a.indentRight ? { style: `margin-right: ${a.indentRight}cm` } : {}),
+        },
+        // Taquets de tabulation du paragraphe : [{ pos (cm depuis la marge gauche), type: "l"|"c"|"r"|"d" }] ; stockés « 1.5l,10r ».
+        tabs: {
+          default: null,
+          parseHTML: (el) => lireTaquets(el.getAttribute("data-tabs")),
+          renderHTML: (a) => (a.tabs && a.tabs.length ? { "data-tabs": a.tabs.map((t) => `${t.pos}${t.type}`).join(",") } : {}),
         },
       },
     }];
@@ -155,13 +168,21 @@ export const MiseEnFormeParagraphe = Extension.create({
     return {
       setLineHeight: (valeur) => ({ commands }) => BLOCS_FORMATABLES.map((t) => commands.updateAttributes(t, { lineHeight: valeur })).some(Boolean),
       unsetLineHeight: () => ({ commands }) => BLOCS_FORMATABLES.map((t) => commands.updateAttributes(t, { lineHeight: null })).some(Boolean),
-      /** Retrait de première ligne (cm) des blocs de la sélection (le triangle de la règle). */
-      setPremiereLigne: (cm) => ({ state, tr, dispatch }) => {
+      /**
+       * Règle (retraits et taquets) : applique aux blocs de la sélection { gauche (cm), premiere (cm, négatif = suspendu),
+       * droite (cm), tabs ([{pos,type}] ou null) } ; seules les clés fournies changent.
+       */
+      setMiseEnFormeBloc: (c) => ({ state, tr, dispatch }) => {
         const { from, to } = state.selection;
         let modifie = false;
         state.doc.nodesBetween(from, to, (node, pos) => {
           if (!BLOCS_FORMATABLES.includes(node.type.name)) return;
-          if (node.attrs.firstLine !== cm) { tr.setNodeMarkup(pos, undefined, { ...node.attrs, firstLine: cm }); modifie = true; }
+          const attrs = { ...node.attrs };
+          if (c.gauche !== undefined) attrs.indent = Math.min(RETRAIT_MAX, Math.max(0, Math.round(c.gauche / PAS_RETRAIT_CM * 1000) / 1000));
+          if (c.premiere !== undefined) attrs.firstLine = c.premiere;
+          if (c.droite !== undefined) attrs.indentRight = Math.max(0, Math.round(c.droite * 10) / 10);
+          if (c.tabs !== undefined) attrs.tabs = c.tabs && c.tabs.length ? c.tabs : null;
+          if (JSON.stringify(attrs) !== JSON.stringify(node.attrs)) { tr.setNodeMarkup(pos, undefined, attrs); modifie = true; }
         });
         if (modifie && dispatch) dispatch(tr);
         return modifie;
@@ -180,6 +201,102 @@ export const MiseEnFormeParagraphe = Extension.create({
         return modifie;
       },
     };
+  },
+});
+
+/** « 1.5l,10r » → [{ pos: 1.5, type: "l" }, { pos: 10, type: "r" }] (trié, valeurs valides seulement). */
+export function lireTaquets(brut) {
+  if (!brut) return null;
+  const liste = String(brut).split(",").map((x) => /^\s*([\d.]+)([lcrd])\s*$/.exec(x)).filter(Boolean)
+    .map((m) => ({ pos: Math.round(parseFloat(m[1]) * 10) / 10, type: m[2] })).filter((t) => t.pos > 0 && t.pos < 40);
+  return liste.length ? liste.sort((a, b) => a.pos - b.pos) : null;
+}
+
+// ─── Tabulations (touche Tab) alignées sur les taquets de la règle ─────────
+
+const PX_CM = 96 / 2.54;
+const TAQUET_DEFAUT_CM = 1.27;
+
+/** Largeur (px) du contenu qui suit `span` jusqu'à la prochaine tabulation ou la fin du bloc ; `jusquAuDecimal` : s'arrête au 1er « , » ou « . ». */
+function largeurSuivante(span, jusquAuDecimal) {
+  const bloc = span.parentElement;
+  const range = document.createRange();
+  let suivante = span.nextSibling;
+  while (suivante && !(suivante.nodeType === 1 && suivante.hasAttribute("data-tab"))) suivante = suivante.nextSibling;
+  range.setStartAfter(span);
+  if (suivante) range.setEndBefore(suivante); else range.setEnd(bloc, bloc.childNodes.length);
+  if (jusquAuDecimal) {
+    const w = document.createTreeWalker(bloc, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = w.nextNode())) {
+      if (!(span.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+      if (suivante && (suivante.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+      const k = n.textContent.search(/[.,]/);
+      if (k >= 0) { range.setEnd(n, k); break; }
+    }
+  }
+  return range.getBoundingClientRect().width;
+}
+
+/** Fixe la largeur de chaque tabulation pour que le texte suivant tombe sur le taquet (gauche, centre, droit ou décimal). */
+function disposerTabulations(view) {
+  const racine = view.dom;
+  const spans = racine.querySelectorAll("span[data-tab]");
+  if (!spans.length) return;
+  const origine = racine.getBoundingClientRect().left + parseFloat(getComputedStyle(racine).paddingLeft || "0");
+  const blocs = new Map();
+  spans.forEach((sp) => { const b = sp.parentElement; if (!blocs.has(b)) blocs.set(b, []); blocs.get(b).push(sp); });
+  blocs.forEach((liste, bloc) => {
+    const taquets = lireTaquets(bloc.getAttribute("data-tabs")) || [];
+    liste.forEach((sp) => { sp.style.width = "0px"; });
+    liste.forEach((sp) => {
+      const x = sp.getBoundingClientRect().left - origine;
+      let cible = taquets.find((t) => t.pos * PX_CM > x + 1);
+      let largeur;
+      if (!cible) {
+        const prochain = (Math.floor((x + 1) / (TAQUET_DEFAUT_CM * PX_CM)) + 1) * TAQUET_DEFAUT_CM * PX_CM;
+        largeur = prochain - x;
+      } else {
+        const stop = cible.pos * PX_CM;
+        if (cible.type === "l") largeur = stop - x;
+        else if (cible.type === "r") largeur = stop - x - largeurSuivante(sp, false);
+        else if (cible.type === "c") largeur = stop - x - largeurSuivante(sp, false) / 2;
+        else largeur = stop - x - largeurSuivante(sp, true);
+      }
+      sp.style.width = `${Math.max(1, Math.round(largeur * 10) / 10)}px`;
+    });
+  });
+}
+
+export const Tabulation = NoeudTiptap.create({
+  name: "tabulation",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: false,
+  parseHTML() { return [{ tag: "span[data-tab]" }, { tag: "span.cursus-tab" }]; },
+  renderHTML() { return ["span", { "data-tab": "", class: "cursus-tab" }]; },
+  renderText() { return "\t"; },
+  addKeyboardShortcuts() {
+    return {
+      // Tab insère une tabulation dans le texte ; dans une liste, le comportement habituel (niveau) est laissé tel quel.
+      Tab: ({ editor }) => {
+        if (editor.isActive("bulletList") || editor.isActive("orderedList")) return false;
+        return editor.commands.insertContent({ type: "tabulation" });
+      },
+    };
+  },
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      view(view) {
+        let raf = 0;
+        const planifier = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => disposerTabulations(view)); };
+        const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(planifier) : null;
+        ro?.observe(view.dom);
+        planifier();
+        return { update: planifier, destroy() { cancelAnimationFrame(raf); ro?.disconnect(); } };
+      },
+    })];
   },
 });
 
