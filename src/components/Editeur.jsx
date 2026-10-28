@@ -61,6 +61,9 @@ import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
 import RubanEditeur from "./RubanEditeur.jsx";
 import QuestionRapide from "./QuestionRapide.jsx";
+import RechercheRemplacement from "./RechercheRemplacement.jsx";
+import { RechercheDansTexte } from "../lib/rechercheEditeur.js";
+import { aplatirStructure } from "../lib/rechercheTexte.js";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -397,6 +400,8 @@ const STYLES_EDITEUR = `
     caret-color: #7F77DD;
   }
   .ProseMirror p { margin: 0 0 1em; }
+  .ProseMirror .recherche-occ { background: #FFE98A; border-radius: 2px; color: inherit; }
+  .ProseMirror .recherche-occ-courante { background: #FF9F43; box-shadow: 0 0 0 1px #E07B00; }
   .ProseMirror h1 { font-size: 1.6em; font-weight: 500; margin: 1.4em 0 0.5em; line-height: 1.3; }
   .ProseMirror h2 { font-size: 1.3em; font-weight: 500; margin: 1.2em 0 0.4em; line-height: 1.3; }
   .ProseMirror h3 { font-size: 1.1em; font-weight: 500; margin: 1em 0 0.3em; line-height: 1.3; }
@@ -1303,6 +1308,9 @@ export default function Editeur({
                            // puisse analyser uniquement le passage surligné plutôt que
                            // tout le chapitre. Ajouté le 16/07/2026.
   onRetour,                // () => void
+  structureProjet = [],    // structure imbriquée du projet (Rechercher / remplacer dans tout le livre, 28/10/2026)
+  onOuvrirNoeud,           // (nœudId) => void — ouvre un autre chapitre
+  onEcrireAutreNoeud,      // async (nœudId, html) => { error } — écrit un autre chapitre (remplacement dans tout le livre)
   // Lecture seule forcée (16/09/2026, CGV art. 6) — abonnement annulé
   // depuis moins de 3 mois : les textes restent consultables/exportables,
   // mais ni modifiables ni importables. Voir abonnementsAPI.statutAccès
@@ -1327,6 +1335,8 @@ export default function Editeur({
   const basculerVuePage = () => setVuePage((v) => { try { localStorage.setItem("cursus-vue-page", v ? "0" : "1"); } catch { /* sans stockage */ } return !v; });
   const pageVisible = vuePage && !mobile && !modeFocus;
   const [questionOuverte, setQuestionOuverte] = useState(false);
+  const [rechercheOuverte, setRechercheOuverte] = useState(false);
+  const [requeteRecherche, setRequeteRecherche] = useState("");
   const [selectionQuestion, setSelectionQuestion] = useState("");
   const [voirHistorique, setVoirHistorique] = useState(false);
   const [texteCopié, setTexteCopié] = useState(false);
@@ -1510,6 +1520,7 @@ export default function Editeur({
         heading: { levels: [1, 2, 3, 4, 5, 6] },
       }),
       Note,
+      RechercheDansTexte,
       Typography,
       Underline,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
@@ -1643,9 +1654,19 @@ export default function Editeur({
   };
   const ouvrirQuestionRef = useRef(ouvrirQuestion);
   ouvrirQuestionRef.current = ouvrirQuestion;
+  // Rechercher / remplacer (Ctrl+F, Ctrl+H) : la sélection courante (courte, sur une ligne) devient la requête.
+  const ouvrirRecherche = () => {
+    const { from, to } = editor?.state?.selection || { from: 0, to: 0 };
+    const sel = to > from ? editor.state.doc.textBetween(from, to, " ") : "";
+    if (sel && sel.length <= 80) setRequeteRecherche(sel);
+    setRechercheOuverte(true);
+  };
+  const ouvrirRechercheRef = useRef(ouvrirRecherche);
+  ouvrirRechercheRef.current = ouvrirRecherche;
   useEffect(() => {
     const touche = (e) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); ouvrirQuestionRef.current(); }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === "f" || e.key.toLowerCase() === "h")) { e.preventDefault(); ouvrirRechercheRef.current(); }
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
@@ -1733,10 +1754,10 @@ export default function Editeur({
   }, [modeFocus, formatRéférence, vuePage, stylesProjet, recalculerNumérosDeLigne]);
 
   // Instantané juste avant une modification en masse (nettoyage mécanique) : permet de revenir en arrière même après rechargement.
-  const sauvegarderAvant = useCallback(async () => {
+  const sauvegarderAvant = useCallback(async (libelle = "Avant nettoyage mécanique") => {
     if (!editor || !nœud?.id) return;
     const html = editor.getHTML();
-    const apercu = "Avant nettoyage mécanique — " + html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) + "…";
+    const apercu = libelle + " — " + html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) + "…";
     const { data } = await supabase.from("versions_noeuds")
       .insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
     if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
@@ -1815,6 +1836,7 @@ export default function Editeur({
   // Actions du ruban (voir src/lib/rubanCatalogue.js : une fonction « fait » doit avoir son entrée ici).
   const actionsRuban = {
     question: { onClick: () => ouvrirQuestion() },
+    rechercher: { onClick: () => ouvrirRecherche() },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
     photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
     image: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-inserer-image")), desactive: lectureSeule },
@@ -2062,6 +2084,7 @@ export default function Editeur({
             </button>
           )}
           <button onClick={ouvrirQuestion} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Poser une question à l'IA sans passer par le Co-pilote">💬 Question rapide</button>
+          <button onClick={ouvrirRecherche} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Rechercher et remplacer dans le chapitre ou dans tout le livre">🔎 Rechercher / remplacer</button>
           {lectureJSX}
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
@@ -2102,6 +2125,11 @@ export default function Editeur({
 
       {vérificationOuverte && editor && (
         <VerifierLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "verifier_le_fond", action, nb })} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
+      )}
+
+      {rechercheOuverte && (
+        <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} noeudId={nœud?.id}
+          noeuds={aplatirStructure(structureProjet)} onOuvrirNoeud={onOuvrirNoeud} onEcrireNoeud={onEcrireAutreNoeud} sauvegarderAvant={sauvegarderAvant} onFermer={() => setRechercheOuverte(false)} />
       )}
 
       {questionOuverte && (
