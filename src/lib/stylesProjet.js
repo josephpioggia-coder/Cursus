@@ -58,6 +58,26 @@ const IDS = new Set(STYLES_PROJET.map((s) => s.id));
 const PILES_AUTORISEES = new Set(POLICES.map((p) => p.valeur));
 const nombre = (v, min, max) => { const n = Number(v); return Number.isFinite(n) && n >= min && n <= max ? Math.round(n * 100) / 100 : undefined; };
 
+const FORMATS_MARGES = ["a4", "a5", "poche", "broche"];
+
+/** Marges gauche/droite réglées sur la règle (cm), par format de page : { a4: { gauche, droite }, … }. */
+function nettoyerPage(brut) {
+  const sortie = {};
+  if (!brut || typeof brut !== "object") return sortie;
+  for (const f of FORMATS_MARGES) {
+    const b = brut[f];
+    if (!b || typeof b !== "object") continue;
+    const o = {};
+    const g = nombre(b.gauche, 0.5, 8); if (g !== undefined) o.gauche = g;
+    const d = nombre(b.droite, 0.5, 8); if (d !== undefined) o.droite = d;
+    if (Object.keys(o).length) sortie[f] = o;
+  }
+  return sortie;
+}
+
+/** Marges réglées (cm) pour un format, ou {} si l'auteur·ice n'y a pas touché. */
+export const margesReglees = (styles, formatId) => styles?.page?.[formatId] || {};
+
 /** Valide et nettoie un objet de styles (tout ce qui est inconnu, hors bornes, ou égal au défaut est retiré). */
 export function nettoyerStyles(brut) {
   const sortie = {};
@@ -78,6 +98,8 @@ export function nettoyerStyles(brut) {
     for (const k of Object.keys(o)) if (String(o[k]).toUpperCase() === String(d[k]).toUpperCase()) delete o[k];
     if (Object.keys(o).length) sortie[id] = o;
   }
+  const page = nettoyerPage(brut.page);
+  if (Object.keys(page).length) sortie.page = page;
   return sortie;
 }
 
