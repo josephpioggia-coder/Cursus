@@ -32,7 +32,7 @@ import {
   PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun, ShadingType, LineRuleType,
 } from "docx";
 import { premierePolice, taillePtDepuisCss } from "./miseEnFormeEditeur.js";
-import { nettoyerStyles, paragrapheDepuisStyle, runDepuisStyle, stylesPourDocx } from "./stylesProjet.js";
+import { margesReglees, nettoyerStyles, paragrapheDepuisStyle, runDepuisStyle, stylesPourDocx } from "./stylesProjet.js";
 
 const NIVEAU_STRUCTURE = {
   partie: HeadingLevel.HEADING_1,
@@ -305,6 +305,7 @@ export function nomDeFichierSûr(titre) {
 export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluses = ["corps"], stylesProjet = {}) {
   const format = FORMATS_PAGE[formatPage] || FORMATS_PAGE.a4;
   const styles = nettoyerStyles(stylesProjet); // propriétés modifiées dans la galerie « Styles » (vide = export inchangé)
+  const margeCm = margesReglees(styles, formatPage);
 
   const pageDeTitre = [
     new Paragraph({
@@ -357,7 +358,7 @@ export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluse
       properties: {
         page: {
           size: { width: format.width, height: format.height },
-          margin: { top: format.margin, bottom: format.margin, left: format.margin, right: format.margin },
+          margin: { top: format.margin, bottom: format.margin, left: margeCm.gauche ? Math.round(margeCm.gauche * 567) : format.margin, right: margeCm.droite ? Math.round(margeCm.droite * 567) : format.margin }, // marges réglées sur la règle (cm → twips)
         },
       },
       children: [...pageDeTitre, ...sommaire, ...contenu],

@@ -61,7 +61,7 @@ import LirePhoto from "./LirePhoto.jsx";
 import ProfilLisibilite from "./ProfilLisibilite.jsx";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
-import { cssDesStyles } from "../lib/stylesProjet.js";
+import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
@@ -130,14 +130,16 @@ const FORMATS_RÉFÉRENCE = {
   broche: { label: "Broché (6×9)",     largeurPx: 432, hauteurPx: 720, margePx: 72 },
 };
 
-// Règle graduée en cm au-dessus de la feuille (« Vue page », 28/10/2026) : zones de marge grisées, 0 au bord de la marge
-// gauche, graduations au demi-cm, repères de marge. Lecture seule : les marges viennent du format d'export.
+// Règle graduée en cm au-dessus de la feuille (« Vue page », 28/10/2026) : marges grisées, 0 au bord de la marge gauche,
+// graduations au demi-cm. RÉGLABLE comme dans Word : glisser la marge gauche / droite (carrés sous la règle) et le retrait de
+// première ligne (triangle du haut). Marges enregistrées par projet ET par format (styles_projet.page), reprises à l'export Word.
 const PX_PAR_CM = 96 / 2.54;
-function RegleCm({ largeurPx, margePx }) {
-  const total = largeurPx + 2 * margePx;
+function RegleCm({ largeurPage, gauchePx, droitePx, alineaCm, editable, onChange }) {
+  const refRegle = useRef(null);
+  const total = largeurPage;
   const traits = [];
-  for (let i = Math.ceil(-margePx / PX_PAR_CM * 2); i <= Math.floor((largeurPx + margePx) / PX_PAR_CM * 2); i++) {
-    const x = margePx + (i / 2) * PX_PAR_CM;
+  for (let i = Math.ceil(-gauchePx / PX_PAR_CM * 2); i <= Math.floor((total - gauchePx) / PX_PAR_CM * 2); i++) {
+    const x = gauchePx + (i / 2) * PX_PAR_CM;
     const entier = i % 2 === 0;
     traits.push(
       <div key={i} style={{ position: "absolute", left: x, bottom: 0, width: 1, height: entier ? 7 : 4, background: "#8a8a99" }}>
@@ -145,14 +147,43 @@ function RegleCm({ largeurPx, margePx }) {
       </div>
     );
   }
+  // Glissement d'un repère : `quoi` = "gauche" | "droite" | "alinea" ; valeurs en cm arrondies au mm.
+  const glisser = (quoi) => (e) => {
+    if (!editable) return;
+    e.preventDefault();
+    const bord = refRegle.current.getBoundingClientRect();
+    const cible = e.currentTarget;
+    try { cible.setPointerCapture(e.pointerId); } catch { /* sans capture */ }
+    const calc = (ev) => {
+      const xPx = ev.clientX - bord.left;
+      const mm = (v) => Math.round(v * 10) / 10;
+      if (quoi === "gauche") return { gauche: mm(Math.min(Math.max(xPx, 0.5 * PX_PAR_CM), total - droitePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
+      if (quoi === "droite") return { droite: mm(Math.min(Math.max(total - xPx, 0.5 * PX_PAR_CM), total - gauchePx - 3 * PX_PAR_CM) / PX_PAR_CM) };
+      return { alinea: mm(Math.min(Math.max((xPx - gauchePx) / PX_PAR_CM, 0), 5)) };
+    };
+    const bouge = (ev) => onChange(calc(ev), false);
+    const fin = (ev) => { cible.removeEventListener("pointermove", bouge); cible.removeEventListener("pointerup", fin); cible.removeEventListener("pointercancel", fin); onChange(calc(ev), true); };
+    cible.addEventListener("pointermove", bouge);
+    cible.addEventListener("pointerup", fin);
+    cible.addEventListener("pointercancel", fin);
+  };
+  const poignee = { position: "absolute", cursor: editable ? "ew-resize" : "default", touchAction: "none", pointerEvents: editable ? "auto" : "none" };
+  const cm1 = (px) => (px / PX_PAR_CM).toFixed(1).replace(".", ",");
   return (
-    <div aria-hidden title={`Largeur du texte : ${(largeurPx / PX_PAR_CM).toFixed(1).replace(".", ",")} cm — marges : ${(margePx / PX_PAR_CM).toFixed(1).replace(".", ",")} cm`}
-      style={{ position: "absolute", top: -22, left: 0, width: total, height: 18, userSelect: "none", pointerEvents: "none", overflow: "hidden", background: "#fff", border: "0.5px solid #d8d8d8", boxSizing: "border-box" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: margePx, background: "#e3e1ea" }} />
-      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: margePx, background: "#e3e1ea" }} />
-      {traits}
-      <div style={{ position: "absolute", left: margePx - 4, top: 0, width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: "6px solid #7F77DD" }} />
-      <div style={{ position: "absolute", left: margePx + largeurPx - 4, top: 0, width: 0, height: 0, borderLeft: "4px solid transparent", borderRight: "4px solid transparent", borderTop: "6px solid #7F77DD" }} />
+    <div ref={refRegle} aria-hidden
+      title={`Marges : gauche ${cm1(gauchePx)} cm, droite ${cm1(droitePx)} cm — largeur du texte ${cm1(total - gauchePx - droitePx)} cm${editable ? ". Glissez les repères pour régler." : ""}`}
+      style={{ position: "absolute", top: -22, left: 0, width: total, height: 18, userSelect: "none", background: "#fff", border: "0.5px solid #d8d8d8", boxSizing: "border-box" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: gauchePx, background: "#e3e1ea", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: droitePx, background: "#e3e1ea", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>{traits}</div>
+      {/* retrait de première ligne (triangle du haut) */}
+      <div onPointerDown={glisser("alinea")} title="Retrait de première ligne"
+        style={{ ...poignee, left: gauchePx + alineaCm * PX_PAR_CM - 5, top: -1, width: 10, height: 8, borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "7px solid #7F77DD", boxSizing: "border-box" }} />
+      {/* marges gauche et droite (carrés du bas) */}
+      <div onPointerDown={glisser("gauche")} title="Marge gauche"
+        style={{ ...poignee, left: gauchePx - 4, bottom: -1, width: 9, height: 8, background: "#7F77DD", borderRadius: 1 }} />
+      <div onPointerDown={glisser("droite")} title="Marge droite"
+        style={{ ...poignee, left: total - droitePx - 4, bottom: -1, width: 9, height: 8, background: "#7F77DD", borderRadius: 1 }} />
     </div>
   );
 }
@@ -1240,6 +1271,26 @@ export default function Editeur({
   const [galerieOuverte, setGalerieOuverte] = useState(false);
   const [stylesProjet, setStylesProjet] = useState({});
   const projetIdStyles = nœud?.projet_id || null;
+  // Marges réglées sur la règle (cm, par format) ; sinon celles du format d'export.
+  const margesFormat = margesReglees(stylesProjet, formatRéférence);
+  const largeurPage = FORMATS_RÉFÉRENCE[formatRéférence].largeurPx + 2 * FORMATS_RÉFÉRENCE[formatRéférence].margePx;
+  const gauchePx = margesFormat.gauche ? margesFormat.gauche * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
+  const droitePx = margesFormat.droite ? margesFormat.droite * PX_PAR_CM : FORMATS_RÉFÉRENCE[formatRéférence].margePx;
+  const [erreurRègle, setErreurRègle] = useState(null);
+  // `fin` = relâché : enregistrement en base (pendant le glissement, seulement l'aperçu).
+  const changerRègle = (changement, fin) => {
+    const { alinea, ...marges } = changement;
+    const suivant = { ...stylesProjet };
+    if (alinea !== undefined) suivant.normal = { ...(stylesProjet.normal || {}), alinea };
+    if (Object.keys(marges).length) suivant.page = { ...(stylesProjet.page || {}), [formatRéférence]: { ...margesFormat, ...marges } };
+    const propre = nettoyerStyles(suivant);
+    setStylesProjet(propre);
+    if (!fin || !projetIdStyles) return;
+    stylesProjetAPI.enregistrer(projetIdStyles, propre).then(({ error }) => {
+      if (error) { journaliserErreur("Editeur:règle", `${error.message} (code ${error.code || "?"})`, projetIdStyles); setErreurRègle("Réglage non enregistré (" + error.message + ")"); }
+      else setErreurRègle(null);
+    });
+  };
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
@@ -1573,7 +1624,7 @@ export default function Editeur({
   useEffect(() => {
     const timer = setTimeout(recalculerNumérosDeLigne, 60);
     return () => clearTimeout(timer);
-  }, [modeFocus, formatRéférence, vuePage, recalculerNumérosDeLigne]);
+  }, [modeFocus, formatRéférence, vuePage, stylesProjet, recalculerNumérosDeLigne]);
 
   // Instantané juste avant une modification en masse (nettoyage mécanique) : permet de revenir en arrière même après rechargement.
   const sauvegarderAvant = useCallback(async () => {
@@ -1945,8 +1996,8 @@ export default function Editeur({
           <div style={pageVisible ? {
             // Feuille : largeur de texte = largeur de l'export + marges de chaque côté ; limites en pointillés.
             position: "relative", boxSizing: "border-box", width: "100%", alignSelf: "flex-start",
-            maxWidth: FORMATS_RÉFÉRENCE[formatRéférence].largeurPx + 2 * FORMATS_RÉFÉRENCE[formatRéférence].margePx,
-            padding: `${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px ${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px`,
+            maxWidth: largeurPage,
+            padding: `${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px ${droitePx}px ${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px ${gauchePx}px`,
             background: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.18)", border: "0.5px solid #d8d8d8",
             minHeight: FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx + 2 * FORMATS_RÉFÉRENCE[formatRéférence].margePx,
           } : {
@@ -1955,9 +2006,11 @@ export default function Editeur({
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {pageVisible && (<>
-              <RegleCm largeurPx={FORMATS_RÉFÉRENCE[formatRéférence].largeurPx} margePx={FORMATS_RÉFÉRENCE[formatRéférence].margePx} />
-              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
-              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, right: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderRight: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+              <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} alineaCm={stylesProjet?.normal?.alinea || 0}
+                editable={!lectureSeule && !!projetIdStyles} onChange={changerRègle} />
+              {erreurRègle && <div style={{ position: "absolute", top: -36, right: 0, fontSize: 10.5, color: "#A32D2D" }}>⚠ {erreurRègle}</div>}
+              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: gauchePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
+              <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, right: droitePx, borderRight: "1px dashed #cfcfe0", pointerEvents: "none" }} />
               <div aria-hidden style={{ position: "absolute", left: 0, right: 0, top: FORMATS_RÉFÉRENCE[formatRéférence].margePx, borderTop: "1px dashed #cfcfe0", pointerEvents: "none" }} />
               <div aria-hidden style={{ position: "absolute", left: 0, right: 0, top: FORMATS_RÉFÉRENCE[formatRéférence].margePx + FORMATS_RÉFÉRENCE[formatRéférence].hauteurPx, borderTop: "1px dashed #cfcfe0", pointerEvents: "none" }} />
             </>)}
