@@ -4,6 +4,7 @@
  * recommandé. Voir src/lib/questionRapide.js et src/lib/modelesIA.js. Rien n'est inséré dans le texte sans un clic.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { detecterRefus, MESSAGE_REFUS } from "../lib/scenesIntimes.js";
 import { poserQuestion } from "../lib/questionRapide.js";
 import { EFFORTS, PROFILS, STYLES, chargerModeles, consoRelative, ecrireChoix, lireChoix, modeleDuProfil, reglageRecommande, MODELES_PAR_DEFAUT } from "../lib/modelesIA.js";
 import { preferencesIAAPI } from "../lib/api.js";
@@ -186,6 +187,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
           <div key={i} style={{ borderTop: "0.5px solid #eee", paddingTop: 8 }}>
             <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>« {x.q.length > 140 ? x.q.slice(0, 140) + "…" : x.q} »</div>
             <div style={{ fontSize: 13.5, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{x.texte}</div>
+            {detecterRefus(x.texte, x.stopReason) && <div style={{ marginTop: 6, fontSize: 12, color: "#8a5a00", background: "#FFF6E0", border: "0.5px solid #E8C770", borderRadius: 8, padding: "6px 8px", lineHeight: 1.45 }}>⚠ {MESSAGE_REFUS}</div>}
             {x.tronque && <div style={{ fontSize: 11.5, color: "#7a5a00", marginTop: 4 }}>Réponse coupée : augmentez l'effort ou reformulez plus court.</div>}
             {x.avecSources ? (
               x.sources.length > 0 ? (

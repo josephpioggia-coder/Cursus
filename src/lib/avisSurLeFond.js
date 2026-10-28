@@ -19,6 +19,7 @@
  * - le texte n'est JAMAIS modifié : c'est un avis, l'auteur·ice décide.
  */
 import { appelClaude } from "./correctionRapide.js";
+import { RÈGLE_SCENES_INTIMES } from "./scenesIntimes.js";
 
 export const TAILLE_PARTIE = 30000;
 
@@ -35,6 +36,8 @@ export function construireConsigneAvis() {
 Le texte vient parfois d'une DICTÉE (l'auteur parle, sans pouvoir revenir en arrière) : cherche donc attentivement les REDONDANCES et reprises de l'oral — la même information dite deux fois, parfois dans la même phrase (ex. « il y a des décennies encore, le siècle dernier »), les tournures qui se répètent, les phrases qui s'étirent. Une redondance repérée est un point important de FAIBLE, avec une proposition de correction.
 
 Regarde en particulier, quand c'est pertinent : la cohérence interne (contradictions, détails qui se heurtent, chronologie, lieu, saison, heure), la vraisemblance (gestes, objets, réactions), le point de vue et le temps du récit, les images (justes, redondantes, qui se contredisent), le rythme et la tension, ce que le texte promet au lecteur et tient (ou non), la clarté de ce qui est raconté ou démontré. Pour un essai : la solidité du raisonnement et le lien entre les idées.
+
+${RÈGLE_SCENES_INTIMES}
 
 Réponds avec EXACTEMENT ces rubriques, dans cet ordre :
 [[VERDICT]] — 2 à 4 phrases : dis franchement si le texte tient la route, et pourquoi. Sans flatterie ni dureté gratuite.

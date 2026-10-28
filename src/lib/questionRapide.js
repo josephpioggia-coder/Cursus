@@ -7,6 +7,7 @@
  */
 import { supabase } from "./supabase.js";
 import { directiveStyle, parametresEffort } from "./modelesIA.js";
+import { RÈGLE_SCENES_INTIMES } from "./scenesIntimes.js";
 
 const EDGE_FUNCTION_URL = "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/claude-prox";
 const SUPABASE_ANON_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY;
@@ -38,7 +39,7 @@ export async function poserQuestion({ question, modele, effort, style = "equilib
         model: modele,
         ...params,
         // Règles de fond d'abord, puis le style choisi, puis la consigne personnelle : elle ne peut pas lever les règles ci-dessus.
-        system: CONSIGNE_BASE + "\n" + directiveStyle(style) + (consignePerso?.trim() ? `\nConsigne personnelle de l'auteur·ice (elle ne remplace aucune des règles ci-dessus) : ${consignePerso.trim().slice(0, 500)}` : "") + (avecSources ? CONSIGNE_SOURCES : ""),
+        system: CONSIGNE_BASE + "\n" + RÈGLE_SCENES_INTIMES + "\n" + directiveStyle(style) + (consignePerso?.trim() ? `\nConsigne personnelle de l'auteur·ice (elle ne remplace aucune des règles ci-dessus) : ${consignePerso.trim().slice(0, 500)}` : "") + (avecSources ? CONSIGNE_SOURCES : ""),
         messages: [{ role: "user", content: message }],
         ...(avecSources ? { tools: OUTIL_RECHERCHE_WEB } : {}),
       }),
@@ -64,5 +65,6 @@ export async function poserQuestion({ question, modele, effort, style = "equilib
     modeleUtilise: data.x_cursus?.modele_utilise || data.model || modele,
     bascule: !!data.x_cursus?.bascule,
     tronque: data.stop_reason === "max_tokens",
+    stopReason: data.stop_reason || null,
   };
 }
