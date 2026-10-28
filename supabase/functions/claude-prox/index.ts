@@ -143,12 +143,14 @@ Deno.serve(async (req) => {
     }
     let response = await appeler(modeleAppele);
     let data = await response.json();
+    let raisonBascule = ""; // erreur RÉELLE du fournisseur qui a déclenché le secours (28/10/2026 : elle n'était pas conservée)
     for (let n = 0; n < 3 && !response.ok; n++) {
       const msg = String(data?.error?.message ?? "").toLowerCase();
       const modeleInconnu = response.status === 404 || data?.error?.type === "not_found_error" || (data?.error?.type === "invalid_request_error" && msg.includes("model"));
       const secours = modeles.get(modeleAppele)?.remplace_par;
       if (!modeleInconnu || !secours || essayes.has(secours)) break;
-      console.error(`[claude-prox] modèle indisponible : ${modeleAppele} → secours ${secours}`);
+      raisonBascule = `${response.status} ${data?.error?.type ?? ""} : ${String(data?.error?.message ?? "").slice(0, 300)}`;
+      console.error(`[claude-prox] modèle indisponible : ${modeleAppele} → secours ${secours} (${raisonBascule})`);
       essayes.add(modeleAppele);
       modeleAppele = secours;
       response = await appeler(modeleAppele);
@@ -158,7 +160,7 @@ Deno.serve(async (req) => {
       data = { ...data, x_cursus: { modele_demande: demande, modele_utilise: modeleAppele, bascule: true } };
       await admin.from("journal_erreurs").insert({
         user_id: userId, projet_id: null, contexte: "claude-prox:bascule-modele",
-        message: `Modèle « ${demande} » indisponible ou désactivé : « ${modeleAppele} » utilisé à la place.`,
+        message: `Modèle « ${demande} » indisponible ou désactivé : « ${modeleAppele} » utilisé à la place.${raisonBascule ? ` Réponse du fournisseur : ${raisonBascule}` : " (désactivé dans le registre)"}`,
       });
     }
 
