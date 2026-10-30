@@ -24,6 +24,7 @@
  * badge) reste à construire séparément.
  */
 
+import InstallerCursus from "./InstallerCursus.jsx";
 import { useState } from "react";
 import CursDecisionPage from "./CursDecisionPage.jsx";
 import PageLancement from "./PageLancement.jsx";
@@ -477,6 +478,8 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
           </div>
         ))}
       </div>
+
+      <div style={{ marginTop: 8, marginBottom: 16 }}><InstallerCursus /></div>
 
       {infoOuverte && <FenêtreInfo espace={infoOuverte} onFermer={() => setInfoOuverte(null)} />}
     </div>

@@ -26,6 +26,7 @@
  * Corrige aussi un bug d'affichage du bouton ⬆ (voir NœudStructure).
  */
 
+import InstallerCursus from "./components/InstallerCursus.jsx";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth, PageConnexion } from "./lib/auth.jsx";
@@ -2580,6 +2581,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 <span>{item.label}</span>
               </div>
             ))}
+            <div style={{ padding: "8px 8px 0" }}><InstallerCursus compact libelle="📲 Installer Cursus" /></div>
           </div>
         )}
       </div>
