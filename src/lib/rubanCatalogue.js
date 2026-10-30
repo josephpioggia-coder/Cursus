@@ -24,7 +24,7 @@ export const FONCTIONS = [
   // ── Accueil ───────────────────────────────────────────────
   { id: "copier", onglet: "accueil", groupe: "Presse-papiers", label: "Copier tout", icone: "📋", statut: "fait", aide: "Copier tout le texte du chapitre" },
   { id: "question", onglet: "accueil", groupe: "Assistance IA", label: "Question rapide", icone: "💬", statut: "fait", aide: "Poser une question à l'IA sans passer par le Co-pilote (Ctrl+K) : modèle et effort au choix, tokens retirés de votre quota" },
-  { id: "rechercher", onglet: "accueil", groupe: "Édition", label: "Rechercher / remplacer", icone: "🔎", statut: "bientot", priorite: "fort", aide: "Rechercher et remplacer dans le chapitre, puis dans tout le livre" },
+  { id: "rechercher", onglet: "accueil", groupe: "Édition", label: "Rechercher / remplacer", icone: "🔎", statut: "fait", aide: "Rechercher et remplacer dans le chapitre, puis dans tout le livre" },
 
   // ── Insertion ─────────────────────────────────────────────
   { id: "image", onglet: "insertion", groupe: "Illustrations", label: "Image", icone: "🖼️", statut: "fait", aide: "Insérer une image dans le texte" },

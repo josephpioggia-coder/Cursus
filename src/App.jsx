@@ -2260,6 +2260,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     await nœudsAPI.sauvegarderTexte(nœudId, html);
   }, [projetActifId]);
 
+  // Rechercher / remplacer dans tout le livre : écrit un AUTRE chapitre que celui ouvert (état local + base), erreur renvoyée à l'appelant.
+  const écrireAutreNœud = useCallback(async (nœudId, html) => {
+    const { error } = await nœudsAPI.sauvegarderTexte(nœudId, html);
+    if (!error) màjTexteLocal(nœudId, html);
+    return { error };
+  }, [màjTexteLocal]);
+
   const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
 
   return (
@@ -2977,6 +2984,9 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               onTexteChange={màjTexteLocal}
               onSelectionChange={setTexteSélectionné}
               onRetour={() => setVue("projet")}
+              structureProjet={projetActif.structure}
+              onOuvrirNoeud={setNœudActifId}
+              onEcrireAutreNoeud={écrireAutreNœud}
               lectureSeule={!!(accèsCursEdit && !accèsCursEdit.peutÉcrire)}
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}
