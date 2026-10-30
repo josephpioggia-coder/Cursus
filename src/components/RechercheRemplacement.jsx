@@ -20,6 +20,8 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const [accents, setAccents] = useState(false);
   const [portee, setPortee] = useState("chapitre");
   const [horsCorps, setHorsCorps] = useState(false);
+  const [vue, setVue] = useState("resultats"); // volet du livre : titres | pages | resultats
+  const [plan, setPlan] = useState([]); // tous les chapitres/parties, avec page estimée et nombre de résultats
   const [livre, setLivre] = useState(null); // résultats de la recherche dans tout le livre
   const [confirmer, setConfirmer] = useState(false);
   const [message, setMessage] = useState("");
@@ -64,11 +66,19 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const listeNoeuds = () => noeuds.filter((n) => horsCorps || n.zone === "corps");
   const chercherLivre = () => {
     setMessage("");
-    const res = listeNoeuds().map((n) => {
+    // Pages ESTIMÉES (Cursus n'a pas de pagination réelle) : ~1 800 caractères par page, chapitres mis bout à bout.
+    let cumul = 0;
+    const tous = listeNoeuds().map((n) => {
       const html = n.id === noeudId && editor ? editor.getHTML() : n.texte;
       const t = chercherDansTitre(n.titre, requete, options);
-      return { id: n.id, titre: n.titre, ...chercherDansHtml(html, requete, options), nTitre: t.n, extraitTitre: t.extrait };
-    }).filter((r) => r.n + r.nTitre > 0);
+      const longueur = (html || "").replace(/<[^>]+>/g, "").length;
+      const debut = Math.floor(cumul / 1800) + 1;
+      cumul += longueur;
+      const fin = Math.max(debut, Math.ceil(cumul / 1800));
+      return { id: n.id, titre: n.titre, profondeur: n.profondeur || 0, debut, fin, ...chercherDansHtml(html, requete, options), nTitre: t.n, extraitTitre: t.extrait };
+    });
+    setPlan(tous);
+    const res = tous.filter((r) => r.n + r.nTitre > 0);
     setLivre(res); setConfirmer(false);
   };
   // Titre d'un chapitre / d'une partie : renommé par l'application (aucun historique des titres : la confirmation montre « avant → après »).
@@ -156,7 +166,7 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <button type="button" style={{ ...bouton(), background: requete ? couleur : "#eee", color: requete ? "#fff" : "#999" }} onClick={chercherLivre} disabled={!requete}>Chercher dans le livre</button>
-            <span style={{ fontSize: 12, color: "#555" }}>{livre ? (livre.length ? `${totalLivre} occurrence${totalLivre > 1 ? "s" : ""} · ${livre.length} chapitre${livre.length > 1 ? "s" : ""}` : "Aucun résultat") : ""}</span>
+            <span style={{ fontSize: 12, color: "#555" }}>{livre ? (livre.length ? <b>{totalLivre} résultat{totalLivre > 1 ? "s" : ""} <span style={{ fontWeight: 400 }}>· {livre.length} chapitre{livre.length > 1 ? "s" : ""}</span></b> : "Aucun résultat") : ""}</span>
           </div>
           {livre?.length > 0 && !lectureSeule && !confirmer && <button type="button" style={bouton()} onClick={() => setConfirmer(true)}>Tout remplacer dans le livre…</button>}
           {confirmer && (
@@ -169,7 +179,34 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
               </div>
             </div>
           )}
-          {livre?.map((r) => (
+          {livre && (
+            <div role="tablist" style={{ display: "flex", gap: 14, borderBottom: "0.5px solid #ddd" }}>
+              {[["titres", "Titres"], ["pages", "Pages"], ["resultats", "Résultats"]].map(([id, lib]) => (
+                <button key={id} type="button" role="tab" aria-selected={vue === id} onClick={() => setVue(id)}
+                  style={{ border: "none", background: "none", padding: "4px 0", fontSize: 12.5, fontFamily: "inherit", cursor: "pointer", color: vue === id ? couleur : "#666", borderBottom: vue === id ? `2px solid ${couleur}` : "2px solid transparent", fontWeight: vue === id ? 600 : 400 }}>{lib}</button>
+              ))}
+            </div>
+          )}
+          {livre && vue === "titres" && plan.map((r) => (
+            <button key={r.id} type="button" onClick={() => { onOuvrirNoeud?.(r.id); setPortee("chapitre"); }}
+              style={{ textAlign: "left", border: "none", background: r.id === noeudId ? "#F6F5FF" : "transparent", borderRadius: 6, padding: `4px 6px 4px ${6 + r.profondeur * 14}px`, cursor: "pointer", fontFamily: "inherit", color: r.n + r.nTitre ? "#1a1a1a" : "#999", fontSize: 12.5, display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <span>{r.titre || "(sans titre)"}</span>
+              {r.n + r.nTitre > 0 && <b style={{ color: couleur }}>{r.n + r.nTitre}</b>}
+            </button>
+          ))}
+          {livre && vue === "pages" && (livre.length ? (
+            <>
+              <div style={{ fontSize: 11, color: "#888" }}>Pages estimées (≈ 1 800 caractères par page) : Cursus n'a pas de pagination réelle avant l'export.</div>
+              {livre.map((r) => (
+                <button key={r.id} type="button" onClick={() => { onOuvrirNoeud?.(r.id); setPortee("chapitre"); }}
+                  style={{ textAlign: "left", border: "0.5px solid #ddd", background: "#fff", borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", fontSize: 12.5, display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span>Page{r.fin > r.debut ? "s" : ""} {r.fin > r.debut ? `${r.debut}–${r.fin}` : r.debut} · {r.titre || "(sans titre)"}</span>
+                  <b style={{ color: couleur }}>{r.n + r.nTitre}</b>
+                </button>
+              ))}
+            </>
+          ) : null)}
+          {livre && vue === "resultats" && livre.map((r) => (
             <button key={r.id} type="button" onClick={() => { onOuvrirNoeud?.(r.id); setPortee("chapitre"); }} style={{ textAlign: "left", border: "0.5px solid #ddd", background: r.id === noeudId ? "#F6F5FF" : "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
               <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.titre || "(sans titre)"} <span style={{ color: "#888", fontWeight: 400 }}>· {r.n + r.nTitre}</span></div>
               {r.extraitTitre && <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.4 }}><b>Titre :</b> …{r.extraitTitre.avant}<mark style={{ background: "#FFE98A", color: "inherit" }}>{r.extraitTitre.trouve}</mark>{r.extraitTitre.apres}…</div>}
