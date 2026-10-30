@@ -5,14 +5,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
-import { chercherDansHtml, remplacerDansHtml } from "../lib/rechercheTexte.js";
+import { chercherDansHtml, chercherDansTitre, remplacerDansHtml, remplacerTout } from "../lib/rechercheTexte.js";
 import { etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes } from "../lib/rechercheEditeur.js";
 
 const champ = { width: "100%", boxSizing: "border-box", border: "0.5px solid #bbb", borderRadius: 7, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: "#1a1a1a" };
 const bouton = (actif = false) => ({ fontSize: 12, border: "0.5px solid #ccc", background: actif ? "#EEEDFE" : "#fff", color: actif ? "#534AB7" : "#333", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" });
 const compterMots = (html) => (html || "").replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
 
-export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, sauvegarderAvant, onFermer }) {
+export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
   const [requete, setRequete] = useState(requeteInitiale);
   const [remplacement, setRemplacement] = useState("");
   const [casse, setCasse] = useState(false);
@@ -66,40 +66,53 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     setMessage("");
     const res = listeNoeuds().map((n) => {
       const html = n.id === noeudId && editor ? editor.getHTML() : n.texte;
-      return { id: n.id, titre: n.titre, ...chercherDansHtml(html, requete, options) };
-    }).filter((r) => r.n > 0);
+      const t = chercherDansTitre(n.titre, requete, options);
+      return { id: n.id, titre: n.titre, ...chercherDansHtml(html, requete, options), nTitre: t.n, extraitTitre: t.extrait };
+    }).filter((r) => r.n + r.nTitre > 0);
     setLivre(res); setConfirmer(false);
+  };
+  // Titre d'un chapitre / d'une partie : renommé par l'application (aucun historique des titres : la confirmation montre « avant → après »).
+  const nouveauTitre = (titre) => remplacerTout(titre || "", requete, remplacement, options).texte;
+  const changerTitre = async (r) => {
+    const apres = nouveauTitre(r.titre).trim();
+    if (!apres) throw new Error("le titre deviendrait vide : non modifié");
+    const res = await onRenommerNoeud?.(r.id, apres);
+    if (res?.error) throw new Error(res.error.message);
   };
   const toutRemplacerLivre = async () => {
     if (lectureSeule || !livre?.length) return;
     setOccupe(true); setMessage("");
-    let n = 0, chapitres = 0, aLaMain = 0, echecs = [];
+    let n = 0, nTitres = 0, aLaMain = 0; const echecs = []; const modifies = new Set();
     const libelle = `Avant remplacement « ${requete.slice(0, 30)} » → « ${remplacement.slice(0, 30)} »`;
     for (const r of livre) {
       try {
         if (r.id === noeudId && editor) {
           await sauvegarderAvant?.(libelle);
           const k = remplacerToutes(editor, remplacement);
-          if (k) { n += k; chapitres += 1; }
+          if (k) { n += k; modifies.add(r.id); }
+          if (r.nTitre) { await changerTitre(r); n += r.nTitre; nTitres += r.nTitre; modifies.add(r.id); }
           continue;
         }
         const source = noeuds.find((x) => x.id === r.id);
         const res = remplacerDansHtml(source?.texte || "", requete, remplacement, options);
         aLaMain += res.aLaMain;
-        if (!res.n) continue;
+        if (!res.n) { if (r.nTitre) { await changerTitre(r); n += r.nTitre; nTitres += r.nTitre; modifies.add(r.id); } continue; }
         const apercu = `${libelle} — ${(source.titre || "").slice(0, 40)}`;
         const { error: errV } = await supabase.from("versions_noeuds").insert({ noeud_id: r.id, contenu: source.texte, mots: compterMots(source.texte), apercu });
         if (errV) throw new Error("instantané impossible : " + errV.message);
         const ecr = await onEcrireNoeud?.(r.id, res.html);
         if (ecr?.error) throw new Error(ecr.error.message);
-        n += res.n; chapitres += 1;
+        n += res.n; modifies.add(r.id);
+        if (r.nTitre) { await changerTitre(r); n += r.nTitre; nTitres += r.nTitre; }
       } catch (err) { echecs.push(`${r.titre || "(sans titre)"} : ${err.message}`); }
     }
     setOccupe(false); setConfirmer(false); setLivre(null);
-    setMessage(`${n} remplacement${n > 1 ? "s" : ""} dans ${chapitres} chapitre${chapitres > 1 ? "s" : ""}.` + (aLaMain ? ` ${aLaMain} occurrence${aLaMain > 1 ? "s" : ""} à cheval sur une mise en forme : à faire à la main.` : "") + (echecs.length ? ` ⚠ Non modifié : ${echecs.join(" ; ")}` : ""));
+    const chapitres = modifies.size;
+    setMessage(`${n} remplacement${n > 1 ? "s" : ""} dans ${chapitres} chapitre${chapitres > 1 ? "s" : ""}${nTitres ? ` (dont ${nTitres} dans des titres)` : ""}.` + (aLaMain ? ` ${aLaMain} occurrence${aLaMain > 1 ? "s" : ""} à cheval sur une mise en forme : à faire à la main.` : "") + (echecs.length ? ` ⚠ Non modifié : ${echecs.join(" ; ")}` : ""));
   };
 
-  const totalLivre = livre?.reduce((s, r) => s + r.n, 0) || 0;
+  const totalLivre = livre?.reduce((s, r) => s + r.n + r.nTitre, 0) || 0;
+  const titresModifies = livre?.filter((r) => r.nTitre) || [];
   const touche = (ev) => {
     if (ev.key === "Escape") { ev.preventDefault(); onFermer?.(); }
     else if (ev.key === "Enter" && ev.target === champRef.current) { ev.preventDefault(); if (portee === "livre") chercherLivre(); else (ev.shiftKey ? precedent() : suivant()); }
@@ -149,6 +162,7 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
           {confirmer && (
             <div style={{ background: "#FFF6E0", border: "0.5px solid #E8C770", borderRadius: 8, padding: 8, fontSize: 12, lineHeight: 1.5 }}>
               Remplacer <b>{totalLivre}</b> occurrence{totalLivre > 1 ? "s" : ""} de « {requete} » par « {remplacement || "(rien : suppression)"} » dans <b>{livre.length}</b> chapitre{livre.length > 1 ? "s" : ""} ? Chaque chapitre modifié est d'abord enregistré dans son historique (↺ Historique).
+              {titresModifies.length > 0 && <div style={{ marginTop: 4 }}><b>Titres modifiés</b> (pas d'historique pour les titres) :{titresModifies.map((r) => <div key={r.id}>« {r.titre} » → « {nouveauTitre(r.titre)} »</div>)}</div>}
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 <button type="button" style={{ ...bouton(), background: couleur, color: "#fff" }} onClick={toutRemplacerLivre} disabled={occupe}>{occupe ? "En cours…" : "Confirmer"}</button>
                 <button type="button" style={bouton()} onClick={() => setConfirmer(false)} disabled={occupe}>Annuler</button>
@@ -157,8 +171,9 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
           )}
           {livre?.map((r) => (
             <button key={r.id} type="button" onClick={() => { onOuvrirNoeud?.(r.id); setPortee("chapitre"); }} style={{ textAlign: "left", border: "0.5px solid #ddd", background: r.id === noeudId ? "#F6F5FF" : "#fff", borderRadius: 8, padding: "6px 8px", cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a" }}>
-              <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.titre || "(sans titre)"} <span style={{ color: "#888", fontWeight: 400 }}>· {r.n}</span></div>
-              {r.extraits.map((x, i) => <div key={i} style={{ fontSize: 11.5, color: "#555", lineHeight: 1.4 }}>…{x.avant}<mark style={{ background: "#FFE98A", color: "inherit" }}>{x.trouve}</mark>{x.apres}…</div>)}
+              <div style={{ fontSize: 12.5, fontWeight: 500 }}>{r.titre || "(sans titre)"} <span style={{ color: "#888", fontWeight: 400 }}>· {r.n + r.nTitre}</span></div>
+              {r.extraitTitre && <div style={{ fontSize: 11.5, color: "#555", lineHeight: 1.4 }}><b>Titre :</b> …{r.extraitTitre.avant}<mark style={{ background: "#FFE98A", color: "inherit" }}>{r.extraitTitre.trouve}</mark>{r.extraitTitre.apres}…</div>}
+              {r.extraits.map((x, i) => <div key={i} style={{ fontSize: 11.5, color: "#555", lineHeight: 1.4 }}>{x.note && <b>Note : </b>}…{x.avant}<mark style={{ background: "#FFE98A", color: "inherit" }}>{x.trouve}</mark>{x.apres}…</div>)}
             </button>
           ))}
         </>

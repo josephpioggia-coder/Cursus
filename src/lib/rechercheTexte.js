@@ -55,15 +55,44 @@ export function blocsDeHtml(html) {
   return feuilles.map((el) => ({ texte: el.textContent || "" })).filter((b) => b.texte);
 }
 
-/** Résumé d'un chapitre pour la recherche dans tout le livre → { n, extraits: [{ avant, trouve, apres }] } */
+const extraitAutour = (texte, o) => ({ avant: texte.slice(Math.max(0, o.debut - 35), o.debut), trouve: texte.slice(o.debut, o.fin), apres: texte.slice(o.fin, o.fin + 35) });
+
+/** Titre d'un chapitre / d'une partie → { n, extrait } (n = nombre d'occurrences). */
+export function chercherDansTitre(titre, requete, options = {}) {
+  const occ = trouver(titre || "", requete, options);
+  return { n: occ.length, extrait: occ.length ? extraitAutour(titre, occ[0]) : null };
+}
+
+/**
+ * Notes de bas de page d'un HTML → [{ element, texte }]. Le texte d'une note est écrit DEUX fois par l'éditeur : `data-texte`
+ * (affichage) et `texte` (relu au rechargement par TipTap) — les deux doivent rester identiques, voir `ecrireTexteNote`.
+ */
+function notesDeDoc(doc) {
+  return [...doc.body.querySelectorAll("span[data-note]")].map((element) => ({ element, texte: element.getAttribute("texte") || element.getAttribute("data-texte") || "" })).filter((x) => x.texte);
+}
+const ecrireTexteNote = (element, texte) => { element.setAttribute("texte", texte); element.setAttribute("data-texte", texte); };
+
+/**
+ * Résumé d'un chapitre pour la recherche dans tout le livre → { n, extraits: [{ avant, trouve, apres, note? }] }
+ * Une NOTE de bas de page compte pour UNE occurrence (tous ses « chat » sont remplacés d'un coup, comme dans l'éditeur).
+ */
 export function chercherDansHtml(html, requete, options = {}, maxExtraits = 3) {
   let n = 0; const extraits = [];
+  if (html) {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+    for (const { texte } of notesDeDoc(doc)) {
+      const occ = trouver(texte, requete, options);
+      if (!occ.length) continue;
+      n += 1;
+      if (extraits.length < maxExtraits) extraits.push({ ...extraitAutour(texte, occ[0]), note: true });
+    }
+  }
   for (const { texte } of blocsDeHtml(html)) {
     const occ = trouver(texte, requete, options);
     n += occ.length;
     for (const o of occ) {
       if (extraits.length >= maxExtraits) break;
-      extraits.push({ avant: texte.slice(Math.max(0, o.debut - 35), o.debut), trouve: texte.slice(o.debut, o.fin), apres: texte.slice(o.fin, o.fin + 35) });
+      extraits.push(extraitAutour(texte, o));
     }
   }
   return { n, extraits };
@@ -84,6 +113,10 @@ export function remplacerDansHtml(html, requete, remplacement, options = {}) {
   for (const nd of noeuds) {
     const r = remplacerTout(nd.data, requete, remplacement, options);
     if (r.n) { nd.data = r.texte; n += r.n; }
+  }
+  for (const { element, texte } of notesDeDoc(doc)) { // notes de bas de page : une note = une occurrence
+    const r = remplacerTout(texte, requete, remplacement, options);
+    if (r.n) { ecrireTexteNote(element, r.texte); n += 1; }
   }
   // Occurrences restantes à cheval sur plusieurs nœuds (comptées après coup, sur le texte de chaque bloc)
   let restantes = 0;
