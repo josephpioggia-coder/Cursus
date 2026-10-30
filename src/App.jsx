@@ -2267,6 +2267,19 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     return { error };
   }, [màjTexteLocal]);
 
+  // Rechercher / remplacer dans tout le livre : renomme un chapitre ou une partie (base + état local), erreur renvoyée à l'appelant.
+  const renommerAutreNœud = useCallback(async (nœudId, titre) => {
+    const { error } = await nœudsAPI.renommer(nœudId, titre);
+    if (!error) {
+      setProjets((prev) => prev.map((p) => {
+        if (p.id !== projetActifId) return p;
+        const màj = (liste) => liste.map((n) => (n.id === nœudId ? { ...n, titre, enfants: màj(n.enfants || []) } : { ...n, enfants: màj(n.enfants || []) }));
+        return { ...p, structure: màj(p.structure) };
+      }));
+    }
+    return { error };
+  }, [projetActifId]);
+
   const totalMots = projets.reduce((acc, p) => acc + totalMotsProjet(p.structure), 0);
 
   return (
@@ -2987,6 +3000,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               structureProjet={projetActif.structure}
               onOuvrirNoeud={setNœudActifId}
               onEcrireAutreNoeud={écrireAutreNœud}
+              onRenommerNoeud={renommerAutreNœud}
               lectureSeule={!!(accèsCursEdit && !accèsCursEdit.peutÉcrire)}
             />
             {/* Panneau contextuel droit : Citations / IA / Idées */}

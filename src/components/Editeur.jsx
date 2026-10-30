@@ -1311,6 +1311,7 @@ export default function Editeur({
   structureProjet = [],    // structure imbriquée du projet (Rechercher / remplacer dans tout le livre, 28/10/2026)
   onOuvrirNoeud,           // (nœudId) => void — ouvre un autre chapitre
   onEcrireAutreNoeud,      // async (nœudId, html) => { error } — écrit un autre chapitre (remplacement dans tout le livre)
+  onRenommerNoeud,         // async (nœudId, titre) => { error } — renomme un chapitre / une partie (remplacement dans les titres)
   // Lecture seule forcée (16/09/2026, CGV art. 6) — abonnement annulé
   // depuis moins de 3 mois : les textes restent consultables/exportables,
   // mais ni modifiables ni importables. Voir abonnementsAPI.statutAccès
@@ -2129,7 +2130,7 @@ export default function Editeur({
 
       {rechercheOuverte && (
         <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} noeudId={nœud?.id}
-          noeuds={aplatirStructure(structureProjet)} onOuvrirNoeud={onOuvrirNoeud} onEcrireNoeud={onEcrireAutreNoeud} sauvegarderAvant={sauvegarderAvant} onFermer={() => setRechercheOuverte(false)} />
+          noeuds={aplatirStructure(structureProjet)} onOuvrirNoeud={onOuvrirNoeud} onEcrireNoeud={onEcrireAutreNoeud} onRenommerNoeud={onRenommerNoeud} sauvegarderAvant={sauvegarderAvant} onFermer={() => setRechercheOuverte(false)} />
       )}
 
       {questionOuverte && (
