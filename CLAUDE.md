@@ -1365,3 +1365,7 @@ Demande de Joseph : lui et ses utilisateurs arrivent par Firefox sur cursus.pro 
 
 ## Règle permanente : alimenter le mode d'emploi (31/10/2026)
 Décision de Joseph : « chaque fois qu'on a une nouvelle modalité, fonctionnalité ou chose à connaître pour utiliser le produit, mets-le en mémoire pour servir dans le mode d'emploi ». **À chaque modification qui change ce que l'utilisateur·ice voit ou doit savoir, ajouter une entrée dans `docs/a-integrer-au-mode-emploi.md`** (où le trouver, ce que ça fait, limites), dans le MÊME commit. Ne pas réécrire `docs/mode-emploi.md` / `ModeEmploi.jsx` à chaque fois : ce fichier est la file d'attente, à vider quand Joseph demande une mise à jour du mode d'emploi (déplacer alors les entrées sous « Déjà intégré »).
+
+### Saut de page (31/10/2026) — ruban, fonction 1 sur 29 (`docs/liste-attente.md` #7)
+Nœud TipTap `SautDePage` (`miseEnFormeEditeur.js` : bloc atomique `div[data-saut-page]`, commande `insererSautDePage`, raccourci Ctrl+Entrée), trait pointillé « SAUT DE PAGE » (CSS dans `Editeur.jsx`), bouton Insertion › Pages (`actionsRuban.saut_page`), export Word : `paragraphesDepuisHTML` produit un paragraphe `PageBreak`. Vérifié : insertion entre deux paragraphes dans un vrai éditeur TipTap, aller-retour HTML identique, 3 paragraphes à l'export, aucune erreur JS, `vite build`. NON testé : ouverture du .docx dans Word, sélection / suppression à la souris, mobile (pas de bouton dans le menu ⋯), import .docx (les sauts Word ne sont pas relus), Vue page (le saut n'y recalcule pas la hauteur de page).
+

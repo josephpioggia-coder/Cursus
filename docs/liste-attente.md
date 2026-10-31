@@ -230,10 +230,10 @@ soi. Discuté mais pas priorisé pour l'instant.
 **État** : sur les 29 fonctions encore annoncées « bientôt » dans `src/lib/rubanCatalogue.js`, seule Rechercher / remplacer (et son volet Titres / Pages / Résultats) est faite. Le catalogue est la liste de référence ; pour coder une fonction : passer son `statut` à « fait » ET ajouter son entrée dans `actionsRuban` (`Editeur.jsx`).
 
 **Ordre de réalisation** (fort d'abord, tel que `aVenirParOrdre()` le donne) :
-- *Fort* : 1 Saut de page · 2 En-têtes et numéros de page · 3 Citation de la Bibliothèque · 4 Bibliographie · 5 Statistiques · 6 Commentaires · 7 Suivi des modifications (le plus gros) · 8 Comparer deux versions · 9 Volet de navigation · 10 Zoom · 11 Nouveautés · 12 Envoyer un retour.
+- *Fort* : ~~1 Saut de page~~ (fait 31/10/2026) · 2 En-têtes et numéros de page · 3 Citation de la Bibliothèque · 4 Bibliographie · 5 Statistiques · 6 Commentaires · 7 Suivi des modifications (le plus gros) · 8 Comparer deux versions · 9 Volet de navigation · 10 Zoom · 11 Nouveautés · 12 Envoyer un retour.
 - *Moyen* : 13 Page de garde · 14 Tableau · 15 Lien · 16 Importer de Zotero · 17 Légende d'image · 18 Index · 19 Synonymes · 20 Traduire · 21 Plan · 22 Deux chapitres côte à côte · 23 Formation · 24 Application mobile.
 - *Faible* : 25 Symbole · 26 Colonnes · 27 Renvoi · 28 Mode lecture · 29 Quadrillage.
 
 **Règle de travail** : une fonction à la fois, vérifiée avant la suivante ; chaque fonction terminée ajoute une entrée dans `docs/a-integrer-au-mode-emploi.md` (règle permanente) et déplace sa ligne ici sous « Faites ».
 
-**Faites** : Rechercher / remplacer (28/10/2026, titres et notes 30/10, volets 30/10).
+**Faites** : Rechercher / remplacer (28/10/2026, titres et notes 30/10, volets 30/10) · Saut de page (31/10/2026).
