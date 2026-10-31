@@ -1,8 +1,11 @@
 // « Installer Cursus » (30/10/2026) — mettre l'icône de Cursus sur l'écran d'accueil.
 // Chrome / Edge / Samsung Internet (Android) : l'événement `beforeinstallprompt` permet l'installation en un clic.
 // Firefox, Safari : AUCUN événement, on affiche les étapes du menu du navigateur. Firefox pour ordinateur ne sait
+// Fenêtre rendue par portail (30/10/2026) : le tiroir mobile a un `transform`, qui devient le repère d'un `position: fixed`
+// enfant — la fenêtre restait coincée (et rognée) dans le tiroir, donc « le bouton n'est pas activable ».
 // pas installer une appli web : on le dit, et on propose le marque-page.
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 let invite = null; // événement mémorisé : il peut arriver avant que le composant soit affiché
 const abonnés = new Set();
@@ -52,7 +55,7 @@ export default function InstallerCursus({ style, libelle = "📲 Installer Cursu
       <button type="button" onClick={cliquer} style={style || { fontSize: compact ? 12 : 14, padding: compact ? "6px 10px" : "10px 16px", borderRadius: 10, border: "0.5px solid #7F77DD", background: "#fff", color: "#534AB7", cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
         {libelle}
       </button>
-      {ouvert && (
+      {ouvert && createPortal(
         <div onClick={() => setOuvert(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 300 }}>
           <div role="dialog" aria-label="Installer Cursus" onClick={(e) => e.stopPropagation()} style={{ background: "#fff", color: "#1a1a1a", borderRadius: 14, padding: "20px 22px", width: "100%", maxWidth: 420, boxSizing: "border-box", fontFamily: "inherit" }}>
             <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 10 }}>Installer Cursus</div>
@@ -61,7 +64,8 @@ export default function InstallerCursus({ style, libelle = "📲 Installer Cursu
             </ol>
             <button type="button" onClick={() => setOuvert(false)} style={{ marginTop: 12, width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "#7F77DD", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>J'ai compris</button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
