@@ -202,3 +202,38 @@ CursDecision autrement qu'en texte.
 réelle (page marketing seule, zéro backend) — ajouter des graphiques
 suppose d'abord de construire CursDecision depuis zéro, un chantier en
 soi. Discuté mais pas priorisé pour l'instant.
+
+---
+
+## #6 — Manuel complet de Cursus, fonction par fonction (suite du #3)
+
+**Ajouté le** 31/10/2026.
+
+**Demande d'origine** (Joseph) : « n'y a-t-il pas d'autres éléments pouvant être repris dans ce manuel descriptif reprenant une à une chacune des fonctions ? Nous avons fait des milliers d'opérations diverses et je doute qu'on parvienne à restituer l'utilité de Cursus sans un manuel (exemple : rien que pour Word il existe un manuel extrêmement complet avec le descriptif). »
+
+**Pourquoi c'est une suite du #3 et non un doublon** : le #3 a produit, le 24/09/2026, un mode d'emploi de synthèse (174 lignes). Depuis, des dizaines de fonctions ont été ajoutées, et plusieurs domaines n'ont jamais été décrits : Bibliothèque, Carnet d'idées, Tableau de bord, Profil auteur, Questionnaire d'intention, Incorporer de la matière, détail de l'import Word, Tarification et codes promo, CursAudit en profondeur (pré-audit gratuit / approfondi / détaillé, 1 IA / 2 IA, question centrale, fiche d'action, images, exports Word), chaque onglet du Co-pilote, les notions de fiabilité (« confirmé » = une source existe, l'IA signale sans trancher), quotas et crédits, et les règles de chaque jeu.
+
+**Démarche proposée** : (1) sommaire détaillé par domaine, à valider par Joseph ; (2) une fiche par fonction, toujours aux mêmes rubriques (à quoi ça sert · où le trouver · pas à pas · ce que ça ne fait pas · en cas de problème) ; (3) rédaction d'après le code et le journal du projet, avec « à confirmer » pour ce qui n'a pas été testé en conditions réelles ; (4) relecture par Joseph domaine par domaine ; (5) publication dans `ModeEmploi.jsx` (sommaire + recherche) et en version Word téléchargeable.
+
+**Matière première** : `docs/a-integrer-au-mode-emploi.md` (file d'attente alimentée à chaque nouveauté, règle permanente du 31/10/2026) + les sections de `CLAUDE.md`. Cette entrée ne se vide qu'à la publication du manuel complet.
+
+**Lien avec le #7** : chaque fonction du ruban codée au #7 reçoit sa fiche dans ce manuel.
+
+---
+
+## #7 — Compléter les fonctions des onglets du ruban de CursEdit
+
+**Ajouté le** 31/10/2026.
+
+**Demande d'origine** (Joseph) : « il nous faut compléter les fonctions apparaissant dans CursEdit dans les onglets que tu viens d'implémenter » (ruban Accueil · Insertion · Mise en page · Références · Révision · Affichage · Aide, créé le 28/10/2026).
+
+**État** : sur les 29 fonctions encore annoncées « bientôt » dans `src/lib/rubanCatalogue.js`, seule Rechercher / remplacer (et son volet Titres / Pages / Résultats) est faite. Le catalogue est la liste de référence ; pour coder une fonction : passer son `statut` à « fait » ET ajouter son entrée dans `actionsRuban` (`Editeur.jsx`).
+
+**Ordre de réalisation** (fort d'abord, tel que `aVenirParOrdre()` le donne) :
+- *Fort* : 1 Saut de page · 2 En-têtes et numéros de page · 3 Citation de la Bibliothèque · 4 Bibliographie · 5 Statistiques · 6 Commentaires · 7 Suivi des modifications (le plus gros) · 8 Comparer deux versions · 9 Volet de navigation · 10 Zoom · 11 Nouveautés · 12 Envoyer un retour.
+- *Moyen* : 13 Page de garde · 14 Tableau · 15 Lien · 16 Importer de Zotero · 17 Légende d'image · 18 Index · 19 Synonymes · 20 Traduire · 21 Plan · 22 Deux chapitres côte à côte · 23 Formation · 24 Application mobile.
+- *Faible* : 25 Symbole · 26 Colonnes · 27 Renvoi · 28 Mode lecture · 29 Quadrillage.
+
+**Règle de travail** : une fonction à la fois, vérifiée avant la suivante ; chaque fonction terminée ajoute une entrée dans `docs/a-integrer-au-mode-emploi.md` (règle permanente) et déplace sa ligne ici sous « Faites ».
+
+**Faites** : Rechercher / remplacer (28/10/2026, titres et notes 30/10, volets 30/10).

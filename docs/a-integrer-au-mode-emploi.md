@@ -2,6 +2,8 @@
 
 File d'attente des nouveautés à expliquer à l'utilisateur·ice. **Règle** (décision de Joseph, 31/10/2026) : à chaque nouvelle modalité, fonctionnalité ou chose à savoir pour utiliser Cursus, ajouter une entrée ICI dans la même modification, rédigée du point de vue de l'utilisateur·ice. Quand une entrée est reprise dans le vrai mode d'emploi (`docs/mode-emploi.md` et l'écran `src/components/ModeEmploi.jsx`), la déplacer en bas sous « Déjà intégré ».
 
+Chantier du manuel COMPLET : voir `docs/liste-attente.md` #6 (suite du #3). Fonctions du ruban à coder : #7.
+
 Le mode d'emploi publié date du 24/09/2026 : tout ce qui suit lui est postérieur. Les entrées du 24/09 au 30/10 ont été reconstituées d'après le journal du projet (CLAUDE.md) ; chaque fonction est à revérifier dans l'appli avant publication.
 
 Format : **Titre** — *où le trouver* — ce que ça fait, en une à trois phrases. Mentionner ce qui ne marche PAS ou reste limité.
