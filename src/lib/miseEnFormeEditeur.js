@@ -368,7 +368,52 @@ export const SautDePage = NoeudTiptap.create({
       insererSautDePage: () => ({ chain }) => chain().insertContent({ type: "sautDePage" }).run(),
     };
   },
+  // Vue dans l'éditeur : trait pointillé avec une vraie zone à cliquer et un bouton « ✕ » pour le supprimer
+  // (31/10/2026 : un trait de 1,5 px de haut ne se laissait ni sélectionner ni effacer).
+  addNodeView() {
+    return ({ editor, getPos, node }) => {
+      const dom = document.createElement("div");
+      dom.className = "saut-de-page";
+      dom.setAttribute("data-saut-page", "1");
+      dom.contentEditable = "false";
+      const etiquette = document.createElement("span");
+      etiquette.className = "saut-de-page-etiquette";
+      etiquette.textContent = "Saut de page";
+      const croix = document.createElement("button");
+      croix.type = "button";
+      croix.className = "saut-de-page-croix";
+      croix.title = "Supprimer ce saut de page";
+      croix.setAttribute("aria-label", "Supprimer ce saut de page");
+      croix.textContent = "✕";
+      croix.addEventListener("mousedown", (e) => e.preventDefault());
+      croix.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (!editor.isEditable) return;
+        const pos = getPos();
+        if (typeof pos === "number") editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+      });
+      dom.append(etiquette, croix);
+      return { dom };
+    };
+  },
   addKeyboardShortcuts() {
-    return { "Mod-Enter": ({ editor }) => editor.commands.insererSautDePage() };
+    // Retour arrière / Suppr : efface le saut sélectionné, ou celui qui touche le curseur (début / fin d'un bloc).
+    const effacer = (editor, sens) => {
+      const { selection } = editor.state;
+      if (selection.node?.type.name === "sautDePage") return editor.commands.deleteSelection();
+      if (!selection.empty) return false;
+      const $p = selection.$from;
+      const voisin = sens < 0
+        ? ($p.parentOffset === 0 ? $p.doc.resolve($p.before()).nodeBefore : null)
+        : ($p.parentOffset === $p.parent.content.size ? $p.doc.resolve($p.after()).nodeAfter : null);
+      if (voisin?.type.name !== "sautDePage") return false;
+      const debut = sens < 0 ? $p.before() - voisin.nodeSize : $p.after();
+      return editor.chain().deleteRange({ from: debut, to: debut + voisin.nodeSize }).run();
+    };
+    return {
+      "Mod-Enter": ({ editor }) => editor.commands.insererSautDePage(),
+      Backspace: ({ editor }) => effacer(editor, -1),
+      Delete: ({ editor }) => effacer(editor, 1),
+    };
   },
 });
