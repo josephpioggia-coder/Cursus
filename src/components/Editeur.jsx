@@ -432,9 +432,12 @@ const STYLES_EDITEUR = `
   }
   .ProseMirror .cursus-tab { display: inline-block; width: 1.27cm; height: 1em; vertical-align: baseline; }
   .ProseMirror mark { background: #faeeda; border-radius: 2px; padding: 0 2px; }
-  .ProseMirror .saut-de-page { position: relative; height: 0; margin: 1.6em 0; border-top: 1.5px dashed #b9b4e8; }
-  .ProseMirror .saut-de-page::after { content: "Saut de page"; position: absolute; left: 50%; top: -0.7em; transform: translateX(-50%); background: #fff; color: #7F77DD; font: 600 10px/1.4 -apple-system, sans-serif; padding: 0 8px; letter-spacing: .04em; text-transform: uppercase; }
-  .ProseMirror .saut-de-page.ProseMirror-selectednode { border-top-color: #7F77DD; }
+  .ProseMirror .saut-de-page { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; height: 26px; margin: 1em 0; cursor: pointer; user-select: none; }
+  .ProseMirror .saut-de-page::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px dashed #b9b4e8; }
+  .ProseMirror .saut-de-page-etiquette, .ProseMirror .saut-de-page-croix { position: relative; background: #fff; color: #7F77DD; font: 600 10px/1.4 -apple-system, sans-serif; padding: 0 8px; letter-spacing: .04em; text-transform: uppercase; }
+  .ProseMirror .saut-de-page-croix { border: 0.5px solid #b9b4e8; border-radius: 10px; padding: 1px 8px; cursor: pointer; font-size: 11px; }
+  .ProseMirror .saut-de-page-croix:hover { background: #7F77DD; color: #fff; }
+  .ProseMirror .saut-de-page.ProseMirror-selectednode::before { border-top-color: #7F77DD; }
   .ProseMirror hr { border: none; border-top: 1px solid #e5e5e5; margin: 2em 0; }
   .ProseMirror img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.8em 0; display: block; }
   .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #7F77DD; outline-offset: 2px; }
