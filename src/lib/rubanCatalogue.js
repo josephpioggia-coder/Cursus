@@ -29,7 +29,7 @@ export const FONCTIONS = [
   // ── Insertion ─────────────────────────────────────────────
   { id: "image", onglet: "insertion", groupe: "Illustrations", label: "Image", icone: "🖼️", statut: "fait", aide: "Insérer une image dans le texte" },
   { id: "photo", onglet: "insertion", groupe: "Illustrations", label: "Lire une photo", icone: "📷", statut: "fait", aide: "Photographier une page : l'IA la recopie fidèlement en texte dans le chapitre" },
-  { id: "saut_page", onglet: "insertion", groupe: "Pages", label: "Saut de page", icone: "⤓", statut: "bientot", priorite: "fort", aide: "Forcer le début d'une nouvelle page (et avant chaque chapitre)" },
+  { id: "saut_page", onglet: "insertion", groupe: "Pages", label: "Saut de page", icone: "⤓", statut: "fait", aide: "Forcer le début d'une nouvelle page (Ctrl+Entrée) ; chaque chapitre commence déjà sur une nouvelle page à l'export" },
   { id: "garde", onglet: "insertion", groupe: "Pages", label: "Page de garde", icone: "📘", statut: "bientot", priorite: "moyen", aide: "Page de titre personnalisable à l'export" },
   { id: "tableau", onglet: "insertion", groupe: "Tableaux", label: "Tableau", icone: "▦", statut: "bientot", priorite: "moyen", aide: "Insérer un tableau (essais, manuels)" },
   { id: "lien", onglet: "insertion", groupe: "Liens", label: "Lien", icone: "🔗", statut: "bientot", priorite: "moyen", aide: "Lien hypertexte" },

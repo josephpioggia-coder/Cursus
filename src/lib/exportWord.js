@@ -264,6 +264,8 @@ export function paragraphesDepuisHTML(html, registreNotes = [], styles = {}) {
         const runs = runsDepuisNœudDOM(li, {}, registreNotes);
         paragraphes.push(new Paragraph({ children: [new TextRun(`${index + 1}. `), ...runs] }));
       });
+    } else if (tag === "div" && n.hasAttribute("data-saut-page")) {
+      paragraphes.push(new Paragraph({ children: [new PageBreak()] }));
     } else if (tag === "hr") {
       paragraphes.push(new Paragraph({
         spacing: { before: 200, after: 200 },

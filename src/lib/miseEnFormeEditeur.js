@@ -353,3 +353,22 @@ export function changerCasse(editor, mode) {
   if (modifie) view.dispatch(tr);
   return modifie;
 }
+
+// ─── Saut de page (31/10/2026) : force le début d'une nouvelle page à l'export Word ───────────────────────
+export const SautDePage = NoeudTiptap.create({
+  name: "sautDePage",
+  group: "block",
+  atom: true,
+  selectable: true,
+  parseHTML() { return [{ tag: "div[data-saut-page]" }]; },
+  renderHTML() { return ["div", { "data-saut-page": "1", class: "saut-de-page" }]; },
+  renderText() { return "\n"; },
+  addCommands() {
+    return {
+      insererSautDePage: () => ({ chain }) => chain().insertContent({ type: "sautDePage" }).run(),
+    };
+  },
+  addKeyboardShortcuts() {
+    return { "Mod-Enter": ({ editor }) => editor.commands.insererSautDePage() };
+  },
+});

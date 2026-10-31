@@ -46,7 +46,7 @@ import Color from "@tiptap/extension-color";
 import TextStyle from "@tiptap/extension-text-style";
 import Image from "@tiptap/extension-image";
 import {
-  PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe, Tabulation,
+  PoliceEtTaille, Indice, Exposant, MiseEnFormeParagraphe, Tabulation, SautDePage,
   POLICES, TAILLES_PT, TAILLE_DEFAUT_PT, INTERLIGNES, taillePtDepuisCss, tailleVoisine, changerCasse, PAS_RETRAIT_CM,
 } from "../lib/miseEnFormeEditeur.js";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -432,6 +432,9 @@ const STYLES_EDITEUR = `
   }
   .ProseMirror .cursus-tab { display: inline-block; width: 1.27cm; height: 1em; vertical-align: baseline; }
   .ProseMirror mark { background: #faeeda; border-radius: 2px; padding: 0 2px; }
+  .ProseMirror .saut-de-page { position: relative; height: 0; margin: 1.6em 0; border-top: 1.5px dashed #b9b4e8; }
+  .ProseMirror .saut-de-page::after { content: "Saut de page"; position: absolute; left: 50%; top: -0.7em; transform: translateX(-50%); background: #fff; color: #7F77DD; font: 600 10px/1.4 -apple-system, sans-serif; padding: 0 8px; letter-spacing: .04em; text-transform: uppercase; }
+  .ProseMirror .saut-de-page.ProseMirror-selectednode { border-top-color: #7F77DD; }
   .ProseMirror hr { border: none; border-top: 1px solid #e5e5e5; margin: 2em 0; }
   .ProseMirror img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.8em 0; display: block; }
   .ProseMirror img.ProseMirror-selectednode { outline: 2px solid #7F77DD; outline-offset: 2px; }
@@ -1544,6 +1547,7 @@ export default function Editeur({
       Exposant,
       MiseEnFormeParagraphe,
       Tabulation,
+      SautDePage,
       // Images (24/09/2026, demande de Joseph : "pouvoir intégrer des
       // schémas ou des photos dans le texte, dans CursEdit") — phase 1
       // (insertion + affichage) uniquement : le pipeline d'analyse
@@ -1838,6 +1842,7 @@ export default function Editeur({
   const actionsRuban = {
     question: { onClick: () => ouvrirQuestion() },
     rechercher: { onClick: () => ouvrirRecherche() },
+    saut_page: { onClick: () => editor?.commands.insererSautDePage(), desactive: lectureSeule },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
     photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
     image: { onClick: () => window.dispatchEvent(new CustomEvent("cursus-inserer-image")), desactive: lectureSeule },
