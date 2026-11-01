@@ -55,6 +55,7 @@ import JournalErreurs from "./components/JournalErreurs.jsx";
 import UsageVoix from "./components/UsageVoix.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
+import { estComplet as estCompletQuestionnaire } from "./lib/questionnaireDemarrage.js";
 import AideFAQ from "./components/AideFAQ.jsx";
 import QuestionRapide from "./components/QuestionRapide.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
@@ -1853,6 +1854,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   const [importOuvert, setImportOuvert]   = useState(false);
   const [incorporerOuvert, setIncorporerOuvert] = useState(false);
   const [projetVenantDêtreCréé, setProjetVenantDêtreCréé] = useState(null);
+  const rappelRefusé = useRef(new Set()); // projets pour lesquels « Plus tard » a été choisi (session en cours)
   const [erreurCréationProjet, setErreurCréationProjet] = useState(null);
   const [rappelIntentionPour, setRappelIntentionPour]     = useState(null);
   const [aideOuverte, setAideOuverte]                     = useState(false);   // fenêtre « Question rapide » (boutons Aide)
@@ -1976,7 +1978,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
       const { data: réponses, error: erreurRéponses } = await supabase
         .from("reponses_questionnaire")
-        .select("question_id")
+        .select("question_id, reponse")
         .eq("projet_id", projetActifId);
       if (erreurRéponses) {
         journaliserErreur("App:vérifierQuestionnaire (reponses_questionnaire)", erreurRéponses.message, projetActifId);
@@ -1993,10 +1995,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         return;
       }
 
-      const idsRépondus = new Set((réponses || []).map((r) => r.question_id));
-      const toutComplet = adn.every((q) => idsRépondus.has(q.id));
+      // 01/11/2026 : Q009b (fiction / faits réels) n'est exigée que pour un roman — sinon le rappel ne disparaissait jamais.
+      const parId = {};
+      (réponses || []).forEach((r) => { parId[r.question_id] = r.reponse; });
+      const toutComplet = estCompletQuestionnaire(adn, parId);
 
-      setRappelIntentionPour(toutComplet ? null : projetActifId);
+      // Pas de rappel en boucle : si l'auteur·ice a dit « Plus tard » pour ce projet pendant cette session, on ne le réaffiche pas.
+      setRappelIntentionPour(toutComplet || rappelRefusé.current.has(projetActifId) ? null : projetActifId);
     };
     vérifier();
   }, [projetActifId, projetVenantDêtreCréé]);
@@ -3225,7 +3230,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         <QuestionnaireIntention
           projetId={projetVenantDêtreCréé.id}
           projetTitre={projetVenantDêtreCréé.titre}
-          onTerminé={() => setProjetVenantDêtreCréé(null)}
+          onTerminé={() => { rappelRefusé.current.add(projetVenantDêtreCréé.id); setProjetVenantDêtreCréé(null); }}
+          onFermer={() => { rappelRefusé.current.add(projetVenantDêtreCréé.id); setProjetVenantDêtreCréé(null); }}
         />
       )}
 
@@ -3235,8 +3241,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         <QuestionnaireIntention
           projetId={rappelIntentionPour}
           projetTitre={projets.find((p) => p.id === rappelIntentionPour)?.titre || ""}
-          onTerminé={() => setRappelIntentionPour(null)}
-          onFermer={() => setRappelIntentionPour(null)}
+          onTerminé={() => { rappelRefusé.current.add(rappelIntentionPour); setRappelIntentionPour(null); }}
+          onFermer={() => { rappelRefusé.current.add(rappelIntentionPour); setRappelIntentionPour(null); }}
         />
       )}
     </div>

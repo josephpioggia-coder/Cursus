@@ -1,40 +1,157 @@
 /**
- * CURSUS — Questionnaire d'intention (référence 60816-01, tangentielle,
- * 23/08/2026) — CORRECTIF, PAS LA FONCTIONNALITÉ D'ORIGINE.
+ * CURSUS — « 🧭 Questionnaire de démarrage » (01/11/2026) : l'ADN du projet, les 11 questions de niveau 1 de
+ * `banque_questions` (Joseph a retrouvé la banque le 01/11/2026). Ce composant était depuis le 23/08/2026 une coquille
+ * vide (il ne rendait rien : voir l'historique) — d'où « le questionnaire ne s'affiche pas et le bouton ne fait rien ».
  *
- * BUG TROUVÉ ET CORRIGÉ ICI : ce fichier contenait, avant ce correctif, une
- * copie complète et fonctionnelle de `CopiloteIA.jsx` (même en-tête "Module :
- * Co-pilote IA", même code), importée dans App.jsx sous le nom
- * `QuestionnaireIntention` (l'alias d'import masque le vrai nom de la
- * fonction exportée, donc l'incohérence ne cassait rien à la compilation).
- * Deux appels dans App.jsx (`{projetVenantDêtreCréé && <QuestionnaireIntention
- * projetId=... projetTitre=... onTerminé=... />}` et le rappel persistant
- * équivalent) attendent une VRAIE modale de questionnaire, avec les props
- * `projetId`, `projetTitre`, `onTerminé`, `onFermer` — la copie de
- * CopiloteIA ignorait ces props (elle attend `texteActif`, `typeProjet`,
- * `couleurProjet`, `langueProjet`...) et surtout ne rendait AUCUN habillage
- * de modale (pas de `position: fixed`, pas de fond assombri) : elle
- * s'affichait comme un bloc ordinaire, en bas du DOM de l'application —
- * signalé par l'auteur du projet comme "un duplicata de co-pilote qui n'a
- * rien à y faire" en bas à gauche de l'écran.
- *
- * Origine probable : un copier-coller resté en place par erreur (le dépôt
- * n'a qu'un historique git compressé depuis le 02/08/2026, impossible de
- * retrouver un état antérieur correct de ce fichier).
- *
- * ÉTAT ACTUEL : composant neutre (ne rend rien), qui accepte les bonnes
- * props sans planter — supprime le bug visuel sans faire semblant qu'une
- * fonctionnalité existe. AUCUNE PERTE RÉELLE : la version buguée ne
- * fonctionnait de toute façon pas comme un vrai questionnaire (mauvaises
- * props, jamais fermable proprement).
- *
- * RESTE À FAIRE, SI L'AUTEUR DU PROJET LE CONFIRME (hors périmètre de ce
- * correctif — nécessite de définir le contenu du questionnaire ET d'ajouter
- * les colonnes correspondantes sur `projets`, qui n'existent pas encore) :
- * concevoir la vraie modale "Questionnaire de démarrage" (intention/ligne de
- * conduite du co-pilote pour le projet), avec persistance en base.
+ * Une question par écran. Chaque réponse est enregistrée en passant à la suivante (`reponses_questionnaire`, sous la forme
+ * { valeur }), ce que lit le Co-pilote. « Plus tard » ferme sans rien perdre. Q009b (fiction / faits réels / biographie)
+ * n'est posée que si Q009 inclut « Roman ». Voir src/lib/questionnaireDemarrage.js (ordre, listes de choix).
  */
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabase.js";
+import { reponsesQuestionnaireAPI } from "../lib/api.js";
+import { journaliserErreur } from "../lib/journalErreurs.js";
+import { AIDES, OPTIONS, genre, joindreMultiple, parseMultiple, questionsAPoser } from "../lib/questionnaireDemarrage.js";
+
+const COULEUR = "#7F77DD";
+const entrée = { fontSize: 14, padding: "8px 10px", border: "0.5px solid #bbb", borderRadius: 8, fontFamily: "inherit", width: "100%", boxSizing: "border-box", background: "#fff", color: "#222", lineHeight: 1.5 };
 
 export default function QuestionnaireIntention({ projetId, projetTitre, onTerminé, onFermer }) {
-  return null;
+  const [questions, setQuestions] = useState(null);
+  const [erreurChargement, setErreurChargement] = useState(null);
+  const [réponses, setRéponses] = useState({}); // { Q001: "texte" }
+  const [indice, setIndice] = useState(0);
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState(null);
+
+  useEffect(() => {
+    let annulé = false;
+    (async () => {
+      const [q, r] = await Promise.all([
+        supabase.from("banque_questions").select("id, question, objectif, type_reponse, niveau").eq("niveau", 1),
+        reponsesQuestionnaireAPI.lire(projetId),
+      ]);
+      if (annulé) return;
+      if (q.error || !q.data?.length) {
+        const msg = q.error?.message || "Aucune question de niveau 1 n'est lisible (table vide ou règle de sécurité).";
+        journaliserErreur("QuestionnaireIntention:chargement", msg, projetId);
+        setErreurChargement(msg);
+        return;
+      }
+      const dejà = {};
+      Object.entries(r.data || {}).forEach(([id, rep]) => { dejà[id] = typeof rep === "string" ? rep : (rep?.valeur || ""); });
+      setRéponses(dejà);
+      setQuestions(q.data);
+      // reprend à la première question sans réponse
+      const liste = questionsAPoser(q.data, Object.fromEntries(Object.entries(dejà).map(([k, v]) => [k, { valeur: v }])));
+      const premier = liste.findIndex((x) => !String(dejà[x.id] || "").trim());
+      setIndice(premier === -1 ? 0 : premier);
+    })();
+    return () => { annulé = true; };
+  }, [projetId]);
+
+  const avecValeurs = useMemo(() => Object.fromEntries(Object.entries(réponses).map(([k, v]) => [k, { valeur: v }])), [réponses]);
+  const liste = useMemo(() => (questions ? questionsAPoser(questions, avecValeurs) : []), [questions, avecValeurs]);
+  const q = liste[Math.min(indice, Math.max(liste.length - 1, 0))];
+  const valeur = q ? (réponses[q.id] || "") : "";
+  const fixer = (v) => { setErreur(null); setRéponses((r) => ({ ...r, [q.id]: v })); };
+  const fermer = () => (onFermer || onTerminé)?.();
+
+  const enregistrerEtAller = async (versIndice) => {
+    if (!q) return;
+    setEnCours(true); setErreur(null);
+    if (valeur.trim()) {
+      const { error } = await reponsesQuestionnaireAPI.enregistrer(projetId, q.id, valeur.trim());
+      if (error) {
+        setEnCours(false);
+        journaliserErreur("QuestionnaireIntention:enregistrer", `${q.id} — ${error.message} (code ${error.code || "?"})`, projetId);
+        setErreur(`Réponse non enregistrée : ${error.message}`);
+        return;
+      }
+    }
+    setEnCours(false);
+    if (versIndice >= liste.length) { onTerminé?.(); return; }
+    setIndice(Math.max(0, versIndice));
+  };
+
+  const dernier = indice >= liste.length - 1;
+  const g = q ? genre(q) : null;
+  const options = q ? OPTIONS[q.id] || [] : [];
+  const choisis = g === "multiple" ? parseMultiple(valeur) : [];
+  const autres = g === "multiple" ? choisis.filter((c) => !options.includes(c)) : [];
+
+  const bouton = (principal, actif = true) => ({
+    fontSize: 14, padding: "9px 16px", borderRadius: 8, cursor: actif ? "pointer" : "default", fontFamily: "inherit", opacity: actif ? 1 : 0.5,
+    border: principal ? "none" : "0.5px solid #ccc", background: principal ? COULEUR : "#fff", color: principal ? "#fff" : "#555",
+  });
+  const puce = (actif) => ({ fontSize: 13.5, padding: "7px 12px", borderRadius: 18, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${actif ? COULEUR : "#ccc"}`, background: actif ? COULEUR : "#fff", color: actif ? "#fff" : "#444" });
+
+  return (
+    <div role="dialog" aria-label="Questionnaire de démarrage" style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+      <div style={{ background: "#fff", color: "#222", borderRadius: 14, width: "100%", maxWidth: 560, maxHeight: "94vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>🧭 Questionnaire de démarrage</div>
+            {projetTitre && <div style={{ fontSize: 12, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projetTitre}</div>}
+          </div>
+          <button onClick={fermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Plus tard" aria-label="Fermer">✕</button>
+        </div>
+
+        <div style={{ padding: 18, overflowY: "auto", minHeight: 0, flex: 1 }}>
+          {erreurChargement && (
+            <div style={{ fontSize: 13.5, color: "#b3261e", lineHeight: 1.5 }}>
+              Les questions n'ont pas pu être chargées ({erreurChargement}). L'erreur est notée dans le Journal des erreurs.
+            </div>
+          )}
+          {!questions && !erreurChargement && <div style={{ fontSize: 13.5, color: "#777" }}>Chargement…</div>}
+
+          {q && (
+            <>
+              <div style={{ height: 6, borderRadius: 3, background: "#eee", marginBottom: 6 }}>
+                <div style={{ height: 6, borderRadius: 3, background: COULEUR, width: `${((indice + 1) / liste.length) * 100}%` }} />
+              </div>
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>Question {indice + 1} sur {liste.length} — réponse facultative, modifiable plus tard</div>
+
+              <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.4, marginBottom: 6 }}>{q.question}</div>
+              {(AIDES[q.id] || q.objectif) && <div style={{ fontSize: 12.5, color: "#777", marginBottom: 12, lineHeight: 1.5 }}>{AIDES[q.id] || q.objectif}</div>}
+
+              {g === "choix" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {options.map((o) => <button key={o} type="button" style={{ ...puce(valeur === o), textAlign: "left", borderRadius: 10 }} onClick={() => fixer(o)}>{o}</button>)}
+                  <input type="text" placeholder="Autre (précisez)" value={options.includes(valeur) ? "" : valeur} onChange={(e) => fixer(e.target.value)} style={entrée} />
+                </div>
+              )}
+              {g === "multiple" && (
+                <div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                    {options.map((o) => {
+                      const actif = choisis.includes(o);
+                      return <button key={o} type="button" style={puce(actif)} aria-pressed={actif} onClick={() => fixer(joindreMultiple(actif ? choisis.filter((c) => c !== o) : [...choisis, o]))}>{o}</button>;
+                    })}
+                  </div>
+                  <input type="text" placeholder="Autre (précisez)" value={autres.join(" ; ")} onChange={(e) => fixer(joindreMultiple([...choisis.filter((c) => options.includes(c)), ...e.target.value.split(" ; ")]))} style={entrée} />
+                </div>
+              )}
+              {(g === "long" || g === "liste") && <textarea value={valeur} onChange={(e) => fixer(e.target.value)} rows={g === "liste" ? 6 : 5} style={{ ...entrée, resize: "vertical" }} placeholder={g === "liste" ? "Un thème par ligne" : "Votre réponse…"} />}
+              {g === "court" && <input type="text" value={valeur} onChange={(e) => fixer(e.target.value)} style={entrée} placeholder="Votre réponse…" />}
+              {erreur && <div role="alert" style={{ marginTop: 10, fontSize: 12.5, color: "#b3261e" }}>{erreur}</div>}
+            </>
+          )}
+        </div>
+
+        {q && (
+          <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
+            <button style={bouton(false)} onClick={fermer} disabled={enCours}>Plus tard</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={bouton(false, indice > 0 && !enCours)} onClick={() => enregistrerEtAller(indice - 1)} disabled={indice === 0 || enCours}>← Précédent</button>
+              <button style={bouton(true, !enCours)} onClick={() => enregistrerEtAller(indice + 1)} disabled={enCours}>{enCours ? "…" : dernier ? "Terminer" : "Suivant →"}</button>
+            </div>
+          </div>
+        )}
+        {erreurChargement && (
+          <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", textAlign: "right" }}><button style={bouton(false)} onClick={fermer}>Fermer</button></div>
+        )}
+      </div>
+    </div>
+  );
 }

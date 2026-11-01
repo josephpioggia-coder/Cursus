@@ -1370,3 +1370,33 @@ export const partiesJeuMotsAPI = {
     return error ? { indisponible: true, tableAbsente: tableAbsente(error), error } : { indisponible: false };
   },
 };
+
+
+// ─── Questionnaire de démarrage (01/11/2026) ─────────────────────────────────
+// Table `reponses_questionnaire` : projet_id, question_id, reponse (jsonb { valeur }). Le schéma exact (colonne user_id,
+// contrainte d'unicité) n'est pas dans le dépôt : on lit puis on met à jour OU on insère, sans dépendre d'un upsert, et
+// on retente sans `user_id` si la colonne n'existe pas.
+export const reponsesQuestionnaireAPI = {
+  async lire(projetId) {
+    const { data, error } = await supabase.from("reponses_questionnaire").select("question_id, reponse").eq("projet_id", projetId);
+    const parId = {};
+    (data || []).forEach((r) => { parId[r.question_id] = r.reponse; });
+    return { data: parId, error };
+  },
+
+  async enregistrer(projetId, questionId, valeur) {
+    const reponse = { valeur };
+    const { data: existant, error: errLecture } = await supabase
+      .from("reponses_questionnaire").select("question_id").eq("projet_id", projetId).eq("question_id", questionId).limit(1);
+    if (errLecture) return { error: errLecture };
+    if (existant?.length) {
+      return supabase.from("reponses_questionnaire").update({ reponse }).eq("projet_id", projetId).eq("question_id", questionId);
+    }
+    const uid = await userId();
+    let res = await supabase.from("reponses_questionnaire").insert({ user_id: uid, projet_id: projetId, question_id: questionId, reponse });
+    if (res.error && /user_id/i.test(res.error.message || "")) {
+      res = await supabase.from("reponses_questionnaire").insert({ projet_id: projetId, question_id: questionId, reponse });
+    }
+    return res;
+  },
+};
