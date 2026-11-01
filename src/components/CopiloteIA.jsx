@@ -26,6 +26,7 @@
  * l'occasion s'y prêtera, sans urgence.
  */
 
+import { IDS_CONTEXTE } from "../lib/questionnaireDemarrage.js";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { RÈGLE_SCENES_INTIMES, detecterRefus, MESSAGE_REFUS } from "../lib/scenesIntimes.js";
 import { useTranslation } from "react-i18next";
@@ -658,7 +659,7 @@ async function chargerContexteADN(projetId) {
     const { data: questions } = await supabase
       .from("banque_questions")
       .select("id, question")
-      .eq("niveau", 1);
+      .or(`niveau.eq.1,id.in.(${IDS_CONTEXTE.join(",")})`); // base + affinage + personnes réelles (01/11/2026)
     const { data: réponses } = await supabase
       .from("reponses_questionnaire")
       .select("question_id, reponse")
