@@ -52,3 +52,6 @@ Format : **Titre** — *où le trouver* — ce que ça fait, en une à trois phr
 
 ## Exporter le questionnaire de démarrage (01/11/2026)
 Où : 🧭 Questionnaire de démarrage → écran « Le questionnaire de base est enregistré » → carte « 📄 Exporter mes réponses ». Trois sorties : Word (.docx, questions + réponses par série, personnes en puces), copie du texte, sauvegarde .json. Les séries non commencées sont omises. Le document peut servir de pièce jointe pour CursAudit (pas d'import automatique).
+
+## Questionnaire de démarrage : plusieurs réponses + « Autre » (01/11/2026)
+Énergie émotionnelle (Q020), risques juridiques (Q019) et ton (Q010) acceptent plusieurs réponses. Sur les autres questions à choix, le champ « Autre (précisez) » s'ajoute au choix coché au lieu de l'effacer. L'export les présente en puces.
