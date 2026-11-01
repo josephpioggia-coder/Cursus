@@ -1389,3 +1389,6 @@ Analyse (demandée par Joseph) des niveaux 2 et 3 de `banque_questions` : ce son
 #### Q016 = LISTE de personnes (01/11/2026, retour de Joseph : « quand il y en a plusieurs il manque la possibilité de rajouter un personnage »)
 Q016 n'est plus un choix unique : une ligne par personne (nom tel qu'il figure dans le livre + statut Nom réel / Pseudonyme / Personnage composite), boutons « + Ajouter une personne » et ✕. Réponse stockée en texte, une ligne `Nom — Statut` (`parsePersonnes` / `joindrePersonnes`, `questionnaireDemarrage.js`) — lisible telle quelle par le Co-pilote ; l'ancienne réponse à choix unique (« Pseudonymes »…) est reprise comme une ligne sans nom. Limite : Q019 (risques juridiques) reste UNE réponse pour tout le livre, pas par personne. Vérifié (navigateur, Supabase simulé) : ajout, retrait, reprise de l'ancienne réponse, valeur écrite, 390 px ; `vite build`.
 
+
+### Export du questionnaire de démarrage (01/11/2026)
+`src/lib/exportQuestionnaireDemarrage.js` (`construireSections` pur, Word / texte / JSON) ; boutons dans l'écran des suites de `QuestionnaireIntention.jsx`. Aucun import dans CursAudit (non demandé précisément : à confirmer avec Joseph). Vérifié : `vite build` + test node de `construireSections` seulement ; téléchargement NON testé dans le navigateur.
