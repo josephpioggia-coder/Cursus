@@ -55,3 +55,6 @@ Où : 🧭 Questionnaire de démarrage → écran « Le questionnaire de base es
 
 ## Questionnaire de démarrage : plusieurs réponses + « Autre » (01/11/2026)
 Énergie émotionnelle (Q020), risques juridiques (Q019) et ton (Q010) acceptent plusieurs réponses. Sur les autres questions à choix, le champ « Autre (précisez) » s'ajoute au choix coché au lieu de l'effacer. L'export les présente en puces.
+
+## Co-pilote : « la partie que j'ai marquée » (01/11/2026)
+Dans la discussion avec le Co-pilote, le passage marqué avec le surlignage gris (bouton loupe de l'éditeur) est maintenant transmis : on peut écrire « reconstruis le dialogue de la partie marquée ». Sans marquage gris dans le chapitre, le Co-pilote le dit au lieu de deviner.
