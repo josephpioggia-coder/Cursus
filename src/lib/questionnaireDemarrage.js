@@ -29,9 +29,23 @@ export const OPTIONS = {
   Q012: ["Prudent : je ménage le lecteur", "Mesuré", "Audacieux : je dis les choses franchement", "Sans retenue"],
   Q020: ["Apaisante", "Mélancolique", "Joyeuse", "Dramatique", "Inquiétante", "Réflexive", "Combative", "Tendre"],
   Q015: ["Oui", "Non", "Je ne sais pas"],
-  Q016: ["Noms réels", "Pseudonymes", "Personnages composites", "Un mélange"],
   Q019: ["Diffamation", "Atteinte à la vie privée", "Droit à l'image", "Données personnelles", "Droit d'auteur (citations)", "Aucun à ma connaissance", "Je ne sais pas"],
 };
+/** Q016 : une LISTE de personnes (nom tel qu'il figure dans le livre + statut), pas un choix unique. */
+export const STATUTS_PERSONNE = ["Nom réel", "Pseudonyme", "Personnage composite"];
+const ANCIENS_STATUTS = { "noms réels": "Nom réel", "pseudonymes": "Pseudonyme", "personnages composites": "Personnage composite" };
+/** « Monsieur Yves — Pseudonyme » (une ligne par personne) → [{ nom, statut }]. Lit aussi l'ancienne réponse à choix unique. */
+export function parsePersonnes(valeur) {
+  const v = String(valeur || "").trim();
+  if (!v) return [];
+  return v.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+    const i = l.lastIndexOf(" — ");
+    if (i === -1) return ANCIENS_STATUTS[l.toLowerCase()] ? { nom: "", statut: ANCIENS_STATUTS[l.toLowerCase()] } : { nom: l, statut: "" };
+    return { nom: l.slice(0, i).trim(), statut: l.slice(i + 3).trim() };
+  });
+}
+export const joindrePersonnes = (lignes) => lignes.filter((x) => x.nom.trim() || x.statut).map((x) => `${x.nom.trim() || "(sans nom)"}${x.statut ? ` — ${x.statut}` : ""}`).join("\n");
+
 /** Questions à choix où « Autre (précisez) » n'a pas de sens. */
 export const SANS_AUTRE = new Set(["Q015"]);
 
@@ -44,7 +58,7 @@ export const AIDES = {
   Q006: "Utile pour que le Co-pilote ne vous conseille pas pour un lecteur qui n'est pas le vôtre.",
   Q023: "Les lectures erronées possibles : ce que le lecteur pourrait comprendre de travers.",
   Q015: "Garde-fou : le Co-pilote s'en sert pour vous alerter. Ce n'est pas un avis juridique.",
-  Q016: "Garde-fou : le Co-pilote s'en sert pour vous alerter. Ce n'est pas un avis juridique.",
+  Q016: "Une ligne par personne, avec le nom tel qu'il figure dans le livre. Garde-fou : le Co-pilote s'en sert pour vous alerter ; ce n'est pas un avis juridique.",
   Q019: "Garde-fou : plusieurs réponses possibles. Ce n'est pas un avis juridique ; en cas de doute, consultez un juriste.",
 };
 
@@ -53,6 +67,7 @@ export const trier = (questions) => [...(questions || [])].sort((a, b) => (ORDRE
 
 /** « choix » (une seule), « multiple » (plusieurs), « liste » (une par ligne), « long », « court » */
 export function genre(question) {
+  if (question?.id === "Q016") return "personnes";
   const t = String(question?.type_reponse || "").toLowerCase();
   if (t.includes("multiple")) return OPTIONS[question.id] ? "multiple" : "long";
   if (t.startsWith("choix") || t.includes("oui")) return OPTIONS[question.id] ? "choix" : "court";

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { reponsesQuestionnaireAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
-import { AIDES, IDS_CONTEXTE, OPTIONS, SANS_AUTRE, SERIES, estComplet, genre, joindreMultiple, parseMultiple, questionsAPoser, seriesProposees } from "../lib/questionnaireDemarrage.js";
+import { AIDES, IDS_CONTEXTE, OPTIONS, SANS_AUTRE, SERIES, estComplet, STATUTS_PERSONNE, genre, joindreMultiple, joindrePersonnes, parseMultiple, parsePersonnes, questionsAPoser, seriesProposees } from "../lib/questionnaireDemarrage.js";
 
 const COULEUR = "#7F77DD";
 const entrée = { fontSize: 14, padding: "8px 10px", border: "0.5px solid #bbb", borderRadius: 8, fontFamily: "inherit", width: "100%", boxSizing: "border-box", background: "#fff", color: "#222", lineHeight: 1.5 };
@@ -64,6 +64,14 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
   const q = liste[Math.min(indice, Math.max(liste.length - 1, 0))];
   const valeur = q ? (réponses[q.id] || "") : "";
   const fixer = (v) => { setErreur(null); setRéponses((r) => ({ ...r, [q.id]: v })); };
+  // Q016 : liste de personnes, éditée en local puis rangée dans la réponse (une ligne « nom — statut » par personne).
+  const [lignes, setLignes] = useState([{ nom: "", statut: "" }]);
+  useEffect(() => {
+    if (q?.id !== "Q016") return;
+    const l = parsePersonnes(réponses.Q016);
+    setLignes(l.length ? l : [{ nom: "", statut: "" }]);
+  }, [q?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const majLignes = (suivant) => { setLignes(suivant); fixer(joindrePersonnes(suivant)); };
   const fermer = () => (onFermer || onTerminé)?.();
 
   const enregistrerEtAller = async (versIndice) => {
@@ -163,6 +171,21 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
                     })}
                   </div>
                   <input type="text" placeholder="Autre (précisez)" value={autres.join(" ; ")} onChange={(e) => fixer(joindreMultiple([...choisis.filter((c) => options.includes(c)), ...e.target.value.split(" ; ")]))} style={entrée} />
+                </div>
+              )}
+              {g === "personnes" && (
+                <div>
+                  {lignes.map((l, i) => (
+                    <div key={i} style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+                      <input type="text" value={l.nom} placeholder="ex. Monsieur Yves" aria-label={`Personne ${i + 1}`} onChange={(e) => majLignes(lignes.map((x, j) => (j === i ? { ...x, nom: e.target.value } : x)))} style={{ ...entrée, flex: "2 1 160px", width: "auto" }} />
+                      <select value={l.statut} aria-label={`Statut de la personne ${i + 1}`} onChange={(e) => majLignes(lignes.map((x, j) => (j === i ? { ...x, statut: e.target.value } : x)))} style={{ ...entrée, flex: "1 1 150px", width: "auto" }}>
+                        <option value="">Statut…</option>
+                        {STATUTS_PERSONNE.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      {lignes.length > 1 && <button type="button" aria-label={`Retirer la personne ${i + 1}`} title="Retirer" onClick={() => majLignes(lignes.filter((_, j) => j !== i))} style={{ ...puce(false), padding: "6px 10px" }}>✕</button>}
+                    </div>
+                  ))}
+                  <button type="button" style={puce(false)} onClick={() => setLignes([...lignes, { nom: "", statut: "" }])}>+ Ajouter une personne</button>
                 </div>
               )}
               {(g === "long" || g === "liste") && <textarea value={valeur} onChange={(e) => fixer(e.target.value)} rows={g === "liste" ? 6 : 5} style={{ ...entrée, resize: "vertical" }} placeholder={g === "liste" ? "Un thème par ligne" : "Votre réponse…"} />}
