@@ -49,3 +49,6 @@ Format : **Titre** — *où le trouver* — ce que ça fait, en une à trois phr
 ## Déjà intégré
 
 *(rien pour l'instant)*
+
+## Exporter le questionnaire de démarrage (01/11/2026)
+Où : 🧭 Questionnaire de démarrage → écran « Le questionnaire de base est enregistré » → carte « 📄 Exporter mes réponses ». Trois sorties : Word (.docx, questions + réponses par série, personnes en puces), copie du texte, sauvegarde .json. Les séries non commencées sont omises. Le document peut servir de pièce jointe pour CursAudit (pas d'import automatique).

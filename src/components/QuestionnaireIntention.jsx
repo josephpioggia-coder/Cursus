@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { reponsesQuestionnaireAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { construireSections, enTexte, exporterQuestionnaireJSON, exporterQuestionnaireWord } from "../lib/exportQuestionnaireDemarrage.js";
 import { AIDES, IDS_CONTEXTE, OPTIONS, SANS_AUTRE, SERIES, estComplet, STATUTS_PERSONNE, genre, joindreMultiple, joindrePersonnes, parseMultiple, parsePersonnes, questionsAPoser, seriesProposees } from "../lib/questionnaireDemarrage.js";
 
 const COULEUR = "#7F77DD";
@@ -55,6 +56,19 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
 
   const avecValeurs = useMemo(() => Object.fromEntries(Object.entries(réponses).map(([k, v]) => [k, { valeur: v }])), [réponses]);
   const liste = useMemo(() => (questions && serie ? questionsAPoser(questions, avecValeurs, serie) : []), [questions, avecValeurs, serie]);
+  const [exportMsg, setExportMsg] = useState("");
+  const exporter = async (mode) => {
+    try {
+      const sections = construireSections(questions, réponses);
+      if (mode === "word") await exporterQuestionnaireWord(sections, projetTitre);
+      else if (mode === "json") exporterQuestionnaireJSON(réponses, projetTitre);
+      else { await navigator.clipboard.writeText(enTexte(sections, projetTitre)); setExportMsg("Copié dans le presse-papiers."); return; }
+      setExportMsg("Fichier créé.");
+    } catch (e) {
+      journaliserErreur("QuestionnaireIntention:export", e?.message || String(e), projetId);
+      setExportMsg(`Export impossible : ${e?.message || e}`);
+    }
+  };
   const suites = useMemo(() => (questions ? seriesProposees(questions, avecValeurs) : []), [questions, avecValeurs]);
   const commencer = (nom) => {
     const l = questionsAPoser(questions, avecValeurs, nom);
@@ -140,6 +154,16 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
                   <button type="button" style={bouton(true)} onClick={() => commencer(x.serie)}>{x.repondues === 0 ? "Commencer" : x.repondues >= x.total ? "Revoir mes réponses" : "Continuer"}</button>
                 </div>
               ))}
+              <div style={{ border: "0.5px solid #ddd", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 600 }}>📄 Exporter mes réponses</div>
+                <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.5, margin: "4px 0 10px" }}>Un document lisible (questions + réponses) à garder, à envoyer ou à joindre à un audit CursAudit.</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button type="button" style={bouton(true)} onClick={() => exporter("word")}>Word (.docx)</button>
+                  <button type="button" style={bouton(false)} onClick={() => exporter("texte")}>Copier le texte</button>
+                  <button type="button" style={bouton(false)} onClick={() => exporter("json")}>Sauvegarde (.json)</button>
+                </div>
+                {exportMsg && <div role="status" style={{ fontSize: 12.5, color: "#555", marginTop: 8 }}>{exportMsg}</div>}
+              </div>
               {questions && !estComplet(questions, avecValeurs, "base") && (
                 <button type="button" style={{ ...bouton(false), marginTop: 4 }} onClick={() => commencer("base")}>Reprendre les questions de base sans réponse</button>
               )}
