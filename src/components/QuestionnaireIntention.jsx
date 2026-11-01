@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { reponsesQuestionnaireAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
-import { AIDES, OPTIONS, genre, joindreMultiple, parseMultiple, questionsAPoser } from "../lib/questionnaireDemarrage.js";
+import { AIDES, IDS_CONTEXTE, OPTIONS, SANS_AUTRE, SERIES, estComplet, genre, joindreMultiple, parseMultiple, questionsAPoser, seriesProposees } from "../lib/questionnaireDemarrage.js";
 
 const COULEUR = "#7F77DD";
 const entrée = { fontSize: 14, padding: "8px 10px", border: "0.5px solid #bbb", borderRadius: 8, fontFamily: "inherit", width: "100%", boxSizing: "border-box", background: "#fff", color: "#222", lineHeight: 1.5 };
@@ -21,6 +21,7 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
   const [erreurChargement, setErreurChargement] = useState(null);
   const [réponses, setRéponses] = useState({}); // { Q001: "texte" }
   const [indice, setIndice] = useState(0);
+  const [serie, setSerie] = useState("base"); // « base » | « affinage » | « personnes » | null = écran des suites proposées
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState(null);
 
@@ -28,7 +29,7 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
     let annulé = false;
     (async () => {
       const [q, r] = await Promise.all([
-        supabase.from("banque_questions").select("id, question, objectif, type_reponse, niveau").eq("niveau", 1),
+        supabase.from("banque_questions").select("id, question, objectif, type_reponse, niveau").or(`niveau.eq.1,id.in.(${IDS_CONTEXTE.join(",")})`),
         reponsesQuestionnaireAPI.lire(projetId),
       ]);
       if (annulé) return;
@@ -42,8 +43,10 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
       Object.entries(r.data || {}).forEach(([id, rep]) => { dejà[id] = typeof rep === "string" ? rep : (rep?.valeur || ""); });
       setRéponses(dejà);
       setQuestions(q.data);
-      // reprend à la première question sans réponse
-      const liste = questionsAPoser(q.data, Object.fromEntries(Object.entries(dejà).map(([k, v]) => [k, { valeur: v }])));
+      // Base déjà complète : on propose directement les suites ; sinon on reprend à la première question sans réponse.
+      const rep = Object.fromEntries(Object.entries(dejà).map(([k, v]) => [k, { valeur: v }]));
+      if (estComplet(q.data, rep, "base")) { setSerie(null); return; }
+      const liste = questionsAPoser(q.data, rep, "base");
       const premier = liste.findIndex((x) => !String(dejà[x.id] || "").trim());
       setIndice(premier === -1 ? 0 : premier);
     })();
@@ -51,7 +54,13 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
   }, [projetId]);
 
   const avecValeurs = useMemo(() => Object.fromEntries(Object.entries(réponses).map(([k, v]) => [k, { valeur: v }])), [réponses]);
-  const liste = useMemo(() => (questions ? questionsAPoser(questions, avecValeurs) : []), [questions, avecValeurs]);
+  const liste = useMemo(() => (questions && serie ? questionsAPoser(questions, avecValeurs, serie) : []), [questions, avecValeurs, serie]);
+  const suites = useMemo(() => (questions ? seriesProposees(questions, avecValeurs) : []), [questions, avecValeurs]);
+  const commencer = (nom) => {
+    const l = questionsAPoser(questions, avecValeurs, nom);
+    const premier = l.findIndex((x) => !String(réponses[x.id] || "").trim());
+    setIndice(premier === -1 ? 0 : premier); setSerie(nom); setErreur(null);
+  };
   const q = liste[Math.min(indice, Math.max(liste.length - 1, 0))];
   const valeur = q ? (réponses[q.id] || "") : "";
   const fixer = (v) => { setErreur(null); setRéponses((r) => ({ ...r, [q.id]: v })); };
@@ -70,13 +79,14 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
       }
     }
     setEnCours(false);
-    if (versIndice >= liste.length) { onTerminé?.(); return; }
+    if (versIndice >= liste.length) { setSerie(null); return; } // série terminée : écran des suites proposées
     setIndice(Math.max(0, versIndice));
   };
 
   const dernier = indice >= liste.length - 1;
   const g = q ? genre(q) : null;
   const options = q ? OPTIONS[q.id] || [] : [];
+  const autreAutorisé = q ? !SANS_AUTRE.has(q.id) : false;
   const choisis = g === "multiple" ? parseMultiple(valeur) : [];
   const autres = g === "multiple" ? choisis.filter((c) => !options.includes(c)) : [];
 
@@ -91,7 +101,7 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
       <div style={{ background: "#fff", color: "#222", borderRadius: 14, width: "100%", maxWidth: 560, maxHeight: "94vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>🧭 Questionnaire de démarrage</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>🧭 {serie ? SERIES[serie].titre : "Questionnaire de démarrage"}</div>
             {projetTitre && <div style={{ fontSize: 12, color: "#777", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projetTitre}</div>}
           </div>
           <button onClick={fermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Plus tard" aria-label="Fermer">✕</button>
@@ -104,6 +114,29 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
             </div>
           )}
           {!questions && !erreurChargement && <div style={{ fontSize: 13.5, color: "#777" }}>Chargement…</div>}
+
+          {questions && !serie && (
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>✓ Le questionnaire de base est enregistré</div>
+              <div style={{ fontSize: 13, color: "#666", lineHeight: 1.55, marginBottom: 14 }}>
+                Le Co-pilote s'en sert comme ligne de conduite de ce livre. Vous pouvez aller plus loin maintenant, ou plus tard : le bouton « 🧭 Questionnaire de démarrage » de la page du livre rouvre cet écran.
+              </div>
+              {suites.map((x) => (
+                <div key={x.serie} style={{ border: "0.5px solid #ddd", borderRadius: 10, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 600 }}>{x.titre} <span style={{ fontWeight: 400, color: "#888", fontSize: 12.5 }}>· {x.repondues} / {x.total}</span></div>
+                  <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.5, margin: "4px 0 10px" }}>
+                    {x.serie === "affinage"
+                      ? "Six précisions : ce qui doit primer, qui n'est pas le lecteur visé, le niveau de langage, l'audace, l'énergie émotionnelle, les malentendus à éviter."
+                      : "Votre livre semble évoquer des personnes réelles : trois questions pour garder la trace des précautions (identification, noms, risques). Ce n'est pas un avis juridique."}
+                  </div>
+                  <button type="button" style={bouton(true)} onClick={() => commencer(x.serie)}>{x.repondues === 0 ? "Commencer" : x.repondues >= x.total ? "Revoir mes réponses" : "Continuer"}</button>
+                </div>
+              ))}
+              {questions && !estComplet(questions, avecValeurs, "base") && (
+                <button type="button" style={{ ...bouton(false), marginTop: 4 }} onClick={() => commencer("base")}>Reprendre les questions de base sans réponse</button>
+              )}
+            </div>
+          )}
 
           {q && (
             <>
@@ -118,7 +151,7 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
               {g === "choix" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {options.map((o) => <button key={o} type="button" style={{ ...puce(valeur === o), textAlign: "left", borderRadius: 10 }} onClick={() => fixer(o)}>{o}</button>)}
-                  <input type="text" placeholder="Autre (précisez)" value={options.includes(valeur) ? "" : valeur} onChange={(e) => fixer(e.target.value)} style={entrée} />
+                  {autreAutorisé && <input type="text" placeholder="Autre (précisez)" value={options.includes(valeur) ? "" : valeur} onChange={(e) => fixer(e.target.value)} style={entrée} />}
                 </div>
               )}
               {g === "multiple" && (
@@ -139,6 +172,9 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
           )}
         </div>
 
+        {questions && !serie && (
+          <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", textAlign: "right" }}><button style={bouton(true)} onClick={() => onTerminé?.()}>Fermer</button></div>
+        )}
         {q && (
           <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "space-between", flexWrap: "wrap" }}>
             <button style={bouton(false)} onClick={fermer} disabled={enCours}>Plus tard</button>
