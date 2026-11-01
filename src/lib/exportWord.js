@@ -30,7 +30,9 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   PageBreak, BorderStyle, TableOfContents, FootnoteReferenceRun, ShadingType, LineRuleType, Tab, TabStopType,
+  Header, Footer, PageNumber,
 } from "docx";
+import { composerZones } from "./entetesPages.js";
 import { premierePolice, taillePtDepuisCss } from "./miseEnFormeEditeur.js";
 import { margesReglees, nettoyerStyles, paragrapheDepuisStyle, runDepuisStyle, stylesPourDocx } from "./stylesProjet.js";
 
@@ -341,10 +343,15 @@ export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluse
     new Paragraph({ children: [new PageBreak()] }),
   ];
 
+  // En-têtes / pieds de page / numéros (31/10/2026, src/lib/entetesPages.js) : si l'auteur·ice en a réglé, la page de titre
+  // et le sommaire forment une première section SANS en-tête ni pied ; le livre commence dans une seconde section dont la
+  // numérotation repart à 1. Rien de réglé = une seule section, export strictement inchangé.
+  const compo = composerZones(styles.entetes);
+  const avecEntetes = compo.entete || compo.pied;
   const sommaire = [
     new Paragraph({ heading: HeadingLevel.HEADING_1, text: "Table des matières" }),
     new TableOfContents("Table des matières", { hyperlink: true, headingStyleRange: "1-3" }),
-    new Paragraph({ children: [new PageBreak()] }),
+    ...(avecEntetes ? [] : [new Paragraph({ children: [new PageBreak()] })]),
   ];
 
   const contenu = [];
@@ -373,16 +380,36 @@ export async function exporterProjetWord(projet, formatPage = "a4", zonesIncluse
     footnotes[i + 1] = { children: [new Paragraph({ children: [new TextRun(texteNote || "(note vide)")] })] };
   });
 
-  const documentWord = new Document({
-    sections: [{
-      properties: {
-        page: {
-          size: { width: format.width, height: format.height },
-          margin: { top: format.margin, bottom: format.margin, left: margeCm.gauche ? Math.round(margeCm.gauche * 567) : format.margin, right: margeCm.droite ? Math.round(margeCm.droite * 567) : format.margin }, // marges réglées sur la règle (cm → twips)
+  const margeGauche = margeCm.gauche ? Math.round(margeCm.gauche * 567) : format.margin;
+  const margeDroite = margeCm.droite ? Math.round(margeCm.droite * 567) : format.margin;
+  const proprietésPage = {
+    size: { width: format.width, height: format.height },
+    margin: { top: format.margin, bottom: format.margin, left: margeGauche, right: margeDroite }, // marges réglées sur la règle (cm → twips)
+  };
+  const largeurTexte = format.width - margeGauche - margeDroite;
+  const runsDeZone = (morceaux) => morceaux.flatMap((m) => {
+    if (m.t !== undefined) return [new TextRun({ text: m.t, size: 18, color: "666666" })];
+    if (m.v === "titre") return [new TextRun({ text: projet.titre || "", size: 18, color: "666666" })];
+    return [new TextRun({ children: [m.v === "page" ? PageNumber.CURRENT : PageNumber.TOTAL_PAGES_IN_SECTION], size: 18, color: "666666" })];
+  });
+  const ligneZones = (zones) => new Paragraph({
+    tabStops: [{ type: TabStopType.CENTER, position: Math.round(largeurTexte / 2) }, { type: TabStopType.RIGHT, position: largeurTexte }],
+    children: [...runsDeZone(zones.gauche), new TextRun({ children: [new Tab()] }), ...runsDeZone(zones.centre), new TextRun({ children: [new Tab()] }), ...runsDeZone(zones.droite)],
+  });
+  const sections = avecEntetes
+    ? [
+        { properties: { page: proprietésPage }, children: [...pageDeTitre, ...sommaire] },
+        {
+          properties: { page: { ...proprietésPage, pageNumbers: { start: 1 } } },
+          headers: compo.entete ? { default: new Header({ children: [ligneZones(compo.zones.entete)] }) } : undefined,
+          footers: compo.pied ? { default: new Footer({ children: [ligneZones(compo.zones.pied)] }) } : undefined,
+          children: contenu,
         },
-      },
-      children: [...pageDeTitre, ...sommaire, ...contenu],
-    }],
+      ]
+    : [{ properties: { page: proprietésPage }, children: [...pageDeTitre, ...sommaire, ...contenu] }];
+
+  const documentWord = new Document({
+    sections,
     footnotes,
     styles: {
       default: (() => {

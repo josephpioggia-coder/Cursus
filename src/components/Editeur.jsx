@@ -64,6 +64,7 @@ import QuestionRapide from "./QuestionRapide.jsx";
 import RechercheRemplacement from "./RechercheRemplacement.jsx";
 import { RechercheDansTexte } from "../lib/rechercheEditeur.js";
 import { aplatirStructure } from "../lib/rechercheTexte.js";
+import EntetesPages from "./EntetesPages.jsx";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -1385,6 +1386,7 @@ export default function Editeur({
       else setErreurRègle(null);
     });
   };
+  const [entetesOuvert, setEntetesOuvert] = useState(false);
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
@@ -1845,6 +1847,7 @@ export default function Editeur({
   const actionsRuban = {
     question: { onClick: () => ouvrirQuestion() },
     rechercher: { onClick: () => ouvrirRecherche() },
+    entetes: { onClick: () => setEntetesOuvert(true) },
     saut_page: { onClick: () => editor?.commands.insererSautDePage(), desactive: lectureSeule },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
     photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
@@ -2114,6 +2117,10 @@ export default function Editeur({
       {galerieOuverte && (
         <GalerieStyles projetId={projetIdStyles} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
           onEnregistre={setStylesProjet} onFermer={() => setGalerieOuverte(false)} />
+      )}
+      {entetesOuvert && (
+        <EntetesPages projetId={projetIdStyles} titre={projetTitre} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
+          onEnregistre={setStylesProjet} onFermer={() => setEntetesOuvert(false)} />
       )}
 
       {profilOuvert && editor && (

@@ -39,7 +39,7 @@ export const FONCTIONS = [
   { id: "format", onglet: "miseenpage", groupe: "Page", label: "Format de page", icone: "📐", statut: "fait", ctrl: "format", aide: "Format de référence (A4, A5, poche, broché)" },
   { id: "regle", onglet: "miseenpage", groupe: "Paragraphe", label: "Marges et retraits", icone: "📏", statut: "fait", aide: "Affiche la feuille et sa règle : marges, retraits, tabulations" },
   { id: "styles", onglet: "miseenpage", groupe: "Styles", label: "Styles", icone: "🎨", statut: "fait", aide: "Régler une fois la police, la taille, l'interligne… de Normal, Titres, Citation" },
-  { id: "entetes", onglet: "miseenpage", groupe: "En-tête et pied de page", label: "En-têtes et numéros de page", icone: "🔢", statut: "bientot", priorite: "fort", aide: "Titre du livre, auteur, numéro de page à l'export Word" },
+  { id: "entetes", onglet: "miseenpage", groupe: "En-tête et pied de page", label: "En-têtes et numéros de page", icone: "🔢", statut: "fait", aide: "Titre du livre, texte libre et numéro de page en haut ou en bas de chaque page, à l'export Word" },
   { id: "colonnes", onglet: "miseenpage", groupe: "Page", label: "Colonnes", icone: "▥", statut: "bientot", priorite: "faible", aide: "Texte sur plusieurs colonnes" },
 
   // ── Références ────────────────────────────────────────────
