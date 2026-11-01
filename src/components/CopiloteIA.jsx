@@ -831,6 +831,8 @@ TU NE MÉMORISES RIEN TOI-MÊME — tu n'as aucun moyen d'enregistrer quoi que c
 
 RÉPONSES COMPLÈTES — l'auteur·ice préfère une réponse complète et développée à une réponse tronquée : ne résume pas par souci de brièveté ce qui mérite d'être détaillé.
 
+PASSAGE MARQUÉ — si le message contient un bloc « PASSAGE MARQUÉ PAR L'AUTEUR·ICE », c'est le passage que l'auteur·ice désigne par « la partie marquée » : travaille directement dessus, sans lui redemander de le préciser. S'il n'y a PAS ce bloc et qu'il parle d'un passage marqué, dis-lui que tu ne vois aucun marquage gris dans le chapitre (il se pose avec le bouton loupe de l'éditeur) plutôt que de deviner.
+
 CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, le plan du livre (titres uniquement, quand il est fourni dans le contexte du projet) et, SEULEMENT si l'auteur·ice l'a joint explicitement, le texte du chapitre précédent. Tu ne connais JAMAIS le contenu des autres chapitres : ne le devine pas, ne l'invente pas, ne le résume pas d'après leur titre. Si une demande exige ce contenu (introduction qui reprend les chapitres précédents, rappel, continuité), dis précisément ce qu'il te manque et propose à l'auteur·ice de te le fournir (joindre le chapitre précédent, ou te donner quelques lignes de résumé) ; tu peux proposer une introduction qui s'appuie sur les titres du plan ou sur le chapitre joint, en le disant clairement.
 
 DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
@@ -1814,6 +1816,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // parvenue". Même source (texteActif, déjà une dépendance ici) donc
       // même mécanique, juste jamais branchée sur CE point d'entrée.
       const imagesDialogue = extraireImages(texteActif).slice(0, 3);
+      // CORRECTIF 01/11/2026 — « pourquoi cette réponse alors que j'ai utilisé le marqueur ad hoc ? » : le fil ne recevait QUE le texte
+      // brut du chapitre (extraireTexte retire toute mise en forme, donc le surlignage gris « à analyser » aussi) : le Co-pilote ne
+      // pouvait pas savoir quel passage était marqué et demandait de le préciser. Les fragments marqués sont maintenant joints à part.
+      const marqué = extraireTexteMarquéAnalyse(texteActif);
+      const blocMarqué = marqué.nbFragments
+        ? `\n\nPASSAGE MARQUÉ PAR L'AUTEUR·ICE (surlignage gris « à analyser » — ${marqué.nbFragments} fragment${marqué.nbFragments > 1 ? "s" : ""}, séparés par [...]). Quand l'auteur·ice parle de « la partie que j'ai marquée » ou « du passage marqué », c'est CE texte, recopié mot pour mot du chapitre :\n"""\n${marqué.texte}\n"""`
+        : "";
       const noteImagesDialogue = imagesDialogue.length
         ? `\n\n(${imagesDialogue.length} image${imagesDialogue.length > 1 ? "s" : ""} du ${typeNœud} jointe${imagesDialogue.length > 1 ? "s" : ""} — observe-${imagesDialogue.length > 1 ? "les" : "la"} si l'auteur·ice t'interroge dessus.)`
         : "";
@@ -1821,7 +1830,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const blocPièceJointe = pj
         ? `\n\nCHAPITRE PRÉCÉDENT « ${pj.titre} » — joint par l'auteur·ice (tu peux t'appuyer dessus ; tu ne connais toujours PAS les autres chapitres) :\n"""\n${pj.texte}\n"""`
         : "";
-      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${blocPièceJointe}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
+      const userContent = `Analyse initiale du co-pilote :\n"""\n${état?.contexteCarte || contexteCarteInitial || ""}\n"""${contexteTexteActuel}${blocMarqué}${blocPièceJointe}${noteImagesDialogue}\n\nÉchange avec l'auteur :\n${historique}${consigneContinuation}`;
 
       const { texte, tronqué } = await appelClaude(
         promptDialogue(langueProjet, typeProjet, contexteADNEtPlan),
