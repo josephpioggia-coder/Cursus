@@ -14,6 +14,7 @@
  * La mise en forme DIRECTE (police, taille ou interligne posés sur un passage) l'emporte toujours sur le
  * style, comme dans Word.
  */
+import { nettoyerEntetes } from "./entetesPages.js";
 import { POLICES, premierePolice } from "./miseEnFormeEditeur.js";
 
 /** Les styles proposés. `export` = pas d'équivalent dans l'éditeur (titres de la structure), effet à l'export Word seulement. */
@@ -100,6 +101,8 @@ export function nettoyerStyles(brut) {
   }
   const page = nettoyerPage(brut.page);
   if (Object.keys(page).length) sortie.page = page;
+  const entetes = nettoyerEntetes(brut.entetes);
+  if (Object.keys(entetes).length) sortie.entetes = entetes;
   return sortie;
 }
 
