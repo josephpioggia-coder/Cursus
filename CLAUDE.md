@@ -1392,3 +1392,6 @@ Q016 n'est plus un choix unique : une ligne par personne (nom tel qu'il figure d
 
 ### Export du questionnaire de démarrage (01/11/2026)
 `src/lib/exportQuestionnaireDemarrage.js` (`construireSections` pur, Word / texte / JSON) ; boutons dans l'écran des suites de `QuestionnaireIntention.jsx`. Aucun import dans CursAudit (non demandé précisément : à confirmer avec Joseph). Vérifié : `vite build` + test node de `construireSections` seulement ; téléchargement NON testé dans le navigateur.
+
+### Questionnaire : choix multiples + « Autre » cumulable (01/11/2026)
+Retour de Joseph (export : « Réflexive Inquiétante Tendre » en une ligne) : Q020 était à choix unique et taper dans « Autre » effaçait le choix coché. Q020/Q019/Q010 forcés en `multiple` (`genre()`), et pour tous les choix la valeur = options cochées + texte libre séparés par « ; » (`composer`, espaces non rognés). Vérifié : `vite build` seulement ; NON testé dans le navigateur.

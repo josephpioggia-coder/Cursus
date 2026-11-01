@@ -68,6 +68,8 @@ export const trier = (questions) => [...(questions || [])].sort((a, b) => (ORDRE
 /** « choix » (une seule), « multiple » (plusieurs), « liste » (une par ligne), « long », « court » */
 export function genre(question) {
   if (question?.id === "Q016") return "personnes";
+  // Plusieurs réponses possibles (retour de Joseph 01/11/2026 : énergie émotionnelle, risques, ton).
+  if (["Q020", "Q019", "Q010"].includes(question?.id) && OPTIONS[question.id]) return "multiple";
   const t = String(question?.type_reponse || "").toLowerCase();
   if (t.includes("multiple")) return OPTIONS[question.id] ? "multiple" : "long";
   if (t.startsWith("choix") || t.includes("oui")) return OPTIONS[question.id] ? "choix" : "court";

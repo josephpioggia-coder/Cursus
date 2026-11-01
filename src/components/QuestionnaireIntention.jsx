@@ -109,8 +109,11 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
   const g = q ? genre(q) : null;
   const options = q ? OPTIONS[q.id] || [] : [];
   const autreAutorisé = q ? !SANS_AUTRE.has(q.id) : false;
-  const choisis = g === "multiple" ? parseMultiple(valeur) : [];
-  const autres = g === "multiple" ? choisis.filter((c) => !options.includes(c)) : [];
+  // Choix + « Autre » coexistent : les options cochées sont séparées du texte libre SANS rogner les espaces (sinon on ne peut pas taper « a b »).
+  const morceaux = g === "multiple" || g === "choix" ? valeur.split(" ; ") : [];
+  const choisis = morceaux.filter((c) => options.includes(c));
+  const texteAutre = morceaux.filter((c) => c !== "" && !options.includes(c)).join(" ; ");
+  const composer = (cochés, autre) => [...cochés, autre].filter(Boolean).join(" ; ");
 
   const bouton = (principal, actif = true) => ({
     fontSize: 14, padding: "9px 16px", borderRadius: 8, cursor: actif ? "pointer" : "default", fontFamily: "inherit", opacity: actif ? 1 : 0.5,
@@ -182,8 +185,8 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
 
               {g === "choix" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {options.map((o) => <button key={o} type="button" style={{ ...puce(valeur === o), textAlign: "left", borderRadius: 10 }} onClick={() => fixer(o)}>{o}</button>)}
-                  {autreAutorisé && <input type="text" placeholder="Autre (précisez)" value={options.includes(valeur) ? "" : valeur} onChange={(e) => fixer(e.target.value)} style={entrée} />}
+                  {options.map((o) => <button key={o} type="button" aria-pressed={choisis.includes(o)} style={{ ...puce(choisis.includes(o)), textAlign: "left", borderRadius: 10 }} onClick={() => fixer(composer(choisis.includes(o) ? [] : [o], texteAutre))}>{o}</button>)}
+                  {autreAutorisé && <input type="text" placeholder="Autre (précisez) — s'ajoute au choix ci-dessus" value={texteAutre} onChange={(e) => fixer(composer(choisis.slice(0, 1), e.target.value))} style={entrée} />}
                 </div>
               )}
               {g === "multiple" && (
@@ -191,10 +194,10 @@ export default function QuestionnaireIntention({ projetId, projetTitre, onTermin
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                     {options.map((o) => {
                       const actif = choisis.includes(o);
-                      return <button key={o} type="button" style={puce(actif)} aria-pressed={actif} onClick={() => fixer(joindreMultiple(actif ? choisis.filter((c) => c !== o) : [...choisis, o]))}>{o}</button>;
+                      return <button key={o} type="button" style={puce(actif)} aria-pressed={actif} onClick={() => fixer(composer(actif ? choisis.filter((c) => c !== o) : [...choisis, o], texteAutre))}>{o}</button>;
                     })}
                   </div>
-                  <input type="text" placeholder="Autre (précisez)" value={autres.join(" ; ")} onChange={(e) => fixer(joindreMultiple([...choisis.filter((c) => options.includes(c)), ...e.target.value.split(" ; ")]))} style={entrée} />
+                  <input type="text" placeholder="Autre (précisez)" value={texteAutre} onChange={(e) => fixer(composer(choisis, e.target.value))} style={entrée} />
                 </div>
               )}
               {g === "personnes" && (
