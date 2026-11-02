@@ -66,6 +66,21 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
     ecrire(CLE_EPINGLEES, JSON.stringify(suite));
     return suite;
   });
+  // Réorganiser « Mes fonctions » : flèches ◀ ▶ au survol, ou glisser-déposer un bouton sur un autre.
+  const deplacerEpingle = (id, delta) => setEpinglees((liste) => {
+    const i = liste.indexOf(id), j = i + delta;
+    if (i < 0 || j < 0 || j >= liste.length) return liste;
+    const suite = [...liste]; [suite[i], suite[j]] = [suite[j], suite[i]];
+    ecrire(CLE_EPINGLEES, JSON.stringify(suite));
+    return suite;
+  });
+  const deposerEpingle = (idSource, idCible) => setEpinglees((liste) => {
+    if (idSource === idCible || !liste.includes(idSource) || !liste.includes(idCible)) return liste;
+    const sans = liste.filter((x) => x !== idSource);
+    sans.splice(sans.indexOf(idCible) + (liste.indexOf(idSource) < liste.indexOf(idCible) ? 1 : 0), 0, idSource);
+    ecrire(CLE_EPINGLEES, JSON.stringify(sans));
+    return sans;
+  });
   const retablir = () => { setEpinglees(EPINGLEES_PAR_DEFAUT); ecrire(CLE_EPINGLEES, JSON.stringify(EPINGLEES_PAR_DEFAUT)); };
 
   const rendu = (f, { peutEpingler, dansAccueil = false }) => {
@@ -92,7 +107,7 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
 
   return (
     <div style={{ flexShrink: 0, borderBottom: "0.5px solid #e5e5e5", background: "#fafafa" }}>
-      <style>{`.ruban-btn:hover .ruban-epingle{opacity:1 !important}.ruban-btn:hover > button:first-child{background:#f0eff6}`}</style>
+      <style>{`.ruban-btn:hover .ruban-epingle{opacity:1 !important}.ruban-btn:hover > button:first-child{background:#f0eff6}.ruban-deplace:hover .ruban-fleches,.ruban-deplace:focus-within .ruban-fleches{opacity:1 !important}.ruban-deplace[draggable=true]{cursor:grab}`}</style>
       <div role="tablist" style={{ display: "flex", alignItems: "center", gap: 2, padding: "0 12px", borderBottom: reduit ? "none" : "0.5px solid #e5e5e5" }}>
         {ONGLETS.map((o) => (
           <button key={o.id} role="tab" aria-selected={onglet === o.id && !reduit} onClick={() => choisir(o.id)}
@@ -107,14 +122,27 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
       </div>
 
       {!reduit && (
-        <>
+        <div style={{ maxHeight: "38vh", overflowY: "auto" }}>
           {/* Accueil : toujours monté (la barre de mise en forme écoute des événements), masqué hors de l'onglet */}
           <div style={{ display: onglet === "accueil" ? "block" : "none" }}>
             {accueil}
             <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap", padding: "2px 4px 2px", borderTop: accueil ? "0.5px solid #eee" : "none" }}>
               {groupes("accueil").map(([titre, liste]) => <Groupe key={titre} titre={titre}>{liste.map((f) => rendu(f, { peutEpingler: false }))}</Groupe>)}
               <Groupe titre="Mes fonctions">
-                {epingleesVisibles.map((f) => rendu(f, { peutEpingler: true, dansAccueil: true }))}
+                {epingleesVisibles.map((f, i) => (
+                  <div key={f.id} className="ruban-deplace" style={{ position: "relative" }} draggable
+                    onDragStart={(e) => { e.dataTransfer.setData("text/plain", f.id); e.dataTransfer.effectAllowed = "move"; }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); deposerEpingle(e.dataTransfer.getData("text/plain"), f.id); }}>
+                    {rendu(f, { peutEpingler: true, dansAccueil: true })}
+                    <span className="ruban-fleches" style={{ position: "absolute", left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "space-between", opacity: 0, pointerEvents: "none" }}>
+                      <button type="button" aria-label={`Déplacer « ${f.label} » vers la gauche`} title="Déplacer à gauche" disabled={i === 0} onClick={() => deplacerEpingle(f.id, -1)}
+                        style={{ pointerEvents: "auto", width: 16, height: 16, padding: 0, fontSize: 9, border: "none", borderRadius: 8, background: "#fff", boxShadow: "0 0 0 0.5px #ccc", cursor: "pointer", color: "#555" }}>◀</button>
+                      <button type="button" aria-label={`Déplacer « ${f.label} » vers la droite`} title="Déplacer à droite" disabled={i === epingleesVisibles.length - 1} onClick={() => deplacerEpingle(f.id, 1)}
+                        style={{ pointerEvents: "auto", width: 16, height: 16, padding: 0, fontSize: 9, border: "none", borderRadius: 8, background: "#fff", boxShadow: "0 0 0 0.5px #ccc", cursor: "pointer", color: "#555" }}>▶</button>
+                    </span>
+                  </div>
+                ))}
                 {epingleesVisibles.length === 0 && <span style={{ fontSize: 11, color: "#999", padding: 8 }}>Épinglez ici (📌) les fonctions des autres onglets.</span>}
               </Groupe>
               <div style={{ display: "flex", alignItems: "flex-end", padding: "0 8px 4px" }}>
@@ -127,7 +155,7 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
               {groupes(onglet).map(([titre, liste]) => <Groupe key={titre} titre={titre}>{liste.map((f) => rendu(f, { peutEpingler: true }))}</Groupe>)}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -58,3 +58,6 @@ Où : 🧭 Questionnaire de démarrage → écran « Le questionnaire de base es
 
 ## Co-pilote : « la partie que j'ai marquée » (01/11/2026)
 Dans la discussion avec le Co-pilote, le passage marqué avec le surlignage gris (bouton loupe de l'éditeur) est maintenant transmis : on peut écrire « reconstruis le dialogue de la partie marquée ». Sans marquage gris dans le chapitre, le Co-pilote le dit au lieu de deviner.
+
+## Ruban : réorganiser « Mes fonctions », règle toujours visible (02/11/2026)
+Accueil › Mes fonctions : survoler un bouton épinglé fait apparaître ◀ ▶ pour le décaler, ou le glisser-déposer sur un autre. La règle de la « Vue page » reste collée en haut de la zone de texte quand on fait défiler. Le ruban ne prend plus plus de 38 % de la hauteur de la fenêtre (il défile à l'intérieur si besoin) ; ▴ le réduit complètement.
