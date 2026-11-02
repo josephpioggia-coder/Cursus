@@ -78,6 +78,10 @@ const extraireTexteMarquéAnalyse = (html = "") => {
   return { texte: fragments.join("\n\n[...]\n\n"), nbFragments: fragments.length };
 };
 
+// Repères de ligne (03/11/2026, demande de Joseph : « quand Copilote se réfère au texte il doit mentionner les numéros de ligne »).
+// Le texte du CHAPITRE est envoyé avec ses numéros de ligne de marge « [L12] » (voir Editeur.jsx, texteNuméroté) et cette note demande de les citer.
+const NOTE_LIGNES = `\n(Chaque ligne du texte commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice. Chaque fois que tu cites ou désignes un passage du texte dans ta réponse — y compris dans les champs JSON (« titre », « texte », « suggestion », « note »…) —, indique son numéro de ligne entre parenthèses, par ex. « (ligne 26) » ou « (lignes 26-28) », avec un court extrait exact entre guillemets. Les repères ne font pas partie du texte : ne les recopie pas dans une réécriture proposée.)`;
+
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
 
@@ -2109,7 +2113,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     sauverResultat(nœudId, "recomposition-portee", portée);
     try {
       const surligné = portée === "surligne";
-      const { texte } = surligné ? { texte: extraireTexteMarquéAnalyse(texteActif).texte } : extraireTexte(texteActif);
+      const numérotéRecompo = surligné ? null : lireTexteNuméroté();
+      const noteLignesRecompo = numérotéRecompo ? NOTE_LIGNES : "";
+      const { texte } = surligné ? { texte: extraireTexteMarquéAnalyse(texteActif).texte } : { texte: numérotéRecompo || extraireTexte(texteActif).texte };
       if (surligné ? compterMots(texte) < 5 : compterMots(texteActif) < 20) {
         throw new Error(surligné ? "Aucun passage surligné (ou passage trop court) : marquez d'abord le passage avec le surlignage « à analyser » (loupe de l'éditeur)." : t("erreur.motsInsuffisants"));
       }
@@ -2136,7 +2142,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           systemAvecLangue(PROMPTS.recomposition(typeProjet), langueProjet, contexteADN),
           surligné
             ? `Tranche ${i + 1}/${tranches.length} du PASSAGE SURLIGNÉ par l'auteur·ice (fragments séparés par [...] : limite-toi à ces fragments, ils sont tirés d'un chapitre plus long) :\n\n${tranches[i]}${noteImages}`
-            : `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}${noteImages}`,
+            : `Tranche ${i + 1}/${tranches.length} du chapitre :${noteLignesRecompo}\n\n${tranches[i]}${noteImages}`,
           null, 4096, null, false, images
         );
         const p = parserJSON(résultat);
@@ -2165,9 +2171,16 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     }
   }, [nœudId, texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
 
+  // Texte du chapitre avec ses numéros de ligne (null si l'éditeur est masqué / non mesurable : texte simple).
+  const lireTexteNuméroté = () => { try { return lecteurLignes?.current?.() || null; } catch { return null; } };
+
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = obtenirSourceHTML();
     const { texte } = extraireTexte(sourceTexte);
+    // Chapitre entier analysé : on envoie la version avec numéros de ligne (jamais pour « vérification », qui compare des citations au texte brut côté serveur).
+    const numérotéAnalyse = sourceAnalyse === "chapitre" && ongletCible !== "vérification" ? lireTexteNuméroté() : null;
+    const texteEnvoyé = numérotéAnalyse || texte;
+    const noteLignes = numérotéAnalyse ? NOTE_LIGNES : "";
     if (compterMots(sourceTexte) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
@@ -2205,11 +2218,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       let résultat = "";
 
       if (ongletCible === "suggestions") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :${noteLignes}\n\n${texteEnvoyé}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("suggestions", p.suggestions || []);
       } else if (ongletCible === "personnages") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.personnages(typeProjet), langueProjet, contexteADN), `Texte :${noteLignes}\n\n${texteEnvoyé}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("personnages", p.personnages || []);
       } else if (ongletCible === "références") {
@@ -2221,7 +2234,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         // mécaniquement chaque référence "vérifiée" contre ce que la
         // recherche web a RÉELLEMENT renvoyé, pas seulement la parole du
         // modèle. Voir CLAUDE.md, point "Références" du GO/NO-GO.
-        const réponseAppel = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :\n\n${texte}${noteImages}`, sig, 6144, OUTIL_RECHERCHE_WEB, true, images);
+        const réponseAppel = await appelClaude(systemAvecLangue(PROMPTS.références(langueProjet), langueProjet, contexteADN), `Projet : ${projetTitre}\n\nTexte :${noteLignes}\n\n${texteEnvoyé}${noteImages}`, sig, 6144, OUTIL_RECHERCHE_WEB, true, images);
         résultat = réponseAppel.texte;
         const résultatsRecherche = réponseAppel.résultatsRecherche || [];
         // Répare le JSON potentiellement tronqué
@@ -2258,7 +2271,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
           }
         }
       } else if (ongletCible === "cohérence") {
-        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
+        résultat = await appelClaude(systemAvecLangue(PROMPTS.cohérence(typeProjet), langueProjet, contexteADN), `Texte :${noteLignes}\n\n${texteEnvoyé}${noteImages}`, sig, 4096, null, false, images);
         const p = parserJSON(résultat);
         màjDonnées("cohérence", p.points || []);
       } else if (ongletCible === "vérification") {
@@ -2278,7 +2291,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       marquerFin(nœudId, ongletCible);
       if (nœudIdRef.current === nœudId) setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [obtenirSourceHTML, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
+  }, [obtenirSourceHTML, sourceAnalyse, lecteurLignes, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -2476,13 +2489,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
         : "";
       // Passage marqué (surlignage gris « à analyser », 03/11/2026) : joint à part, sinon un texte entier ne dit pas ce que l'auteur·ice désigne.
+      const numérotéBlocage = sourceAnalyse === "chapitre" ? lireTexteNuméroté() : null;
       const marquéBlocage = sourceAnalyse === "analyse" ? { nbFragments: 0, texte: "" } : extraireTexteMarquéAnalyse(texteActif);
       const blocMarquéBlocage = marquéBlocage.nbFragments
         ? `\n\nPASSAGE MARQUÉ PAR L'AUTEUR·ICE (surlignage gris « à analyser » — ${marquéBlocage.nbFragments} fragment${marquéBlocage.nbFragments > 1 ? "s" : ""}, séparés par [...]) : c'est ce qu'il/elle te désigne comme point d'attention. Concentre ton diagnostic sur ce passage, en t'appuyant sur le reste du texte pour le situer :\n"""\n${marquéBlocage.texte}\n"""`
         : "";
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur, typeProjet), langueProjet, contexteADNEtPlan),
-        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage + blocMarquéBlocage,
+        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :${numérotéBlocage ? NOTE_LIGNES : ""}\n\n${numérotéBlocage || texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage + blocMarquéBlocage,
         sig, 1024, null, false, imagesBlocage
       );
       const p = parserJSON(résultat);
