@@ -122,3 +122,63 @@ export function remplacerToutes(editor, remplacement) {
   editor.view.dispatch(tr);
   return e.occurrences.length;
 }
+
+// ─── « Atteindre » (02/11/2026) : aller à un paragraphe, une note, une image, un intertitre, un caractère du chapitre ───
+// [singulier, pluriel, « Aucun/Aucune »]
+export const TYPES_CIBLE = { paragraphe: ["paragraphe", "paragraphes", "Aucun"], note: ["note de bas de page", "notes de bas de page", "Aucune"], image: ["image", "images", "Aucune"], intertitre: ["intertitre", "intertitres", "Aucun"] };
+
+/** Positions des éléments d'un type dans le chapitre ouvert → [{ pos, fin, noeud }] (ordre du document). */
+export function ciblesDe(editor, type) {
+  const res = [];
+  editor.state.doc.descendants((n, pos) => {
+    if (type === "paragraphe" && n.isTextblock) res.push({ pos, fin: pos + n.nodeSize, texte: true });
+    else if (type === "intertitre" && n.type.name === "heading") res.push({ pos, fin: pos + n.nodeSize, texte: true, niveau: n.attrs.level, libelle: n.textContent });
+    else if (type === "note" && n.type.name === "note") res.push({ pos, fin: pos + n.nodeSize, texte: false });
+    else if (type === "image" && n.type.name === "image") res.push({ pos, fin: pos + n.nodeSize, texte: false });
+    return true;
+  });
+  return res;
+}
+
+function placer(editor, c) {
+  const { doc } = editor.state;
+  const sel = c.texte ? TextSelection.create(doc, c.pos + 1, Math.max(c.pos + 1, c.fin - 1)) : NodeSelection.create(doc, c.pos);
+  editor.view.dispatch(editor.state.tr.setSelection(sel).scrollIntoView());
+  editor.view.focus();
+}
+
+/**
+ * Va à l'élément n° `saisie` du type donné ; « +3 » / « −2 » = relatif à la position du curseur (comme « Atteindre » de Word).
+ * → { ok, message }
+ */
+export function atteindreCible(editor, type, saisie, indexExact = null) {
+  const cibles = ciblesDe(editor, type);
+  const [nom, pluriel, aucun] = TYPES_CIBLE[type];
+  if (!cibles.length) return { ok: false, message: `${aucun} ${nom} dans ce chapitre.` };
+  let idx = indexExact;
+  if (idx == null) {
+    const s = String(saisie ?? "").trim();
+    const n = parseInt(s.replace(/[+\-−\s]/g, ""), 10);
+    if (!Number.isFinite(n)) return { ok: false, message: "Indiquez un nombre (ex. 12, +3 ou −2)." };
+    if (/^[+\-−]/.test(s)) {
+      const courant = cibles.reduce((k, c, i) => (c.pos <= editor.state.selection.from ? i : k), -1);
+      idx = courant + (/^[\-−]/.test(s) ? -n : n);
+    } else idx = n - 1;
+  }
+  if (idx < 0 || idx >= cibles.length) return { ok: false, message: `Il y a ${cibles.length} ${cibles.length > 1 ? pluriel : nom} dans ce chapitre (de 1 à ${cibles.length}).` };
+  placer(editor, cibles[idx]);
+  return { ok: true, message: `${nom[0].toUpperCase()}${nom.slice(1)} ${idx + 1} sur ${cibles.length}.` };
+}
+
+/** Position dans le document du caractère n° `car` du texte du chapitre (texte seul, sans notes ni éléments). */
+export function placerAuCaractere(editor, car) {
+  let reste = Math.max(0, car); let cible = null; let derniere = 1;
+  editor.state.doc.descendants((n, pos) => {
+    if (cible != null) return false;
+    if (n.isText) { derniere = pos + n.nodeSize; if (reste <= n.nodeSize) cible = pos + Math.min(reste, n.nodeSize); else reste -= n.nodeSize; }
+    return true;
+  });
+  const pos = cible ?? derniere;
+  editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, Math.min(pos, editor.state.doc.content.size))).scrollIntoView());
+  editor.view.focus();
+}

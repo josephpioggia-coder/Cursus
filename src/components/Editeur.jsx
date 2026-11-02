@@ -35,6 +35,7 @@
 
 import { useEditor, EditorContent, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import { Node, mergeAttributes } from "@tiptap/core";
+import { TextSelection } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import Typography from "@tiptap/extension-typography";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -1677,18 +1678,41 @@ export default function Editeur({
   const ouvrirQuestionRef = useRef(ouvrirQuestion);
   ouvrirQuestionRef.current = ouvrirQuestion;
   // Rechercher / remplacer (Ctrl+F, Ctrl+H) : la sélection courante (courte, sur une ligne) devient la requête.
-  const ouvrirRecherche = () => {
+  const [porteeRecherche, setPorteeRecherche] = useState("chapitre"); // "chapitre" | "atteindre" (Ctrl+G)
+  const ouvrirRecherche = (portee = "chapitre") => {
     const { from, to } = editor?.state?.selection || { from: 0, to: 0 };
     const sel = to > from ? editor.state.doc.textBetween(from, to, " ") : "";
-    if (sel && sel.length <= 80) setRequeteRecherche(sel);
+    if (sel && sel.length <= 80 && portee !== "atteindre") setRequeteRecherche(sel);
+    setPorteeRecherche(typeof portee === "string" ? portee : "chapitre");
     setRechercheOuverte(true);
+  };
+  // « Atteindre » une ligne (numéros de la marge gauche) : « 12 » ou « +3 » / « −2 » depuis le curseur.
+  const atteindreLigne = (saisie) => {
+    if (!editor || !wrapperLigneRef.current || !numérosDeLigne.length) return { ok: false, message: "Aucune ligne." };
+    const s = String(saisie ?? "").trim(); const n = parseInt(s.replace(/[+\-−\s]/g, ""), 10);
+    if (!Number.isFinite(n)) return { ok: false, message: "Indiquez un nombre (ex. 12, +3 ou −2)." };
+    const hautWrapper = wrapperLigneRef.current.getBoundingClientRect().top;
+    let idx = n - 1;
+    if (/^[+\-−]/.test(s)) {
+      const topCurseur = editor.view.coordsAtPos(editor.state.selection.from).top - hautWrapper;
+      const courant = numérosDeLigne.reduce((k, l, i) => (l.top <= topCurseur + 4 ? i : k), 0);
+      idx = courant + (/^[\-−]/.test(s) ? -n : n);
+    }
+    if (idx < 0 || idx >= numérosDeLigne.length) return { ok: false, message: `Il y a ${numérosDeLigne.length} lignes dans ce chapitre (de 1 à ${numérosDeLigne.length}).` };
+    const rect = editor.view.dom.getBoundingClientRect();
+    const r = editor.view.posAtCoords({ left: rect.left + 12, top: hautWrapper + numérosDeLigne[idx].top + 6 });
+    if (!r) return { ok: false, message: "Ligne introuvable (faites défiler le texte puis réessayez)." };
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, r.pos)).scrollIntoView());
+    editor.view.focus();
+    return { ok: true, message: `Ligne ${idx + 1} sur ${numérosDeLigne.length}.` };
   };
   const ouvrirRechercheRef = useRef(ouvrirRecherche);
   ouvrirRechercheRef.current = ouvrirRecherche;
   useEffect(() => {
     const touche = (e) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); ouvrirQuestionRef.current(); }
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === "f" || e.key.toLowerCase() === "h")) { e.preventDefault(); ouvrirRechercheRef.current(); }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === "f" || e.key.toLowerCase() === "h")) { e.preventDefault(); ouvrirRechercheRef.current("chapitre"); }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "g") { e.preventDefault(); ouvrirRechercheRef.current("atteindre"); }
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
@@ -1858,7 +1882,8 @@ export default function Editeur({
   // Actions du ruban (voir src/lib/rubanCatalogue.js : une fonction « fait » doit avoir son entrée ici).
   const actionsRuban = {
     question: { onClick: () => ouvrirQuestion() },
-    rechercher: { onClick: () => ouvrirRecherche() },
+    rechercher: { onClick: () => ouvrirRecherche("chapitre") },
+    atteindre: { onClick: () => ouvrirRecherche("atteindre") },
     entetes: { onClick: () => setEntetesOuvert(true) },
     saut_page: { onClick: () => editor?.commands.insererSautDePage(), desactive: lectureSeule },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
@@ -2108,7 +2133,7 @@ export default function Editeur({
             </button>
           )}
           <button onClick={ouvrirQuestion} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Poser une question à l'IA sans passer par le Co-pilote">💬 Question rapide</button>
-          <button onClick={ouvrirRecherche} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Rechercher et remplacer dans le chapitre ou dans tout le livre">🔎 Rechercher / remplacer</button>
+          <button onClick={() => ouvrirRecherche("chapitre")} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Rechercher et remplacer dans le chapitre ou dans tout le livre">🔎 Rechercher / remplacer</button>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", whiteSpace: "nowrap", flexBasis: "100%", minWidth: 0, overflowX: "auto" }}>{lectureJSX}</div>
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
@@ -2156,7 +2181,7 @@ export default function Editeur({
       )}
 
       {rechercheOuverte && (
-        <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} noeudId={nœud?.id}
+        <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} porteeInitiale={porteeRecherche} onAtteindreLigne={atteindreLigne} nbLignes={numérosDeLigne.length} noeudId={nœud?.id}
           noeuds={aplatirStructure(structureProjet)} onOuvrirNoeud={onOuvrirNoeud} onEcrireNoeud={onEcrireAutreNoeud} onRenommerNoeud={onRenommerNoeud} sauvegarderAvant={sauvegarderAvant} onFermer={() => setRechercheOuverte(false)} />
       )}
 
