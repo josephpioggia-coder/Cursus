@@ -54,9 +54,11 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     setMenuSpecial(false);
     setTimeout(() => { el?.focus(); el?.setSelectionRange(a + code.length, a + code.length); }, 0);
   };
+  const [ignorerPonct, setIgnorerPonct] = useState(false);
+  const [ignorerEsp, setIgnorerEsp] = useState(false);
   const [format, setFormat] = useState({}); // filtres de mise en forme (gras, italique…) — ce chapitre seulement
   const nFiltres = filtresActifs({ format }).length;
-  const options = useMemo(() => ({ casse, motEntier, debutMot, finMot, accents, format }), [casse, motEntier, debutMot, finMot, accents, format]);
+  const options = useMemo(() => ({ casse, motEntier, debutMot, finMot, accents, ignorerPonct, ignorerEsp, format }), [casse, motEntier, debutMot, finMot, accents, ignorerPonct, ignorerEsp, format]);
   const [formatRemp, setFormatRemp] = useState({}); // mise en forme du remplacement : clé → true (appliquer) | false (retirer)
   const nRemp = formatsRempActifs(formatRemp).length;
   const peutRemplacer = !!requete || nRemp > 0; // sans texte cherché, il faut au moins une mise en forme à appliquer / retirer
@@ -227,6 +229,8 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
             <button type="button" style={bouton(debutMot)} onClick={() => setDebutMot(!debutMot)} aria-pressed={debutMot} title="Le mot commence par ce texte (« temp » trouve « temps » et « température », pas « longtemps »)">Début de mot</button>
             <button type="button" style={bouton(finMot)} onClick={() => setFinMot(!finMot)} aria-pressed={finMot} title="Le mot finit par ce texte (« temps » trouve « longtemps » et « contretemps », pas « temporel »)">Fin de mot</button>
+            <button type="button" style={bouton(ignorerPonct)} onClick={() => setIgnorerPonct(!ignorerPonct)} aria-pressed={ignorerPonct} title="« bonjour » trouve aussi « bon-jour » ; « cest » trouve « c'est »">Ignorer la ponctuation</button>
+            <button type="button" style={bouton(ignorerEsp)} onClick={() => setIgnorerEsp(!ignorerEsp)} aria-pressed={ignorerEsp} title="« peutêtre » trouve « peut être » ; « 1000 » trouve « 1 000 »">Ignorer les espaces</button>
           </div>
           <div style={{ fontSize: 11.5, color: "#555", marginBottom: 4 }}>Mise en forme {portee === "livre" ? "(dans le livre : recherche seulement, pas de remplacement)" : "(laisser « Rechercher » vide : tous les passages ainsi mis en forme)"} :</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
