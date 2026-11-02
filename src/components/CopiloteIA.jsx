@@ -832,7 +832,7 @@ TU NE MÉMORISES RIEN TOI-MÊME — tu n'as aucun moyen d'enregistrer quoi que c
 
 RÉPONSES COMPLÈTES — l'auteur·ice préfère une réponse complète et développée à une réponse tronquée : ne résume pas par souci de brièveté ce qui mérite d'être détaillé.
 
-PASSAGE MARQUÉ — si le message contient un bloc « PASSAGE MARQUÉ PAR L'AUTEUR·ICE », c'est le passage que l'auteur·ice désigne par « la partie marquée » : travaille directement dessus, sans lui redemander de le préciser. S'il n'y a PAS ce bloc et qu'il parle d'un passage marqué, dis-lui que tu ne vois aucun marquage gris dans le chapitre (il se pose avec le bouton loupe de l'éditeur) plutôt que de deviner.
+PASSAGE MARQUÉ — si le message contient un bloc « PASSAGE MARQUÉ PAR L'AUTEUR·ICE », c'est le passage que l'auteur·ice désigne par « la partie marquée » : travaille directement dessus, sans lui redemander de le préciser. Tant qu'un tel bloc est présent, c'est le POINT D'ATTENTION par défaut de ses questions, même quand il/elle ne le mentionne pas explicitement (« ici », « ce passage », « cette phrase » = le passage marqué), sauf s'il/elle désigne clairement autre chose ; réponds d'abord sur ce passage, puis situe-le dans le chapitre si utile. S'il n'y a PAS ce bloc et qu'il parle d'un passage marqué, dis-lui que tu ne vois aucun marquage gris dans le chapitre (il se pose avec le bouton loupe de l'éditeur) plutôt que de deviner.
 
 NUMÉROS DE LIGNE — quand le texte actuel est fourni avec des repères [L12], ce sont les numéros de ligne que l'auteur·ice voit dans la marge gauche de son éditeur. Quand tu renvoies à un passage, cite son numéro (« ligne 26 », « lignes 26-28 ») ET un court extrait entre guillemets, recopié mot pour mot ; quand l'auteur·ice parle de « la ligne 26 », c'est le repère [L26]. Ne dis jamais que tu ne vois pas les numéros de ligne si les repères sont présents. S'il n'y a aucun repère, dis-le simplement et cite l'extrait. Les repères ne font pas partie du texte : ne les recopie pas dans une proposition de réécriture. Les lignes dépendent de la largeur de la fenêtre : un numéro peut changer si l'auteur·ice redimensionne ou modifie le texte.
 
@@ -2094,19 +2094,24 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // retry automatique — le risque de dérive de coût qui justifiait ce
   // garde-fou ne s'applique pas à ce mécanisme.
   const [recompositionPoints, setRecompositionPoints] = useState(null);
+  const [recompositionPortée, setRecompositionPortée] = useState("chapitre");
   const [recompositionChargement, setRecompositionChargement] = useState(false);
   const [recompositionProgression, setRecompositionProgression] = useState(null);
   const [recompositionErreur, setRecompositionErreur] = useState(null);
 
-  const lancerConseilsRecomposition = useCallback(async () => {
+  // `portée` : "chapitre" (chapitre entier) ou "surligne" (seulement les fragments marqués avec le surlignage gris « à analyser », 03/11/2026).
+  const lancerConseilsRecomposition = useCallback(async (portée = "chapitre") => {
     marquerDebut(nœudId, "recomposition");
     setRecompositionChargement(true);
     setRecompositionErreur(null);
     setRecompositionPoints(null);
+    setRecompositionPortée(portée);
+    sauverResultat(nœudId, "recomposition-portee", portée);
     try {
-      const { texte } = extraireTexte(texteActif);
-      if (compterMots(texteActif) < 20) {
-        throw new Error(t("erreur.motsInsuffisants"));
+      const surligné = portée === "surligne";
+      const { texte } = surligné ? { texte: extraireTexteMarquéAnalyse(texteActif).texte } : extraireTexte(texteActif);
+      if (surligné ? compterMots(texte) < 5 : compterMots(texteActif) < 20) {
+        throw new Error(surligné ? "Aucun passage surligné (ou passage trop court) : marquez d'abord le passage avec le surlignage « à analyser » (loupe de l'éditeur)." : t("erreur.motsInsuffisants"));
       }
       // CORRECTIF 24/09/2026 — signalé en usage réel (le bandeau générique
       // "Le co-pilote n'a pas pu traiter ce passage" apparaissait ici,
@@ -2129,7 +2134,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         setRecompositionProgression(tranches.length > 1 ? `Tranche ${i + 1}/${tranches.length}…` : "Analyse en cours…");
         const résultat = await appelClaude(
           systemAvecLangue(PROMPTS.recomposition(typeProjet), langueProjet, contexteADN),
-          `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}${noteImages}`,
+          surligné
+            ? `Tranche ${i + 1}/${tranches.length} du PASSAGE SURLIGNÉ par l'auteur·ice (fragments séparés par [...] : limite-toi à ces fragments, ils sont tirés d'un chapitre plus long) :\n\n${tranches[i]}${noteImages}`
+            : `Tranche ${i + 1}/${tranches.length} du chapitre :\n\n${tranches[i]}${noteImages}`,
           null, 4096, null, false, images
         );
         const p = parserJSON(résultat);
@@ -2415,7 +2422,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     if (!nœudId) return undefined;
     const idP = `projet-${projetId}`;
     const restaurer = {
-      recomposition: () => setRecompositionPoints(lireResultat(nœudId, "recomposition")),
+      recomposition: () => { setRecompositionPoints(lireResultat(nœudId, "recomposition")); setRecompositionPortée(lireResultat(nœudId, "recomposition-portee") || "chapitre"); },
       "page-blanche": () => setBrouillonPageBlanche(lireResultat(nœudId, "page-blanche")),
       blocage: () => { const b = lireResultat(nœudId, "blocage"); setDiagnosticBlocage(b?.diagnostic ?? null); setHistoriqueBlocage(b?.historique ?? []); setTexteAnalyséBlocage(b?.texte ?? ""); },
       projet: () => setPropositionProjet(lireResultat(idP, "projet")),
@@ -2468,9 +2475,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       const noteImagesBlocage = imagesBlocage.length
         ? `\n\n(${imagesBlocage.length} image${imagesBlocage.length > 1 ? "s" : ""} jointe${imagesBlocage.length > 1 ? "s" : ""} — observe-${imagesBlocage.length > 1 ? "les" : "la"}.)`
         : "";
+      // Passage marqué (surlignage gris « à analyser », 03/11/2026) : joint à part, sinon un texte entier ne dit pas ce que l'auteur·ice désigne.
+      const marquéBlocage = sourceAnalyse === "analyse" ? { nbFragments: 0, texte: "" } : extraireTexteMarquéAnalyse(texteActif);
+      const blocMarquéBlocage = marquéBlocage.nbFragments
+        ? `\n\nPASSAGE MARQUÉ PAR L'AUTEUR·ICE (surlignage gris « à analyser » — ${marquéBlocage.nbFragments} fragment${marquéBlocage.nbFragments > 1 ? "s" : ""}, séparés par [...]) : c'est ce qu'il/elle te désigne comme point d'attention. Concentre ton diagnostic sur ce passage, en t'appuyant sur le reste du texte pour le situer :\n"""\n${marquéBlocage.texte}\n"""`
+        : "";
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur, typeProjet), langueProjet, contexteADNEtPlan),
-        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage,
+        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :\n\n${texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage + blocMarquéBlocage,
         sig, 1024, null, false, imagesBlocage
       );
       const p = parserJSON(résultat);
@@ -2489,7 +2501,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       marquerFin(nœudId, "blocage");
       if (nœudIdRef.current === nœudId) setChargementBlocage(false);
     }
-  }, [nœudId, historiqueBlocage, obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
+  }, [nœudId, historiqueBlocage, sourceAnalyse, obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
@@ -2798,18 +2810,32 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             maintenant" (onglets Suggestions/Cohérence/...) : c'est
             précisément l'opération conçue pour dépasser le seuil de 8000
             caractères, donc jamais désactivée par texteTropVolumineux. */}
-        <button
-          onClick={lancerConseilsRecomposition}
-          disabled={recompositionChargement || usageBloqué}
-          title="Analyse le chapitre entier par tranches si besoin (au-delà de 8000 caractères), sans rien résumer — structure, répétitions, transitions, glose redondante."
-          style={{
-            width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: couleurProjet,
-            border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
-            cursor: (recompositionChargement || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
-            opacity: usageBloqué ? 0.5 : 1,
-          }}>
-          {recompositionChargement ? (recompositionProgression || t("bouton.enCours")) : "🧩 Conseils de recomposition (chapitre entier)"}
-        </button>
+        <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          <button
+            onClick={() => lancerConseilsRecomposition("chapitre")}
+            disabled={recompositionChargement || usageBloqué}
+            title="Analyse le chapitre entier par tranches si besoin (au-delà de 8000 caractères), sans rien résumer — structure, répétitions, transitions, glose redondante."
+            style={{
+              flex: 1, minWidth: 0, padding: "7px", background: "#fff", color: couleurProjet,
+              border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: (recompositionChargement || usageBloqué) ? "default" : "pointer", fontFamily: "inherit",
+              opacity: usageBloqué ? 0.5 : 1,
+            }}>
+            {recompositionChargement && recompositionPortée === "chapitre" ? (recompositionProgression || t("bouton.enCours")) : "🧩 Conseils de recomposition (chapitre entier)"}
+          </button>
+          <button
+            onClick={() => lancerConseilsRecomposition("surligne")}
+            disabled={recompositionChargement || usageBloqué || nbFragmentsMarqués === 0}
+            title={nbFragmentsMarqués === 0 ? "Marquez d'abord un passage avec le surlignage « à analyser » (loupe de l'éditeur)" : `Mêmes conseils, limités aux ${nbFragmentsMarqués} passage${nbFragmentsMarqués > 1 ? "s" : ""} surligné${nbFragmentsMarqués > 1 ? "s" : ""} — moins cher qu'un chapitre entier.`}
+            style={{
+              flex: 1, minWidth: 0, padding: "7px", background: "#fff", color: couleurProjet,
+              border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500,
+              cursor: (recompositionChargement || usageBloqué || nbFragmentsMarqués === 0) ? "default" : "pointer", fontFamily: "inherit",
+              opacity: (usageBloqué || nbFragmentsMarqués === 0) ? 0.5 : 1,
+            }}>
+            {recompositionChargement && recompositionPortée === "surligne" ? (recompositionProgression || t("bouton.enCours")) : "🧩 Conseils de recomposition (partie surlignée)"}
+          </button>
+        </div>
 
         {recompositionErreur && (
           <div style={{ background: "#FCEBEB", borderRadius: 7, padding: "8px 10px", fontSize: 12, color: "#A32D2D", marginTop: 6 }}>{recompositionErreur}</div>
@@ -2962,8 +2988,9 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             emplacement) pour pouvoir défiler avec le reste du corps. */}
         {recompositionPoints && (
           <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: "#888", margin: "4px 0" }}>🧩 Conseils de recomposition — {recompositionPortée === "surligne" ? "partie surlignée" : "chapitre entier"}</div>
             {recompositionPoints.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center", margin: "8px 0" }}>Rien à signaler sur ce chapitre.</p>
+              <p style={{ fontSize: 12, color: "#1D9E75", textAlign: "center", margin: "8px 0" }}>{recompositionPortée === "surligne" ? "Rien à signaler sur la partie surlignée." : "Rien à signaler sur ce chapitre."}</p>
             ) : (
               recompositionPoints.map((p, i) => (
                 <CarteCoherence
