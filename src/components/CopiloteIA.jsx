@@ -1668,7 +1668,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     let annulé = false;
     // Changement de chapitre : on repart d'un état vide (avant, les analyses du chapitre précédent restaient affichées chez le suivant),
     // puis on reprend ce qui a été produit pendant cette session (mémoire) et ce qui tourne encore (registre des appels en cours).
-    setDonnées({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null, ...lireMemoire(nœudId) });
+    // Copie locale de chaque onglet (03/11/2026) : filet si la base ne répond pas / refuse l'écriture (un rechargement de page ne doit rien effacer).
+    const locales = {};
+    for (const o of ["suggestions", "personnages", "références", "cohérence", "vérification"]) { const v = lireResultat(nœudId, `onglet-${o}`); if (v) locales[o] = v; }
+    setDonnées({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null, ...locales, ...lireMemoire(nœudId) });
     setChargement(Object.fromEntries(clesEnCours(nœudId).map((k) => [k, true])));
     analysesCopiloteAPI.parNœud(nœudId).then(({ data, error }) => {
       if (error) { console.error("[analyses_copilote] échec du chargement :", error); return; }
@@ -1681,6 +1684,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // entre-temps (cas rare, le chargement est quasi immédiat), sinon
       // remplit les `null` de départ avec ce qui a été chargé.
       if (!annulé && data) setDonnées((d) => ({ ...d, ...data, ...lireMemoire(nœudId) }));
+      // Ce que la base ne connaît pas mais que cet appareil a gardé : on le remet (et on retente l'enregistrement en base).
+      if (!annulé) for (const o of ["suggestions", "personnages", "références", "cohérence", "vérification"]) {
+        const v = lireResultat(nœudId, `onglet-${o}`);
+        if (v && !(data && data[o])) analysesCopiloteAPI.sauvegarder(nœudId, o, v).then(({ error: e2 }) => { if (e2) console.error("[analyses_copilote] nouvelle tentative d'enregistrement :", e2); });
+      }
     });
     // Un appel de CE chapitre démarre / se termine (peut-être lancé avant que ce panneau soit remonté) : on l'affiche et on récupère son résultat.
     const surEtat = (ev) => {
@@ -1694,11 +1702,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   }, [nœudId]);
 
   const màjDonnées = useCallback((onglet, valeur) => {
-    if (nœudId) retenirEnMemoire(nœudId, onglet, valeur);
+    if (nœudId) { retenirEnMemoire(nœudId, onglet, valeur); sauverResultat(nœudId, `onglet-${onglet}`, valeur); }
     if (nœudIdRef.current === nœudId) setDonnées((d) => ({ ...d, [onglet]: valeur }));
     if (nœudId) {
       analysesCopiloteAPI.sauvegarder(nœudId, onglet, valeur)
-        .then(({ error }) => { if (error) console.error("[analyses_copilote] échec de la sauvegarde :", error); });
+        .then(({ error }) => { if (error) { console.error("[analyses_copilote] échec de la sauvegarde :", error); journaliserErreur("CopiloteIA:enregistrerAnalyse", `${onglet} : ${error.message || JSON.stringify(error)}`); } });
     }
   }, [nœudId]);
 
