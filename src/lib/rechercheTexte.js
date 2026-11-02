@@ -131,6 +131,49 @@ function texteDuBloc(el) {
 
 const extraitAutour = (texte, o) => ({ avant: lisible(texte.slice(Math.max(0, o.debut - 35), o.debut)), trouve: lisible(texte.slice(o.debut, o.fin)), apres: lisible(texte.slice(o.fin, o.fin + 35)) });
 
+// ─── Recherche par mise en forme dans le HTML (03/11/2026) : mêmes clés que FILTRES_FORMAT (rechercheEditeur.js) ───
+const FORMES_HTML = {
+  gras: (el) => /^(STRONG|B)$/.test(el.tagName), italique: (el) => /^(EM|I)$/.test(el.tagName), souligne: (el) => el.tagName === "U",
+  barre: (el) => /^(S|DEL|STRIKE)$/.test(el.tagName), surligne: (el) => el.tagName === "MARK", indice: (el) => el.tagName === "SUB", exposant: (el) => el.tagName === "SUP",
+  couleur: (el) => !!el.style?.color, police: (el) => !!el.style?.fontFamily, taille: (el) => !!el.style?.fontSize,
+};
+export const filtresHtmlActifs = (options = {}) => Object.keys(FORMES_HTML).filter((k) => options.format?.[k]);
+
+/** Texte à plat d'un bloc + pour chaque caractère l'ensemble des mises en forme qu'il porte. → { texte, formes: Set[] } */
+function texteEtFormes(el) {
+  const doc = el.ownerDocument; const copie = el.cloneNode(true);
+  const speciaux = new Set(); // nœuds créés pour un élément spécial : sans mise en forme, ils interrompent les suites
+  const remplacer = (sel, car) => copie.querySelectorAll(sel).forEach((x) => { const t = doc.createTextNode(car); speciaux.add(t); x.replaceWith(t); });
+  remplacer("br", "\n"); remplacer("span[data-tab]", "\t"); remplacer("span[data-note]", NOTE); remplacer("img", OBJET);
+  let texte = ""; const formes = [];
+  const marcheur = doc.createTreeWalker(copie, NodeFilter.SHOW_TEXT); let nd;
+  while ((nd = marcheur.nextNode())) {
+    const cles = new Set();
+    for (let a = nd.parentElement; a && a !== copie.parentNode; a = a.parentElement) for (const [k, f] of Object.entries(FORMES_HTML)) if (f(a)) cles.add(k);
+    const special = speciaux.has(nd);
+    for (let i = 0; i < nd.data.length; i++) { formes.push(special ? new Set() : cles); }
+    texte += nd.data;
+  }
+  return { texte, formes };
+}
+
+/** Occurrences d'un HTML qui portent TOUTES les mises en forme demandées → [{ texte, debut, fin }]. Requête vide : suites continues. */
+function occurrencesFormatees(html, requete, options) {
+  const filtres = filtresHtmlActifs(options); const res = [];
+  if (!html) return res;
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  const feuilles = [...doc.body.querySelectorAll(BLOCS)].filter((el) => !el.querySelector(BLOCS));
+  for (const el of feuilles) {
+    const { texte, formes } = texteEtFormes(el);
+    const ok = (i) => filtres.every((k) => formes[i]?.has(k));
+    if (!requete) {
+      let i = 0;
+      while (i < texte.length) { if (!ok(i)) { i++; continue; } let j = i; while (j < texte.length && ok(j)) j++; res.push({ texte, debut: i, fin: j }); i = j; }
+    } else for (const o of trouver(texte, requete, options)) { let tous = true; for (let i = o.debut; i < o.fin; i++) if (!ok(i)) { tous = false; break; } if (tous) res.push({ texte, debut: o.debut, fin: o.fin }); }
+  }
+  return res;
+}
+
 /** Titre d'un chapitre / d'une partie → { n, extrait } (n = nombre d'occurrences). */
 export function chercherDansTitre(titre, requete, options = {}) {
   const occ = trouver(titre || "", requete, options);
@@ -152,6 +195,10 @@ const ecrireTexteNote = (element, texte) => { element.setAttribute("texte", text
  */
 export function chercherDansHtml(html, requete, options = {}, maxExtraits = 3) {
   let n = 0; const extraits = [];
+  if (filtresHtmlActifs(options).length) { // mise en forme demandée : notes et titres ne sont pas concernés
+    const occ = occurrencesFormatees(html, requete, options);
+    return { n: occ.length, extraits: occ.slice(0, maxExtraits).map((o) => extraitAutour(o.texte, o)) };
+  }
   if (html) {
     const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
     for (const { texte } of notesDeDoc(doc)) {

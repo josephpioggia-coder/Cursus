@@ -137,7 +137,7 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     let cumul = 0;
     const tous = listeNoeuds().map((n) => {
       const html = n.id === noeudId && editor ? editor.getHTML() : n.texte;
-      const t = chercherDansTitre(n.titre, requete, options);
+      const t = nFiltres ? { n: 0, extrait: null } : chercherDansTitre(n.titre, requete, options);
       const longueur = (html || "").replace(/<[^>]+>/g, "").length;
       const debut = Math.floor(cumul / 1800) + 1;
       cumul += longueur;
@@ -228,7 +228,7 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
             <button type="button" style={bouton(debutMot)} onClick={() => setDebutMot(!debutMot)} aria-pressed={debutMot} title="Le mot commence par ce texte (« temp » trouve « temps » et « température », pas « longtemps »)">Début de mot</button>
             <button type="button" style={bouton(finMot)} onClick={() => setFinMot(!finMot)} aria-pressed={finMot} title="Le mot finit par ce texte (« temps » trouve « longtemps » et « contretemps », pas « temporel »)">Fin de mot</button>
           </div>
-          <div style={{ fontSize: 11.5, color: "#555", marginBottom: 4 }}>Mise en forme {portee === "livre" ? "(ne filtre que « Ce chapitre »)" : "(laisser « Rechercher » vide : tous les passages ainsi mis en forme)"} :</div>
+          <div style={{ fontSize: 11.5, color: "#555", marginBottom: 4 }}>Mise en forme {portee === "livre" ? "(dans le livre : recherche seulement, pas de remplacement)" : "(laisser « Rechercher » vide : tous les passages ainsi mis en forme)"} :</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
             {Object.entries(FILTRES_FORMAT).map(([k, [lib]]) => (
               <button key={k} type="button" style={bouton(!!format[k])} aria-pressed={!!format[k]} onClick={() => setFormat((f) => ({ ...f, [k]: !f[k] }))}>{lib}</button>
@@ -313,10 +313,10 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <button type="button" style={{ ...bouton(), background: requete ? couleur : "#eee", color: requete ? "#fff" : "#999" }} onClick={chercherLivre} disabled={!requete}>Chercher dans le livre</button>
+            <button type="button" style={{ ...bouton(), background: requete || nFiltres ? couleur : "#eee", color: requete || nFiltres ? "#fff" : "#999" }} onClick={chercherLivre} disabled={!requete && !nFiltres}>Chercher dans le livre</button>
             <span style={{ fontSize: 12, color: "#555" }}>{livre ? (livre.length ? <b>{totalLivre} résultat{totalLivre > 1 ? "s" : ""} <span style={{ fontWeight: 400 }}>· {livre.length} chapitre{livre.length > 1 ? "s" : ""}</span></b> : "Aucun résultat") : ""}</span>
           </div>
-          {livre?.length > 0 && !lectureSeule && !confirmer && <button type="button" style={bouton()} onClick={() => setConfirmer(true)}>Tout remplacer dans le livre…</button>}
+          {livre?.length > 0 && !lectureSeule && !confirmer && !nFiltres && <button type="button" style={bouton()} onClick={() => setConfirmer(true)}>Tout remplacer dans le livre…</button>}
           {confirmer && (
             <div style={{ background: "#FFF6E0", border: "0.5px solid #E8C770", borderRadius: 8, padding: 8, fontSize: 12, lineHeight: 1.5 }}>
               Remplacer <b>{totalLivre}</b> occurrence{totalLivre > 1 ? "s" : ""} de « {requete} » par « {remplacement || "(rien : suppression)"} » dans <b>{livre.length}</b> chapitre{livre.length > 1 ? "s" : ""} ? Chaque chapitre modifié est d'abord enregistré dans son historique (↺ Historique).
