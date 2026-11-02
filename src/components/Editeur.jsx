@@ -67,6 +67,7 @@ import { RechercheDansTexte } from "../lib/rechercheEditeur.js";
 import { aplatirStructure } from "../lib/rechercheTexte.js";
 import EntetesPages from "./EntetesPages.jsx";
 import StatistiquesTexte from "./StatistiquesTexte.jsx";
+import { ecrireBrouillon, lireBrouillon, confirmerBrouillon, oublierBrouillon } from "../lib/brouillonLocal.js";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -1302,6 +1303,7 @@ function IndicateurSauvegarde({ état, court = false }) {
     sauvegardé: { couleur: "#1D9E75", label: "Sauvegardé", icone: "✓" },
     en_cours: { couleur: "#BA7517", label: "Modification…", icone: "●" },
     erreur: { couleur: "#E24B4A", label: "Erreur", icone: "✕" },
+    echec: { couleur: "#D32F2F", label: "NON ENREGISTRÉ — ne rechargez pas", icone: "⚠" },
   };
   const c = configs[état] || configs.sauvegardé;
   return (
@@ -1437,6 +1439,12 @@ export default function Editeur({
   const timerSauvegarde = useRef(null);
   const timerSession = useRef(null);
   const contenuRef = useRef(nœud?.texte || "");
+  // Texte que la BASE a confirmé pour ce chapitre : seul un texte différent justifie une écriture (avant, une écriture forcée toutes les 30 s
+  // réécrivait le texte chargé même inchangé — une fenêtre restée ouverte sur l'ancien texte pouvait écraser le travail fait ailleurs).
+  const dernierEnregistréHtml = useRef(nœud?.texte || "");
+  const enregistrerRef = useRef(null);
+  const timerBrouillon = useRef(null);
+  const [brouillonTrouvé, setBrouillonTrouvé] = useState(null);
   // Mots du dernier instantané connu pour CE nœud — sert à décider si un
   // nouvel instantané mérite d'être créé (seuil de 50 mots de différence).
   // Utilise une ref (pas un state) pour rester lisible de façon synchrone
@@ -1536,6 +1544,26 @@ export default function Editeur({
     return () => { annulé = true; };
   }, [nœud?.id]);
 
+  // Enregistrement du texte en base AVEC contrôle (03/11/2026) : l'échec était ignoré et l'écran disait « Sauvegardé ». Trois essais espacés ;
+  // si la base refuse toujours, l'indicateur devient rouge, l'incident est journalisé, et la copie locale (brouillonLocal.js) reste disponible.
+  enregistrerRef.current = async (id, html) => {
+    const attentes = [2000, 5000, 10000];
+    for (let essai = 0; essai <= attentes.length; essai++) {
+      let r;
+      try { r = await onSauvegarder?.(id, html); } catch (e) { r = { error: e }; }
+      if (!r?.error) {
+        dernierEnregistréHtml.current = html;
+        confirmerBrouillon(id, html);
+        setStatutSauvegarde(contenuRef.current === html ? "sauvegardé" : "en_cours");
+        return true;
+      }
+      setStatutSauvegarde("echec");
+      journaliserErreur("Editeur:sauvegardeTexte", r.error.message || JSON.stringify(r.error), id);
+      if (essai < attentes.length) await new Promise((ok) => setTimeout(ok, attentes[essai]));
+    }
+    return false;
+  };
+
   // Initialisation de l'éditeur TipTap
   const editor = useEditor({
     editable: !lectureSeule,
@@ -1613,11 +1641,15 @@ export default function Editeur({
       // Indicateur "modification en cours"
       setStatutSauvegarde("en_cours");
 
+      // Copie locale (filet de sécurité), écrite 0,8 s après la dernière frappe ; supprimée seulement quand la base a confirmé ce texte.
+      clearTimeout(timerBrouillon.current);
+      timerBrouillon.current = setTimeout(() => ecrireBrouillon(nœud.id, html), 800);
+
       // Sauvegarde différée (debounce 2s)
       clearTimeout(timerSauvegarde.current);
       timerSauvegarde.current = setTimeout(async () => {
-        onSauvegarder?.(nœud.id, html);
-        setStatutSauvegarde("sauvegardé");
+        const enregistré = await enregistrerRef.current(nœud.id, html);
+        if (!enregistré) return; // pas d'instantané d'historique si le texte lui-même n'a pas pu être enregistré
 
         // Instantané d'historique — MODIF 21/07/2026 : écrit désormais dans
         // Supabase (table versions_noeuds) au lieu d'un simple état local.
@@ -1754,13 +1786,40 @@ export default function Editeur({
   // Sauvegarde automatique forcée toutes les 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      if (contenuRef.current && editor) {
-        onSauvegarder?.(nœud?.id, contenuRef.current);
-        setStatutSauvegarde("sauvegardé");
+      // Seulement si le texte a CHANGÉ depuis la dernière confirmation de la base (ou si le dernier essai a échoué).
+      if (contenuRef.current && editor && contenuRef.current !== dernierEnregistréHtml.current) {
+        enregistrerRef.current?.(nœud?.id, contenuRef.current);
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [editor, nœud?.id, onSauvegarder]);
+  }, [editor, nœud?.id]);
+
+  // Chapitre ouvert : le « texte confirmé » est celui de la base ; une copie locale différente (travail non enregistré avant un rechargement)
+  // est proposée à la récupération.
+  useEffect(() => {
+    if (!nœud?.id) return;
+    dernierEnregistréHtml.current = nœud.texte || "";
+    const b = lireBrouillon(nœud.id);
+    if (b && b.html !== (nœud.texte || "")) setBrouillonTrouvé(b);
+    else { setBrouillonTrouvé(null); if (b) oublierBrouillon(nœud.id); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nœud?.id]);
+
+  // Quitter / recharger la page avec du texte non enregistré : le navigateur demande confirmation (et on tente un dernier enregistrement).
+  const statutRef = useRef(statutSauvegarde);
+  statutRef.current = statutSauvegarde;
+  useEffect(() => {
+    const avant = (e) => {
+      if (statutRef.current !== "sauvegardé") { e.preventDefault(); e.returnValue = ""; }
+      if (contenuRef.current !== dernierEnregistréHtml.current) { ecrireBrouillon(nœud?.id, contenuRef.current); enregistrerRef.current?.(nœud?.id, contenuRef.current); }
+    };
+    const masquee = () => {
+      if (document.visibilityState === "hidden" && contenuRef.current !== dernierEnregistréHtml.current) { ecrireBrouillon(nœud?.id, contenuRef.current); enregistrerRef.current?.(nœud?.id, contenuRef.current); }
+    };
+    window.addEventListener("beforeunload", avant);
+    document.addEventListener("visibilitychange", masquee);
+    return () => { window.removeEventListener("beforeunload", avant); document.removeEventListener("visibilitychange", masquee); };
+  }, [nœud?.id]);
 
   // Réinitialise la sélection transmise au co-pilote quand on change de
   // chapitre — sinon une sélection faite dans un chapitre précédent resterait
@@ -1851,7 +1910,7 @@ export default function Editeur({
         .insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
       if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
     }
-    editor?.commands.setContent(contenu);
+    editor?.commands.setContent(contenu, true); // true : déclenche l'enregistrement du texte restauré
     setVoirHistorique(false);
   }, [editor, nœud?.id]);
 
@@ -2192,6 +2251,16 @@ export default function Editeur({
       {entetesOuvert && (
         <EntetesPages projetId={projetIdStyles} titre={projetTitre} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
           onEnregistre={setStylesProjet} onFermer={() => setEntetesOuvert(false)} />
+      )}
+
+      {brouillonTrouvé && editor && (
+        <div role="alert" style={{ position: "fixed", zIndex: 1200, top: 64, left: "50%", transform: "translateX(-50%)", width: "min(560px, calc(100vw - 24px))", background: "#FFF6E0", border: "1px solid #E8C770", borderRadius: 10, boxShadow: "0 6px 24px rgba(0,0,0,.2)", padding: "12px 14px", fontSize: 13, color: "#5a4200", lineHeight: 1.5 }}>
+          <b>Travail non enregistré retrouvé sur cet appareil.</b> Une version plus récente de ce chapitre ({compterMots(brouillonTrouvé.html)} mots, {new Date(brouillonTrouvé.le).toLocaleString("fr-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}) diffère de celle du compte ({compterMots(nœud?.texte || "")} mots).
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button type="button" onClick={async () => { try { await sauvegarderAvant("Avant récupération du brouillon local"); } catch { /* sans historique */ } editor.commands.setContent(brouillonTrouvé.html, true); setBrouillonTrouvé(null); }} style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8, border: "none", background: "#7F77DD", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>Récupérer ce travail</button>
+            <button type="button" onClick={() => { oublierBrouillon(nœud.id); setBrouillonTrouvé(null); }} style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8, border: "0.5px solid #ccc", background: "#fff", color: "#555", cursor: "pointer", fontFamily: "inherit" }}>Ignorer (garder la version du compte)</button>
+          </div>
+        </div>
       )}
 
       {statsOuvert && editor && (
