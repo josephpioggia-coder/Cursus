@@ -708,6 +708,14 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
   // état pour les deux popovers : ouvrir l'un ferme l'autre, plutôt que
   // deux booléens indépendants qui pourraient rester ouverts ensemble.
   const [paletteActive, setPaletteActive] = useState(null); // null | "surlignage" | "couleur"
+  // Les palettes sont en position: fixed (ancrées sur leur bouton) : la barre défile horizontalement (overflow) et rognerait
+  // sinon une palette en position: absolute (02/11/2026).
+  const [posPalette, setPosPalette] = useState({ top: 0, left: 0 });
+  const ouvrirPalette = (nom) => (e) => {
+    const r = e.currentTarget.closest("[data-ancre-palette]")?.getBoundingClientRect();
+    if (r) setPosPalette({ top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 190)) });
+    setPaletteActive((v) => (v === nom ? null : nom));
+  };
   const zoneCouleursRef = useRef(null);
 
   // Ferme le popover ouvert au clic ailleurs dans la page — absent de la
@@ -858,13 +866,17 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
       padding: "6px 16px",
       borderBottom: "0.5px solid #e5e5e5",
       background: "#fafafa",
-      flexWrap: "wrap",
+      flexWrap: mobile ? "wrap" : "nowrap",
+      ...(mobile ? {} : { overflowX: "auto" }),
       transition: "opacity 0.3s",
       opacity: modeFocus ? 0.3 : 1,
     }}
+      className={mobile ? undefined : "barre-defile"}
+      onScroll={() => { if (paletteActive) setPaletteActive(null); }}
       onMouseEnter={(e) => { if (modeFocus) e.currentTarget.style.opacity = 1; }}
       onMouseLeave={(e) => { if (modeFocus) e.currentTarget.style.opacity = 0.3; }}
     >
+      <style>{`.barre-defile{scrollbar-width:thin}.barre-defile>*{flex-shrink:0}`}</style>
       {/* Style de paragraphe, police, taille (28/10/2026) — à la façon du ruban Word : « Normal »
           existe enfin (avant : seulement six boutons Titre qui basculaient). */}
       <select value={styleActuel} onChange={(e) => appliquerStyle(e.target.value)} title="Style du paragraphe"
@@ -929,10 +941,10 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
           Word/Docs), crayon = surlignage — le "✦" d'origine ne se lisait
           pas comme un outil de couleur. */}
       <div ref={zoneCouleursRef} style={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <div style={{ position: "relative" }}>
+        <div data-ancre-palette style={{ position: "relative" }}>
           <BoutonOutil actif={editor.isActive("textStyle") && !!editor.getAttributes("textStyle").color}
             titre="Couleur du texte"
-            onClick={() => setPaletteActive((v) => (v === "couleur" ? null : "couleur"))}>
+            onClick={ouvrirPalette("couleur")}>
             <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", lineHeight: 1 }}>
               <span>A</span>
               <span style={{
@@ -943,7 +955,7 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
           </BoutonOutil>
           {paletteActive === "couleur" && (
             <div style={{
-              position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
+              position: "fixed", top: posPalette.top, left: posPalette.left, zIndex: 60,
               background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
               padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
             }}>
@@ -964,12 +976,12 @@ function BarreOutils({ editor, modeFocus, onToggleFocus, mobile = false }) {
           )}
         </div>
 
-        <div style={{ position: "relative" }}>
+        <div data-ancre-palette style={{ position: "relative" }}>
           <BoutonOutil actif={editor.isActive("highlight")} titre="Surligner le texte"
-            onClick={() => setPaletteActive((v) => (v === "surlignage" ? null : "surlignage"))}>🖍️</BoutonOutil>
+            onClick={ouvrirPalette("surlignage")}>🖍️</BoutonOutil>
           {paletteActive === "surlignage" && (
             <div style={{
-              position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20,
+              position: "fixed", top: posPalette.top, left: posPalette.left, zIndex: 60,
               background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 8,
               padding: 6, display: "flex", gap: 5, boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
             }}>
