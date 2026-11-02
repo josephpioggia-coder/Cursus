@@ -73,3 +73,6 @@ Dans la fenêtre Rechercher / remplacer, bouton « Plus >> » puis « Spécial �
 
 ## Atteindre (Ctrl+G) (02/11/2026)
 Ruban Accueil › Édition › « Atteindre », ou Ctrl+G, ou l'onglet « Atteindre » de la fenêtre Rechercher / remplacer. On choisit la destination : un chapitre ou une partie (liste), un intertitre du chapitre (liste), une ligne (numéros de la marge gauche), un paragraphe (les titres comptent comme des paragraphes), une page, une note de bas de page, une image. Pour les nombres : « 12 » = le n° 12 ; « +3 » / « −2 » = trois plus loin / deux plus haut depuis le curseur ; boutons Précédent / Suivant. Les pages sont ESTIMÉES (≈ 1 800 caractères par page, tout le livre) : Cursus n'a pas de pagination réelle avant l'export Word. Une page située dans un autre chapitre ouvre ce chapitre et s'y place.
+
+## Rechercher / remplacer : début de mot, fin de mot (02/11/2026)
+« Plus >> » dans la fenêtre Rechercher / remplacer : boutons « Début de mot » (« temp » trouve « temps » et « température », pas « longtemps ») et « Fin de mot » (« temps » trouve « longtemps » et « contretemps », pas « temporel »). Les deux ensemble = « Mot entier ». S'appliquent au chapitre comme à tout le livre.

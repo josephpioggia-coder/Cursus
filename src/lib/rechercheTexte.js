@@ -1,7 +1,7 @@
 /**
  * CURSUS — Rechercher / remplacer : moteur PUR (28/10/2026). Aucun accès à l'éditeur ni au réseau.
  * Recherche de TEXTE littéral (pas d'expressions régulières : un « ? » ou un « . » dans un livre est de la ponctuation).
- * Options : respecter la casse, mot entier, accents significatifs. Par défaut on ignore casse ET accents (« ete » trouve « été »).
+ * Options : respecter la casse, mot entier, début de mot, fin de mot, accents significatifs. Par défaut on ignore casse ET accents (« ete » trouve « été »).
  * `plier` garde la LONGUEUR de la chaîne (un caractère → un caractère) : les positions trouvées sur le texte plié valent pour l'original.
  */
 
@@ -65,7 +65,10 @@ export function trouver(texte, requete, options = {}) {
   const t = plier(texte, options);
   if (t.length !== String(texte).length) return []; // garde-fou : un pliage qui changerait la longueur fausserait les positions
   const res = [];
-  const ok = (i, fin) => !options.motEntier || ((i === 0 || !lettre.test(t[i - 1])) && (fin >= t.length || !lettre.test(t[fin])));
+  // Mot entier = début ET fin de mot ; « début de mot » : « temp » trouve « temps », « température » mais pas « longtemps » ; « fin de mot » : l'inverse.
+  const debutOk = (i) => i === 0 || !lettre.test(t[i - 1]);
+  const finOk = (fin) => fin >= t.length || !lettre.test(t[fin]);
+  const ok = (i, fin) => (!(options.motEntier || options.debutMot) || debutOk(i)) && (!(options.motEntier || options.finMot) || finOk(fin));
   if (contientJeton(q)) {
     let re;
     try { re = new RegExp(sourceRegex(q, options), "gu"); } catch { return []; }
