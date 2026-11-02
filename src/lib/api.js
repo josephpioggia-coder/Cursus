@@ -185,6 +185,46 @@ export const nœudsAPI = {
     return { error };
   },
 
+  /**
+   * Sauvegarde le texte SEULEMENT si personne d'autre ne l'a modifié depuis la version connue (03/11/2026 : un appareil resté ouvert sur
+   * l'ancien texte écrasait le travail fait ailleurs). Contrôle par `mis_a_jour` (« verrou optimiste »).
+   * → { error } | { error: null, version } (enregistré) | { error: null, conflit: { texte, mis_a_jour } } (le compte contient un AUTRE texte, rien n'est écrit).
+   * Un `mis_a_jour` qui a changé alors que le TEXTE du compte est resté celui qu'on connaît (renommage, autre colonne) n'est pas un conflit : un nouvel essai est fait.
+   */
+  async sauvegarderTexteControle(nœudId, texte, versionConnue, texteConnu) {
+    const maintenant = new Date().toISOString();
+    const essayer = (v) => {
+      let q = supabase.from("noeuds").update({ texte, mis_a_jour: maintenant }).eq("id", nœudId);
+      q = v === null ? q.is("mis_a_jour", null) : q.eq("mis_a_jour", v);
+      return q.select("id, mis_a_jour");
+    };
+    let { data, error } = await essayer(versionConnue ?? null);
+    if (error) return { error };
+    if (data && data.length) return { error: null, version: data[0].mis_a_jour };
+    const { data: actuel, error: e2 } = await supabase.from("noeuds").select("texte, mis_a_jour").eq("id", nœudId).maybeSingle();
+    if (e2) return { error: e2 };
+    if (!actuel) return { error: { message: "Chapitre introuvable : droits d'écriture, session à renouveler ou chapitre supprimé" } };
+    if ((actuel.texte || "") === texte) return { error: null, version: actuel.mis_a_jour };
+    if ((actuel.texte || "") === (texteConnu || "")) {
+      ({ data, error } = await essayer(actuel.mis_a_jour ?? null));
+      if (error) return { error };
+      if (data && data.length) return { error: null, version: data[0].mis_a_jour };
+      // Le texte du compte est celui qu'on connaît (personne d'autre ne l'a changé) mais la comparaison de version échoue encore (format de date…) :
+      // écriture directe, sans risque d'écraser un autre texte.
+      const { data: d3, error: e3 } = await supabase.from("noeuds").update({ texte, mis_a_jour: maintenant }).eq("id", nœudId).select("id, mis_a_jour");
+      if (e3) return { error: e3 };
+      if (d3 && d3.length) return { error: null, version: d3[0].mis_a_jour };
+      return { error: { message: "Aucune ligne modifiée : droits d'écriture ou session à renouveler" } };
+    }
+    return { error: null, conflit: { texte: actuel.texte || "", mis_a_jour: actuel.mis_a_jour } };
+  },
+
+  /** Texte et version actuels d'un nœud (détection d'une modification venue d'un autre appareil). */
+  async lireTexteEtVersion(nœudId) {
+    const { data, error } = await supabase.from("noeuds").select("texte, mis_a_jour").eq("id", nœudId).maybeSingle();
+    return { data, error };
+  },
+
   /** Renomme un nœud */
   async renommer(nœudId, titre) {
     const { error } = await supabase

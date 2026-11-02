@@ -69,7 +69,7 @@ import EntetesPages from "./EntetesPages.jsx";
 import StatistiquesTexte from "./StatistiquesTexte.jsx";
 import { ecrireBrouillon, lireBrouillon, confirmerBrouillon, oublierBrouillon } from "../lib/brouillonLocal.js";
 import GalerieStyles from "./GalerieStyles.jsx";
-import { stylesProjetAPI } from "../lib/api.js";
+import { stylesProjetAPI, nœudsAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
@@ -1304,6 +1304,7 @@ function IndicateurSauvegarde({ état, court = false }) {
     en_cours: { couleur: "#BA7517", label: "Modification…", icone: "●" },
     erreur: { couleur: "#E24B4A", label: "Erreur", icone: "✕" },
     echec: { couleur: "#D32F2F", label: "NON ENREGISTRÉ — ne rechargez pas", icone: "⚠" },
+    conflit: { couleur: "#D32F2F", label: "CONFLIT — choisissez dans l'encadré", icone: "⚠" },
   };
   const c = configs[état] || configs.sauvegardé;
   return (
@@ -1443,6 +1444,11 @@ export default function Editeur({
   // réécrivait le texte chargé même inchangé — une fenêtre restée ouverte sur l'ancien texte pouvait écraser le travail fait ailleurs).
   const dernierEnregistréHtml = useRef(nœud?.texte || "");
   const enregistrerRef = useRef(null);
+  // Détection de conflit (03/11/2026) : `versionConnue` = `mis_a_jour` du chapitre tel que cet écran le connaît. L'écriture est refusée si le compte
+  // contient un AUTRE texte (modifié depuis un autre appareil / onglet) ; rien n'est écrasé sans choix.
+  const versionConnue = useRef(nœud?.mis_a_jour);
+  const enConflit = useRef(false);
+  const [conflit, setConflit] = useState(null); // { theirs, mine, mis_a_jour, auto }
   const timerBrouillon = useRef(null);
   const [brouillonTrouvé, setBrouillonTrouvé] = useState(null);
   // Mots du dernier instantané connu pour CE nœud — sert à décider si un
@@ -1549,9 +1555,18 @@ export default function Editeur({
   enregistrerRef.current = async (id, html) => {
     const attentes = [2000, 5000, 10000];
     for (let essai = 0; essai <= attentes.length; essai++) {
+      if (enConflit.current) return false; // en attente du choix de l'auteur·ice : on n'écrit rien
       let r;
-      try { r = await onSauvegarder?.(id, html); } catch (e) { r = { error: e }; }
+      try { r = await onSauvegarder?.(id, html, { version: versionConnue.current, texteConnu: dernierEnregistréHtml.current }); } catch (e) { r = { error: e }; }
+      if (r?.conflit) {
+        enConflit.current = true;
+        setConflit({ theirs: r.conflit.texte, mine: html, mis_a_jour: r.conflit.mis_a_jour });
+        setStatutSauvegarde("conflit");
+        journaliserErreur("Editeur:conflit", `Texte modifié ailleurs (compte : ${compterMots(r.conflit.texte)} mots, ici : ${compterMots(html)} mots)`, id);
+        return false;
+      }
       if (!r?.error) {
+        if (r?.version) versionConnue.current = r.version;
         dernierEnregistréHtml.current = html;
         confirmerBrouillon(id, html);
         setStatutSauvegarde(contenuRef.current === html ? "sauvegardé" : "en_cours");
@@ -1799,11 +1814,48 @@ export default function Editeur({
   useEffect(() => {
     if (!nœud?.id) return;
     dernierEnregistréHtml.current = nœud.texte || "";
+    versionConnue.current = nœud.mis_a_jour;
+    enConflit.current = false;
+    setConflit(null);
     const b = lireBrouillon(nœud.id);
     if (b && b.html !== (nœud.texte || "")) setBrouillonTrouvé(b);
     else { setBrouillonTrouvé(null); if (b) oublierBrouillon(nœud.id); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nœud?.id]);
+
+  // Retour sur l'écran (onglet réactivé, fenêtre refocalisée) : le chapitre a-t-il été modifié ailleurs entre-temps ?
+  //  - rien de non enregistré ici → on charge simplement la version du compte (avec un avis) ;
+  //  - du texte non enregistré ici ET un autre texte sur le compte → conflit, à trancher par l'auteur·ice.
+  const dernierControle = useRef(0);
+  useEffect(() => {
+    const verifier = async () => {
+      if (document.visibilityState === "hidden" || !editor || !nœud?.id || enConflit.current) return;
+      if (Date.now() - dernierControle.current < 5000) return;
+      dernierControle.current = Date.now();
+      const { data } = await nœudsAPI.lireTexteEtVersion(nœud.id);
+      if (!data || enConflit.current || data.mis_a_jour === versionConnue.current) return;
+      const theirs = data.texte || "";
+      const mine = contenuRef.current;
+      if (theirs === mine) { versionConnue.current = data.mis_a_jour; dernierEnregistréHtml.current = theirs; return; }
+      if (mine === dernierEnregistréHtml.current) {
+        // Rien de non enregistré ici : on adopte la version du compte (l'ancienne reste dans l'historique).
+        try { await instantané("Avant mise à jour depuis un autre appareil", mine); } catch { /* sans historique */ }
+        editor.commands.setContent(theirs, false);
+        contenuRef.current = theirs; dernierEnregistréHtml.current = theirs; versionConnue.current = data.mis_a_jour;
+        onTexteChange?.(nœud.id, theirs);
+        oublierBrouillon(nœud.id);
+        setConflit({ theirs, mine, mis_a_jour: data.mis_a_jour, auto: true });
+      } else {
+        enConflit.current = true;
+        setConflit({ theirs, mine, mis_a_jour: data.mis_a_jour });
+        setStatutSauvegarde("conflit");
+      }
+    };
+    window.addEventListener("focus", verifier);
+    document.addEventListener("visibilitychange", verifier);
+    return () => { window.removeEventListener("focus", verifier); document.removeEventListener("visibilitychange", verifier); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, nœud?.id]);
 
   // Quitter / recharger la page avec du texte non enregistré : le navigateur demande confirmation (et on tente un dernier enregistrement).
   const statutRef = useRef(statutSauvegarde);
@@ -1900,6 +1952,29 @@ export default function Editeur({
       .insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
     if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
   }, [editor, nœud?.id]);
+
+  // Instantané d'historique d'un texte donné (utilisé pour ne JAMAIS perdre l'une des deux versions lors d'un conflit).
+  const instantané = async (libelle, html) => {
+    if (!nœud?.id) return;
+    const apercu = libelle + " — " + html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) + "…";
+    const { data } = await supabase.from("versions_noeuds").insert({ noeud_id: nœud.id, contenu: html, mots: compterMots(html), apercu }).select().single();
+    if (data) setHistorique((prev) => [{ id: data.id, contenu: data.contenu, mots: data.mots, aperçu: data.apercu, horodatage: formaterDateHeure(data.created_at) }, ...prev]);
+  };
+  // Conflit : « garder ma version » (celle du compte est gardée dans l'historique) ou « prendre celle du compte » (la mienne y est gardée).
+  const garderMaVersion = async () => {
+    const c = conflit; if (!c) return;
+    try { await instantané("Version d'un autre appareil, avant écrasement", c.theirs); } catch { /* sans historique */ }
+    versionConnue.current = c.mis_a_jour; dernierEnregistréHtml.current = c.theirs; enConflit.current = false; setConflit(null);
+    enregistrerRef.current(nœud.id, contenuRef.current);
+  };
+  const prendreVersionCompte = async () => {
+    const c = conflit; if (!c || !editor) return;
+    try { await instantané("Ma version, avant de reprendre celle du compte", contenuRef.current); } catch { /* sans historique */ }
+    editor.commands.setContent(c.theirs, false);
+    contenuRef.current = c.theirs; dernierEnregistréHtml.current = c.theirs; versionConnue.current = c.mis_a_jour;
+    onTexteChange?.(nœud.id, c.theirs); oublierBrouillon(nœud.id);
+    enConflit.current = false; setConflit(null); setStatutSauvegarde("sauvegardé");
+  };
 
   const restaurerVersion = useCallback(async (contenu) => {
     // Filet de sécurité : le texte actuel est gardé dans l'historique avant d'être remplacé.
@@ -2251,6 +2326,25 @@ export default function Editeur({
       {entetesOuvert && (
         <EntetesPages projetId={projetIdStyles} titre={projetTitre} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
           onEnregistre={setStylesProjet} onFermer={() => setEntetesOuvert(false)} />
+      )}
+
+      {conflit && editor && (
+        <div role="alertdialog" style={{ position: "fixed", zIndex: 1250, top: 64, left: "50%", transform: "translateX(-50%)", width: "min(580px, calc(100vw - 24px))", background: conflit.auto ? "#E8F5EF" : "#FDECEC", border: `1px solid ${conflit.auto ? "#9AD3BC" : "#E8A0A0"}`, borderRadius: 10, boxShadow: "0 6px 24px rgba(0,0,0,.22)", padding: "12px 14px", fontSize: 13, color: "#3a2a2a", lineHeight: 1.5 }}>
+          {conflit.auto ? (
+            <>
+              <b>Ce chapitre a été mis à jour depuis un autre appareil ou onglet.</b> La version la plus récente du compte vient d'être chargée ({compterMots(conflit.theirs)} mots). La version précédente est dans l'historique (↺).
+              <div style={{ marginTop: 8 }}><button type="button" onClick={() => setConflit(null)} style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8, border: "0.5px solid #ccc", background: "#fff", color: "#333", cursor: "pointer", fontFamily: "inherit" }}>Compris</button></div>
+            </>
+          ) : (
+            <>
+              <b>Ce chapitre a été modifié ailleurs (autre appareil ou onglet) pendant que vous écriviez ici.</b> Rien n'a été écrasé. Version du compte : {compterMots(conflit.theirs)} mots ; votre version ici : {compterMots(conflit.mine)} mots. Quelle version garder ? <span style={{ color: "#777" }}>L'autre reste dans l'historique (↺), rien n'est perdu.</span>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button type="button" onClick={garderMaVersion} style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8, border: "none", background: "#7F77DD", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}>Garder MA version (écrase celle du compte)</button>
+                <button type="button" onClick={prendreVersionCompte} style={{ fontSize: 13, padding: "6px 12px", borderRadius: 8, border: "0.5px solid #ccc", background: "#fff", color: "#333", cursor: "pointer", fontFamily: "inherit" }}>Prendre la version du compte</button>
+              </div>
+            </>
+          )}
+        </div>
       )}
 
       {brouillonTrouvé && editor && (
