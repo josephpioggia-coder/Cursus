@@ -5,11 +5,14 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
-import { chercherDansHtml, chercherDansTitre, remplacerDansHtml, remplacerTout } from "../lib/rechercheTexte.js";
+import { chercherDansHtml, chercherDansTitre, remplacerDansHtml, remplacerTout, jetonsNonPris } from "../lib/rechercheTexte.js";
 import { etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes } from "../lib/rechercheEditeur.js";
 
 const champ = { width: "100%", boxSizing: "border-box", border: "0.5px solid #bbb", borderRadius: 7, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: "#1a1a1a" };
 const bouton = (actif = false) => ({ fontSize: 12, border: "0.5px solid #ccc", background: actif ? "#EEEDFE" : "#fff", color: actif ? "#534AB7" : "#333", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" });
+// Caractères spéciaux (menu « Spécial », comme dans Word) : [code, libellé]
+const SPECIAUX_RECHERCHE = [["^s", "Espace insécable"], ["^t", "Tabulation"], ["^l", "Saut de ligne"], ["^w", "Espace blanc (un ou plusieurs)"], ["^?", "Un caractère quelconque"], ["^#", "Un chiffre"], ["^$", "Une lettre"], ["^f", "Note de bas de page"], ["^g", "Image"], ["^^", "Un accent circonflexe « ^ »"]];
+const SPECIAUX_REMPLACEMENT = [["^s", "Espace insécable"], ["^t", "Tabulation"], ["^l", "Saut de ligne"], ["^&", "Le texte trouvé"], ["^^", "Un accent circonflexe « ^ »"]];
 const compterMots = (html) => (html || "").replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
 
 export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
@@ -29,6 +32,20 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const [annulable, setAnnulable] = useState(false); // dernier « Tout remplacer » du chapitre, annulable depuis le panneau (Ctrl+Z reste dans le champ de saisie)
   const [, setTic] = useState(0);
   const champRef = useRef(null);
+  const remplRef = useRef(null);
+  const [plus, setPlus] = useState(false); // « Plus >> » : caractères spéciaux
+  const [menuSpecial, setMenuSpecial] = useState(false);
+  const dernierChamp = useRef("rech"); // champ qui avait le focus en dernier : "rech" | "rempl"
+  const insererSpecial = (code) => {
+    const rempl = dernierChamp.current === "rempl";
+    const el = rempl ? remplRef.current : champRef.current;
+    const valeur = rempl ? remplacement : requete;
+    const a = el?.selectionStart ?? valeur.length, b = el?.selectionEnd ?? valeur.length;
+    const neuf = valeur.slice(0, a) + code + valeur.slice(b);
+    (rempl ? setRemplacement : setRequete)(neuf);
+    setMenuSpecial(false);
+    setTimeout(() => { el?.focus(); el?.setSelectionRange(a + code.length, a + code.length); }, 0);
+  };
   const options = useMemo(() => ({ casse, motEntier, accents }), [casse, motEntier, accents]);
 
   useEffect(() => { champRef.current?.focus(); champRef.current?.select(); }, []);
@@ -141,15 +158,34 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "none", fontSize: 16, color: "#888", cursor: "pointer" }}>✕</button>
       </div>
 
-      <input ref={champRef} value={requete} onChange={(ev) => { setRequete(ev.target.value); setMessage(""); }} placeholder="Rechercher…" aria-label="Rechercher" style={champ} />
-      <input value={remplacement} onChange={(ev) => setRemplacement(ev.target.value)} placeholder="Remplacer par…" aria-label="Remplacer par" disabled={lectureSeule} style={champ} />
+      <input ref={champRef} value={requete} onFocus={() => { dernierChamp.current = "rech"; }} onChange={(ev) => { setRequete(ev.target.value); setMessage(""); }} placeholder="Rechercher…" aria-label="Rechercher" style={champ} />
+      <input ref={remplRef} value={remplacement} onFocus={() => { dernierChamp.current = "rempl"; }} onChange={(ev) => setRemplacement(ev.target.value)} placeholder="Remplacer par…" aria-label="Remplacer par" disabled={lectureSeule} style={champ} />
+      {jetonsNonPris(requete).length > 0 && <div role="status" style={{ fontSize: 11.5, color: "#8a5a00", background: "#FFF6E0", borderRadius: 6, padding: "4px 8px" }}>Pas encore pris en charge : {jetonsNonPris(requete).join(", ")}. Ces codes sont cherchés tels quels.</div>}
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <button type="button" style={bouton(casse)} onClick={() => setCasse(!casse)} title="Majuscules et minuscules comptent">Aa</button>
         <button type="button" style={bouton(motEntier)} onClick={() => setMotEntier(!motEntier)} title="Seulement le mot entier (« chat » ne trouve pas « chaton »)">Mot entier</button>
         <button type="button" style={bouton(accents)} onClick={() => setAccents(!accents)} title="Les accents comptent (« ete » ne trouve plus « été »)">é ≠ e</button>
+        <button type="button" style={bouton(plus)} onClick={() => { setPlus(!plus); setMenuSpecial(false); }} title="Caractères spéciaux : espace insécable, tabulation, saut de ligne…" aria-expanded={plus}>Plus {plus ? "<<" : ">>"}</button>
         {portee === "livre" && <button type="button" style={bouton(horsCorps)} onClick={() => setHorsCorps(!horsCorps)} title="Chercher aussi dans la réserve, les notes de cadrage et les brouillons">+ réserve, notes, brouillons</button>}
       </div>
+
+      {plus && (
+        <div style={{ position: "relative" }}>
+          <button type="button" style={bouton(menuSpecial)} onClick={() => setMenuSpecial(!menuSpecial)} aria-expanded={menuSpecial}>Spécial ▾</button>
+          <span style={{ fontSize: 11, color: "#777", marginLeft: 8 }}>s'insère dans le champ où se trouve le curseur ({dernierChamp.current === "rempl" ? "Remplacer par" : "Rechercher"})</span>
+          {menuSpecial && (
+            <div role="menu" style={{ marginTop: 6, background: "#fff", border: "0.5px solid #ccc", borderRadius: 8, padding: 4 }}>
+              {(dernierChamp.current === "rempl" ? SPECIAUX_REMPLACEMENT : SPECIAUX_RECHERCHE).map(([code, lib]) => (
+                <button key={code} type="button" role="menuitem" onClick={() => insererSpecial(code)}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 14, width: "100%", border: "none", background: "none", textAlign: "left", padding: "5px 8px", fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", color: "#1a1a1a", borderRadius: 5 }}>
+                  <span>{lib}</span><code style={{ color: "#666" }}>{code}</code>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {portee === "chapitre" ? (
         <>

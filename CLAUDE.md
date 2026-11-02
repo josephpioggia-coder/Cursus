@@ -1416,3 +1416,10 @@ Message de Joseph tronqué (« lire à haute voix doit rester autant que possibl
 
 ### Menu « ⋯ » mobile : Lire à voix haute sur une seule ligne (02/11/2026)
 Même demande que pour le ruban : le contrôle (bouton + voix + vitesse + solde) est dans un conteneur `nowrap` pleine largeur du menu « ⋯ » (`Editeur.jsx`), défilant horizontalement si 360 px ne suffisent pas. Vérifié dans l'éditeur réel (Supabase simulé) à 360 px : bouton, voix et vitesse sur une ligne, `scrollWidth == innerWidth`, aucune erreur JS ; le solde de caractères n'apparaissait pas dans ce test (pas de compte) : à vérifier en usage réel.
+
+### Rechercher / remplacer : caractères spéciaux « à la Word » (02/11/2026)
+Demande de Joseph (captures de la fenêtre Word : « tu n'as pas encodé toutes les fonctions ») ; ordre convenu : caractères spéciaux, puis « Atteindre », début/fin de mot, recherche par mise en forme (+ remplacement avec mise en forme), puis le reste.
+- `rechercheTexte.js` : jetons `^s ^t ^l(^n) ^w ^? ^# ^$ ^f ^g ^^` compilés en expression régulière SUR LE TEXTE PLIÉ (parties littérales pliées comme avant ; sans jeton : chemin `indexOf` inchangé) ; `developperRemplacement` (`^s ^t ^l ^^ ^&`) ; texte « à plat » : tabulation → `\t`, saut de ligne → `\n`, note → `NOTE` (U+E001), image/autre → `OBJET` (U+FFFC), dans l'éditeur ET pour le livre (`texteDuBloc`). `^p` / `^m` : NON pris en charge (la recherche ne traverse jamais deux paragraphes) → annoncés (`jetonsNonPris`), jamais ignorés en silence.
+- `rechercheEditeur.js` : un remplacement contenant `\t` / `\n` insère de VRAIS éléments (nœuds `tabulation`, `hardBreak`) via `replaceWith` (marques du point d'insertion conservées) ; sinon `insertText` comme avant.
+- Fenêtre : « Plus >> » → « Spécial ▾ » (liste en flux, pas en popover : le panneau défile et rognerait un menu flottant), s'insère dans le dernier champ actif.
+- Vérifié : moteur (node : `^s ^w ^t ^l ^# ^$ ^? ^^`, accents, mot entier, remplacement), éditeur réel (Supabase simulé) : `^s`→`^t` (2 nœuds tabulation), `^l`→`^l^l` (1 → 2 sauts), `^w`→espace, `1^s000`, menu Spécial. NON testé : « Tout le livre » avec ces jetons, très gros livre, mobile.
