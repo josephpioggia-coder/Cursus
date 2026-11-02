@@ -1413,3 +1413,6 @@ Demande de Joseph (même principe que le ruban : uniformité, moins de risques d
 
 ### Ruban : « Lire à voix haute » sur une seule ligne (02/11/2026)
 Message de Joseph tronqué (« lire à haute voix doit rester autant que possible sur la m… », suite non reçue) interprété comme « sur la même ligne » : le contrôle (bouton + voix + vitesse + solde de caractères) était sur 3 lignes (`maxWidth: 230`, `flexWrap: wrap`) et gonflait le ruban. Maintenant `nowrap` (le ruban défile horizontalement si l'écran est étroit). INTERPRÉTATION À CONFIRMER. Vérifié : `vite build` seulement.
+
+### Menu « ⋯ » mobile : Lire à voix haute sur une seule ligne (02/11/2026)
+Même demande que pour le ruban : le contrôle (bouton + voix + vitesse + solde) est dans un conteneur `nowrap` pleine largeur du menu « ⋯ » (`Editeur.jsx`), défilant horizontalement si 360 px ne suffisent pas. Vérifié dans l'éditeur réel (Supabase simulé) à 360 px : bouton, voix et vitesse sur une ligne, `scrollWidth == innerWidth`, aucune erreur JS ; le solde de caractères n'apparaissait pas dans ce test (pas de compte) : à vérifier en usage réel.
