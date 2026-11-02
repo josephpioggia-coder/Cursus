@@ -2182,7 +2182,7 @@ export default function Editeur({
       {mobile || modeFocus ? (
         <BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />
       ) : (
-        <RubanEditeur couleur={projetCouleur} actions={actionsRuban} controles={{ format: formatSelectJSX, lecture: <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "center", maxWidth: 230 }}>{lectureJSX}</div> }}
+        <RubanEditeur couleur={projetCouleur} actions={actionsRuban} controles={{ format: formatSelectJSX, lecture: <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", whiteSpace: "nowrap" }}>{lectureJSX}</div> }}
           accueil={<BarreOutils editor={editor} modeFocus={modeFocus} mobile={mobile} onToggleFocus={() => setModeFocus(!modeFocus)} />} lectureSeule={lectureSeule} />
       )}
 
