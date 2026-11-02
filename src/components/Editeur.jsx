@@ -1708,6 +1708,14 @@ export default function Editeur({
     editor.view.focus();
     return { ok: true, message: `Ligne ${idx + 1} sur ${numérosDeLigne.length}.` };
   };
+  // Numéro de ligne (celui de la marge) où se trouve une position du texte — pour la liste des résultats de la recherche.
+  const ligneDePos = (pos) => {
+    if (!editor || !wrapperLigneRef.current || !numérosDeLigne.length) return null;
+    try {
+      const top = editor.view.coordsAtPos(pos).top - wrapperLigneRef.current.getBoundingClientRect().top;
+      return numérosDeLigne.reduce((k, l, i) => (l.top <= top + 4 ? i : k), 0) + 1;
+    } catch { return null; }
+  };
   const ouvrirRechercheRef = useRef(ouvrirRecherche);
   ouvrirRechercheRef.current = ouvrirRecherche;
   useEffect(() => {
@@ -2188,7 +2196,7 @@ export default function Editeur({
       )}
 
       {rechercheOuverte && (
-        <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} porteeInitiale={porteeRecherche} onAtteindreLigne={atteindreLigne} nbLignes={numérosDeLigne.length} noeudId={nœud?.id}
+        <RechercheRemplacement editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} requeteInitiale={requeteRecherche} porteeInitiale={porteeRecherche} onAtteindreLigne={atteindreLigne} ligneDePos={ligneDePos} nbLignes={numérosDeLigne.length} noeudId={nœud?.id}
           noeuds={aplatirStructure(structureProjet)} onOuvrirNoeud={onOuvrirNoeud} onEcrireNoeud={onEcrireAutreNoeud} onRenommerNoeud={onRenommerNoeud} sauvegarderAvant={sauvegarderAvant} onFermer={() => setRechercheOuverte(false)} />
       )}
 
