@@ -833,6 +833,8 @@ RÉPONSES COMPLÈTES — l'auteur·ice préfère une réponse complète et déve
 
 PASSAGE MARQUÉ — si le message contient un bloc « PASSAGE MARQUÉ PAR L'AUTEUR·ICE », c'est le passage que l'auteur·ice désigne par « la partie marquée » : travaille directement dessus, sans lui redemander de le préciser. S'il n'y a PAS ce bloc et qu'il parle d'un passage marqué, dis-lui que tu ne vois aucun marquage gris dans le chapitre (il se pose avec le bouton loupe de l'éditeur) plutôt que de deviner.
 
+NUMÉROS DE LIGNE — quand le texte actuel est fourni avec des repères [L12], ce sont les numéros de ligne que l'auteur·ice voit dans la marge gauche de son éditeur. Quand tu renvoies à un passage, cite son numéro (« ligne 26 », « lignes 26-28 ») ET un court extrait entre guillemets, recopié mot pour mot ; quand l'auteur·ice parle de « la ligne 26 », c'est le repère [L26]. Ne dis jamais que tu ne vois pas les numéros de ligne si les repères sont présents. S'il n'y a aucun repère, dis-le simplement et cite l'extrait. Les repères ne font pas partie du texte : ne les recopie pas dans une proposition de réécriture. Les lignes dépendent de la largeur de la fenêtre : un numéro peut changer si l'auteur·ice redimensionne ou modifie le texte.
+
 CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, le plan du livre (titres uniquement, quand il est fourni dans le contexte du projet) et, SEULEMENT si l'auteur·ice l'a joint explicitement, le texte du chapitre précédent. Tu ne connais JAMAIS le contenu des autres chapitres : ne le devine pas, ne l'invente pas, ne le résume pas d'après leur titre. Si une demande exige ce contenu (introduction qui reprend les chapitres précédents, rappel, continuité), dis précisément ce qu'il te manque et propose à l'auteur·ice de te le fournir (joindre le chapitre précédent, ou te donner quelques lignes de résumé) ; tu peux proposer une introduction qui s'appuie sur les titres du plan ou sur le chapitre joint, en le disant clairement.
 
 DIRECTIVE DE GUIDAGE — si le message de l'auteur commence par ${MARQUEUR_DIRECTIVE}, il a explicitement demandé à être guidé : cette directive PRIME, pour cette réponse, sur toute préférence du contexte du projet du type « écrit d'un jet, sans plan, ne pas imposer de structure ». Suis-la franchement (propose, tranche entre des options, prends la direction qu'elle demande) au lieu de te contenter de poser des questions. Les règles de fond ci-dessus et ci-dessous restent, elles, absolues : tu ne présentes jamais une hypothèse comme un fait, tu t'appuies sur le texte exact fourni, et tu signales ce qui vient de l'auteur et ce qui est ton hypothèse.
@@ -1552,7 +1554,7 @@ function CarteBlocage({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "", planDuLivre = null, chapitrePrécédent = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "", planDuLivre = null, chapitrePrécédent = null, lecteurLignes = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADNBrut, setContexteADNBrut] = useState(null);
   // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
@@ -1804,8 +1806,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // (qui reste pertinente pour le bouton "Analyser", pas pour le fil
       // de dialogue).
       const { texte: texteActuel } = extraireTexte(texteActif);
+      // Numéros de ligne (03/11/2026) : l'éditeur fournit le texte où chaque ligne affichée porte son numéro de marge « [L12] » ;
+      // l'auteur·ice voit ces numéros à l'écran et s'y réfère. Absent (mobile, éditeur masqué…) → texte simple.
+      let texteNuméroté = null;
+      try { texteNuméroté = lecteurLignes?.current?.() || null; } catch { texteNuméroté = null; }
       const contexteTexteActuel = texteActuel.trim()
-        ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version) :\n"""\n${texteActuel}\n"""`
+        ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version)${texteNuméroté ? ". Chaque ligne commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice (lignes d'écran : elles dépendent de la largeur de la fenêtre)" : ""} :\n"""\n${texteNuméroté || texteActuel}\n"""`
         : "";
       // CORRECTIF 24/09/2026 — signalé en usage réel : le fil de dialogue
       // (toutes cartes confondues, pas seulement "Aide-moi à avancer") ne
@@ -1866,7 +1872,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, texteActif, typeNœud, nœudId, contexteADNEtPlan]);
+  }, [dialogues, langueProjet, messageErreur, texteActif, lecteurLignes, typeNœud, nœudId, contexteADNEtPlan]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le

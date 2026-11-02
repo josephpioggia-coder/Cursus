@@ -1329,6 +1329,7 @@ export default function Editeur({
                            // puisse analyser uniquement le passage surligné plutôt que
                            // tout le chapitre. Ajouté le 16/07/2026.
   onRetour,                // () => void
+  enregistrerLecteurLignes, // (fn | null) => void — fournit au Co-pilote une fonction qui rend le texte avec les numéros de ligne de la marge
   structureProjet = [],    // structure imbriquée du projet (Rechercher / remplacer dans tout le livre, 28/10/2026)
   onOuvrirNoeud,           // (nœudId) => void — ouvre un autre chapitre
   onEcrireAutreNoeud,      // async (nœudId, html) => { error } — écrit un autre chapitre (remplacement dans tout le livre)
@@ -1716,6 +1717,28 @@ export default function Editeur({
       return numérosDeLigne.reduce((k, l, i) => (l.top <= top + 4 ? i : k), 0) + 1;
     } catch { return null; }
   };
+  // Texte du chapitre où chaque ligne affichée porte son numéro de marge : « [L12] … » (pour le Co-pilote, 03/11/2026). null si non mesurable.
+  const texteNuméroté = () => {
+    if (!editor || !wrapperLigneRef.current || !numérosDeLigne.length || editor.view.dom.offsetParent === null) return null;
+    const haut = wrapperLigneRef.current.getBoundingClientRect().top;
+    const n = numérosDeLigne.length; const lignes = new Map(); let ligne = 0;
+    editor.state.doc.descendants((noeud, pos) => {
+      if (!noeud.isTextblock) return true;
+      noeud.forEach((enfant, decalage) => {
+        if (!enfant.isText) return;
+        const debut = pos + 1 + decalage; const re = /\S+\s*/g; let m;
+        while ((m = re.exec(enfant.text))) {
+          let top; try { top = editor.view.coordsAtPos(debut + m.index).top - haut; } catch { continue; }
+          while (ligne + 1 < n && numérosDeLigne[ligne + 1].top <= top + 4) ligne++;
+          lignes.set(ligne, (lignes.get(ligne) || "") + m[0]);
+        }
+      });
+      return false;
+    });
+    if (!lignes.size) return null;
+    return [...lignes.entries()].sort((a, b) => a[0] - b[0]).map(([i, t]) => `[L${i + 1}] ${t.replace(/\s+$/, "")}`).join("\n");
+  };
+  useEffect(() => { enregistrerLecteurLignes?.(texteNuméroté); return () => enregistrerLecteurLignes?.(null); });
   const ouvrirRechercheRef = useRef(ouvrirRecherche);
   ouvrirRechercheRef.current = ouvrirRecherche;
   useEffect(() => {

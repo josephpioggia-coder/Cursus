@@ -103,6 +103,24 @@ export function majRecherche(editor, requete, options, courant = 0) {
   editor.view.dispatch(editor.state.tr.setMeta(cleRecherche, { requete, options, courant }));
 }
 
+/** Fait défiler le conteneur de l'éditeur pour montrer la position `pos` (au tiers de la hauteur visible).
+ *  scrollIntoView de ProseMirror part de la sélection DOM : tant que le focus est dans le panneau de recherche, il ne trouve pas le bon conteneur défilant. */
+export function montrerPosition(editor, pos) {
+  try {
+    const { view } = editor; const r = view.coordsAtPos(pos);
+    let el = view.dom.parentElement;
+    while (el && el !== document.body) {
+      const o = getComputedStyle(el).overflowY;
+      if ((o === "auto" || o === "scroll") && el.scrollHeight > el.clientHeight) break;
+      el = el.parentElement;
+    }
+    if (el && el !== document.body) {
+      const c = el.getBoundingClientRect();
+      if (r.top < c.top + 40 || r.bottom > c.bottom - 40) el.scrollTop += r.top - c.top - c.height / 3;
+    } else if (r.top < 40 || r.bottom > window.innerHeight - 40) window.scrollBy(0, r.top - window.innerHeight / 3);
+  } catch { /* position hors du document */ }
+}
+
 /** Sélectionne l'occurrence `i` et la fait apparaître à l'écran, sans voler le focus du champ de recherche. */
 export function allerA(editor, i) {
   const e = etatRecherche(editor);
@@ -114,6 +132,7 @@ export function allerA(editor, i) {
   const sel = o.note ? NodeSelection.create(editor.state.doc, o.from) : TextSelection.create(editor.state.doc, o.from, o.to);
   const tr = editor.state.tr.setSelection(sel).scrollIntoView();
   editor.view.dispatch(tr);
+  montrerPosition(editor, o.from);
   return idx;
 }
 

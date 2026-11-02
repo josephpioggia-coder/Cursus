@@ -1909,6 +1909,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
   });
   // Mobile (04/10/2026) : l'éditeur occupe toute la largeur, le Co-pilote s'ouvre par-dessus (bouton flottant).
   const [copiloteMobileOuvert, setCopiloteMobileOuvert] = useState(false);
+  const lecteurLignesRef = useRef(null); // fonction fournie par l'éditeur : texte du chapitre avec numéros de ligne de la marge (Co-pilote)
   const [texteSélectionné, setTexteSélectionné] = useState("");
   const redimensionnementActif = useRef(false);
   const largeurRef = useRef(largeurPanneau);
@@ -3004,6 +3005,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               onTexteChange={màjTexteLocal}
               onSelectionChange={setTexteSélectionné}
               onRetour={() => setVue("projet")}
+              enregistrerLecteurLignes={(f) => { lecteurLignesRef.current = f; }}
               structureProjet={projetActif.structure}
               onOuvrirNoeud={setNœudActifId}
               onEcrireAutreNoeud={écrireAutreNœud}
@@ -3049,6 +3051,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               <CopiloteIA
                 texteActif={nœudActif.texte || ""}
                 texteSélectionné={texteSélectionné}
+                lecteurLignes={lecteurLignesRef}
                 typeProjet={projetActif.genre === "Roman / Témoignage" ? "fiction" : "non-fiction"}
                 couleurProjet={projetActif.couleur}
                 projetTitre={projetActif.titre}
