@@ -76,3 +76,6 @@ Ruban Accueil › Édition › « Atteindre », ou Ctrl+G, ou l'onglet « Attein
 
 ## Rechercher / remplacer : début de mot, fin de mot (02/11/2026)
 « Plus >> » dans la fenêtre Rechercher / remplacer : boutons « Début de mot » (« temp » trouve « temps » et « température », pas « longtemps ») et « Fin de mot » (« temps » trouve « longtemps » et « contretemps », pas « temporel »). Les deux ensemble = « Mot entier ». S'appliquent au chapitre comme à tout le livre.
+
+## Rechercher par mise en forme (03/11/2026)
+« Plus >> » dans Rechercher / remplacer › « Ce chapitre » : boutons de mise en forme (Gras, Italique, Souligné, Barré, Surligné, Couleur de texte, Police, Taille, Indice, Exposant). Champ « Rechercher » VIDE + une ou plusieurs mises en forme = tous les passages qui les portent toutes (suites continues de texte ; une note, une tabulation ou une image interrompt la suite), parcourus avec ◀ ▶. Avec un texte cherché, seules les occurrences entièrement ainsi mises en forme sont gardées. Limites : « Ce chapitre » seulement (« Tout le livre » ignore ces filtres) ; remplacer est désactivé tant qu'aucun texte n'est cherché (le remplacement avec mise en forme viendra ensuite).
