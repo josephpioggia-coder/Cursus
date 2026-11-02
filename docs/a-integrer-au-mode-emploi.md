@@ -67,3 +67,6 @@ Sur un écran étroit, les fonctions d'un onglet restent sur UNE rangée et se p
 
 ## Barre de mise en forme : une seule rangée qui défile (02/11/2026)
 Sur le bureau, la barre de mise en forme (Style, Police, Taille, G, I, S, couleurs…) reste sur UNE rangée : si l'écran est trop étroit, on la fait défiler horizontalement (barre fine sous la rangée, ou Maj + molette). Les palettes de couleur s'ouvrent sous leur bouton, sans être coupées. Sur mobile, elle garde son retour à la ligne.
+
+## Rechercher / remplacer : caractères spéciaux (02/11/2026)
+Dans la fenêtre Rechercher / remplacer, bouton « Plus >> » puis « Spécial ▾ » : le code choisi s'insère dans le champ où se trouve le curseur. À la main : `^s` espace insécable, `^t` tabulation, `^l` saut de ligne, `^w` espace blanc (un ou plusieurs ; utile pour supprimer les doubles espaces : `^w` → un espace), `^?` un caractère quelconque, `^#` un chiffre, `^$` une lettre, `^f` note de bas de page, `^g` image, `^^` un « ^ ». Dans « Remplacer par » : `^s`, `^t`, `^l`, `^^` et `^&` (le texte trouvé). Pas encore : `^p` (marque de paragraphe) et `^m` (saut de page) — annoncés dans la fenêtre. Dans « Tout le livre », remplacer par une tabulation, un saut de ligne ou chercher une note / image reste « à faire à la main » (signalé).

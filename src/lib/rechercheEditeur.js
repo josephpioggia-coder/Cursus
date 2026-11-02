@@ -7,7 +7,7 @@
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection, NodeSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { trouver, remplacerTout } from "./rechercheTexte.js";
+import { trouver, remplacerTout, developperRemplacement, NOTE } from "./rechercheTexte.js";
 
 export const cleRecherche = new PluginKey("rechercheDansTexte");
 const SEPARATEUR = "￼";
@@ -23,7 +23,8 @@ export function occurrencesDansDoc(doc, requete, options = {}) {
       const debut = pos + 1 + decalage;
       if (enfant.isText) { for (let i = 0; i < enfant.text.length; i++) positions.push(debut + i); texte += enfant.text; }
       else {
-        positions.push(debut); texte += (enfant.type.name === "hardBreak" ? "\n" : SEPARATEUR);
+        // Texte « à plat » (jetons « ^t », « ^l », « ^f », « ^g » de rechercheTexte.js) : tabulation → \t, saut de ligne → \n, note → NOTE, autre → séparateur.
+        positions.push(debut); texte += (enfant.type.name === "hardBreak" ? "\n" : enfant.type.name === "tabulation" ? "\t" : enfant.type.name === "note" ? NOTE : SEPARATEUR);
         // Note de bas de page : son texte vit dans l'attribut `texte` ; une note = une occurrence (tous ses « chat » remplacés d'un coup)
         if (enfant.type.name === "note" && trouver(enfant.attrs.texte || "", requete, options).length) res.push({ from: debut, to: debut + enfant.nodeSize, note: true });
       }
@@ -86,7 +87,19 @@ function appliquer(tr, o, remplacement, e) {
   if (o.note) {
     const noeud = tr.doc.nodeAt(o.from);
     if (noeud) tr.setNodeMarkup(o.from, undefined, { ...noeud.attrs, texte: remplacerTout(noeud.attrs.texte || "", e.requete, remplacement, e.options).texte });
-  } else tr.insertText(remplacement, o.from, o.to);
+  } else {
+    const texte = developperRemplacement(remplacement, tr.doc.textBetween(o.from, o.to, "\n", SEPARATEUR));
+    if (!/[\t\n]/.test(texte)) { tr.insertText(texte, o.from, o.to); return; }
+    // Tabulation / saut de ligne dans le remplacement : ce sont des ÉLÉMENTS du document (pas du texte), on les insère comme tels.
+    const { schema } = tr.doc.type; const marques = tr.doc.resolve(o.from).marks();
+    const noeuds = [];
+    texte.split(/(\t|\n)/).forEach((seg) => {
+      if (seg === "\t" && schema.nodes.tabulation) noeuds.push(schema.nodes.tabulation.create());
+      else if (seg === "\n" && schema.nodes.hardBreak) noeuds.push(schema.nodes.hardBreak.create());
+      else if (seg) noeuds.push(schema.text(seg, marques));
+    });
+    tr.replaceWith(o.from, o.to, noeuds);
+  }
 }
 
 /** Remplace l'occurrence `i` → nouvelle occurrence courante. Les marques (gras, italique) du texte remplacé sont conservées. */
