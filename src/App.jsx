@@ -2253,7 +2253,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
     );
   }, [projetActifId]);
 
-  const sauvegarderNœud = useCallback(async (nœudId, html) => {
+  const sauvegarderNœud = useCallback(async (nœudId, html, controle) => {
     setProjets((prev) =>
       prev.map((p) => {
         if (p.id !== projetActifId) return p;
@@ -2264,6 +2264,18 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         return { ...p, structure: màj(p.structure) };
       })
     );
+    // Avec `controle` ({ version, texteConnu }) : écriture refusée si un autre appareil a modifié le texte entre-temps (conflit renvoyé à l'éditeur).
+    if (controle && controle.version !== undefined) {
+      const r = await nœudsAPI.sauvegarderTexteControle(nœudId, html, controle.version, controle.texteConnu);
+      if (r.version) {
+        setProjets((prev) => prev.map((p) => {
+          if (p.id !== projetActifId) return p;
+          const màj = (liste) => liste.map((n) => (n.id === nœudId ? { ...n, mis_a_jour: r.version } : { ...n, enfants: màj(n.enfants || []) }));
+          return { ...p, structure: màj(p.structure) };
+        }));
+      }
+      return r;
+    }
     return nœudsAPI.sauvegarderTexte(nœudId, html); // { error } : l'éditeur réessaie et signale un échec (03/11/2026)
   }, [projetActifId]);
 
