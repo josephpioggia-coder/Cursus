@@ -35,6 +35,7 @@ import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI, direct
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { noterUsageIA } from "../lib/usageIA.js";
+import { marquerDebut, marquerFin, clesEnCours, sauverResultat, lireResultat, retenirEnMemoire, lireMemoire } from "../lib/copiloteConserve.js";
 import { extraitPourJoindre } from "../lib/planDuLivre.js";
 
 // Plus de troncature artificielle depuis le 17/07/2026 (demande de Joseph) :
@@ -1649,6 +1650,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     return () => { annulé = true; };
   }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
+  // Chapitre actuellement affiché : un appel lancé sur le chapitre A qui se termine alors qu'on est sur B ne doit ni s'afficher chez B ni être perdu
+  // (03/11/2026) — il est enregistré pour A (mémoire + base) et retrouvé en revenant sur A.
+  const nœudIdRef = useRef(nœudId);
+  nœudIdRef.current = nœudId;
   const [données, setDonnées] = useState({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null });
 
   // Persistance des résultats d'analyse (16/09/2026) — suite directe de la
@@ -1661,6 +1666,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   useEffect(() => {
     if (!nœudId) return;
     let annulé = false;
+    // Changement de chapitre : on repart d'un état vide (avant, les analyses du chapitre précédent restaient affichées chez le suivant),
+    // puis on reprend ce qui a été produit pendant cette session (mémoire) et ce qui tourne encore (registre des appels en cours).
+    setDonnées({ suggestions: null, personnages: null, références: null, cohérence: null, vérification: null, ...lireMemoire(nœudId) });
+    setChargement(Object.fromEntries(clesEnCours(nœudId).map((k) => [k, true])));
     analysesCopiloteAPI.parNœud(nœudId).then(({ data, error }) => {
       if (error) { console.error("[analyses_copilote] échec du chargement :", error); return; }
       // ATTENTION à l'ordre de fusion (16/09/2026) : `données` démarre
@@ -1671,13 +1680,22 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // chaque fois. `{...d, ...data}` : garde une analyse déjà relancée
       // entre-temps (cas rare, le chargement est quasi immédiat), sinon
       // remplit les `null` de départ avec ce qui a été chargé.
-      if (!annulé && data) setDonnées((d) => ({ ...d, ...data }));
+      if (!annulé && data) setDonnées((d) => ({ ...d, ...data, ...lireMemoire(nœudId) }));
     });
-    return () => { annulé = true; };
+    // Un appel de CE chapitre démarre / se termine (peut-être lancé avant que ce panneau soit remonté) : on l'affiche et on récupère son résultat.
+    const surEtat = (ev) => {
+      const { nœudId: id, clé, enCours } = ev.detail || {};
+      if (id !== nœudId) return;
+      setChargement((c) => ({ ...c, [clé]: enCours }));
+      if (!enCours) setDonnées((d) => ({ ...d, ...lireMemoire(nœudId) }));
+    };
+    window.addEventListener("cursus-copilote-etat", surEtat);
+    return () => { annulé = true; window.removeEventListener("cursus-copilote-etat", surEtat); };
   }, [nœudId]);
 
   const màjDonnées = useCallback((onglet, valeur) => {
-    setDonnées((d) => ({ ...d, [onglet]: valeur }));
+    if (nœudId) retenirEnMemoire(nœudId, onglet, valeur);
+    if (nœudIdRef.current === nœudId) setDonnées((d) => ({ ...d, [onglet]: valeur }));
     if (nœudId) {
       analysesCopiloteAPI.sauvegarder(nœudId, onglet, valeur)
         .then(({ error }) => { if (error) console.error("[analyses_copilote] échec de la sauvegarde :", error); });
@@ -1701,7 +1719,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   }, [sourceAnalyse, texteSélectionné, texteActif]);
   const [modeAuto, setModeAuto] = useState(false);
   const [dernièreAnalyse, setDernièreAnalyse] = useState(null);
-  const abortRef = useRef(null);
+  // Un contrôleur d'annulation PAR demande (onglet, « Aide-moi à avancer »…) : avant, lancer une analyse annulait silencieusement toute autre
+  // analyse en cours — des requêtes payées jetées (03/11/2026). Une demande n'est annulée que par une NOUVELLE demande de la même sorte.
+  const abortRef = useRef({});
+  const signalPour = (clé) => { abortRef.current[clé]?.abort(); abortRef.current[clé] = new AbortController(); return abortRef.current[clé].signal; };
   const intervalRef = useRef(null);
 
   // ── Dialogue par carte — voir note au-dessus de DIALOGUE_MAX_TOKENS ──
@@ -2070,6 +2091,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [recompositionErreur, setRecompositionErreur] = useState(null);
 
   const lancerConseilsRecomposition = useCallback(async () => {
+    marquerDebut(nœudId, "recomposition");
     setRecompositionChargement(true);
     setRecompositionErreur(null);
     setRecompositionPoints(null);
@@ -2118,14 +2140,15 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         pointsFinaux = synthèse.points || résultatsParTranche;
       }
 
-      setRecompositionPoints(pointsFinaux);
+      sauverResultat(nœudId, "recomposition", pointsFinaux);
+      if (nœudIdRef.current === nœudId) setRecompositionPoints(pointsFinaux);
     } catch (err) {
-      setRecompositionErreur(messageErreur(err));
+      if (nœudIdRef.current === nœudId) setRecompositionErreur(messageErreur(err));
     } finally {
-      setRecompositionChargement(false);
-      setRecompositionProgression(null);
+      marquerFin(nœudId, "recomposition");
+      if (nœudIdRef.current === nœudId) { setRecompositionChargement(false); setRecompositionProgression(null); }
     }
-  }, [texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
+  }, [nœudId, texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
 
   const analyser = useCallback(async (ongletCible) => {
     const sourceTexte = obtenirSourceHTML();
@@ -2158,14 +2181,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       ? `\n\n(${images.length} image${images.length > 1 ? "s" : ""} jointe${images.length > 1 ? "s" : ""} au passage — observe-${images.length > 1 ? "les" : "la"} et tiens-en compte dans ton analyse.)`
       : "";
 
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const sig = signalPour(ongletCible);
+    marquerDebut(nœudId, ongletCible);
     setChargement(c => ({ ...c, [ongletCible]: true }));
     setErreur(e => ({ ...e, [ongletCible]: null }));
 
     try {
       let résultat = "";
-      const sig = abortRef.current.signal;
 
       if (ongletCible === "suggestions") {
         résultat = await appelClaude(systemAvecLangue(PROMPTS.suggestions(typeProjet), langueProjet, contexteADN), `Texte :\n\n${texte}${noteImages}`, sig, 4096, null, false, images);
@@ -2234,11 +2256,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
 
       setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
-      if (err.name !== "AbortError") {
+      if (err.name !== "AbortError" && nœudIdRef.current === nœudId) {
         setErreur(e => ({ ...e, [ongletCible]: messageErreur(err) }));
       }
     } finally {
-      setChargement(c => ({ ...c, [ongletCible]: false }));
+      marquerFin(nœudId, ongletCible);
+      if (nœudIdRef.current === nœudId) setChargement(c => ({ ...c, [ongletCible]: false }));
     }
   }, [obtenirSourceHTML, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
@@ -2247,12 +2270,11 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   // MODIF 20/07/2026 : transmet aussi titrePartieParente et
   // titresChapitresVoisins pour ancrer les pistes d'un chapitre sans titre.
   const analyserDémarrage = useCallback(async () => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const sig = signalPour("suggestions");
+    marquerDebut(nœudId, "suggestions");
     setChargement(c => ({ ...c, suggestions: true }));
     setErreur(e => ({ ...e, suggestions: null }));
     try {
-      const sig = abortRef.current.signal;
       const notesEtCitations = typeNœud === "scene" ? await chargerNotesEtCitations(projetId) : null;
       const résultat = await appelClaude(
         systemAvecLangue(
@@ -2267,13 +2289,14 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       màjDonnées("suggestions", p.suggestions || []);
       setDernièreAnalyse(new Date().toLocaleTimeString(langueProjet === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" }));
     } catch (err) {
-      if (err.name !== "AbortError") {
+      if (err.name !== "AbortError" && nœudIdRef.current === nœudId) {
         setErreur(e => ({ ...e, suggestions: messageErreur(err) }));
       }
     } finally {
-      setChargement(c => ({ ...c, suggestions: false }));
+      marquerFin(nœudId, "suggestions");
+      if (nœudIdRef.current === nœudId) setChargement(c => ({ ...c, suggestions: false }));
     }
-  }, [titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur, màjDonnées]);
+  }, [nœudId, titreNœud, typeNœud, titresEnfants, titrePartieParente, titresChapitresVoisins, projetId, projetTitre, langueProjet, contexteADN, messageErreur, màjDonnées]);
 
   // Page blanche — brouillon complet (voir PROMPTS.pageBlanche ci-dessus).
   // État séparé de `données`/`suggestions` : ce n'est pas une liste de
@@ -2284,25 +2307,26 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [erreurPageBlanche, setErreurPageBlanche] = useState(null);
 
   const demanderPageBlanche = useCallback(async () => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const sig = signalPour("page-blanche");
+    marquerDebut(nœudId, "page-blanche");
     setChargementPageBlanche(true);
     setErreurPageBlanche(null);
     try {
-      const sig = abortRef.current.signal;
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.pageBlanche(typeNœud, titreNœud), langueProjet, contexteADN),
         `Titre à développer (${typeNœud}) : ${titreNœud || "(sans titre)"}\nTitre du projet : ${projetTitre}`,
         sig, 4096
       );
       const p = parserJSON(résultat);
-      setBrouillonPageBlanche(p.brouillon || "");
+      sauverResultat(nœudId, "page-blanche", p.brouillon || "");
+      if (nœudIdRef.current === nœudId) setBrouillonPageBlanche(p.brouillon || "");
     } catch (err) {
-      if (err.name !== "AbortError") setErreurPageBlanche(messageErreur(err));
+      if (err.name !== "AbortError" && nœudIdRef.current === nœudId) setErreurPageBlanche(messageErreur(err));
     } finally {
-      setChargementPageBlanche(false);
+      marquerFin(nœudId, "page-blanche");
+      if (nœudIdRef.current === nœudId) setChargementPageBlanche(false);
     }
-  }, [typeNœud, titreNœud, projetTitre, langueProjet, contexteADN, messageErreur]);
+  }, [nœudId, typeNœud, titreNœud, projetTitre, langueProjet, contexteADN, messageErreur]);
 
   // Aide à définir un projet (voir PROMPTS.definirProjet ci-dessus) —
   // n'existe que pour un livre encore sans chapitre (condition d'affichage
@@ -2321,25 +2345,27 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       setErreurProjet(t("erreur.motsInsuffisants"));
       return;
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const sig = signalPour("projet");
+    const idP = `projet-${projetId}`;
+    marquerDebut(idP, "projet");
     setChargementProjet(true);
     setErreurProjet(null);
     try {
-      const sig = abortRef.current.signal;
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.definirProjet(), langueProjet, contexteADN),
         `Compte-rendu de l'auteur·ice :\n\n${compteRenduBrut}`,
         sig, 4096
       );
       const p = parserJSON(résultat);
+      sauverResultat(idP, "projet", p);
       setPropositionProjet(p);
     } catch (err) {
       if (err.name !== "AbortError") setErreurProjet(messageErreur(err));
     } finally {
+      marquerFin(idP, "projet");
       setChargementProjet(false);
     }
-  }, [compteRenduBrut, langueProjet, contexteADN, messageErreur, t]);
+  }, [projetId, compteRenduBrut, langueProjet, contexteADN, messageErreur, t]);
 
   // "Aide-moi à avancer" — réf. 60816-01, suite, 30/08/2026 (voir
   // PROMPTS.jeSuisBloqué ci-dessus). Toujours disponible, quel que soit
@@ -2375,20 +2401,50 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const [texteAnalyséBlocage, setTexteAnalyséBlocage] = useState("");
   const cléCarteBlocage = "blocage:0";
 
+  // Résultats payants conservés d'un passage à l'autre (03/11/2026) : voir src/lib/copiloteConserve.js.
+  // Au changement de chapitre / au remontage : on remet ce qui a été produit (ou ce qui tourne encore), jamais un état vide « par défaut ».
+  useEffect(() => {
+    if (!nœudId) return undefined;
+    const idP = `projet-${projetId}`;
+    const restaurer = {
+      recomposition: () => setRecompositionPoints(lireResultat(nœudId, "recomposition")),
+      "page-blanche": () => setBrouillonPageBlanche(lireResultat(nœudId, "page-blanche")),
+      blocage: () => { const b = lireResultat(nœudId, "blocage"); setDiagnosticBlocage(b?.diagnostic ?? null); setHistoriqueBlocage(b?.historique ?? []); setTexteAnalyséBlocage(b?.texte ?? ""); },
+      projet: () => setPropositionProjet(lireResultat(idP, "projet")),
+    };
+    Object.values(restaurer).forEach((f) => f());
+    const enc = clesEnCours(nœudId), encP = clesEnCours(idP);
+    setRecompositionChargement(enc.includes("recomposition"));
+    setChargementPageBlanche(enc.includes("page-blanche"));
+    setChargementBlocage(enc.includes("blocage"));
+    setChargementProjet(encP.includes("projet"));
+    const setCharg = { recomposition: setRecompositionChargement, "page-blanche": setChargementPageBlanche, blocage: setChargementBlocage, projet: setChargementProjet };
+    const surEtat = (ev) => {
+      const { nœudId: id, clé, enCours } = ev.detail || {};
+      if ((id !== nœudId && id !== idP) || !restaurer[clé]) return;
+      setCharg[clé](enCours);
+      if (!enCours) restaurer[clé]();
+    };
+    window.addEventListener("cursus-copilote-etat", surEtat);
+    return () => window.removeEventListener("cursus-copilote-etat", surEtat);
+  }, [nœudId, projetId]);
+
   const demanderJeSuisBloqué = useCallback(async (complémentAuteur = null) => {
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
+    const sig = signalPour("blocage");
+    marquerDebut(nœudId, "blocage");
     setChargementBlocage(true);
     setErreurBlocage(null);
+    let nouvelHistorique = historiqueBlocage;
     if (complémentAuteur === null) {
+      nouvelHistorique = [];
       setHistoriqueBlocage([]);
     } else if (diagnosticBlocage) {
-      setHistoriqueBlocage((h) => [...h, { diagnostic: diagnosticBlocage, complément: complémentAuteur }]);
+      nouvelHistorique = [...historiqueBlocage, { diagnostic: diagnosticBlocage, complément: complémentAuteur }];
+      setHistoriqueBlocage(nouvelHistorique);
     }
     setDiagnosticBlocage(null);
     setConfirmationBlocage(null);
     try {
-      const sig = abortRef.current.signal;
       const sourceHTML = obtenirSourceHTML();
       const { texte } = extraireTexte(sourceHTML);
       // CORRECTIF 24/09/2026, puis re-CORRECTIF le jour même — "Aide-moi
@@ -2410,6 +2466,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         sig, 1024, null, false, imagesBlocage
       );
       const p = parserJSON(résultat);
+      sauverResultat(nœudId, "blocage", { diagnostic: p, historique: nouvelHistorique, texte });
+      if (nœudIdRef.current !== nœudId) return; // l'auteur·ice a changé de chapitre : le diagnostic est gardé, il le retrouvera en revenant
       setDiagnosticBlocage(p);
       setTexteAnalyséBlocage(texte);
       setComplémentBlocage("");
@@ -2418,11 +2476,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       // remplacé par un nouveau.
       setDialogues((d) => ({ ...d, [cléCarteBlocage]: undefined }));
     } catch (err) {
-      if (err.name !== "AbortError") setErreurBlocage(messageErreur(err));
+      if (err.name !== "AbortError" && nœudIdRef.current === nœudId) setErreurBlocage(messageErreur(err));
     } finally {
-      setChargementBlocage(false);
+      marquerFin(nœudId, "blocage");
+      if (nœudIdRef.current === nœudId) setChargementBlocage(false);
     }
-  }, [obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
+  }, [nœudId, historiqueBlocage, obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
