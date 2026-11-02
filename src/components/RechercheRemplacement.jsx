@@ -15,7 +15,7 @@ const SPECIAUX_RECHERCHE = [["^s", "Espace insécable"], ["^t", "Tabulation"], [
 const SPECIAUX_REMPLACEMENT = [["^s", "Espace insécable"], ["^t", "Tabulation"], ["^l", "Saut de ligne"], ["^&", "Le texte trouvé"], ["^^", "Un accent circonflexe « ^ »"]];
 const compterMots = (html) => (html || "").replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
 
-export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", porteeInitiale = "chapitre", onAtteindreLigne, nbLignes = 0, noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
+export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", porteeInitiale = "chapitre", onAtteindreLigne, ligneDePos, nbLignes = 0, noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
   const [requete, setRequete] = useState(requeteInitiale);
   const [remplacement, setRemplacement] = useState("");
   const [casse, setCasse] = useState(false);
@@ -313,6 +313,29 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
             <button type="button" style={bouton()} onClick={remplacerCourante} disabled={lectureSeule || !total || !peutRemplacer} title={!peutRemplacer ? "Cochez une mise en forme à appliquer (Plus >>) ou saisissez un texte cherché" : undefined}>Remplacer</button>
             <button type="button" style={{ ...bouton(), background: total && !lectureSeule && peutRemplacer ? couleur : "#eee", color: total && !lectureSeule && peutRemplacer ? "#fff" : "#999" }} onClick={toutRemplacerChapitre} disabled={lectureSeule || !total || !peutRemplacer}>Tout remplacer</button>
           </div>
+          {total > 0 && (() => {
+            // Liste des résultats (comme le volet de Word) : « 12 / 155 — ligne 48 : …extrait… » ; un clic y va.
+            const doc = editor.state.doc, MAX = 300;
+            return (
+              <div role="list" aria-label="Résultats" style={{ maxHeight: 230, overflowY: "auto", border: "0.5px solid #ddd", borderRadius: 8 }}>
+                {e.occurrences.slice(0, MAX).map((o, i) => {
+                  const avant = doc.textBetween(Math.max(0, o.from - 40), o.from, " ", " ").replace(/\s+/g, " ");
+                  const trouve = o.note ? "Note : " + (doc.nodeAt(o.from)?.attrs.texte || "").slice(0, 60) : doc.textBetween(o.from, Math.min(o.to, o.from + 80), " ", " ");
+                  const apres = o.note ? "" : doc.textBetween(o.to, Math.min(doc.content.size, o.to + 40), " ", " ").replace(/\s+/g, " ");
+                  const ligne = ligneDePos?.(o.from);
+                  const actif = i === courant;
+                  return (
+                    <button key={i} type="button" role="listitem" ref={actif ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined} onClick={() => { setMessage(""); allerA(editor, i); }}
+                      style={{ display: "block", width: "100%", textAlign: "left", border: "none", borderBottom: "0.5px solid #eee", background: actif ? "#EEEDFE" : "#fff", padding: "5px 8px", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, lineHeight: 1.4, color: "#444" }}>
+                      <b style={{ color: "#534AB7" }}>{i + 1} / {total}</b>{ligne ? <span style={{ color: "#888" }}> — ligne {ligne}</span> : null}<br />
+                      …{avant}<mark style={{ background: "#FFE98A", color: "inherit" }}>{trouve}</mark>{apres}…
+                    </button>
+                  );
+                })}
+                {total > MAX && <div style={{ padding: "5px 8px", fontSize: 11.5, color: "#888" }}>Les {MAX} premiers résultats sont listés ; ◀ ▶ parcourt les {total}.</div>}
+              </div>
+            );
+          })()}
         </>
       ) : (
         <>
