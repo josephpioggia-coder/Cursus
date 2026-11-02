@@ -3,7 +3,9 @@
  * Évalue l'effort de lecture du texte (six dimensions, citations vérifiées par le code,
  * orientation en trois niveaux). Lecture seule : le texte n'est jamais modifié.
  */
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal, annulerEnCours } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireTexteComplet } from "../lib/paragraphesEditeur.js";
 import { analyserRepetitions } from "../lib/nettoyageMecanique.js";
@@ -11,19 +13,27 @@ import { DIMENSIONS, NATURES, ORIENTATIONS, SEUIL_COURT, profilDeLisibilite, tex
 
 const COULEUR_NIVEAU = { absente: "#9a9a9a", ponctuelle: "#0F6E56", fréquente: "#7A5B00", dominante: "#A32D2D" };
 
-export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD", typeProjet = "non-fiction", onFermer }) {
+const CLE = "profil";
+
+export default function ProfilLisibilite({ editor, noeudId, onUsage, couleur = "#7F77DD", typeProjet = "non-fiction", onFermer }) {
+  // Profil conservé (03/11/2026) : fermer la fenêtre n'interrompt plus la demande et ne perd plus un profil déjà payé. Voir src/lib/copiloteConserve.js.
+  const sauvé = useMemo(() => lireResultat(noeudId, CLE), []); // eslint-disable-line react-hooks/exhaustive-deps
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
   // Récit de fiction ou non (25/10/2026) : en fiction, la retenue narrative n'est pas une difficulté de lecture
   // et l'outil ne conclut jamais à une « reconstruction ». Valeur par défaut = genre du projet, modifiable ici.
   const [fiction, setFiction] = useState(typeProjet === "fiction");
-  const [étape, setÉtape] = useState("choix"); // choix | encours | revue
+  const [étape, setÉtape] = useState(estEnCours(noeudId, CLE) ? "encours" : sauvé?.profil ? "revue" : "choix"); // choix | encours | revue
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
-  const [profil, setProfil] = useState(null);
-  const [signaux, setSignaux] = useState(null);
+  const [profil, setProfil] = useState(sauvé?.profil || null);
+  const [signaux, setSignaux] = useState(sauvé?.signaux || null);
   const [copie, setCopie] = useState(null);
-  const contrôleur = useRef(null);
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setÉtape("encours"),
+    surResultat: (v) => { setProfil(v.profil); setSignaux(v.signaux || null); setÉtape("revue"); },
+    surFin: (issue) => { setÉtape("choix"); if (issue === "echec") setErreur((e) => e || "Le profil demandé avant la fermeture n'a pas abouti."); },
+  });
 
   const lancer = async () => {
     const { liste } = lireTexteComplet(editor, portée === "sélection");
@@ -32,17 +42,22 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
     onUsage?.("lance");
     setErreur(null);
     setÉtape("encours");
-    contrôleur.current = new AbortController();
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     try {
-      const r = await profilDeLisibilite(liste, { signal: contrôleur.current.signal, surProgres: (faits, total) => setProgrès({ faits, total }), fiction });
-      setSignaux(analyserRepetitions(liste));
+      const r = await profilDeLisibilite(liste, { signal, surProgres: (faits, total) => setProgrès({ faits, total }), fiction });
+      const sig = analyserRepetitions(liste);
+      sauverResultat(noeudId, CLE, { profil: r, signaux: sig });
+      setSignaux(sig);
       setProfil(r);
       setÉtape("revue");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
-      if (e?.name === "AbortError") { setÉtape("choix"); return; }
+      if (e?.name === "AbortError") { setÉtape("choix"); marquerFin(noeudId, CLE, "annule", signal); return; }
       journaliserErreur("ProfilLisibilite", e.message);
       setErreur(e.message || "Impossible d'établir le profil.");
       setÉtape("choix");
+      marquerFin(noeudId, CLE, "echec", signal);
     }
   };
 
@@ -81,7 +96,7 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 760, maxHeight: "92vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>📊 Profil de lisibilité</span>
-          <button onClick={() => { contrôleur.current?.abort(); onFermer(); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer">✕</button>
+          <button onClick={onFermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer (la demande continue et le résultat est gardé)">✕</button>
         </div>
 
         <div style={{ padding: 18, overflowY: "auto", minHeight: 0, flex: 1 }}>
@@ -202,10 +217,10 @@ export default function ProfilLisibilite({ editor, onUsage, couleur = "#7F77DD",
 
         <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
           {étape === "choix" && <><button style={bouton(false)} onClick={onFermer}>Fermer</button><button style={bouton(true)} onClick={lancer}>Évaluer la lisibilité</button></>}
-          {étape === "encours" && <button style={bouton(false)} onClick={() => contrôleur.current?.abort()}>Annuler</button>}
+          {étape === "encours" && <button style={bouton(false)} onClick={() => annulerEnCours(noeudId, CLE)}>Annuler</button>}
           {étape === "revue" && <>
             <button style={bouton(false)} onClick={() => copier("c", texteCompteRendu())}>{copie === "c" ? "✓ Copié" : "📋 Copier le compte rendu"}</button>
-            <button style={bouton(false)} onClick={() => { setProfil(null); setÉtape("choix"); }}>Relancer</button>
+            <button style={bouton(false)} onClick={() => { effacerResultat(noeudId, CLE); setProfil(null); setÉtape("choix"); }} title="Oublier ce profil et en demander un autre">Relancer</button>
             <button style={bouton(true)} onClick={onFermer}>Fermer</button>
           </>}
         </div>

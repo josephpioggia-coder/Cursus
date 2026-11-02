@@ -3,7 +3,9 @@
  * Avis éditorial sur le récit / le propos : verdict, ce qui fonctionne, ce qui ne
  * tient pas encore, pistes, questions. Lecture seule : le texte n'est jamais modifié.
  */
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal, annulerEnCours } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireTexteComplet } from "../lib/paragraphesEditeur.js";
 import RemarqueAvecProposition from "./RemarqueAvecProposition.jsx";
@@ -11,14 +13,22 @@ import { avisSurLeFond, RUBRIQUES_AVIS, TAILLE_PARTIE } from "../lib/avisSurLeFo
 
 const COULEURS = { TIENT: "#0F6E56", FAIBLE: "#A32D2D", PISTES: "#185FA5", QUESTIONS: "#7A5B00" };
 
-export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
+const CLE = "avis";
+
+export default function AvisSurLeFond({ editor, noeudId, onUsage, couleur = "#7F77DD", onFermer }) {
+  // Avis conservé (03/11/2026) : fermer la fenêtre n'interrompt plus la demande et ne perd plus un avis déjà payé. Voir src/lib/copiloteConserve.js.
+  const sauvé = useMemo(() => lireResultat(noeudId, CLE), []); // eslint-disable-line react-hooks/exhaustive-deps
   const aSélection = !editor.state.selection.empty;
-  const [étape, setÉtape] = useState("choix"); // choix | encours | revue
+  const [étape, setÉtape] = useState(estEnCours(noeudId, CLE) ? "encours" : sauvé?.avis ? "revue" : "choix"); // choix | encours | revue
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
-  const [avis, setAvis] = useState(null);
-  const contrôleur = useRef(null);
+  const [avis, setAvis] = useState(sauvé?.avis || null);
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setÉtape("encours"),
+    surResultat: (v) => { setAvis(v.avis); setÉtape("revue"); },
+    surFin: (issue) => { setÉtape("choix"); if (issue === "echec") setErreur((e) => e || "L'avis demandé avant la fermeture n'a pas abouti."); },
+  });
 
   const lancer = async () => {
     const { liste } = lireTexteComplet(editor, portée === "sélection");
@@ -26,16 +36,20 @@ export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", on
     onUsage?.("lance");
     setErreur(null);
     setÉtape("encours");
-    contrôleur.current = new AbortController();
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     try {
-      const r = await avisSurLeFond(liste, { signal: contrôleur.current.signal, surProgres: (faits, total) => setProgrès({ faits, total }) });
+      const r = await avisSurLeFond(liste, { signal, surProgres: (faits, total) => setProgrès({ faits, total }) });
+      sauverResultat(noeudId, CLE, { avis: r });
       setAvis(r);
       setÉtape("revue");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
-      if (e?.name === "AbortError") { setÉtape("choix"); return; }
+      if (e?.name === "AbortError") { setÉtape("choix"); marquerFin(noeudId, CLE, "annule", signal); return; }
       journaliserErreur("AvisSurLeFond", e.message);
       setErreur(e.message || "Impossible d'obtenir l'avis.");
       setÉtape("choix");
+      marquerFin(noeudId, CLE, "echec", signal);
     }
   };
 
@@ -50,7 +64,7 @@ export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", on
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 760, maxHeight: "92vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>Vérifier le fond</span>
-          <button onClick={() => { contrôleur.current?.abort(); onFermer(); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer">✕</button>
+          <button onClick={onFermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer (la demande continue et le résultat est gardé)">✕</button>
         </div>
 
         <div style={{ padding: 18, overflowY: "auto", minHeight: 0, flex: 1 }}>
@@ -108,8 +122,8 @@ export default function AvisSurLeFond({ editor, onUsage, couleur = "#7F77DD", on
 
         <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "flex-end" }}>
           {étape === "choix" && <><button style={bouton(false)} onClick={onFermer}>Fermer</button><button style={bouton(true)} onClick={lancer}>Lire et donner son avis</button></>}
-          {étape === "encours" && <button style={bouton(false)} onClick={() => contrôleur.current?.abort()}>Annuler</button>}
-          {étape === "revue" && <><button style={bouton(false)} onClick={() => { setAvis(null); setÉtape("choix"); }}>Relancer</button><button style={bouton(true)} onClick={onFermer}>Fermer</button></>}
+          {étape === "encours" && <button style={bouton(false)} onClick={() => annulerEnCours(noeudId, CLE)}>Annuler</button>}
+          {étape === "revue" && <><button style={bouton(false)} onClick={() => { effacerResultat(noeudId, CLE); setAvis(null); setÉtape("choix"); }} title="Oublier cet avis et en demander un autre">Relancer</button><button style={bouton(true)} onClick={onFermer}>Fermer</button></>}
         </div>
       </div>
     </div>

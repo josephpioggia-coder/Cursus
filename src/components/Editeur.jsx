@@ -2199,11 +2199,11 @@ export default function Editeur({
       )}
 
       {profilOuvert && editor && (
-        <ProfilLisibilite editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "profil_lisibilite", action, nb })} couleur={projetCouleur} typeProjet={typeProjet} onFermer={() => setProfilOuvert(false)} />
+        <ProfilLisibilite editor={editor} noeudId={nœud?.id} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "profil_lisibilite", action, nb })} couleur={projetCouleur} typeProjet={typeProjet} onFermer={() => setProfilOuvert(false)} />
       )}
 
       {photoOuverte && editor && (
-        <LirePhoto editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "lecture_photo", action, nb })} couleur={projetCouleur} onFermer={() => setPhotoOuverte(false)} />
+        <LirePhoto editor={editor} noeudId={nœud?.id} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "lecture_photo", action, nb })} couleur={projetCouleur} onFermer={() => setPhotoOuverte(false)} />
       )}
 
       {nettoyageOuvert && editor && (
@@ -2211,11 +2211,11 @@ export default function Editeur({
       )}
 
       {avisOuvert && editor && (
-        <AvisSurLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "avis_fond", action, nb })} couleur={projetCouleur} onFermer={() => setAvisOuvert(false)} />
+        <AvisSurLeFond editor={editor} noeudId={nœud?.id} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "avis_fond", action, nb })} couleur={projetCouleur} onFermer={() => setAvisOuvert(false)} />
       )}
 
       {vérificationOuverte && editor && (
-        <VerifierLeFond editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "verifier_le_fond", action, nb })} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
+        <VerifierLeFond editor={editor} noeudId={nœud?.id} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "verifier_le_fond", action, nb })} couleur={projetCouleur} onFermer={() => setVérificationOuverte(false)} />
       )}
 
       {rechercheOuverte && (
@@ -2224,11 +2224,11 @@ export default function Editeur({
       )}
 
       {questionOuverte && (
-        <QuestionRapide editor={editor} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} selectionInitiale={selectionQuestion} onFermer={() => setQuestionOuverte(false)} />
+        <QuestionRapide editor={editor} noeudId={nœud?.id} couleur={projetCouleur} lectureSeule={lectureSeule} mobile={mobile} selectionInitiale={selectionQuestion} onFermer={() => setQuestionOuverte(false)} />
       )}
 
       {correctionOuverte && editor && (
-        <CorrectionRapide editor={editor} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "correction_rapide", action, nb })} couleur={projetCouleur} onFermer={() => setCorrectionOuverte(false)} />
+        <CorrectionRapide editor={editor} noeudId={nœud?.id} onUsage={(action, nb) => noterUsageIA({ projetId: nœud?.projet_id, noeudId: nœud?.id, outil: "correction_rapide", action, nb })} couleur={projetCouleur} onFermer={() => setCorrectionOuverte(false)} />
       )}
 
       {!modeFocus && erreurLecture && (
