@@ -10,13 +10,19 @@
  * Tout est protégé par try/catch : un navigateur sans stockage retombe sur l'ancien comportement.
  */
 const enCours = new Map(); // "nœudId|clé" → début (ms)
+const controleurs = new Map(); // "nœudId|clé" → AbortController : l'annulation survit à la fermeture de la fenêtre (seul « Annuler » arrête un appel)
 const PREFIXE = "cursus-copilote-resultat-v1";
 
 const cle = (nœudId, clé) => `${nœudId}|${clé}`;
 const diffuser = (nom, detail) => { try { window.dispatchEvent(new CustomEvent(nom, { detail })); } catch { /* hors navigateur */ } };
 
 export function marquerDebut(nœudId, clé) { enCours.set(cle(nœudId, clé), Date.now()); diffuser("cursus-copilote-etat", { nœudId, clé, enCours: true }); }
-export function marquerFin(nœudId, clé) { enCours.delete(cle(nœudId, clé)); diffuser("cursus-copilote-etat", { nœudId, clé, enCours: false }); }
+/** `issue` : "ok" (résultat enregistré avant l'appel), "annule" (l'auteur·ice a annulé), "echec". Omise : événement neutre (analyses du Co-pilote). */
+export function marquerFin(nœudId, clé, issue, signal) {
+  // `signal` : celui de l'appel qui se termine. Si une NOUVELLE demande l'a remplacé entre-temps (relance), cette fin est périmée : on l'ignore,
+  // sinon elle effacerait l'état « en cours » de la nouvelle demande.
+  if (signal && controleurs.get(cle(nœudId, clé))?.signal !== signal) return;
+  enCours.delete(cle(nœudId, clé)); controleurs.delete(cle(nœudId, clé)); diffuser("cursus-copilote-etat", { nœudId, clé, enCours: false, issue }); }
 export const estEnCours = (nœudId, clé) => enCours.has(cle(nœudId, clé));
 /** Clés (ex. "suggestions", "blocage") en cours pour ce chapitre. */
 export const clesEnCours = (nœudId) => [...enCours.keys()].filter((k) => k.startsWith(`${nœudId}|`)).map((k) => k.slice(String(nœudId).length + 1));
@@ -35,3 +41,7 @@ export function effacerResultat(nœudId, clé) { try { localStorage.removeItem(`
 const memoire = new Map(); // nœudId → { onglet: valeur }
 export function retenirEnMemoire(nœudId, onglet, valeur) { memoire.set(nœudId, { ...(memoire.get(nœudId) || {}), [onglet]: valeur }); }
 export const lireMemoire = (nœudId) => memoire.get(nœudId) || {};
+
+/** Nouvelle demande : annule la précédente de MÊME sorte (même chapitre, même outil) et rend le signal de la nouvelle. */
+export function nouveauSignal(nœudId, clé) { const k = cle(nœudId, clé); controleurs.get(k)?.abort(); const c = new AbortController(); controleurs.set(k, c); return c.signal; }
+export function annulerEnCours(nœudId, clé) { controleurs.get(cle(nœudId, clé))?.abort(); }

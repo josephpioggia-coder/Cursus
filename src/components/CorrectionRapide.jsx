@@ -11,23 +11,34 @@
  * le gras/italique du reste du paragraphe est conservé.
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal, annulerEnCours } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireParagraphes } from "../lib/paragraphesEditeur.js";
 import RemarqueAvecProposition from "./RemarqueAvecProposition.jsx";
 import { NIVEAUX, CATEGORIES_BILAN, decouperEnLots, corrigerTout, diffMots } from "../lib/correctionRapide.js";
 
-export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
-  const [étape, setÉtape] = useState("choix"); // choix | encours | revue
+const CLE = "correction";
+
+export default function CorrectionRapide({ editor, noeudId, onUsage, couleur = "#7F77DD", onFermer }) {
+  // Résultat conservé (03/11/2026) : fermer la fenêtre ou changer de chapitre n'efface plus une correction déjà payée ; seule « Tout refuser »,
+  // l'application des corrections ou une nouvelle correction la remplace. Voir src/lib/copiloteConserve.js.
+  const sauvé = useMemo(() => lireResultat(noeudId, CLE), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [étape, setÉtape] = useState(estEnCours(noeudId, CLE) ? "encours" : sauvé?.résultat ? "revue" : "choix"); // choix | encours | revue
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
   const [niveau, setNiveau] = useState(() => localStorage.getItem("cursus-correction-niveau") || "fluidite");
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
-  const [résultat, setRésultat] = useState(null); // { cartes, remarques, ignorés, échecs }
+  const [résultat, setRésultat] = useState(sauvé?.résultat || null); // { cartes, remarques, ignorés, échecs }
   const [refusés, setRefusés] = useState(() => new Set());
   const [appliqué, setAppliqué] = useState(null);
-  const contrôleur = useRef(null);
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setÉtape("encours"),
+    surResultat: (v) => { setRésultat(v.résultat); setRefusés(new Set()); setÉtape("revue"); },
+    surFin: (issue) => { setÉtape("choix"); if (issue === "echec") setErreur((e) => e || "La correction lancée avant la fermeture n'a pas abouti."); },
+  });
 
   const lancer = async () => {
     localStorage.setItem("cursus-correction-niveau", niveau);
@@ -38,10 +49,11 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
     setÉtape("encours");
     const lots = decouperEnLots(liste);
     setProgrès({ faits: 0, total: lots.length });
-    contrôleur.current = new AbortController();
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     try {
       const r = await corrigerTout(lots, niveau, {
-        signal: contrôleur.current.signal,
+        signal,
         surProgres: (faits, total) => setProgrès({ faits, total }),
       });
       const cartes = [];
@@ -52,18 +64,23 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
         if (d.hunks.length) cartes.push({ ...p, corrigé, segments: d.segments, hunks: d.hunks });
       }
       if (r.échecs || r.échecsBilan) journaliserErreur("CorrectionRapide", `${r.échecs}/${lots.length} lot(s) et ${r.échecsBilan} bilan(s) en échec : ${r.premièreErreur?.message}`);
-      setRésultat({ cartes, bilan: r.bilan, ignorés, échecs: r.échecs, échecsBilan: r.échecsBilan, message: r.premièreErreur?.message });
+      const complet = { cartes, bilan: r.bilan, ignorés, échecs: r.échecs, échecsBilan: r.échecsBilan, message: r.premièreErreur?.message };
+      sauverResultat(noeudId, CLE, { résultat: complet });
+      setRésultat(complet);
       setRefusés(new Set());
       setÉtape("revue");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
-      if (e?.name === "AbortError") { setÉtape("choix"); return; }
+      if (e?.name === "AbortError") { setÉtape("choix"); marquerFin(noeudId, CLE, "annule", signal); return; }
       journaliserErreur("CorrectionRapide", e?.message || String(e));
       setErreur(e?.message || "La correction a échoué.");
       setÉtape("choix");
+      marquerFin(noeudId, CLE, "echec", signal);
     }
   };
 
-  const annuler = () => { contrôleur.current?.abort(); setÉtape("choix"); };
+  const annuler = () => { annulerEnCours(noeudId, CLE); setÉtape("choix"); };
+  const abandonner = () => { effacerResultat(noeudId, CLE); onFermer(); }; // décision de l'auteur·ice : « Tout refuser »
 
   const retenues = useMemo(
     () => (résultat ? résultat.cartes.filter((c) => !refusés.has(c.idx)) : []),
@@ -89,6 +106,7 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
     }
     if (remplacements.length) editor.view.dispatch(tr);
     if (remplacements.length) onUsage?.("applique", retenues.length - périmés);
+    if (remplacements.length) effacerResultat(noeudId, CLE); // appliquées : le résultat a servi
     setAppliqué({ n: retenues.length - périmés, périmés });
   };
 
@@ -210,7 +228,7 @@ export default function CorrectionRapide({ editor, onUsage, couleur = "#7F77DD",
           {étape === "encours" && <button style={bouton(false)} onClick={annuler}>Annuler</button>}
           {étape === "revue" && !appliqué && (
             <>
-              <button style={bouton(false)} onClick={onFermer}>{résultat?.cartes?.length ? "Tout refuser" : "Fermer"}</button>
+              <button style={bouton(false)} onClick={résultat?.cartes?.length ? abandonner : onFermer}>{résultat?.cartes?.length ? "Tout refuser" : "Fermer"}</button>
               {(résultat?.échecs > 0 || résultat?.échecsBilan > 0) && <button style={bouton(false)} onClick={lancer}>Relancer</button>}
               {retenues.length > 0 && <button style={bouton(true)} onClick={appliquer}>Appliquer {retenues.length === résultat.cartes.length ? "tout" : `les ${retenues.length} retenus`}</button>}
             </>

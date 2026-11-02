@@ -3,20 +3,31 @@
  * Photo(s) de page(s) → texte recopié FIDÈLEMENT (fautes comprises) → relu à côté de
  * la photo, modifiable → inséré dans le chapitre. La photo n'est pas conservée.
  */
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal, annulerEnCours } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { MAX_PHOTOS, preparerPhoto, lirePhoto, versNoeuds } from "../lib/lecturePhoto.js";
 
-export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
-  const [pages, setPages] = useState([]); // { id, photo, texte, incertains, erreur, tronque, etat }
-  const [étape, setÉtape] = useState("choix"); // choix | encours | revue | fini
+const CLE = "photo";
+const sansPhoto = (pages) => pages.map(({ photo, ...reste }) => reste); // la photo (lourde) n'est jamais conservée : seul le texte lu l'est
+
+export default function LirePhoto({ editor, noeudId, onUsage, couleur = "#7F77DD", onFermer }) {
+  // Lectures conservées (03/11/2026) : fermer la fenêtre n'interrompt plus la lecture et ne perd plus un texte déjà payé. Voir src/lib/copiloteConserve.js.
+  const sauvé = useMemo(() => lireResultat(noeudId, CLE), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [pages, setPages] = useState(sauvé?.pages || []); // { id, photo (absente après reprise), texte, incertains, erreur, tronque, etat }
+  const [étape, setÉtape] = useState(estEnCours(noeudId, CLE) ? "encours" : sauvé?.pages?.length ? "revue" : "choix"); // choix | encours | revue | fini
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
   const [position, setPosition] = useState("fin");
   const [agrandie, setAgrandie] = useState(null);
   const [inséré, setInséré] = useState(0);
-  const contrôleur = useRef(null);
-  const compteur = useRef(0);
+  const compteur = useRef((sauvé?.pages || []).reduce((m, p) => Math.max(m, p.id || 0), 0));
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setÉtape("encours"),
+    surResultat: (v) => { setPages(v.pages); setÉtape("revue"); },
+    surFin: (issue) => { setÉtape("choix"); if (issue === "echec") setErreur((e) => e || "La lecture lancée avant la fermeture n'a pas abouti."); },
+  });
 
   const ajouter = async (fichiers) => {
     setErreur(null);
@@ -48,20 +59,24 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
     onUsage?.("lance", pages.length);
     setErreur(null);
     setÉtape("encours");
-    contrôleur.current = new AbortController();
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     const résultat = [...pages];
     try {
       for (let i = 0; i < résultat.length; i++) {
         setProgrès({ faits: i, total: résultat.length });
-        résultat[i] = await lirePage(résultat[i], contrôleur.current.signal);
+        résultat[i] = await lirePage(résultat[i], signal);
         setPages([...résultat]);
       }
       setProgrès({ faits: résultat.length, total: résultat.length });
+      sauverResultat(noeudId, CLE, { pages: sansPhoto(résultat) });
       setÉtape("revue");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
-      if (e?.name === "AbortError") { setÉtape("choix"); return; }
+      if (e?.name === "AbortError") { setÉtape("choix"); marquerFin(noeudId, CLE, "annule", signal); return; }
       setErreur(e.message);
       setÉtape("choix");
+      marquerFin(noeudId, CLE, "echec", signal);
     }
   };
 
@@ -69,9 +84,10 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
     const p = pages.find((x) => x.id === id);
     if (!p) return;
     setPages((ps) => ps.map((x) => (x.id === id ? { ...x, etat: "attente", erreur: null } : x)));
-    contrôleur.current = new AbortController();
+    if (!p.photo) return; // lecture reprise après fermeture : la photo n'est plus là, on ne peut pas relire
+    const signal = nouveauSignal(noeudId, CLE + "-relire");
     try {
-      const n = await lirePage(p, contrôleur.current.signal);
+      const n = await lirePage(p, signal);
       setPages((ps) => ps.map((x) => (x.id === id ? n : x)));
     } catch { /* annulé */ }
   };
@@ -87,6 +103,7 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
     else if (position === "curseur") editor.chain().focus().insertContent(nœuds).run();
     else editor.commands.insertContentAt(editor.state.doc.content.size, nœuds);
     onUsage?.("applique", pages.filter((p) => p.texte.trim()).length);
+    effacerResultat(noeudId, CLE); // insérées dans le chapitre : le résultat a servi
     setInséré(nœuds.length);
     setÉtape("fini");
   };
@@ -102,7 +119,7 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 760, maxHeight: "92vh", display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "14px 18px", borderBottom: "0.5px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 15, fontWeight: 500, flex: 1 }}>📷 Lire une page à partir d'une photo</span>
-          <button onClick={() => { contrôleur.current?.abort(); onFermer(); }} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer">✕</button>
+          <button onClick={onFermer} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#999" }} title="Fermer (la lecture continue et le texte lu est gardé)">✕</button>
         </div>
 
         <div style={{ padding: 18, overflowY: "auto", minHeight: 0, flex: 1 }}>
@@ -130,7 +147,7 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {pages.map((p, i) => (
                     <div key={p.id} style={{ position: "relative", width: 96 }}>
-                      <img src={p.photo.apercu} alt={`Page ${i + 1}`} style={{ width: 96, height: 128, objectFit: "cover", borderRadius: 6, border: "0.5px solid #ddd" }} />
+                      {p.photo ? <img src={p.photo.apercu} alt={`Page ${i + 1}`} style={{ width: 96, height: 128, objectFit: "cover", borderRadius: 6, border: "0.5px solid #ddd" }} /> : <div style={{ width: 96, height: 128, borderRadius: 6, border: "0.5px dashed #ccc", fontSize: 10.5, color: "#999", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 4, boxSizing: "border-box" }}>photo non conservée</div>}
                       <button onClick={() => retirer(p.id)} title="Retirer" style={{ position: "absolute", top: 2, right: 2, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: 10, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: "18px", padding: 0 }}>✕</button>
                       <div style={{ fontSize: 11, color: "#777", textAlign: "center" }}>Page {i + 1}</div>
                     </div>
@@ -159,7 +176,7 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
               {pages.map((p, i) => (
                 <div key={p.id} style={{ border: "0.5px solid #e5e5e5", borderRadius: 8, padding: 10, marginBottom: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <div style={{ flex: "0 0 auto" }}>
-                    <img src={p.photo.apercu} alt={`Page ${i + 1}`} onClick={() => setAgrandie(p.photo.apercu)} style={{ width: 96, height: 128, objectFit: "cover", borderRadius: 6, cursor: "zoom-in", border: "0.5px solid #ddd" }} />
+                    {p.photo ? <img src={p.photo.apercu} alt={`Page ${i + 1}`} onClick={() => setAgrandie(p.photo.apercu)} style={{ width: 96, height: 128, objectFit: "cover", borderRadius: 6, cursor: "zoom-in", border: "0.5px solid #ddd" }} /> : <div style={{ width: 96, height: 128, borderRadius: 6, border: "0.5px dashed #ccc", fontSize: 10.5, color: "#999", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 4, boxSizing: "border-box" }}>photo non conservée</div>}
                     <div style={{ fontSize: 11, color: "#777", textAlign: "center" }}>Page {i + 1}</div>
                   </div>
                   <div style={{ flex: 1, minWidth: 200 }}>
@@ -194,8 +211,8 @@ export default function LirePhoto({ editor, onUsage, couleur = "#7F77DD", onFerm
 
         <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
           {étape === "choix" && <><button style={bouton(false)} onClick={onFermer}>Fermer</button><button style={{ ...bouton(true), opacity: pages.length ? 1 : 0.5 }} disabled={!pages.length} onClick={lancer}>Lire {pages.length || ""} page{pages.length > 1 ? "s" : ""}</button></>}
-          {étape === "encours" && <button style={bouton(false)} onClick={() => contrôleur.current?.abort()}>Annuler</button>}
-          {étape === "revue" && <><button style={bouton(false)} onClick={() => setÉtape("choix")}>← Photos</button><button style={bouton(true)} onClick={insérer}>Insérer dans le chapitre</button></>}
+          {étape === "encours" && <button style={bouton(false)} onClick={() => annulerEnCours(noeudId, CLE)}>Annuler</button>}
+          {étape === "revue" && <><button style={bouton(false)} onClick={() => { effacerResultat(noeudId, CLE); setPages([]); setÉtape("choix"); }} title="Abandonner ces lectures (« Fermer » les garde)">Oublier ces lectures</button><button style={bouton(false)} onClick={() => setÉtape("choix")}>← Photos</button><button style={bouton(true)} onClick={insérer}>Insérer dans le chapitre</button></>}
           {étape === "fini" && <button style={bouton(true)} onClick={onFermer}>Fermer</button>}
         </div>
       </div>

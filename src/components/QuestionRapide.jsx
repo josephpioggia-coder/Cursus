@@ -9,11 +9,15 @@ import { poserQuestion } from "../lib/questionRapide.js";
 import { EFFORTS, PROFILS, STYLES, chargerModeles, consoRelative, ecrireChoix, lireChoix, modeleDuProfil, reglageRecommande, MODELES_PAR_DEFAUT } from "../lib/modelesIA.js";
 import { preferencesIAAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 
 const CLE_MODE = "cursus-question-rapide-mode";
 const pastille = { fontSize: 10, border: "0.5px solid #bbb", borderRadius: 10, padding: "0 6px", color: "#666", marginLeft: 6, whiteSpace: "nowrap" };
 
-export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeule = false, selectionInitiale = "", mobile = false, onFermer, onAide }) {
+const CLE = "question";
+
+export default function QuestionRapide({ editor, noeudId: noeudIdProp, couleur = "#7F77DD", lectureSeule = false, selectionInitiale = "", mobile = false, onFermer, onAide }) {
   const [modeles, setModeles] = useState(MODELES_PAR_DEFAUT);
   const [reglage, setReglage] = useState(() => ({ ...lireChoix(MODELES_PAR_DEFAUT), profil: null }));
   const [propose, setPropose] = useState(false); // réglage recommandé proposé (rien d'enregistré encore) — non bloquant
@@ -22,11 +26,18 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
   const [question, setQuestion] = useState("");
   const [avecSources, setAvecSources] = useState(() => { try { return localStorage.getItem(CLE_MODE) === "sources"; } catch { return false; } });
   const [joindre, setJoindre] = useState(false);
-  const [enCours, setEnCours] = useState(false);
+  const [enCours, setEnCours] = useState(() => estEnCours(noeudId, CLE));
   const [erreur, setErreur] = useState(null);
-  const [echanges, setEchanges] = useState([]);
+  // Échanges conservés (03/11/2026) : fermer la fenêtre ne perd plus une réponse déjà payée et n'interrompt plus la question en cours.
+  // Par chapitre (ou « global » hors éditeur). Voir src/lib/copiloteConserve.js.
+  const noeudId = noeudIdProp || "global";
+  const [echanges, setEchanges] = useState(() => lireResultat(noeudId, CLE)?.echanges || []);
   const [copie, setCopie] = useState(null);
-  const arret = useRef(null);
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setEnCours(true),
+    surResultat: (v) => { setEchanges(v.echanges || []); setEnCours(false); },
+    surFin: (issue) => { setEnCours(false); if (issue === "echec") setErreur((e) => e || "La question posée avant la fermeture n'a pas abouti."); },
+  });
   const champ = useRef(null);
 
   useEffect(() => {
@@ -44,7 +55,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
       setReglage(reglageRecommande(liste)); setPropose(true);
     })();
     champ.current?.focus();
-    return () => { vivant = false; arret.current?.abort(); };
+    return () => { vivant = false; };
   }, []);
   useEffect(() => {
     const touche = (e) => { if (e.key === "Escape") { if (menu) setMenu(null); else onFermer?.(); } };
@@ -74,14 +85,19 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
     const q = question.trim();
     if (!q || enCours) return;
     setEnCours(true); setErreur(null);
-    const ctl = new AbortController(); arret.current = ctl;
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     try {
       if (propose) sauver(reglage); // on a posé une question sans toucher au réglage proposé : il est retenu
-      const r = await poserQuestion({ question: q, modele, effort, style, consignePerso: reglage.consigne, avecSources, selection: joindre ? selectionInitiale : "", signal: ctl.signal });
-      setEchanges((liste) => [{ q, avecSources, ...r, poids: Math.round((r.entree + r.sortie) * (modeles.find((m) => m.id === r.modeleUtilise)?.poids ?? modeleChoisi?.poids ?? 1)) }, ...liste].slice(0, 6));
+      const r = await poserQuestion({ question: q, modele, effort, style, consignePerso: reglage.consigne, avecSources, selection: joindre ? selectionInitiale : "", signal });
+      const liste = [{ q, avecSources, ...r, poids: Math.round((r.entree + r.sortie) * (modeles.find((m) => m.id === r.modeleUtilise)?.poids ?? modeleChoisi?.poids ?? 1)) }, ...(lireResultat(noeudId, CLE)?.echanges || [])].slice(0, 6);
+      sauverResultat(noeudId, CLE, { echanges: liste });
+      setEchanges(liste);
       setQuestion("");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
       if (e?.name !== "AbortError") { setErreur(e.message || "La question n'a pas abouti."); journaliserErreur("QuestionRapide", e.message || String(e)); }
+      marquerFin(noeudId, CLE, e?.name === "AbortError" ? "annule" : "echec", signal);
     } finally { setEnCours(false); }
   };
 
@@ -183,6 +199,7 @@ export default function QuestionRapide({ editor, couleur = "#7F77DD", lectureSeu
         </div>
         {erreur && <div role="alert" style={{ fontSize: 12.5, color: "#A32D2D", background: "#FBE9E9", borderRadius: 6, padding: "6px 8px" }}>⚠ {erreur}</div>}
 
+        {echanges.length > 0 && <button type="button" onClick={() => { effacerResultat(noeudId, CLE); setEchanges([]); }} style={{ alignSelf: "flex-end", border: "none", background: "none", color: "#888", fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }} title="Les réponses sont gardées tant que vous ne les effacez pas">Effacer ces réponses</button>}
         {echanges.map((x, i) => (
           <div key={i} style={{ borderTop: "0.5px solid #eee", paddingTop: 8 }}>
             <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>« {x.q.length > 140 ? x.q.slice(0, 140) + "…" : x.q} »</div>

@@ -7,7 +7,9 @@
  * accepte ou non (cochée UNIQUEMENT par lui·elle, jamais par défaut).
  */
 
-import { useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal, annulerEnCours } from "../lib/copiloteConserve.js";
+import { useReprise } from "../lib/useReprise.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { lireParagraphes } from "../lib/paragraphesEditeur.js";
 import { extraireAffirmations, verifierAffirmations, localiserExtrait, MAX_AFFIRMATIONS } from "../lib/verifierLeFond.js";
@@ -20,17 +22,25 @@ const VERDICTS = {
 
 const nombre = (v) => v.toLocaleString("fr-FR", { maximumSignificantDigits: 4 });
 
-export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", onFermer }) {
-  const [étape, setÉtape] = useState("choix"); // choix | encours | revue
+const CLE = "faits";
+
+export default function VerifierLeFond({ editor, noeudId, onUsage, couleur = "#7F77DD", onFermer }) {
+  // Résultat conservé (03/11/2026) : voir src/lib/copiloteConserve.js. Seul « Oublier ce résultat » ou une nouvelle vérification le remplace.
+  const sauvé = useMemo(() => lireResultat(noeudId, CLE), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [étape, setÉtape] = useState(estEnCours(noeudId, CLE) ? "encours" : sauvé?.résultats ? "revue" : "choix"); // choix | encours | revue
   const aSélection = !editor.state.selection.empty;
   const [portée, setPortée] = useState(aSélection ? "sélection" : "tout");
   const [phase, setPhase] = useState("");
   const [progrès, setProgrès] = useState({ faits: 0, total: 0 });
   const [erreur, setErreur] = useState(null);
-  const [résultats, setRésultats] = useState(null);
+  const [résultats, setRésultats] = useState(sauvé?.résultats || null);
   const [choisies, setChoisies] = useState(() => new Set());
   const [appliqué, setAppliqué] = useState(null);
-  const contrôleur = useRef(null);
+  useReprise(noeudId, CLE, {
+    surEnCours: () => setÉtape("encours"),
+    surResultat: (v) => { setRésultats(v.résultats); setChoisies(new Set()); setÉtape("revue"); },
+    surFin: (issue) => { setÉtape("choix"); if (issue === "echec") setErreur((e) => e || "La vérification lancée avant la fermeture n'a pas abouti."); },
+  });
 
   const lancer = async () => {
     const { liste } = lireParagraphes(editor, portée === "sélection");
@@ -40,30 +50,36 @@ export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", o
     setÉtape("encours");
     setPhase("Repérage des affirmations vérifiables…");
     setProgrès({ faits: 0, total: 0 });
-    contrôleur.current = new AbortController();
+    const signal = nouveauSignal(noeudId, CLE);
+    marquerDebut(noeudId, CLE);
     try {
-      const affirmations = await extraireAffirmations(liste, contrôleur.current.signal);
+      const affirmations = await extraireAffirmations(liste, signal);
       if (!affirmations.length) {
+        sauverResultat(noeudId, CLE, { résultats: [] });
         setRésultats([]);
         setÉtape("revue");
+        marquerFin(noeudId, CLE, "ok", signal);
         return;
       }
       setPhase("Vérification sur le web…");
       setProgrès({ faits: 0, total: affirmations.length });
       const r = await verifierAffirmations(affirmations, liste, {
-        signal: contrôleur.current.signal,
+        signal,
         surProgres: (faits, total) => setProgrès({ faits, total }),
       });
       const enErreur = r.filter((x) => x.erreur);
       if (enErreur.length) journaliserErreur("VerifierLeFond", `${enErreur.length}/${r.length} vérification(s) en échec : ${enErreur[0].erreur}`);
+      sauverResultat(noeudId, CLE, { résultats: r });
       setRésultats(r);
       setChoisies(new Set());
       setÉtape("revue");
+      marquerFin(noeudId, CLE, "ok", signal);
     } catch (e) {
-      if (e?.name === "AbortError") { setÉtape("choix"); return; }
+      if (e?.name === "AbortError") { setÉtape("choix"); marquerFin(noeudId, CLE, "annule", signal); return; }
       journaliserErreur("VerifierLeFond", e?.message || String(e));
       setErreur(e?.message || "La vérification a échoué.");
       setÉtape("choix");
+      marquerFin(noeudId, CLE, "echec", signal);
     }
   };
 
@@ -222,10 +238,11 @@ export default function VerifierLeFond({ editor, onUsage, couleur = "#7F77DD", o
 
         <div style={{ padding: "12px 18px", borderTop: "0.5px solid #e5e5e5", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
           {étape === "choix" && <><button style={bouton(false)} onClick={onFermer}>Fermer</button><button style={bouton(true)} onClick={lancer}>Lancer la vérification</button></>}
-          {étape === "encours" && <button style={bouton(false)} onClick={() => { contrôleur.current?.abort(); setÉtape("choix"); }}>Annuler</button>}
+          {étape === "encours" && <button style={bouton(false)} onClick={() => { annulerEnCours(noeudId, CLE); setÉtape("choix"); }}>Annuler</button>}
           {étape === "revue" && !appliqué && (
             <>
-              <button style={bouton(false)} onClick={onFermer}>Fermer</button>
+              <button style={bouton(false)} onClick={() => { effacerResultat(noeudId, CLE); setRésultats(null); setÉtape("choix"); }} title="Abandonner ce résultat (« Fermer » le garde)">Oublier ce résultat</button>
+              <button style={bouton(false)} onClick={onFermer}>Fermer (résultat gardé)</button>
               {choisies.size > 0 && <button style={bouton(true)} onClick={appliquer}>Appliquer {choisies.size} reformulation{choisies.size > 1 ? "s" : ""}</button>}
             </>
           )}
