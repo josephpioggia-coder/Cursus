@@ -66,6 +66,7 @@ import RechercheRemplacement from "./RechercheRemplacement.jsx";
 import { RechercheDansTexte } from "../lib/rechercheEditeur.js";
 import { aplatirStructure } from "../lib/rechercheTexte.js";
 import EntetesPages from "./EntetesPages.jsx";
+import StatistiquesTexte from "./StatistiquesTexte.jsx";
 import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
@@ -1400,6 +1401,7 @@ export default function Editeur({
     });
   };
   const [entetesOuvert, setEntetesOuvert] = useState(false);
+  const [statsOuvert, setStatsOuvert] = useState(false);
   const [photoOuverte, setPhotoOuverte] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);
   // Lecture à voix haute (01/10/2026) — voir lib/lectureVoix.js.
@@ -1885,6 +1887,7 @@ export default function Editeur({
     rechercher: { onClick: () => ouvrirRecherche("chapitre") },
     atteindre: { onClick: () => ouvrirRecherche("atteindre") },
     entetes: { onClick: () => setEntetesOuvert(true) },
+    statistiques: { onClick: () => setStatsOuvert(true) },
     saut_page: { onClick: () => editor?.commands.insererSautDePage(), desactive: lectureSeule },
     copier: { onClick: () => { navigator.clipboard?.writeText(editor?.getText() || ""); setTexteCopié(true); setTimeout(() => setTexteCopié(false), 2000); }, libelle: texteCopié ? "Copié !" : undefined, actif: texteCopié },
     photo: { onClick: () => setPhotoOuverte(true), desactive: lectureSeule },
@@ -2158,6 +2161,10 @@ export default function Editeur({
       {entetesOuvert && (
         <EntetesPages projetId={projetIdStyles} titre={projetTitre} styles={stylesProjet} couleur={projetCouleur} lectureSeule={lectureSeule}
           onEnregistre={setStylesProjet} onFermer={() => setEntetesOuvert(false)} />
+      )}
+
+      {statsOuvert && editor && (
+        <StatistiquesTexte editor={editor} noeuds={aplatirStructure(structureProjet)} noeudId={nœud?.id} couleur={projetCouleur} mobile={mobile} onFermer={() => setStatsOuvert(false)} />
       )}
 
       {profilOuvert && editor && (

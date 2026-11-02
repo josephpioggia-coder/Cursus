@@ -59,7 +59,7 @@ export const FONCTIONS = [
   { id: "faits", onglet: "revision", groupe: "Vérification", label: "Vérifier les faits", icone: "🔢", statut: "fait", aide: "Affirmations factuelles et calculs, avec sources" },
   { id: "profil", onglet: "revision", groupe: "Vérification", label: "Profil de lisibilité", icone: "📊", statut: "fait", aide: "L'effort que le texte impose au lecteur, citations vérifiées" },
   { id: "nettoyage", onglet: "revision", groupe: "Vérification", label: "Nettoyage mécanique", icone: "🧹", statut: "fait", aide: "Typographie française et répétitions, sans IA" },
-  { id: "statistiques", onglet: "revision", groupe: "Vérification", label: "Statistiques", icone: "🔡", statut: "bientot", priorite: "fort", aide: "Mots, caractères, paragraphes, pages, temps de lecture" },
+  { id: "statistiques", onglet: "revision", groupe: "Vérification", label: "Statistiques", icone: "🔡", statut: "fait", priorite: "fort", aide: "Mots, caractères, paragraphes, pages, temps de lecture" },
   { id: "synonymes", onglet: "revision", groupe: "Vérification", label: "Synonymes", icone: "📖", statut: "bientot", priorite: "moyen", aide: "Dictionnaire des synonymes" },
   { id: "lire", onglet: "revision", groupe: "Fonction vocale", label: "Lire à voix haute", icone: "🔊", statut: "fait", ctrl: "lecture", aide: "Lecture à voix haute (voix et vitesse au choix)" },
   { id: "traduire", onglet: "revision", groupe: "Langue", label: "Traduire", icone: "🌐", statut: "bientot", priorite: "moyen", aide: "Traduire un passage" },
