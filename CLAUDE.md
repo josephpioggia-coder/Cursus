@@ -1404,3 +1404,6 @@ Retour de Joseph (capture PC à 120 %) : « il manque les règles et la possibil
 
 ### Ruban : « Rétablir l'Accueil » dans le groupe, plus de colonne vide (02/11/2026)
 Retour de Joseph (PC portable vs grand écran) : un grand espace vide autour de « Rétablir l'Accueil » quand « Mes fonctions » passe à la ligne. Cause : le lien était une colonne séparée à droite du groupe. Maintenant dans le pied du groupe (`Groupe` : props `extension`, `pied`), et « Mes fonctions » occupe la largeur restante (`flex: 1 1 auto`). Vérifié : `vite build` seulement ; NON testé visuellement à la largeur d'un portable.
+
+### Ruban : une seule rangée, défilement horizontal (02/11/2026)
+Demande de Joseph : sur écran étroit, ne pas faire descendre « Mes fonctions » (double perte d'espace d'édition), mais défiler horizontalement pour atteindre les fonctions cachées, dans tous les onglets. Rangées des groupes : `flexWrap: nowrap` + `overflowX: auto` (`.ruban-defile`, barre fine), groupes `flexShrink: 0`, boutons d'un groupe sur une ligne. La barre de mise en forme (Style, Police, G, I…), fournie par l'éditeur, passe toujours à la ligne : volontairement (ses palettes s'ouvrent en dessous et seraient rognées par un conteneur défilant). Vérifié : maquette du ruban seul à 700 et 1170 px (une seule rangée, défilement à 700 px, page non élargie) ; PAS dans l'éditeur complet.

@@ -97,8 +97,8 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
     return [...parGroupe.entries()];
   };
   const Groupe = ({ titre, children, extension = false, pied = null }) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", padding: "2px 8px", borderRight: "0.5px solid #e2e2e8", minWidth: 0, ...(extension ? { flex: "1 1 auto" } : {}) }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 2, flex: 1, alignItems: "flex-start" }}>{children}</div>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", padding: "2px 8px", borderRight: "0.5px solid #e2e2e8", flexShrink: 0, ...(extension ? { flex: "1 1 auto" } : {}) }}>
+      <div style={{ display: "flex", flexWrap: "nowrap", gap: 2, flex: 1, alignItems: "flex-start" }}>{children}</div>
       <div style={{ fontSize: 9.5, color: "#999", textAlign: "center", paddingTop: 2, position: "relative" }}>
         {titre}
         {pied}
@@ -110,7 +110,7 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
 
   return (
     <div style={{ flexShrink: 0, borderBottom: "0.5px solid #e5e5e5", background: "#fafafa" }}>
-      <style>{`.ruban-btn:hover .ruban-epingle{opacity:1 !important}.ruban-btn:hover > button:first-child{background:#f0eff6}.ruban-deplace:hover .ruban-fleches,.ruban-deplace:focus-within .ruban-fleches{opacity:1 !important}.ruban-deplace[draggable=true]{cursor:grab}`}</style>
+      <style>{`.ruban-btn:hover .ruban-epingle{opacity:1 !important}.ruban-btn:hover > button:first-child{background:#f0eff6}.ruban-deplace:hover .ruban-fleches,.ruban-deplace:focus-within .ruban-fleches{opacity:1 !important}.ruban-deplace[draggable=true]{cursor:grab}.ruban-defile{scrollbar-width:thin}`}</style>
       <div role="tablist" style={{ display: "flex", alignItems: "center", gap: 2, padding: "0 12px", borderBottom: reduit ? "none" : "0.5px solid #e5e5e5" }}>
         {ONGLETS.map((o) => (
           <button key={o.id} role="tab" aria-selected={onglet === o.id && !reduit} onClick={() => choisir(o.id)}
@@ -129,7 +129,7 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
           {/* Accueil : toujours monté (la barre de mise en forme écoute des événements), masqué hors de l'onglet */}
           <div style={{ display: onglet === "accueil" ? "block" : "none" }}>
             {accueil}
-            <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap", padding: "2px 4px 2px", borderTop: accueil ? "0.5px solid #eee" : "none" }}>
+            <div className="ruban-defile" style={{ display: "flex", alignItems: "stretch", flexWrap: "nowrap", overflowX: "auto", padding: "2px 4px 2px", borderTop: accueil ? "0.5px solid #eee" : "none" }}>
               {groupes("accueil").map(([titre, liste]) => <Groupe key={titre} titre={titre}>{liste.map((f) => rendu(f, { peutEpingler: false }))}</Groupe>)}
               <Groupe titre="Mes fonctions" extension pied={(
                 <button onClick={retablir} style={{ position: "absolute", right: 0, bottom: 0, fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit", padding: 0 }}>Rétablir l'Accueil</button>
@@ -153,7 +153,7 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
             </div>
           </div>
           {onglet !== "accueil" && (
-            <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap", padding: "2px 4px" }}>
+            <div className="ruban-defile" style={{ display: "flex", alignItems: "stretch", flexWrap: "nowrap", overflowX: "auto", padding: "2px 4px" }}>
               {groupes(onglet).map(([titre, liste]) => <Groupe key={titre} titre={titre}>{liste.map((f) => rendu(f, { peutEpingler: true }))}</Groupe>)}
             </div>
           )}
