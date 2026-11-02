@@ -117,14 +117,51 @@ export function allerA(editor, i) {
   return idx;
 }
 
-/** Applique un remplacement à UNE occurrence (texte ou note) dans la transaction `tr`. */
-function appliquer(tr, o, remplacement, e) {
+/** Mise en forme à appliquer (true) ou retirer (false) au texte remplacé (03/11/2026) : clé → [libellé, marque, peutAppliquer]. */
+export const FORMATS_REMPLACEMENT = {
+  gras: ["Gras", "bold", true], italique: ["Italique", "italic", true], souligne: ["Souligné", "underline", true], barre: ["Barré", "strike", true],
+  surligne: ["Surligné", "highlight", true], indice: ["Indice", "subscript", true], exposant: ["Exposant", "superscript", true],
+  couleur: ["Couleur de texte", "color", false], police: ["Police", "fontFamily", false], taille: ["Taille", "fontSize", false],
+};
+export const formatsRempActifs = (f = {}) => Object.keys(FORMATS_REMPLACEMENT).filter((k) => f[k] === true || f[k] === false);
+
+function appliquerFormat(tr, from, to, fmt) {
+  if (!fmt || to <= from) return;
+  const { schema } = tr.doc.type;
+  for (const k of formatsRempActifs(fmt)) {
+    const [, nom, peut] = FORMATS_REMPLACEMENT[k];
+    if (["color", "fontFamily", "fontSize"].includes(nom)) {
+      if (fmt[k] !== false || !schema.marks.textStyle) continue;
+      // Retirer couleur / police / taille : on vide l'attribut dans la marque textStyle (et on la retire si elle devient vide).
+      const trouvees = [];
+      tr.doc.nodesBetween(from, to, (n, pos) => { if (n.isText) { const m = n.marks.find((x) => x.type.name === "textStyle"); if (m) trouvees.push([Math.max(pos, from), Math.min(pos + n.nodeSize, to), m]); } });
+      for (const [a, b, m] of trouvees) {
+        tr.removeMark(a, b, m);
+        const attrs = { ...m.attrs, [nom]: null };
+        if (Object.values(attrs).some(Boolean)) tr.addMark(a, b, schema.marks.textStyle.create(attrs));
+      }
+      continue;
+    }
+    const type = schema.marks[nom]; if (!type) continue;
+    if (fmt[k] === false) tr.removeMark(from, to, type);
+    else if (peut) {
+      if (nom === "subscript") tr.removeMark(from, to, schema.marks.superscript);
+      if (nom === "superscript") tr.removeMark(from, to, schema.marks.subscript);
+      tr.addMark(from, to, nom === "highlight" ? type.create({ color: "#FFF59D" }) : type.create());
+    }
+  }
+}
+
+/** Applique un remplacement à UNE occurrence (texte ou note) dans la transaction `tr`.
+ *  `fmt` : mise en forme à appliquer / retirer au texte remplacé ; sans texte cherché (`e.requete` vide), seule la mise en forme change. */
+function appliquer(tr, o, remplacement, e, fmt) {
+  if (!e.requete) { if (!o.note) appliquerFormat(tr, o.from, o.to, fmt); return; }
   if (o.note) {
     const noeud = tr.doc.nodeAt(o.from);
     if (noeud) tr.setNodeMarkup(o.from, undefined, { ...noeud.attrs, texte: remplacerTout(noeud.attrs.texte || "", e.requete, remplacement, e.options).texte });
   } else {
     const texte = developperRemplacement(remplacement, tr.doc.textBetween(o.from, o.to, "\n", SEPARATEUR));
-    if (!/[\t\n]/.test(texte)) { tr.insertText(texte, o.from, o.to); return; }
+    if (!/[\t\n]/.test(texte)) { tr.insertText(texte, o.from, o.to); appliquerFormat(tr, o.from, o.from + texte.length, fmt); return; }
     // Tabulation / saut de ligne dans le remplacement : ce sont des ÉLÉMENTS du document (pas du texte), on les insère comme tels.
     const { schema } = tr.doc.type; const marques = tr.doc.resolve(o.from).marks();
     const noeuds = [];
@@ -134,26 +171,27 @@ function appliquer(tr, o, remplacement, e) {
       else if (seg) noeuds.push(schema.text(seg, marques));
     });
     tr.replaceWith(o.from, o.to, noeuds);
+    appliquerFormat(tr, o.from, o.from + noeuds.reduce((t, n) => t + n.nodeSize, 0), fmt);
   }
 }
 
 /** Remplace l'occurrence `i` → nouvelle occurrence courante. Les marques (gras, italique) du texte remplacé sont conservées. */
-export function remplacerUne(editor, i, remplacement) {
+export function remplacerUne(editor, i, remplacement, fmt) {
   const e = etatRecherche(editor);
   if (!e || !e.occurrences[i]) return 0;
   const o = e.occurrences[i];
   const tr = editor.state.tr;
-  appliquer(tr, o, remplacement, e);
+  appliquer(tr, o, remplacement, e, fmt);
   editor.view.dispatch(tr);
   return 1;
 }
 
 /** Remplace TOUTES les occurrences du chapitre en une transaction (un Ctrl+Z annule tout) → nombre remplacé. */
-export function remplacerToutes(editor, remplacement) {
+export function remplacerToutes(editor, remplacement, fmt) {
   const e = etatRecherche(editor);
   if (!e || !e.occurrences.length) return 0;
   const tr = editor.state.tr;
-  [...e.occurrences].sort((a, b) => b.from - a.from).forEach((o) => appliquer(tr, o, remplacement, e));
+  [...e.occurrences].sort((a, b) => b.from - a.from).forEach((o) => appliquer(tr, o, remplacement, e, fmt));
   editor.view.dispatch(tr);
   return e.occurrences.length;
 }
