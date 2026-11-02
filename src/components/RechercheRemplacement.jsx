@@ -20,6 +20,8 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const [remplacement, setRemplacement] = useState("");
   const [casse, setCasse] = useState(false);
   const [motEntier, setMotEntier] = useState(false);
+  const [debutMot, setDebutMot] = useState(false);
+  const [finMot, setFinMot] = useState(false);
   const [accents, setAccents] = useState(false);
   const [portee, setPortee] = useState(porteeInitiale);
   // « Atteindre » (Ctrl+G)
@@ -52,7 +54,7 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     setMenuSpecial(false);
     setTimeout(() => { el?.focus(); el?.setSelectionRange(a + code.length, a + code.length); }, 0);
   };
-  const options = useMemo(() => ({ casse, motEntier, accents }), [casse, motEntier, accents]);
+  const options = useMemo(() => ({ casse, motEntier, debutMot, finMot, accents }), [casse, motEntier, debutMot, finMot, accents]);
 
   useEffect(() => { champRef.current?.focus(); champRef.current?.select(); }, []);
   useEffect(() => {
@@ -216,6 +218,10 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
 
       {plus && (
         <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+            <button type="button" style={bouton(debutMot)} onClick={() => setDebutMot(!debutMot)} aria-pressed={debutMot} title="Le mot commence par ce texte (« temp » trouve « temps » et « température », pas « longtemps »)">Début de mot</button>
+            <button type="button" style={bouton(finMot)} onClick={() => setFinMot(!finMot)} aria-pressed={finMot} title="Le mot finit par ce texte (« temps » trouve « longtemps » et « contretemps », pas « temporel »)">Fin de mot</button>
+          </div>
           <button type="button" style={bouton(menuSpecial)} onClick={() => setMenuSpecial(!menuSpecial)} aria-expanded={menuSpecial}>Spécial ▾</button>
           <span style={{ fontSize: 11, color: "#777", marginLeft: 8 }}>s'insère dans le champ où se trouve le curseur ({dernierChamp.current === "rempl" ? "Remplacer par" : "Rechercher"})</span>
           {menuSpecial && (
