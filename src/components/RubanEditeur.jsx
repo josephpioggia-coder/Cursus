@@ -96,10 +96,13 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
     liste.forEach((f) => { if (!parGroupe.has(f.groupe)) parGroupe.set(f.groupe, []); parGroupe.get(f.groupe).push(f); });
     return [...parGroupe.entries()];
   };
-  const Groupe = ({ titre, children }) => (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", padding: "2px 8px", borderRight: "0.5px solid #e2e2e8", minWidth: 0 }}>
+  const Groupe = ({ titre, children, extension = false, pied = null }) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", padding: "2px 8px", borderRight: "0.5px solid #e2e2e8", minWidth: 0, ...(extension ? { flex: "1 1 auto" } : {}) }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 2, flex: 1, alignItems: "flex-start" }}>{children}</div>
-      <div style={{ fontSize: 9.5, color: "#999", textAlign: "center", paddingTop: 2 }}>{titre}</div>
+      <div style={{ fontSize: 9.5, color: "#999", textAlign: "center", paddingTop: 2, position: "relative" }}>
+        {titre}
+        {pied}
+      </div>
     </div>
   );
 
@@ -128,7 +131,9 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
             {accueil}
             <div style={{ display: "flex", alignItems: "stretch", flexWrap: "wrap", padding: "2px 4px 2px", borderTop: accueil ? "0.5px solid #eee" : "none" }}>
               {groupes("accueil").map(([titre, liste]) => <Groupe key={titre} titre={titre}>{liste.map((f) => rendu(f, { peutEpingler: false }))}</Groupe>)}
-              <Groupe titre="Mes fonctions">
+              <Groupe titre="Mes fonctions" extension pied={(
+                <button onClick={retablir} style={{ position: "absolute", right: 0, bottom: 0, fontSize: 10, color: "#888", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit", padding: 0 }}>Rétablir l'Accueil</button>
+              )}>
                 {epingleesVisibles.map((f, i) => (
                   <div key={f.id} className="ruban-deplace" style={{ position: "relative" }} draggable
                     onDragStart={(e) => { e.dataTransfer.setData("text/plain", f.id); e.dataTransfer.effectAllowed = "move"; }}
@@ -145,9 +150,6 @@ export default function RubanEditeur({ couleur = "#7F77DD", actions, controles =
                 ))}
                 {epingleesVisibles.length === 0 && <span style={{ fontSize: 11, color: "#999", padding: 8 }}>Épinglez ici (📌) les fonctions des autres onglets.</span>}
               </Groupe>
-              <div style={{ display: "flex", alignItems: "flex-end", padding: "0 8px 4px" }}>
-                <button onClick={retablir} style={{ fontSize: 10.5, color: "#888", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Rétablir l'Accueil</button>
-              </div>
             </div>
           </div>
           {onglet !== "accueil" && (
