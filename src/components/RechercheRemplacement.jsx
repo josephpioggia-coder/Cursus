@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { chercherDansHtml, chercherDansTitre, remplacerDansHtml, remplacerTout, jetonsNonPris } from "../lib/rechercheTexte.js";
-import { FILTRES_FORMAT, filtresActifs, etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes, ciblesDe, atteindreCible, placerAuCaractere } from "../lib/rechercheEditeur.js";
+import { FILTRES_FORMAT, FORMATS_REMPLACEMENT, formatsRempActifs, filtresActifs, etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes, ciblesDe, atteindreCible, placerAuCaractere } from "../lib/rechercheEditeur.js";
 
 const champ = { width: "100%", boxSizing: "border-box", border: "0.5px solid #bbb", borderRadius: 7, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: "#1a1a1a" };
 const bouton = (actif = false) => ({ fontSize: 12, border: "0.5px solid #ccc", background: actif ? "#EEEDFE" : "#fff", color: actif ? "#534AB7" : "#333", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" });
@@ -57,7 +57,10 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const [format, setFormat] = useState({}); // filtres de mise en forme (gras, italique…) — ce chapitre seulement
   const nFiltres = filtresActifs({ format }).length;
   const options = useMemo(() => ({ casse, motEntier, debutMot, finMot, accents, format }), [casse, motEntier, debutMot, finMot, accents, format]);
-  const formatSeule = nFiltres > 0 && !requete; // pas de texte cherché : on repère les passages mis en forme, sans remplacement possible
+  const [formatRemp, setFormatRemp] = useState({}); // mise en forme du remplacement : clé → true (appliquer) | false (retirer)
+  const nRemp = formatsRempActifs(formatRemp).length;
+  const peutRemplacer = !!requete || nRemp > 0; // sans texte cherché, il faut au moins une mise en forme à appliquer / retirer
+  const cycleRemp = (k) => setFormatRemp((f) => { const v = f[k]; const suite = FORMATS_REMPLACEMENT[k][2] ? (v === true ? false : v === false ? undefined : true) : (v === false ? undefined : false); return { ...f, [k]: suite }; }); // pas de texte cherché : on repère les passages mis en forme, sans remplacement possible
 
   useEffect(() => { champRef.current?.focus(); champRef.current?.select(); }, []);
   useEffect(() => {
@@ -83,15 +86,15 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const suivant = () => { setMessage(""); allerA(editor, (courant < 0 ? 0 : courant + 1)); };
   const precedent = () => { setMessage(""); allerA(editor, (courant < 0 ? total - 1 : courant - 1)); };
   const remplacerCourante = () => {
-    if (lectureSeule || !total || formatSeule) return;
+    if (lectureSeule || !total || !peutRemplacer) return;
     const i = courant < 0 ? 0 : courant;
-    remplacerUne(editor, i, remplacement);
+    remplacerUne(editor, i, remplacement, formatRemp);
     setMessage("1 remplacement.");
     setTimeout(() => allerA(editor, i), 0); // l'occurrence suivante prend la place de l'index courant
   };
   const toutRemplacerChapitre = () => {
-    if (lectureSeule || !total || formatSeule) return;
-    const n = remplacerToutes(editor, remplacement);
+    if (lectureSeule || !total || !peutRemplacer) return;
+    const n = remplacerToutes(editor, remplacement, formatRemp);
     setMessage(`${n} remplacement${n > 1 ? "s" : ""} dans ce chapitre.`);
     setAnnulable(true);
   };
@@ -232,6 +235,14 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
             ))}
             {nFiltres > 0 && <button type="button" style={bouton()} onClick={() => setFormat({})}>Effacer</button>}
           </div>
+          <div style={{ fontSize: 11.5, color: "#555", marginBottom: 4 }}>Mise en forme du remplacement (un clic = appliquer <b>+</b>, deux = retirer <b>−</b>, trois = ne rien changer) :</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {Object.entries(FORMATS_REMPLACEMENT).map(([k, [lib, , peut]]) => {
+              const v = formatRemp[k];
+              return <button key={k} type="button" style={bouton(v === true || v === false)} onClick={() => cycleRemp(k)} title={peut ? undefined : "Peut seulement être retiré"}>{v === true ? "+ " : v === false ? "− " : ""}{lib}</button>;
+            })}
+            {nRemp > 0 && <button type="button" style={bouton()} onClick={() => setFormatRemp({})}>Effacer</button>}
+          </div>
           <button type="button" style={bouton(menuSpecial)} onClick={() => setMenuSpecial(!menuSpecial)} aria-expanded={menuSpecial}>Spécial ▾</button>
           <span style={{ fontSize: 11, color: "#777", marginLeft: 8 }}>s'insère dans le champ où se trouve le curseur ({dernierChamp.current === "rempl" ? "Remplacer par" : "Rechercher"})</span>
           {menuSpecial && (
@@ -295,8 +306,8 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
             <button type="button" style={bouton()} onClick={suivant} disabled={!total} aria-label="Occurrence suivante">▶</button>
             <span style={{ fontSize: 12, color: "#555", minWidth: 70 }}>{!requete && !nFiltres ? "" : total ? `${courant + 1} / ${total}` : "Aucun résultat"}</span>
             <span style={{ flex: 1 }} />
-            <button type="button" style={bouton()} onClick={remplacerCourante} disabled={lectureSeule || !total || formatSeule} title={formatSeule ? "Le remplacement avec mise en forme n'est pas encore disponible" : undefined}>Remplacer</button>
-            <button type="button" style={{ ...bouton(), background: total && !lectureSeule && !formatSeule ? couleur : "#eee", color: total && !lectureSeule && !formatSeule ? "#fff" : "#999" }} onClick={toutRemplacerChapitre} disabled={lectureSeule || !total || formatSeule}>Tout remplacer</button>
+            <button type="button" style={bouton()} onClick={remplacerCourante} disabled={lectureSeule || !total || !peutRemplacer} title={!peutRemplacer ? "Cochez une mise en forme à appliquer (Plus >>) ou saisissez un texte cherché" : undefined}>Remplacer</button>
+            <button type="button" style={{ ...bouton(), background: total && !lectureSeule && peutRemplacer ? couleur : "#eee", color: total && !lectureSeule && peutRemplacer ? "#fff" : "#999" }} onClick={toutRemplacerChapitre} disabled={lectureSeule || !total || !peutRemplacer}>Tout remplacer</button>
           </div>
         </>
       ) : (
