@@ -2109,7 +2109,7 @@ export default function Editeur({
           )}
           <button onClick={ouvrirQuestion} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Poser une question à l'IA sans passer par le Co-pilote">💬 Question rapide</button>
           <button onClick={ouvrirRecherche} style={{ fontSize: 12, color: projetCouleur, background: `${projetCouleur}15`, border: "none", cursor: "pointer", borderRadius: 6, padding: "4px 8px", fontFamily: "inherit" }} title="Rechercher et remplacer dans le chapitre ou dans tout le livre">🔎 Rechercher / remplacer</button>
-          {lectureJSX}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", whiteSpace: "nowrap", flexBasis: "100%", minWidth: 0, overflowX: "auto" }}>{lectureJSX}</div>
           <button
             onClick={() => setVoirHistorique(!voirHistorique)}
             style={{
