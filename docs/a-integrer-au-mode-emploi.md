@@ -94,3 +94,9 @@ Ruban Révision › Vérification › « Statistiques » (aussi épinglée par d
 
 ## Rechercher : liste des résultats avec numéro de ligne (03/11/2026)
 Dans Rechercher / remplacer › « Ce chapitre », sous les boutons ◀ ▶, la liste de TOUS les résultats : « 12 / 155 — ligne 48 », puis l'extrait avec le passage trouvé surligné. Un clic va au passage (le panneau reste ouvert, le résultat courant est en violet). Utile quand l'expression n'est pas tout à fait la bonne : on repère d'un coup d'œil le bon passage sans tout parcourir. Le numéro de ligne est celui de la marge gauche (absent si les numéros de ligne ne sont pas affichés). Les 300 premiers résultats sont listés ; ◀ ▶ parcourt tous les résultats. Fonctionne aussi pour la recherche par mise en forme seule.
+
+## Le Co-pilote voit les numéros de ligne (03/11/2026)
+Dans le fil de discussion du Co-pilote (toutes les cartes, « Aide-moi à avancer », Guide directif), le texte du chapitre lui est envoyé avec les numéros de ligne de la marge gauche de l'éditeur (« [L12] … »). On peut donc écrire « regarde la ligne 26 » ; le Co-pilote cite à son tour « ligne 26 » avec un court extrait. Limites : ce sont des lignes d'écran, elles changent si on redimensionne la fenêtre ou modifie le texte ; sur mobile (éditeur masqué sous le Co-pilote) les numéros ne sont pas disponibles et le texte part sans repères. Le bouton « Analyser » et les autres onglets n'utilisent pas encore ces repères.
+
+## Rechercher : un clic sur un résultat amène au passage (03/11/2026)
+Corrigé : cliquer un résultat de la liste (ou ◀ ▶) fait maintenant défiler le texte jusqu'au passage, même quand le curseur est resté dans le panneau de recherche.
