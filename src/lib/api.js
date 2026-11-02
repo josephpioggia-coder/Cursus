@@ -174,10 +174,14 @@ export const nœudsAPI = {
 
   /** Sauvegarde le texte HTML d'un nœud (éditeur) */
   async sauvegarderTexte(nœudId, texte) {
-    const { error } = await supabase
+    // `.select("id")` : sans lui, une mise à jour qui ne touche AUCUNE ligne (droits, session expirée…) revient sans erreur — le texte était
+    // alors « sauvegardé » à l'écran sans l'être (03/11/2026, une heure de travail perdue).
+    const { data, error } = await supabase
       .from("noeuds")
       .update({ texte, mis_a_jour: new Date().toISOString() })
-      .eq("id", nœudId);
+      .eq("id", nœudId)
+      .select("id");
+    if (!error && (!data || data.length === 0)) return { error: { message: "Aucune ligne modifiée : droits d'écriture ou session à renouveler" } };
     return { error };
   },
 

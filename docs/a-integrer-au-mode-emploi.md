@@ -109,3 +109,6 @@ Correction rapide, Vérifier les faits, Vérifier le fond, Profil de lisibilité
 
 ## Co-pilote : filet de sécurité local pour les analyses (03/11/2026)
 Chaque analyse (Suggestions, Personnages, Références, Cohérence, Vérification) est aussi gardée sur l'appareil ; un rechargement de page (F5, Ctrl+F5) la retrouve même si l'enregistrement sur le compte a échoué. Les analyses faites AVANT cette mise à jour ne sont pas récupérables si elles n'avaient pas été enregistrées.
+
+## Enregistrement du texte : plus sûr, et visible (03/11/2026)
+Le témoin à côté du titre du chapitre n'affiche « Sauvegardé » que lorsque le compte a CONFIRMÉ l'enregistrement. En cas d'échec, Cursus réessaie trois fois puis affiche en rouge « NON ENREGISTRÉ — ne rechargez pas » : ne fermez pas la page, copiez votre texte si besoin. Une copie de sécurité du chapitre est aussi gardée sur l'appareil : si la page est rechargée avant que l'enregistrement n'ait abouti, un bandeau propose de « Récupérer ce travail ». Le navigateur demande confirmation si vous quittez la page avec du texte non enregistré. Attention : n'ouvrez pas le même chapitre sur deux appareils ou deux onglets à la fois (le plus ancien peut écraser le plus récent) ; fermez l'ancien avant de reprendre ailleurs.

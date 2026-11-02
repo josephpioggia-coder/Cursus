@@ -2264,7 +2264,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
         return { ...p, structure: màj(p.structure) };
       })
     );
-    await nœudsAPI.sauvegarderTexte(nœudId, html);
+    return nœudsAPI.sauvegarderTexte(nœudId, html); // { error } : l'éditeur réessaie et signale un échec (03/11/2026)
   }, [projetActifId]);
 
   // Rechercher / remplacer dans tout le livre : écrit un AUTRE chapitre que celui ouvert (état local + base), erreur renvoyée à l'appelant.
