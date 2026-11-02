@@ -2197,8 +2197,11 @@ export default function Editeur({
             padding: mobile ? "0 12px 0 40px" : "0 40px",
           }}>
             {pageVisible && (<>
+              {/* Règle collée en haut de la zone défilante (28/10 → 02/11/2026 : elle défilait avec la page et disparaissait). */}
+              <div style={{ position: "sticky", top: 26, height: 0, zIndex: 6, display: "flow-root", margin: `-${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px -${droitePx}px ${FORMATS_RÉFÉRENCE[formatRéférence].margePx}px -${gauchePx}px` }}>
               <RegleCm largeurPage={largeurPage} gauchePx={gauchePx} droitePx={droitePx} retrait={{ gauche: retraitCurseur.gauche, premiere: retraitCurseur.premiere ?? (stylesProjet?.normal?.alinea || 0), droite: retraitCurseur.droite, tabs: retraitCurseur.tabs }}
                 editable={!lectureSeule && !!projetIdStyles} onChange={changerRègle} />
+              </div>
               {erreurRègle && <div style={{ position: "absolute", top: -36, right: 0, fontSize: 10.5, color: "#A32D2D" }}>⚠ {erreurRègle}</div>}
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, left: gauchePx, borderLeft: "1px dashed #cfcfe0", pointerEvents: "none" }} />
               <div aria-hidden style={{ position: "absolute", top: 0, bottom: 0, right: droitePx, borderRight: "1px dashed #cfcfe0", pointerEvents: "none" }} />
