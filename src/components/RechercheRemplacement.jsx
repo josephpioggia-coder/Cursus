@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase.js";
 import { chercherDansHtml, chercherDansTitre, remplacerDansHtml, remplacerTout, jetonsNonPris } from "../lib/rechercheTexte.js";
-import { etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes } from "../lib/rechercheEditeur.js";
+import { etatRecherche, majRecherche, allerA, remplacerUne, remplacerToutes, ciblesDe, atteindreCible, placerAuCaractere } from "../lib/rechercheEditeur.js";
 
 const champ = { width: "100%", boxSizing: "border-box", border: "0.5px solid #bbb", borderRadius: 7, padding: "6px 8px", fontSize: 13, fontFamily: "inherit", background: "#fff", color: "#1a1a1a" };
 const bouton = (actif = false) => ({ fontSize: 12, border: "0.5px solid #ccc", background: actif ? "#EEEDFE" : "#fff", color: actif ? "#534AB7" : "#333", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" });
@@ -15,13 +15,19 @@ const SPECIAUX_RECHERCHE = [["^s", "Espace insécable"], ["^t", "Tabulation"], [
 const SPECIAUX_REMPLACEMENT = [["^s", "Espace insécable"], ["^t", "Tabulation"], ["^l", "Saut de ligne"], ["^&", "Le texte trouvé"], ["^^", "Un accent circonflexe « ^ »"]];
 const compterMots = (html) => (html || "").replace(/<[^>]*>/g, " ").split(/\s+/).filter(Boolean).length;
 
-export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
+export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", porteeInitiale = "chapitre", onAtteindreLigne, nbLignes = 0, noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
   const [requete, setRequete] = useState(requeteInitiale);
   const [remplacement, setRemplacement] = useState("");
   const [casse, setCasse] = useState(false);
   const [motEntier, setMotEntier] = useState(false);
   const [accents, setAccents] = useState(false);
-  const [portee, setPortee] = useState("chapitre");
+  const [portee, setPortee] = useState(porteeInitiale);
+  // « Atteindre » (Ctrl+G)
+  const [cible, setCible] = useState("titre"); // titre | intertitre | ligne | paragraphe | page | note | image
+  const [saisieCible, setSaisieCible] = useState("");
+  const [choixNoeud, setChoixNoeud] = useState("");
+  const [choixIntertitre, setChoixIntertitre] = useState("0");
+  const enAttente = useRef(null); // { id, car } : page estimée dans un AUTRE chapitre, appliquée dès qu'il est ouvert
   const [horsCorps, setHorsCorps] = useState(false);
   const [vue, setVue] = useState("resultats"); // volet du livre : titres | pages | resultats
   const [plan, setPlan] = useState([]); // tous les chapitres/parties, avec page estimée et nombre de résultats
@@ -49,6 +55,12 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
   const options = useMemo(() => ({ casse, motEntier, accents }), [casse, motEntier, accents]);
 
   useEffect(() => { champRef.current?.focus(); champRef.current?.select(); }, []);
+  useEffect(() => {
+    if (!enAttente.current || enAttente.current.id !== noeudId || !editor) return undefined;
+    const car = enAttente.current.car; enAttente.current = null;
+    const t = setTimeout(() => placerAuCaractere(editor, car), 350); // laisse l'éditeur charger le chapitre
+    return () => clearTimeout(t);
+  }, [noeudId, editor]);
   useEffect(() => {
     if (!editor) return;
     const f = () => setTic((t) => t + 1);
@@ -79,6 +91,36 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     setAnnulable(true);
   };
   const annulerRemplacement = () => { editor?.commands.undo(); setAnnulable(false); setMessage("Remplacement annulé."); };
+
+  const aller = () => {
+    setMessage("");
+    if (cible === "titre") {
+      const n = noeuds.find((x) => x.id === choixNoeud); if (!n) { setMessage("⚠ Choisissez un chapitre ou une partie."); return; }
+      if (n.id !== noeudId) onOuvrirNoeud?.(n.id);
+      setMessage(`« ${n.titre || "(sans titre)"} » ouvert.`); return;
+    }
+    if (cible === "ligne") { const r = onAtteindreLigne?.(saisieCible) || { ok: false, message: "Indisponible." }; setMessage((r.ok ? "" : "⚠ ") + r.message); return; }
+    if (cible === "intertitre") { const r = atteindreCible(editor, "intertitre", "", Number(choixIntertitre)); setMessage((r.ok ? "" : "⚠ ") + r.message); return; }
+    if (cible === "page") {
+      const n = parseInt(String(saisieCible).replace(/\D/g, ""), 10);
+      if (!Number.isFinite(n) || n < 1) { setMessage("⚠ Indiquez un numéro de page."); return; }
+      let cumul = 0;
+      const tousLesNoeuds = listeNoeuds().length ? listeNoeuds() : [{ id: noeudId, titre: "ce chapitre", texte: "" }]; // sans livre (ou chapitre isolé) : le chapitre ouvert
+      for (const x of tousLesNoeuds) {
+        const html = x.id === noeudId && editor ? editor.getHTML() : x.texte;
+        const long = (html || "").replace(/<[^>]+>/g, "").length;
+        if (n * 1800 > cumul && (n - 1) * 1800 < cumul + long) {
+          const car = Math.max(0, (n - 1) * 1800 - cumul);
+          if (x.id === noeudId && editor) placerAuCaractere(editor, car);
+          else { enAttente.current = { id: x.id, car }; onOuvrirNoeud?.(x.id); }
+          setMessage(`Page ${n} estimée : « ${x.titre || "(sans titre)"} » (≈ 1 800 caractères par page, sans pagination réelle).`); return;
+        }
+        cumul += long;
+      }
+      const nb = Math.max(1, Math.ceil(cumul / 1800)); setMessage(`⚠ Le livre compte environ ${nb} page${nb > 1 ? "s" : ""} (estimation).`); return;
+    }
+    const r = atteindreCible(editor, cible, saisieCible); setMessage((r.ok ? "" : "⚠ ") + r.message);
+  };
 
   const listeNoeuds = () => noeuds.filter((n) => horsCorps || n.zone === "corps");
   const chercherLivre = () => {
@@ -150,14 +192,16 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
     <div role="dialog" aria-label="Rechercher et remplacer" onKeyDown={touche} data-pointeur-ignore
       style={{ position: "fixed", zIndex: 70, background: "#fff", color: "#1a1a1a", border: "0.5px solid #ccc", borderRadius: 12, boxShadow: "0 8px 30px rgba(0,0,0,.18)", padding: 12, display: "flex", flexDirection: "column", gap: 8, fontSize: 13,
         ...(mobile ? { left: 8, right: 8, bottom: 8, maxHeight: "60vh", overflowY: "auto" } : { top: 120, right: 24, width: 380, maxHeight: "70vh", overflowY: "auto" }) }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <strong style={{ fontSize: 13 }}>🔎 Rechercher / remplacer</strong>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 13, whiteSpace: "nowrap" }}>🔎 Rechercher / remplacer</strong>
         <span style={{ flex: 1 }} />
         <button type="button" style={bouton(portee === "chapitre")} onClick={() => setPortee("chapitre")}>Ce chapitre</button>
         <button type="button" style={bouton(portee === "livre")} onClick={() => setPortee("livre")}>Tout le livre</button>
+        <button type="button" style={bouton(portee === "atteindre")} onClick={() => setPortee("atteindre")} title="Aller à un chapitre, une ligne, un paragraphe, une page, une note, une image (Ctrl+G)">Atteindre</button>
         <button type="button" onClick={onFermer} aria-label="Fermer" style={{ border: "none", background: "none", fontSize: 16, color: "#888", cursor: "pointer" }}>✕</button>
       </div>
 
+      {portee !== "atteindre" && (<>
       <input ref={champRef} value={requete} onFocus={() => { dernierChamp.current = "rech"; }} onChange={(ev) => { setRequete(ev.target.value); setMessage(""); }} placeholder="Rechercher…" aria-label="Rechercher" style={champ} />
       <input ref={remplRef} value={remplacement} onFocus={() => { dernierChamp.current = "rempl"; }} onChange={(ev) => setRemplacement(ev.target.value)} placeholder="Remplacer par…" aria-label="Remplacer par" disabled={lectureSeule} style={champ} />
       {jetonsNonPris(requete).length > 0 && <div role="status" style={{ fontSize: 11.5, color: "#8a5a00", background: "#FFF6E0", borderRadius: 6, padding: "4px 8px" }}>Pas encore pris en charge : {jetonsNonPris(requete).join(", ")}. Ces codes sont cherchés tels quels.</div>}
@@ -186,8 +230,49 @@ export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lec
           )}
         </div>
       )}
+      </>)}
 
-      {portee === "chapitre" ? (
+      {portee === "atteindre" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 12, color: "#555" }}>Aller à
+            <select value={cible} onChange={(ev) => { setCible(ev.target.value); setMessage(""); setSaisieCible(""); }} style={{ ...champ, marginTop: 4 }} aria-label="Type de destination">
+              <option value="titre">Un chapitre ou une partie</option>
+              <option value="intertitre">Un intertitre de ce chapitre</option>
+              <option value="ligne">Une ligne (numéros de la marge)</option>
+              <option value="paragraphe">Un paragraphe</option>
+              <option value="page">Une page (estimée)</option>
+              <option value="note">Une note de bas de page</option>
+              <option value="image">Une image</option>
+            </select>
+          </label>
+          {cible === "titre" && (
+            <select value={choixNoeud} onChange={(ev) => setChoixNoeud(ev.target.value)} style={champ} aria-label="Chapitre ou partie">
+              <option value="">— choisir —</option>
+              {listeNoeuds().map((n) => <option key={n.id} value={n.id}>{"\u00A0\u00A0".repeat(n.profondeur || 0)}{n.titre || "(sans titre)"}</option>)}
+            </select>
+          )}
+          {cible === "intertitre" && (() => {
+            const liste = editor ? ciblesDe(editor, "intertitre") : [];
+            return liste.length ? (
+              <select value={choixIntertitre} onChange={(ev) => setChoixIntertitre(ev.target.value)} style={champ} aria-label="Intertitre">
+                {liste.map((c, i) => <option key={i} value={i}>{"\u00A0\u00A0".repeat(Math.max(0, (c.niveau || 1) - 1))}{c.libelle || "(vide)"}</option>)}
+              </select>
+            ) : <div style={{ fontSize: 12, color: "#777" }}>Aucun intertitre (titre de niveau 1 à 6) dans ce chapitre.</div>;
+          })()}
+          {!["titre", "intertitre"].includes(cible) && (
+            <input value={saisieCible} onChange={(ev) => setSaisieCible(ev.target.value)} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); aller(); } }} inputMode="text" aria-label="Numéro"
+              placeholder={cible === "ligne" ? `Numéro de ligne (1 à ${nbLignes || "…"}) ou +3 / −2` : cible === "page" ? "Numéro de page (estimée)" : "Numéro, ou +1 / −1 depuis le curseur"} style={champ} />
+          )}
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <button type="button" style={{ ...bouton(), background: couleur, color: "#fff" }} onClick={aller}>Atteindre</button>
+            {["ligne", "paragraphe", "note", "image"].includes(cible) && <>
+              <button type="button" style={bouton()} onClick={() => { setSaisieCible("-1"); setTimeout(() => { const r = cible === "ligne" ? onAtteindreLigne?.("-1") : atteindreCible(editor, cible, "-1"); setMessage(r ? (r.ok ? "" : "⚠ ") + r.message : ""); }, 0); }}>◀ Précédent</button>
+              <button type="button" style={bouton()} onClick={() => { setSaisieCible("+1"); setTimeout(() => { const r = cible === "ligne" ? onAtteindreLigne?.("+1") : atteindreCible(editor, cible, "+1"); setMessage(r ? (r.ok ? "" : "⚠ ") + r.message : ""); }, 0); }}>Suivant ▶</button>
+            </>}
+          </div>
+          <div style={{ fontSize: 11, color: "#888", lineHeight: 1.4 }}>Un nombre précédé de + ou − se compte depuis le curseur (« +3 » = trois plus loin). Les pages sont estimées (≈ 1 800 caractères) : Cursus n'a pas de pagination réelle avant l'export.</div>
+        </div>
+      ) : portee === "chapitre" ? (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <button type="button" style={bouton()} onClick={precedent} disabled={!total} aria-label="Occurrence précédente">◀</button>
