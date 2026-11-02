@@ -12,24 +12,59 @@ import { trouver, remplacerTout, developperRemplacement, NOTE } from "./recherch
 export const cleRecherche = new PluginKey("rechercheDansTexte");
 const SEPARATEUR = "￼";
 
-/** → [{ from, to }] positions dans le document ProseMirror. */
+/** Filtres de mise en forme (03/11/2026) : clé → test sur les marques d'un passage de texte. */
+export const FILTRES_FORMAT = {
+  gras: ["Gras", (m) => m.some((x) => x.type.name === "bold")],
+  italique: ["Italique", (m) => m.some((x) => x.type.name === "italic")],
+  souligne: ["Souligné", (m) => m.some((x) => x.type.name === "underline")],
+  barre: ["Barré", (m) => m.some((x) => x.type.name === "strike")],
+  surligne: ["Surligné", (m) => m.some((x) => x.type.name === "highlight")],
+  couleur: ["Couleur de texte", (m) => m.some((x) => x.type.name === "textStyle" && x.attrs.color)],
+  police: ["Police", (m) => m.some((x) => x.type.name === "textStyle" && x.attrs.fontFamily)],
+  taille: ["Taille", (m) => m.some((x) => x.type.name === "textStyle" && x.attrs.fontSize)],
+  indice: ["Indice", (m) => m.some((x) => x.type.name === "subscript")],
+  exposant: ["Exposant", (m) => m.some((x) => x.type.name === "superscript")],
+};
+export const filtresActifs = (options = {}) => Object.keys(FILTRES_FORMAT).filter((k) => options.format?.[k]);
+
+/** → [{ from, to }] positions dans le document ProseMirror.
+ *  Avec des filtres de mise en forme : seuls comptent les passages dont TOUS les caractères portent TOUTES les mises en forme demandées ;
+ *  sans texte cherché, chaque suite continue de tels caractères est une occurrence. */
 export function occurrencesDansDoc(doc, requete, options = {}) {
   const res = [];
-  if (!requete) return res;
+  const filtres = filtresActifs(options).map((k) => FILTRES_FORMAT[k][1]);
+  if (!requete && !filtres.length) return res;
   doc.descendants((noeud, pos) => {
     if (!noeud.isTextblock) return true;
-    let texte = ""; const positions = [];
+    let texte = ""; const positions = []; const formes = [];
     noeud.forEach((enfant, decalage) => {
       const debut = pos + 1 + decalage;
-      if (enfant.isText) { for (let i = 0; i < enfant.text.length; i++) positions.push(debut + i); texte += enfant.text; }
+      if (enfant.isText) {
+        const ok = filtres.every((f) => f(enfant.marks));
+        for (let i = 0; i < enfant.text.length; i++) { positions.push(debut + i); formes.push(ok); }
+        texte += enfant.text;
+      }
       else {
         // Texte « à plat » (jetons « ^t », « ^l », « ^f », « ^g » de rechercheTexte.js) : tabulation → \t, saut de ligne → \n, note → NOTE, autre → séparateur.
-        positions.push(debut); texte += (enfant.type.name === "hardBreak" ? "\n" : enfant.type.name === "tabulation" ? "\t" : enfant.type.name === "note" ? NOTE : SEPARATEUR);
+        positions.push(debut); formes.push(!filtres.length); texte += (enfant.type.name === "hardBreak" ? "\n" : enfant.type.name === "tabulation" ? "\t" : enfant.type.name === "note" ? NOTE : SEPARATEUR);
         // Note de bas de page : son texte vit dans l'attribut `texte` ; une note = une occurrence (tous ses « chat » remplacés d'un coup)
-        if (enfant.type.name === "note" && trouver(enfant.attrs.texte || "", requete, options).length) res.push({ from: debut, to: debut + enfant.nodeSize, note: true });
+        if (!filtres.length && requete && enfant.type.name === "note" && trouver(enfant.attrs.texte || "", requete, options).length) res.push({ from: debut, to: debut + enfant.nodeSize, note: true });
       }
     });
-    for (const o of trouver(texte, requete, options)) res.push({ from: positions[o.debut], to: positions[o.fin - 1] + 1 });
+    if (!requete) {
+      // Mise en forme seule : suites continues de caractères conformes (une note / tabulation / image les interrompt)
+      let i = 0;
+      while (i < texte.length) {
+        if (!formes[i]) { i++; continue; }
+        let j = i; while (j < texte.length && formes[j] && positions[j] === positions[i] + (j - i)) j++;
+        res.push({ from: positions[i], to: positions[j - 1] + 1 }); i = j;
+      }
+      return false;
+    }
+    for (const o of trouver(texte, requete, options)) {
+      if (filtres.length && !formes.slice(o.debut, o.fin).every(Boolean)) continue;
+      res.push({ from: positions[o.debut], to: positions[o.fin - 1] + 1 });
+    }
     return false;
   });
   return res.sort((a, b) => a.from - b.from);
