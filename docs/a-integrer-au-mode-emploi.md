@@ -100,3 +100,6 @@ Dans le fil de discussion du Co-pilote (toutes les cartes, « Aide-moi à avance
 
 ## Rechercher : un clic sur un résultat amène au passage (03/11/2026)
 Corrigé : cliquer un résultat de la liste (ou ◀ ▶) fait maintenant défiler le texte jusqu'au passage, même quand le curseur est resté dans le panneau de recherche.
+
+## Co-pilote : plus de résultat perdu en quittant le chapitre (03/11/2026)
+Une demande lancée au Co-pilote (onglets Suggestions, Personnages, Références, Cohérence, Vérification, conseils de recomposition, « Aide-moi à avancer », page blanche, définition du projet) continue et son résultat est CONSERVÉ même si on change de chapitre ou si on quitte l'éditeur : en revenant sur le chapitre, on retrouve le résultat (ou l'indicateur « en cours » si la réponse n'est pas arrivée). Lancer une analyse dans un onglet n'annule plus celle d'un autre onglet ; seule une nouvelle demande de la même sorte remplace la précédente. Les résultats de l'analyse d'un chapitre ne s'affichent plus chez le chapitre suivant. Les résultats d'analyse et les fils de discussion restent enregistrés avec votre compte ; les conseils de recomposition, « Aide-moi à avancer », la page blanche et la définition du projet sont gardés sur CET appareil (autre appareil : ils n'apparaissent pas). Fermer la page du navigateur PENDANT une réponse l'interrompt, comme avant.
