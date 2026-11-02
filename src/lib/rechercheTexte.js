@@ -58,10 +58,35 @@ function sourceRegex(requete, options) {
   return src;
 }
 
+// ─── « Ignorer les signes de ponctuation » / « Ignorer les espaces » (03/11/2026), comme dans Word ───
+const ESPACE = /[\s\u00A0\u202F]/u;
+const PONCTUATION = /[\p{P}\p{S}]/u;
+const negligeable = (c, options) => c !== NOTE && c !== OBJET && ((options.ignorerEsp && ESPACE.test(c)) || (options.ignorerPonct && PONCTUATION.test(c)));
+
+/** Recherche en ignorant espaces et/ou ponctuation, dans le texte ET dans la requête (ignorée avec des jetons « ^ »).
+ *  Les limites de mot sont contrôlées sur le texte d'origine. Une occurrence commence et finit toujours sur un caractère retenu. */
+function trouverEnIgnorant(texte, q, options) {
+  const t = plier(texte, options); if (t.length !== String(texte).length) return [];
+  const garder = (s) => { let r = ""; const idx = []; for (let i = 0; i < s.length; i++) if (!negligeable(s[i], options)) { r += s[i]; idx.push(i); } return { r, idx }; };
+  const { r: tr, idx } = garder(t);
+  const qp = garder(plier(q, options)).r;
+  if (!qp) return [];
+  const debutOk = (i) => i === 0 || !lettre.test(t[i - 1]);
+  const finOk = (fin) => fin >= t.length || !lettre.test(t[fin]);
+  const res = []; let i = 0;
+  while ((i = tr.indexOf(qp, i)) !== -1) {
+    const debut = idx[i], fin = idx[i + qp.length - 1] + 1;
+    const ok = (!(options.motEntier || options.debutMot) || debutOk(debut)) && (!(options.motEntier || options.finMot) || finOk(fin));
+    if (ok) { res.push({ debut, fin }); i += qp.length; } else i += 1;
+  }
+  return res;
+}
+
 /** → [{ debut, fin }] (indices dans `texte`), occurrences qui ne se chevauchent pas. */
 export function trouver(texte, requete, options = {}) {
   const q = String(requete ?? "");
   if (!q) return [];
+  if ((options.ignorerPonct || options.ignorerEsp) && !contientJeton(q)) return trouverEnIgnorant(texte, q, options);
   const t = plier(texte, options);
   if (t.length !== String(texte).length) return []; // garde-fou : un pliage qui changerait la longueur fausserait les positions
   const res = [];
