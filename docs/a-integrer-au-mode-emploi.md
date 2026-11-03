@@ -122,3 +122,6 @@ Si un chapitre est modifié depuis un autre appareil ou un autre onglet pendant 
 
 ## Le Co-pilote cite les numéros de ligne partout (03/11/2026)
 Quand le Co-pilote analyse le chapitre entier (Suggestions, Personnages, Références, Cohérence, Conseils de recomposition « chapitre entier », Aide-moi à avancer) ou répond dans un échange, il cite maintenant les numéros de ligne de la marge gauche de l'éditeur, avec un court extrait : « (ligne 26) », « (lignes 26-28) ». Pratique pour retrouver et remplacer un passage dans un long texte. Limites : ce sont des lignes d'écran — elles changent si vous modifiez le texte ou redimensionnez la fenêtre (après plusieurs remplacements, relancez ou vérifiez les extraits) ; pas de numéros quand l'analyse porte seulement sur une sélection ou sur le passage surligné, ni sur mobile quand le texte est masqué sous le Co-pilote ; l'onglet Vérification n'en donne pas.
+
+## Co-pilote : le chapitre est précisé quand le passage cité n'est pas dans le chapitre ouvert (03/11/2026)
+Les numéros de ligne cités par le Co-pilote valent pour le chapitre ouvert. Quand il cite un passage d'un autre chapitre (par exemple le chapitre précédent que vous avez joint), il nomme ce chapitre par son titre au lieu de donner un numéro de ligne.
