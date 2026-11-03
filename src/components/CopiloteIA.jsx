@@ -80,7 +80,7 @@ const extraireTexteMarquéAnalyse = (html = "") => {
 
 // Repères de ligne (03/11/2026, demande de Joseph : « quand Copilote se réfère au texte il doit mentionner les numéros de ligne »).
 // Le texte du CHAPITRE est envoyé avec ses numéros de ligne de marge « [L12] » (voir Editeur.jsx, texteNuméroté) et cette note demande de les citer.
-const NOTE_LIGNES = `\n(Chaque ligne du texte commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice. Chaque fois que tu cites ou désignes un passage du texte dans ta réponse — y compris dans les champs JSON (« titre », « texte », « suggestion », « note »…) —, indique son numéro de ligne entre parenthèses, par ex. « (ligne 26) » ou « (lignes 26-28) », avec un court extrait exact entre guillemets. Les repères ne font pas partie du texte : ne les recopie pas dans une réécriture proposée.)`;
+const NOTE_LIGNES = (titre = "") => `\n(Chaque ligne du texte commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice, POUR LE CHAPITRE OUVERT${titre ? ` « ${titre} »` : ""} uniquement. Chaque fois que tu cites ou désignes un passage du texte dans ta réponse — y compris dans les champs JSON (« titre », « texte », « suggestion », « note »…) —, indique son numéro de ligne entre parenthèses, par ex. « (ligne 26) » ou « (lignes 26-28) », avec un court extrait exact entre guillemets. Si le passage vient d'un AUTRE chapitre (par ex. le chapitre précédent joint), indique le TITRE de ce chapitre à la place du numéro de ligne (ces autres textes n'ont pas de repères de ligne). Les repères ne font pas partie du texte : ne les recopie pas dans une réécriture proposée.)`;
 
 const compterMots = (html = "") =>
   html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().split(" ").filter(Boolean).length;
@@ -838,7 +838,7 @@ RÉPONSES COMPLÈTES — l'auteur·ice préfère une réponse complète et déve
 
 PASSAGE MARQUÉ — si le message contient un bloc « PASSAGE MARQUÉ PAR L'AUTEUR·ICE », c'est le passage que l'auteur·ice désigne par « la partie marquée » : travaille directement dessus, sans lui redemander de le préciser. Tant qu'un tel bloc est présent, c'est le POINT D'ATTENTION par défaut de ses questions, même quand il/elle ne le mentionne pas explicitement (« ici », « ce passage », « cette phrase » = le passage marqué), sauf s'il/elle désigne clairement autre chose ; réponds d'abord sur ce passage, puis situe-le dans le chapitre si utile. S'il n'y a PAS ce bloc et qu'il parle d'un passage marqué, dis-lui que tu ne vois aucun marquage gris dans le chapitre (il se pose avec le bouton loupe de l'éditeur) plutôt que de deviner.
 
-NUMÉROS DE LIGNE — quand le texte actuel est fourni avec des repères [L12], ce sont les numéros de ligne que l'auteur·ice voit dans la marge gauche de son éditeur. Quand tu renvoies à un passage, cite son numéro (« ligne 26 », « lignes 26-28 ») ET un court extrait entre guillemets, recopié mot pour mot ; quand l'auteur·ice parle de « la ligne 26 », c'est le repère [L26]. Ne dis jamais que tu ne vois pas les numéros de ligne si les repères sont présents. S'il n'y a aucun repère, dis-le simplement et cite l'extrait. Les repères ne font pas partie du texte : ne les recopie pas dans une proposition de réécriture. Les lignes dépendent de la largeur de la fenêtre : un numéro peut changer si l'auteur·ice redimensionne ou modifie le texte.
+NUMÉROS DE LIGNE — quand le texte actuel est fourni avec des repères [L12], ce sont les numéros de ligne que l'auteur·ice voit dans la marge gauche de son éditeur. Quand tu renvoies à un passage, cite son numéro (« ligne 26 », « lignes 26-28 ») ET un court extrait entre guillemets, recopié mot pour mot ; quand l'auteur·ice parle de « la ligne 26 », c'est le repère [L26]. Ne dis jamais que tu ne vois pas les numéros de ligne si les repères sont présents. S'il n'y a aucun repère, dis-le simplement et cite l'extrait. Les repères ne font pas partie du texte : ne les recopie pas dans une proposition de réécriture. Les repères ne valent QUE pour le chapitre ouvert : quand tu cites un passage d'un AUTRE chapitre (le chapitre précédent joint, ou tout autre texte que l'auteur·ice t'a fourni), nomme ce chapitre par son TITRE (le plan du livre te donne les titres) et n'invente aucun numéro de ligne pour lui. Un numéro peut changer si l'auteur·ice ajoute ou supprime des lignes avant le passage.
 
 CE QUE TU CONNAIS DU LIVRE — tu ne connais que : le texte du chapitre ouvert, le plan du livre (titres uniquement, quand il est fourni dans le contexte du projet) et, SEULEMENT si l'auteur·ice l'a joint explicitement, le texte du chapitre précédent. Tu ne connais JAMAIS le contenu des autres chapitres : ne le devine pas, ne l'invente pas, ne le résume pas d'après leur titre. Si une demande exige ce contenu (introduction qui reprend les chapitres précédents, rappel, continuité), dis précisément ce qu'il te manque et propose à l'auteur·ice de te le fournir (joindre le chapitre précédent, ou te donner quelques lignes de résumé) ; tu peux proposer une introduction qui s'appuie sur les titres du plan ou sur le chapitre joint, en le disant clairement.
 
@@ -1844,7 +1844,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       let texteNuméroté = null;
       try { texteNuméroté = lecteurLignes?.current?.() || null; } catch { texteNuméroté = null; }
       const contexteTexteActuel = texteActuel.trim()
-        ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version)${texteNuméroté ? ". Chaque ligne commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice (lignes d'écran : elles dépendent de la largeur de la fenêtre)" : ""} :\n"""\n${texteNuméroté || texteActuel}\n"""`
+        ? `\n\nTexte actuel du ${typeNœud}, tel qu'il est maintenant (peut avoir été modifié depuis l'analyse initiale ci-dessus — si l'auteur·ice évoque un changement, appuie-toi sur CETTE version)${texteNuméroté ? ". Chaque ligne commence par son repère [L12] = le numéro de ligne affiché dans la marge de l'éditeur de l'auteur·ice pour CE chapitre (« ${titreNœud || typeNœud} »)" : ""} :\n"""\n${texteNuméroté || texteActuel}\n"""`
         : "";
       // CORRECTIF 24/09/2026 — signalé en usage réel : le fil de dialogue
       // (toutes cartes confondues, pas seulement "Aide-moi à avancer") ne
@@ -1905,7 +1905,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         [cléCarte]: { ...d[cléCarte], enCours: false, erreur: messageErreur(err) },
       }));
     }
-  }, [dialogues, langueProjet, messageErreur, texteActif, lecteurLignes, typeNœud, nœudId, contexteADNEtPlan]);
+  }, [titreNœud, dialogues, langueProjet, messageErreur, texteActif, lecteurLignes, typeNœud, nœudId, contexteADNEtPlan]);
 
   // "💾 Mémoriser cette intention" — réf. 60816-01, suite, 30/08/2026, voir
   // le commentaire sur notesProjet/contexteADN plus haut. Distille le
@@ -2114,7 +2114,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     try {
       const surligné = portée === "surligne";
       const numérotéRecompo = surligné ? null : lireTexteNuméroté();
-      const noteLignesRecompo = numérotéRecompo ? NOTE_LIGNES : "";
+      const noteLignesRecompo = numérotéRecompo ? NOTE_LIGNES(titreNœud) : "";
       const { texte } = surligné ? { texte: extraireTexteMarquéAnalyse(texteActif).texte } : { texte: numérotéRecompo || extraireTexte(texteActif).texte };
       if (surligné ? compterMots(texte) < 5 : compterMots(texteActif) < 20) {
         throw new Error(surligné ? "Aucun passage surligné (ou passage trop court) : marquez d'abord le passage avec le surlignage « à analyser » (loupe de l'éditeur)." : t("erreur.motsInsuffisants"));
@@ -2169,7 +2169,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       marquerFin(nœudId, "recomposition");
       if (nœudIdRef.current === nœudId) { setRecompositionChargement(false); setRecompositionProgression(null); }
     }
-  }, [nœudId, texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
+  }, [titreNœud, nœudId, texteActif, typeProjet, langueProjet, contexteADN, t, messageErreur]);
 
   // Texte du chapitre avec ses numéros de ligne (null si l'éditeur est masqué / non mesurable : texte simple).
   const lireTexteNuméroté = () => { try { return lecteurLignes?.current?.() || null; } catch { return null; } };
@@ -2180,7 +2180,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     // Chapitre entier analysé : on envoie la version avec numéros de ligne (jamais pour « vérification », qui compare des citations au texte brut côté serveur).
     const numérotéAnalyse = sourceAnalyse === "chapitre" && ongletCible !== "vérification" ? lireTexteNuméroté() : null;
     const texteEnvoyé = numérotéAnalyse || texte;
-    const noteLignes = numérotéAnalyse ? NOTE_LIGNES : "";
+    const noteLignes = numérotéAnalyse ? NOTE_LIGNES(titreNœud) : "";
     if (compterMots(sourceTexte) < 20) {
       setErreur(e => ({ ...e, [ongletCible]: t("erreur.motsInsuffisants") }));
       return;
@@ -2291,7 +2291,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       marquerFin(nœudId, ongletCible);
       if (nœudIdRef.current === nœudId) setChargement(c => ({ ...c, [ongletCible]: false }));
     }
-  }, [obtenirSourceHTML, sourceAnalyse, lecteurLignes, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
+  }, [titreNœud, obtenirSourceHTML, sourceAnalyse, lecteurLignes, texteActif, typeProjet, projetTitre, langueProjet, contexteADN, t, messageErreur, projetId, nœudId, màjDonnées]);
 
   // Aide au démarrage — ne dépend d'aucun texte de l'éditeur, uniquement du
   // contexte ADN et du titre du chapitre en cours. Ajoutée le 18/07/2026.
@@ -2496,7 +2496,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         : "";
       const résultat = await appelClaude(
         systemAvecLangue(PROMPTS.jeSuisBloqué(typeNœud, titreNœud, complémentAuteur, typeProjet), langueProjet, contexteADNEtPlan),
-        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :${numérotéBlocage ? NOTE_LIGNES : ""}\n\n${numérotéBlocage || texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage + blocMarquéBlocage,
+        (texte.trim() ? `Texte déjà écrit dans ce ${typeNœud} :${numérotéBlocage ? NOTE_LIGNES(titreNœud) : ""}\n\n${numérotéBlocage || texte}` : `Ce ${typeNœud} ("${titreNœud || "(sans titre)"}") est encore vide — aucun texte écrit pour l'instant.`) + noteImagesBlocage + blocMarquéBlocage,
         sig, 1024, null, false, imagesBlocage
       );
       const p = parserJSON(résultat);
@@ -2515,7 +2515,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
       marquerFin(nœudId, "blocage");
       if (nœudIdRef.current === nœudId) setChargementBlocage(false);
     }
-  }, [nœudId, historiqueBlocage, sourceAnalyse, obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
+  }, [titreNœud, nœudId, historiqueBlocage, sourceAnalyse, obtenirSourceHTML, texteActif, typeNœud, titreNœud, typeProjet, langueProjet, contexteADNEtPlan, messageErreur, diagnosticBlocage]);
 
   const confirmerBlocage = useCallback(() => setConfirmationBlocage(true), []);
   const rejeterBlocage = useCallback(() => setConfirmationBlocage(false), []);
