@@ -125,3 +125,6 @@ Quand le Co-pilote analyse le chapitre entier (Suggestions, Personnages, Référ
 
 ## Co-pilote : le chapitre est précisé quand le passage cité n'est pas dans le chapitre ouvert (03/11/2026)
 Les numéros de ligne cités par le Co-pilote valent pour le chapitre ouvert. Quand il cite un passage d'un autre chapitre (par exemple le chapitre précédent que vous avez joint), il nomme ce chapitre par son titre au lieu de donner un numéro de ligne.
+
+## Confirmation de l'adresse e-mail à l'inscription (05/11/2026)
+Après « Créer le compte », un e-mail de confirmation est envoyé : cliquez sur le lien (vérifiez les courriers indésirables). Si le lien ne s'ouvre pas, copiez-le dans la barre d'adresse de votre navigateur, ou revenez sur cursus.pro et connectez-vous (votre compte est peut-être déjà confirmé). Si le lien a expiré ou a déjà été utilisé, la page de connexion l'explique et propose « Renvoyer l'e-mail de confirmation ».

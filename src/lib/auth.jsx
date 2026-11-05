@@ -73,6 +73,29 @@ export function PageConnexion() {
   // null = formulaire de connexion normal.
   const [pageLégale, setPageLégale] = useState(null);
 
+  // Retour d'un lien de confirmation qui a échoué (05/11/2026, cas d'une utilisatrice dont le lien « ne s'ouvrait pas ») : Supabase renvoie vers
+  // l'adresse du site avec #error=…&error_code=otp_expired dans l'URL (lien déjà utilisé — certains logiciels de messagerie « ouvrent » le lien
+  // avant la personne —, expiré, ou redirection non autorisée). On l'explique au lieu d'afficher une page de connexion muette.
+  useEffect(() => {
+    try {
+      const h = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+      const code = h.get("error_code") || "";
+      if (!code && !h.get("error")) return;
+      setErreur(code === "otp_expired"
+        ? "Le lien de confirmation a expiré ou a déjà été utilisé. Si vous avez déjà cliqué dessus, votre compte est peut-être confirmé : essayez de vous connecter. Sinon, saisissez votre adresse et utilisez « Renvoyer l'e-mail de confirmation »."
+        : (h.get("error_description") || "Le lien de confirmation n'a pas pu être validé.").replace(/\+/g, " "));
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    } catch (_e) { /* sans conséquence */ }
+  }, []);
+
+  const renvoyerConfirmation = async () => {
+    if (!email) { setErreur("Saisissez d'abord votre adresse e-mail."); return; }
+    setChargement(true); setErreur(null); setMessage(null);
+    const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
+    if (error) setErreur(error.message); else setMessage("E-mail de confirmation renvoyé : ouvrez le lien dans le navigateur de votre ordinateur ou de votre téléphone (pas dans l'aperçu de la messagerie).");
+    setChargement(false);
+  };
+
   const soumettre = async () => {
     if (!email || !motDePasse) return;
     setChargement(true);
@@ -83,8 +106,9 @@ export function PageConnexion() {
     if (mode === "connexion") {
       ({ error } = await supabase.auth.signInWithPassword({ email, password: motDePasse }));
     } else {
-      ({ error } = await supabase.auth.signUp({ email, password: motDePasse }));
-      if (!error) setMessage("Compte créé ! Vérifiez votre email pour confirmer.");
+      // emailRedirectTo : sans lui, le lien de l'e-mail renvoie vers l'« URL du site » réglée dans Supabase (qui peut être une autre adresse).
+      ({ error } = await supabase.auth.signUp({ email, password: motDePasse, options: { emailRedirectTo: window.location.origin } }));
+      if (!error) setMessage("Compte créé ! Vérifiez votre e-mail et cliquez sur le lien de confirmation (pensez aux courriers indésirables). Si le lien ne s'ouvre pas, copiez-le dans la barre d'adresse de votre navigateur, ou revenez ici et connectez-vous.");
     }
 
     if (error) {
@@ -260,6 +284,10 @@ export function PageConnexion() {
               fontFamily: "inherit", marginTop: 4,
             }}>
             {chargement ? "…" : mode === "connexion" ? "Se connecter" : "Créer le compte"}
+          </button>
+          <button type="button" onClick={renvoyerConfirmation} disabled={chargement || !email}
+            style={{ background: "none", border: "none", color: "#7F77DD", fontSize: 12, cursor: email ? "pointer" : "default", textDecoration: "underline", fontFamily: "inherit", padding: 0 }}>
+            Renvoyer l'e-mail de confirmation
           </button>
         </div>
 

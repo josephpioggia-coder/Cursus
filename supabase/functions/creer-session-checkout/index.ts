@@ -238,6 +238,7 @@ Deno.serve(async (req) => {
     // la garantie finale reste consommer_code_promo() côté webhook.
     let discounts;
     let codePromoId;
+    let remise100 = false; // code à 100 % : aucune carte à demander (cadeau, 05/11/2026)
     if (codePromo) {
       const { data: ligne, error: erreurLecture } = await supabase
         .from("codes_promo")
@@ -313,6 +314,7 @@ Deno.serve(async (req) => {
       });
       discounts = [{ coupon: coupon.id }];
       codePromoId = ligne.id;
+      remise100 = ligne.remise_pourcent === 100;
     }
 
     // CORRECTIF 17/10/2026 (point "mise en place du paiement" de l'audit
@@ -348,6 +350,9 @@ Deno.serve(async (req) => {
           : { price: priceId, quantity: 1 },
       ],
       ...(discounts ? { discounts } : {}),
+      // Code cadeau à 100 % sur un ABONNEMENT : par défaut Stripe Checkout demande quand même une carte (et en mode TEST refuse une vraie carte).
+      // « if_required » : aucune carte demandée tant que le montant dû est nul. (À l'échéance de la remise, l'abonnement demandera un moyen de paiement.)
+      ...(remise100 && modeCheckout === "subscription" ? { payment_method_collection: "if_required" } : {}),
       metadata: {
         ...(codePromoId ? { code_promo_id: codePromoId } : {}),
         ...(auditId ? { type: "cursaudit", audit_id: auditId } : {}),
