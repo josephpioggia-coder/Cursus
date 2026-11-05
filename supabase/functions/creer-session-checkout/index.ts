@@ -240,11 +240,12 @@ Deno.serve(async (req) => {
     let codePromoId;
     let remise100 = false; // code à 100 % : aucune carte à demander (cadeau, 05/11/2026)
     if (codePromo) {
-      const { data: ligne, error: erreurLecture } = await supabase
-        .from("codes_promo")
-        .select("*")
-        .eq("code", codePromo.trim().toUpperCase())
-        .maybeSingle();
+      // Comparaison TOLÉRANTE (05/11/2026) : un code comme « ANNIELALÉ-100%-SMDD » (accent, %) est facilement retapé « ANNIELALE-100%-SMDD » ou
+      // collé avec un É décomposé (clavier iPhone / Mac) → « introuvable ». On compare sans accents, sans espaces, en majuscules.
+      const normaliser = (t: string) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "").toUpperCase();
+      const voulu = normaliser(codePromo);
+      const { data: tousLesCodes, error: erreurLecture } = await supabase.from("codes_promo").select("*");
+      const ligne = (tousLesCodes || []).find((c: { code: string }) => normaliser(c.code) === voulu) || null;
 
       if (erreurLecture || !ligne) {
         return new Response(JSON.stringify({ error: "Code promo introuvable." }), {
