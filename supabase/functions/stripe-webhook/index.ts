@@ -145,9 +145,17 @@ Deno.serve(async (req) => {
       const priceId = subscription.items.data[0]?.price.id;
       const palier = PALIERS[priceId] || "Inconnu";
 
-      // Trouve l'utilisateur Supabase par email
-      const { data: users } = await supabase.auth.admin.listUsers();
-      const user = users?.users?.find((u) => u.email === email);
+      // Trouve l'utilisateur Supabase : d'abord par l'identifiant du compte transmis à la création de la session
+      // (client_reference_id, posé par creer-session-checkout depuis le 06/11/2026), sinon par l'adresse e-mail (anciennes sessions).
+      let user = null;
+      if (session.client_reference_id) {
+        const { data: parId } = await supabase.auth.admin.getUserById(session.client_reference_id);
+        user = parId?.user ?? null;
+      }
+      if (!user) {
+        const { data: users } = await supabase.auth.admin.listUsers();
+        user = users?.users?.find((u) => u.email === email) ?? null;
+      }
 
       if (!user) {
         console.error("Utilisateur introuvable pour l'email :", email);

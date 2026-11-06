@@ -351,6 +351,10 @@ Deno.serve(async (req) => {
           : { price: priceId, quantity: 1 },
       ],
       ...(discounts ? { discounts } : {}),
+      // 06/11/2026 — l'adresse de la page de paiement est VERROUILLÉE sur celle du compte connecté et l'identifiant du compte est
+      // transmis au webhook : avant, rien n'empêchait (ni Stripe Link qui préremplit une autre adresse) de payer avec une adresse
+      // différente, et l'abonnement partait sur un autre compte (ou nulle part, « Utilisateur introuvable »).
+      ...(utilisateurAppelant?.email ? { customer_email: utilisateurAppelant.email, client_reference_id: utilisateurAppelant.id } : {}),
       // Code cadeau à 100 % sur un ABONNEMENT : par défaut Stripe Checkout demande quand même une carte (et en mode TEST refuse une vraie carte).
       // « if_required » : aucune carte demandée tant que le montant dû est nul. (À l'échéance de la remise, l'abonnement demandera un moyen de paiement.)
       ...(remise100 && modeCheckout === "subscription" ? { payment_method_collection: "if_required" } : {}),

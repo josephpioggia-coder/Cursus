@@ -131,3 +131,4 @@ Après « Créer le compte », un e-mail de confirmation est envoyé : cliquez s
 
 ### Entrer dans CursEdit : abonnement ou code (06/11/2026)
 - **Accès à CursEdit** — *après connexion, espace CursEdit* — sans abonnement actif, une page « Active ton accès à CursEdit » s'affiche à la place de l'éditeur. Choisir une formule ; un **code promotionnel / code cadeau** se saisit dans la case « Code promotionnel » **avant** de cliquer sur « Choisir » (montant 0 € si le code est à 100 %). L'écran se met à jour tout seul après le paiement. Abonnement annulé depuis moins de 3 mois : lecture seule ; plus de 3 mois : cette page.
+- **Paiement et adresse e-mail** (06/11/2026) — sur la page de paiement, l'adresse est celle du compte connecté et ne peut pas être modifiée : l'abonnement (ou le code) est toujours activé sur le compte avec lequel on s'est connecté·e.
