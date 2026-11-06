@@ -53,6 +53,19 @@ export function useAuth() {
 // chargement de la page. Un seul champ mémorisé, jamais le mot de passe.
 const CLÉ_DERNIER_EMAIL = "cursus_dernier_email";
 
+/** Messages d'erreur de Supabase Auth (en anglais) → français clair, avec la conduite à tenir. Texte inconnu : renvoyé tel quel. */
+function traduireErreurAuth(brut) {
+  const t = String(brut || "");
+  if (/email not confirmed/i.test(t)) return "Cette adresse n'est pas encore confirmée : ouvrez le lien reçu par e-mail à l'inscription, ou utilisez « Renvoyer l'e-mail de confirmation » ci-dessous.";
+  if (/invalid login credentials/i.test(t)) return "Adresse ou mot de passe incorrect. (Si vous venez de créer le compte, confirmez d'abord votre adresse par le lien reçu par e-mail.)";
+  const attente = t.match(/after (\d+) seconds?/i);
+  if (/for security purposes/i.test(t) && attente) return `Pour des raisons de sécurité, patientez ${attente[1]} secondes avant de réessayer.`;
+  if (/rate limit|too many requests|over_email_send_rate_limit/i.test(t)) return "Trop de demandes d'e-mail en peu de temps : patientez un moment (parfois une heure) avant de réessayer.";
+  if (/user already registered/i.test(t)) return "Cette adresse a déjà un compte : connectez-vous.";
+  if (/password should be at least/i.test(t)) return "Le mot de passe est trop court.";
+  return t;
+}
+
 export function PageConnexion() {
   const [email, setEmail]       = useState(() => {
     try {
@@ -72,6 +85,9 @@ export function PageConnexion() {
   // consultables par n'importe qui, pas seulement un compte existant).
   // null = formulaire de connexion normal.
   const [pageLégale, setPageLégale] = useState(null);
+  // Le lien « Renvoyer l'e-mail de confirmation » n'a de sens que dans deux cas : compte tout juste créé, ou connexion refusée parce que
+  // l'adresse n'est pas confirmée (06/11/2026 : affiché en permanence, il invitait à regarder ses e-mails alors que rien n'était à confirmer).
+  const [peutRenvoyer, setPeutRenvoyer] = useState(false);
 
   // Retour d'un lien de confirmation qui a échoué (05/11/2026, cas d'une utilisatrice dont le lien « ne s'ouvrait pas ») : Supabase renvoie vers
   // l'adresse du site avec #error=…&error_code=otp_expired dans l'URL (lien déjà utilisé — certains logiciels de messagerie « ouvrent » le lien
@@ -81,6 +97,7 @@ export function PageConnexion() {
       const h = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
       const code = h.get("error_code") || "";
       if (!code && !h.get("error")) return;
+      setPeutRenvoyer(true);
       setErreur(code === "otp_expired"
         ? "Le lien de confirmation a expiré ou a déjà été utilisé. Si vous avez déjà cliqué dessus, votre compte est peut-être confirmé : essayez de vous connecter. Sinon, saisissez votre adresse et utilisez « Renvoyer l'e-mail de confirmation »."
         : (h.get("error_description") || "Le lien de confirmation n'a pas pu être validé.").replace(/\+/g, " "));
@@ -92,7 +109,7 @@ export function PageConnexion() {
     if (!email) { setErreur("Saisissez d'abord votre adresse e-mail."); return; }
     setChargement(true); setErreur(null); setMessage(null);
     const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: window.location.origin } });
-    if (error) setErreur(error.message); else setMessage("E-mail de confirmation renvoyé : ouvrez le lien dans le navigateur de votre ordinateur ou de votre téléphone (pas dans l'aperçu de la messagerie).");
+    if (error) setErreur(traduireErreurAuth(error.message)); else setMessage("Demande envoyée. Si cette adresse attend encore sa confirmation, un e-mail vient d'être renvoyé : ouvrez son lien dans le navigateur (pas dans l'aperçu de la messagerie). Si rien n'arrive, c'est que l'adresse est déjà confirmée : connectez-vous.");
     setChargement(false);
   };
 
@@ -107,12 +124,26 @@ export function PageConnexion() {
       ({ error } = await supabase.auth.signInWithPassword({ email, password: motDePasse }));
     } else {
       // emailRedirectTo : sans lui, le lien de l'e-mail renvoie vers l'« URL du site » réglée dans Supabase (qui peut être une autre adresse).
-      ({ error } = await supabase.auth.signUp({ email, password: motDePasse, options: { emailRedirectTo: window.location.origin } }));
-      if (!error) setMessage("Compte créé ! Vérifiez votre e-mail et cliquez sur le lien de confirmation (pensez aux courriers indésirables). Si le lien ne s'ouvre pas, copiez-le dans la barre d'adresse de votre navigateur, ou revenez ici et connectez-vous.");
+      let data;
+      ({ data, error } = await supabase.auth.signUp({ email, password: motDePasse, options: { emailRedirectTo: window.location.origin } }));
+      if (!error) {
+        // Adresse DÉJÀ inscrite et confirmée : Supabase ne renvoie aucune erreur (pour ne pas révéler quels comptes existent) mais un utilisateur
+        // sans identité, et n'envoie AUCUN e-mail. Dire « Compte créé, vérifiez votre e-mail » serait faux.
+        if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+          setMode("connexion");
+          setMessage("Cette adresse a déjà un compte. Aucun e-mail n'a été envoyé : connectez-vous avec votre mot de passe.");
+          setChargement(false);
+          return;
+        }
+        setPeutRenvoyer(true);
+        setMessage("Compte créé ! Un e-mail de confirmation vient de vous être envoyé : cliquez sur son lien (pensez aux courriers indésirables). Si le lien ne s'ouvre pas, copiez-le dans la barre d'adresse du navigateur, puis connectez-vous.");
+      }
     }
 
     if (error) {
-      setErreur(error.message);
+      const brut = String(error.message || "");
+      if (/email not confirmed/i.test(brut)) setPeutRenvoyer(true);
+      setErreur(traduireErreurAuth(brut));
     } else {
       try { localStorage.setItem(CLÉ_DERNIER_EMAIL, email); } catch (_e) { /* stockage indisponible, sans conséquence */ }
     }
@@ -285,10 +316,12 @@ export function PageConnexion() {
             }}>
             {chargement ? "…" : mode === "connexion" ? "Se connecter" : "Créer le compte"}
           </button>
-          <button type="button" onClick={renvoyerConfirmation} disabled={chargement || !email}
-            style={{ background: "none", border: "none", color: "#7F77DD", fontSize: 12, cursor: email ? "pointer" : "default", textDecoration: "underline", fontFamily: "inherit", padding: 0 }}>
-            Renvoyer l'e-mail de confirmation
-          </button>
+          {peutRenvoyer && (
+            <button type="button" onClick={renvoyerConfirmation} disabled={chargement || !email}
+              style={{ background: "none", border: "none", color: "#7F77DD", fontSize: 12, cursor: email ? "pointer" : "default", textDecoration: "underline", fontFamily: "inherit", padding: 0 }}>
+              Renvoyer l'e-mail de confirmation
+            </button>
+          )}
         </div>
 
         <p style={{ fontSize: 11, color: "#bbb", textAlign: "center", marginTop: 24, lineHeight: 1.6 }}>
