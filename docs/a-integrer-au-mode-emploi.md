@@ -128,3 +128,6 @@ Les numéros de ligne cités par le Co-pilote valent pour le chapitre ouvert. Qu
 
 ## Confirmation de l'adresse e-mail à l'inscription (05/11/2026)
 Après « Créer le compte », un e-mail de confirmation est envoyé : cliquez sur le lien (vérifiez les courriers indésirables). Si le lien ne s'ouvre pas, copiez-le dans la barre d'adresse de votre navigateur, ou revenez sur cursus.pro et connectez-vous (votre compte est peut-être déjà confirmé). Si le lien a expiré ou a déjà été utilisé, la page de connexion l'explique et propose « Renvoyer l'e-mail de confirmation ».
+
+### Entrer dans CursEdit : abonnement ou code (06/11/2026)
+- **Accès à CursEdit** — *après connexion, espace CursEdit* — sans abonnement actif, une page « Active ton accès à CursEdit » s'affiche à la place de l'éditeur. Choisir une formule ; un **code promotionnel / code cadeau** se saisit dans la case « Code promotionnel » **avant** de cliquer sur « Choisir » (montant 0 € si le code est à 100 %). L'écran se met à jour tout seul après le paiement. Abonnement annulé depuis moins de 3 mois : lecture seule ; plus de 3 mois : cette page.
