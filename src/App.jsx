@@ -54,6 +54,7 @@ import Supervision from "./components/Supervision.jsx";
 import JournalErreurs from "./components/JournalErreurs.jsx";
 import UsageVoix from "./components/UsageVoix.jsx";
 import EcranChoixEspace from "./components/EcranChoixEspace.jsx";
+import PorteAbonnement from "./components/PorteAbonnement.jsx";
 import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import { estComplet as estCompletQuestionnaire } from "./lib/questionnaireDemarrage.js";
 import AideFAQ from "./components/AideFAQ.jsx";
@@ -1780,7 +1781,16 @@ export default function App() {
   // pour afficher un tarif.
   if (!espace) return <EcranChoixEspace onChoisir={choisirEspace} onDéconnecter={déconnecter} />;
 
-  return <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} />;
+  const appli = <AppConnectée user={user} déconnecter={déconnecter} espaceActif={espace} onChangerEspace={changerEspace} />;
+  // 06/11/2026 — CursEdit n'est ouvert qu'avec un abonnement actif ou un code promotionnel (PorteAbonnement).
+  if (espace === "cursedit") {
+    return (
+      <PorteAbonnement estAdmin={user.email === "joseph.pioggia@gmail.com"} onChangerEspace={changerEspace} onDéconnecter={déconnecter}>
+        {appli}
+      </PorteAbonnement>
+    );
+  }
+  return appli;
 }
 
 // ─── Composant : App connectée (après auth) ───────────────────────────────────
