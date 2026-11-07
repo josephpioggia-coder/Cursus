@@ -51,6 +51,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { auditsAPI, misEnPageAPI } from "../lib/api.js";
+import { useAuth } from "../lib/auth.jsx";
 import { demarrerCheckoutAudit } from "../lib/contenuPaliers.js";
 import { segmenterTexte, analyserStructureDocx, regrouperParNiveaux, diagnostiquerQualitéImport } from "../lib/segmenterCursAudit.js";
 import { calculerPrixCursAudit, estimerDuréeCursAudit, calculerPrixPreauditPourcentage, estimerDuréeAppelGlobal, PRIX_MISE_EN_PAGE } from "../lib/tarifCursAudit.js";
@@ -326,6 +327,19 @@ export default function CursAudit({ onVoirAudits } = {}) {
       ? "structuration_seule"
       : null;
 
+  // 07/11/2026 — le compte propriétaire peut passer outre le blocage « mise en page » (son propre manuscrit, essais) : case à cocher
+  // visible de lui seul. Pour les clients, la mise en page reste un service à résoudre ou à commander.
+  const { user: utilisateurAuth } = useAuth();
+  const estPropriétaire = utilisateurAuth?.email === "joseph.pioggia@gmail.com";
+  const [passerOutreMiseEnPage, setPasserOutreMiseEnPage] = useState(false);
+  const blocageMiseEnPage = !!problèmeMiseEnPage && !(estPropriétaire && passerOutreMiseEnPage);
+  const casePasserOutre = (problèmeMiseEnPage && estPropriétaire) ? (
+    <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 10, fontSize: 11.5, color: "var(--texte-secondaire)", lineHeight: 1.5, cursor: "pointer" }}>
+      <input type="checkbox" checked={passerOutreMiseEnPage} onChange={(e) => setPasserOutreMiseEnPage(e.target.checked)} style={{ marginTop: 2 }} />
+      <span><strong>Passer outre (compte propriétaire)</strong> — créer l'audit tel quel. Sans titres de chapitre détectés, le pré-audit par chapitre sera moins précis ; une segmentation irrégulière gonfle le nombre d'unités, donc le prix.</span>
+    </label>
+  ) : null;
+
   const demanderMiseEnPage = async () => {
     if (!problèmeMiseEnPage) return;
     setMiseEnPageEnCours(true);
@@ -564,6 +578,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
               {miseEnPageEnCours ? "Envoi…" : `Commander la mise en page — ${PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC`}
             </button>
           )}
+          {casePasserOutre}
         </div>
       )}
     </div>
@@ -732,6 +747,7 @@ export default function CursAudit({ onVoirAudits } = {}) {
                   {miseEnPageEnCours ? "Envoi…" : `Commander la mise en page — ${PRIX_MISE_EN_PAGE[problèmeMiseEnPage].toFixed(2).replace(".", ",")} € TTC`}
                 </button>
               )}
+              {casePasserOutre}
             </div>
           )}
 
@@ -882,16 +898,16 @@ export default function CursAudit({ onVoirAudits } = {}) {
           {!étapeConfirmation && (
             <button
               onClick={() => setÉtapeConfirmation(true)}
-              disabled={enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision}
+              disabled={enCours || !titre.trim() || unités.length === 0 || !prix || blocageMiseEnPage || !consentementSupervision}
               style={{
                 padding: "10px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-                background: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "#ccc" : "#7F77DD",
-                color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || !!problèmeMiseEnPage || !consentementSupervision) ? "default" : "pointer",
+                background: (enCours || !titre.trim() || unités.length === 0 || !prix || blocageMiseEnPage || !consentementSupervision) ? "#ccc" : "#7F77DD",
+                color: "#fff", cursor: (enCours || !titre.trim() || unités.length === 0 || !prix || blocageMiseEnPage || !consentementSupervision) ? "default" : "pointer",
               }}
             >
               {enCours
                 ? "Création…"
-                : problèmeMiseEnPage
+                : blocageMiseEnPage
                   ? "Mise en page à résoudre avant création"
                   : !consentementSupervision
                     ? "Acceptez la supervision ci-dessus pour continuer"
