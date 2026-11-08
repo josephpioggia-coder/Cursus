@@ -150,7 +150,7 @@ export function MentionsLegales({ onRetour, onNaviguer }) {
 export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
   const id = IDENTITE_EDITEUR;
   return (
-    <Page titre="Politique de confidentialité" misÀJour="7 novembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
+    <Page titre="Politique de confidentialité" misÀJour="15 septembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
       <P>
         Cette politique décrit comment {id.raisonSociale} ("Cursus", "nous") traite vos données personnelles,
         conformément au Règlement Général sur la Protection des Données (RGPD).
@@ -162,8 +162,7 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
       <H2>Données que nous collectons</H2>
       <Ul>
         <li>Données de compte : adresse email, mot de passe (jamais stocké en clair, géré par Supabase Auth).</li>
-        <li>Contenus que vous créez ou importez : manuscrits, chapitres, textes soumis à l'analyse (CursAudit, CursEdit), images insérées dans vos chapitres ou importées avec un fichier Word.</li>
-        <li>Contenus que vous soumettez à un outil d'IA précis : photos de pages (« Lire une photo »), enregistrements audio de la dictée vocale, texte envoyé à la lecture à voix haute. Les photos ne sont pas conservées par Cursus : seul le texte que vous validez est inséré dans votre chapitre.</li>
+        <li>Contenus que vous créez ou importez : manuscrits, chapitres, textes soumis à l'analyse (CursAudit, CursEdit).</li>
         <li>Données de facturation : gérées directement par Stripe, notre prestataire de paiement — nous ne stockons jamais votre numéro de carte bancaire.</li>
         <li>Données d'usage technique : journaux de connexion, volume de tokens IA consommés (pour le suivi de votre quota).</li>
       </Ul>
@@ -180,8 +179,7 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
       <P>Vos données ne sont jamais vendues. Elles peuvent être transmises, dans la stricte mesure nécessaire au fonctionnement du service, à :</P>
       <Ul>
         <li><strong>Supabase Inc.</strong> — hébergement de la base de données et authentification.</li>
-        <li><strong>Anthropic (Claude)</strong> — pour générer les analyses, corrections, avis et réponses que vous demandez : le texte, les images ou les photos que vous soumettez à l'outil concerné lui sont transmis le temps du traitement. Lorsque vous utilisez un outil avec recherche web (références, vérification des faits), les requêtes de recherche sont élaborées à partir de l'affirmation à vérifier.</li>
-        <li><strong>OpenAI</strong> — analyses (GPT-4o) lorsque vous choisissez le mode « 2 IA », transcription de la dictée vocale (l'enregistrement audio) et lecture à voix haute (le texte à lire).</li>
+        <li><strong>Anthropic (Claude)</strong> et <strong>OpenAI (GPT-4o)</strong> — pour générer les analyses IA que vous demandez : le texte que vous soumettez à une analyse leur est transmis le temps du traitement.</li>
         <li><strong>Stripe</strong> — traitement des paiements.</li>
         <li><strong>Vercel Inc.</strong> — hébergement de l'application.</li>
       </Ul>
@@ -190,15 +188,6 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
         vers eux repose sur les garanties prévues par le RGPD (clauses contractuelles types ou mécanisme équivalent
         propre à chaque prestataire).
       </P>
-
-      <H2>Vos textes et l'intelligence artificielle</H2>
-      <Ul>
-        <li>Vos contenus ne sont transmis à un prestataire d'IA que lorsque <strong>vous lancez</strong> une analyse, une correction, une question, une dictée, une lecture à voix haute ou la lecture d'une photo, ou lorsque vous activez le mode automatique du Co-pilote. Le simple fait d'écrire dans CursEdit n'envoie rien.</li>
-        <li>Cursus <strong>n'utilise pas vos contenus pour entraîner ou affiner des modèles d'IA</strong> et ne les vend pas.</li>
-        <li>Les prestataires d'IA appliquent leurs propres conditions aux données reçues par leur interface professionnelle (API), y compris une conservation temporaire limitée, notamment pour détecter les abus. Nous vous invitons à consulter leurs politiques de confidentialité ; nous ne pouvons pas garantir leur contenu à leur place.</li>
-        <li>Pour un audit CursAudit, vous acceptez, case à cocher avant chaque création, que les données transmises puissent être relues par l'équipe Cursus, dans un cadre confidentiel. Hors de ce cas, des demandes d'assistance que vous formulez et de la maintenance technique (par exemple l'examen d'une erreur de traitement), l'équipe ne consulte pas vos textes.</li>
-        <li>Les analyses IA peuvent comporter des erreurs : vérifiez toujours une affirmation factuelle ou une référence avant de vous en servir.</li>
-      </Ul>
 
       <H2>Durée de conservation</H2>
       <P>

@@ -4,3 +4,6 @@ dist/
 .env.local
 .DS_Store
 supabase/.temp/
+
+# Rapports du jeu d'essai IA (comparaison entre modèles, en local)
+scripts/essais-ia/resultats/
