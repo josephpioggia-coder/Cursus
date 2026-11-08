@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "description": "Jeu d'essai de robustesse des outils IA de Cursus face aux erreurs d'entrée (dictée, variantes de noms, homophones, faits voulus). Chaque cas : un texte, l'outil visé, des vérifications mécaniques (graves = ne doit JAMAIS arriver ; souhaitables = amélioration attendue) et une réponse de référence bonne et mauvaise pour valider le dispositif hors ligne.",
+  "cas": [
+    {
+      "id": "noms-variantes-correction",
+      "outil": "correction",
+      "niveau": "fautes",
+      "intention": "Un nom propre écrit de deux façons (Annie/Anni, Lallet/Lalé), typique d'une dictée. La correction ne doit PAS choisir à la place de l'auteur·ice : chaque forme reste telle qu'écrite (le signalement revient au bilan).",
+      "paragraphes": [
+        "Annie Lallet entra dans la cuisine. Anni posa son sac sur la table et chercha les clés.",
+        "« Madame Lalé, dit le voisin, vous êtes bien matinale. » Elle sourit sans répondre."
+      ],
+      "verifications": [
+        {
+          "id": "formes-conservees",
+          "gravite": "grave",
+          "type": "contient",
+          "valeurs": [
+            "Annie Lallet",
+            "Anni posa",
+            "Lalé"
+          ],
+          "pourquoi": "unifier silencieusement les noms = changer un nom propre (interdit par la consigne)"
+        }
+      ],
+      "reference": {
+        "bonne": "[[1]] Annie Lallet entra dans la cuisine. Anni posa son sac sur la table et chercha les clés.\n[[2]] « Madame Lalé, dit le voisin, vous êtes bien matinale. » Elle sourit sans répondre.",
+        "mauvaise": "[[1]] Annie Lallet entra dans la cuisine. Annie posa son sac sur la table et chercha les clés.\n[[2]] « Madame Lallet, dit le voisin, vous êtes bien matinale. » Elle sourit sans répondre."
+      }
+    },
+    {
+      "id": "noms-variantes-bilan",
+      "outil": "bilan",
+      "intention": "Même texte : le bilan de relecture doit SIGNALER la variation des noms (à vérifier), sans trancher ni rien inventer.",
+      "paragraphes": [
+        "Annie Lallet entra dans la cuisine. Anni posa son sac sur la table et chercha les clés.",
+        "« Madame Lalé, dit le voisin, vous êtes bien matinale. » Elle sourit sans répondre."
+      ],
+      "verifications": [
+        {
+          "id": "variation-signalee",
+          "gravite": "souhaitable",
+          "type": "contient",
+          "valeurs": [
+            "Lalé",
+            "Lallet"
+          ],
+          "pourquoi": "une incohérence de nom doit être remontée à l'auteur·ice"
+        },
+        {
+          "id": "rien-invente",
+          "gravite": "grave",
+          "type": "ne_contient_pas",
+          "valeurs": [
+            "Marc",
+            "Sophie",
+            "Pierre"
+          ],
+          "pourquoi": "aucun personnage ne doit apparaître qui n'est pas dans le texte"
+        }
+      ],
+      "reference": {
+        "bonne": "[[COHERENCE]]\n- « Annie Lallet » puis « Madame Lalé » : le nom de famille est écrit de deux façons (Lallet / Lalé) — à vérifier, sans trancher\n- « Anni posa » : prénom écrit « Anni » alors que « Annie » apparaît juste avant — à vérifier",
+        "mauvaise": "[[RIEN]]"
+      }
+    },
+    {
+      "id": "homophone-dictee-correction",
+      "outil": "correction",
+      "niveau": "fautes",
+      "intention": "Homophone typique de la reconnaissance vocale (« compte » pour « conte ») : une vraie faute, que la correction doit réparer.",
+      "paragraphes": [
+        "Avant de dormir, sa grand-mère lui racontait toujours un compte de fées."
+      ],
+      "verifications": [
+        {
+          "id": "homophone-repare",
+          "gravite": "souhaitable",
+          "type": "contient",
+          "valeurs": [
+            "conte de fées"
+          ],
+          "pourquoi": "faute évidente en contexte"
+        },
+        {
+          "id": "faute-disparue",
+          "gravite": "souhaitable",
+          "type": "ne_contient_pas",
+          "valeurs": [
+            "compte de fées"
+          ],
+          "pourquoi": "la forme fautive ne doit plus figurer"
+        }
+      ],
+      "reference": {
+        "bonne": "[[1]] Avant de dormir, sa grand-mère lui racontait toujours un conte de fées.",
+        "mauvaise": "[[1]] Avant de dormir, sa grand-mère lui racontait toujours un compte de fées."
+      }
+    },
+    {
+      "id": "ponctuation-dictee-correction",
+      "outil": "correction",
+      "niveau": "fautes",
+      "intention": "Mots de ponctuation dictés (« virgule », « point ») restés dans le texte : artefact de transcription à convertir, sans perdre un mot du texte.",
+      "paragraphes": [
+        "Il ouvrit la porte virgule hésita un instant virgule puis entra point"
+      ],
+      "verifications": [
+        {
+          "id": "contenu-conserve",
+          "gravite": "grave",
+          "type": "contient",
+          "valeurs": [
+            "ouvrit la porte",
+            "hésita un instant",
+            "puis entra"
+          ],
+          "pourquoi": "aucun mot du texte ne doit disparaître"
+        },
+        {
+          "id": "artefacts-convertis",
+          "gravite": "souhaitable",
+          "type": "ne_contient_pas",
+          "valeurs": [
+            "virgule",
+            "entra point"
+          ],
+          "pourquoi": "les mots dictés doivent devenir de la ponctuation"
+        }
+      ],
+      "reference": {
+        "bonne": "[[1]] Il ouvrit la porte, hésita un instant, puis entra.",
+        "mauvaise": "[[1]] Il ouvrit la porte virgule hésita un instant virgule puis entra point"
+      }
+    },
+    {
+      "id": "fait-surprenant-authentique-correction",
+      "outil": "correction",
+      "niveau": "fautes",
+      "intention": "Une information inattendue mais VOULUE (fiction : « le soleil se leva à l'ouest »). La correction ne doit pas la « rectifier » : une info inattendue peut être authentique.",
+      "paragraphes": [
+        "Ce matin-là, le soleil se leva à l'ouest, et personne au village ne s'en étonna."
+      ],
+      "verifications": [
+        {
+          "id": "audace-conservee",
+          "gravite": "grave",
+          "type": "contient",
+          "valeurs": [
+            "à l'ouest"
+          ],
+          "pourquoi": "modifier un fait ou une audace de style est interdit"
+        }
+      ],
+      "reference": {
+        "bonne": "[[1]] Ce matin-là, le soleil se leva à l'ouest, et personne au village ne s'en étonna.",
+        "mauvaise": "[[1]] Ce matin-là, le soleil se leva à l'est, et personne au village ne s'en étonna."
+      }
+    },
+    {
+      "id": "lecture-sur-erreurs-avis",
+      "outil": "avis",
+      "intention": "Avis sur le fond d'un texte dont le nom varie : l'avis ne doit pas inventer de personnage ni bâtir sur une lecture incertaine sans le dire ; la variation doit être signalée comme à vérifier.",
+      "paragraphes": [
+        "Annie Lallet entra dans la cuisine. Anni posa son sac sur la table et chercha les clés.",
+        "« Madame Lalé, dit le voisin, vous êtes bien matinale. » Elle sourit sans répondre.",
+        "Elle s'installa dans le fauteuil de sa mère et relut la lettre."
+      ],
+      "verifications": [
+        {
+          "id": "rien-invente",
+          "gravite": "grave",
+          "type": "ne_contient_pas",
+          "valeurs": [
+            "Marc",
+            "Sophie",
+            "Pierre"
+          ],
+          "pourquoi": "aucun personnage inventé"
+        },
+        {
+          "id": "variation-signalee",
+          "gravite": "souhaitable",
+          "type": "contient_une_parmi",
+          "valeurs": [
+            "Lalé",
+            "Lallet",
+            "Anni "
+          ],
+          "pourquoi": "l'incertitude de lecture doit être signalée, pas absorbée"
+        }
+      ],
+      "reference": {
+        "bonne": "[[VERDICT]] Passage court : l'ouverture est claire mais le nom du personnage varie d'une phrase à l'autre.\n[[TIENT]]\n- « Anni posa son sac sur la table » : un geste simple qui installe la scène.\n[[FAIBLE]]\n- « Annie Lallet » / « Madame Lalé » : le nom varie — à vérifier, peut-être une faute de dictée.\n[[PISTES]]\n- Uniformiser le nom une fois vérifié.\n[[QUESTIONS]]\n- Que dit la lettre ?",
+        "mauvaise": "[[VERDICT]] Marc, le voisin, ouvre bien le récit.\n[[TIENT]]\n- « Madame » : un voisin attentif.\n[[FAIBLE]]\n- Sophie manque de présence.\n[[PISTES]]\n- Développer Pierre.\n[[QUESTIONS]]\n- Qui est Marc ?"
+      }
+    }
+  ]
+}
