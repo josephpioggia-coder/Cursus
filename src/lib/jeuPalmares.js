@@ -1,15 +1,17 @@
 /**
  * CURSUS — Moteur pur du jeu « Au palmarès » (05/10/2026) : deux livres du Top 200 hebdomadaire des ventes (Edistat, semaine 39,
  * du 21 au 27 septembre 2026), une question de comparaison (mieux classé, plus ancien au classement, paru en premier, plus cher).
- * Données : public/jeux/palmares.json (saisies à partir du tableau fourni par Joseph le 05/10/2026 ; voir scripts/verifier-palmares.mjs).
+ * Données : scripts/donnees/palmares-semaine-39-2026.json — retiré de public/ le 09/11/2026 (données commerciales d'Edistat : ne pas les servir publiquement sans autorisation ; saisies à partir du tableau fourni par Joseph le 05/10/2026 ; voir scripts/verifier-palmares.mjs).
  * Les réponses sont des FAITS du tableau : aucun appel IA, aucune interprétation.
  */
 
 let enCache = null;
 export async function chargerPalmares() {
   if (enCache) return enCache;
+  // Le fichier n'est plus servi publiquement (09/11/2026) : tant qu'il n'existe pas de source autorisée, ce chargement échoue
+  // volontairement. Le jeu « Au palmarès » est de toute façon caché (SalleDesJeux.jsx, `cache: true`).
   const rep = await fetch("/jeux/palmares.json");
-  if (!rep.ok) throw new Error("Palmarès introuvable (HTTP " + rep.status + ").");
+  if (!rep.ok) throw new Error("Données du palmarès non publiées (jeu indisponible pour le moment).");
   enCache = await rep.json();
   return enCache;
 }
