@@ -642,6 +642,8 @@ export default function CursAudit({ onVoirAudits } = {}) {
                 value={codePromoAudit}
                 onChange={(e) => setCodePromoAudit(e.target.value)}
                 placeholder="Code promotionnel (optionnel)"
+                autoComplete="off" autoCorrect="off" autoCapitalize="characters" spellCheck={false}
+                aria-label="Code promotionnel"
                 style={{
                   padding: "8px 12px", borderRadius: 7, border: "0.5px solid var(--border)",
                   fontFamily: "inherit", fontSize: 12.5, textTransform: "uppercase", letterSpacing: 0.5,
