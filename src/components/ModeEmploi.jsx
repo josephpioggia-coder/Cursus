@@ -127,8 +127,9 @@ export default function ModeEmploi({ onRetour }) {
           (une dizaine de questions sur votre livre) : y répondre aide le Co-pilote ; « Plus tard » le ferme sans rien perdre.
         </li>
         <li style={{ marginBottom: 8 }}>
-          <strong>Ajoutez une partie, puis un chapitre, et écrivez.</strong> Votre texte est enregistré automatiquement. Le témoin à côté du titre
-          du chapitre affiche « Sauvegardé » quand l'enregistrement est confirmé. S'il affiche « NON ENREGISTRÉ » en rouge, ne rechargez pas la page.
+          <strong>Ajoutez une partie, puis un chapitre, et écrivez.</strong> Votre texte s'enregistre tout seul. À côté du titre, <strong>✓ Sauvegardé</strong>{" "}
+          (en vert) veut dire que tout est en sécurité. Si vous voyez <strong>NON ENREGISTRÉ</strong> en rouge, ne fermez pas et ne rechargez pas la page :
+          attendez que le vert revienne.
         </li>
         <li style={{ marginBottom: 8 }}>
           <strong>Demandez un coup de main.</strong> Le Co-pilote (panneau de droite) donne des avis ; « Aide-moi à avancer » est toujours disponible.
