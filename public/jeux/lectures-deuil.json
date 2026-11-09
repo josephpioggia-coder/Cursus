@@ -1,0 +1,183 @@
+[
+  {
+    "id": "oscar-dame-rose",
+    "titre": "Oscar et la Dame rose",
+    "auteur": "Éric-Emmanuel Schmitt",
+    "pays": "France",
+    "annee": 2002,
+    "format": "recit",
+    "genre": "Conte philosophique",
+    "categorie": "roman",
+    "lieu": "Un hôpital pour enfants",
+    "pitch": "Un enfant de dix ans, hospitalisé pour une maladie dont il ne guérira pas, correspond avec Dieu sur les conseils d'une visiteuse bénévole.",
+    "indices": [
+      "Un petit livre, entre conte et récit, souvent lu en classe.",
+      "Le narrateur a dix ans et il est hospitalisé : sa maladie ne guérira pas.",
+      "Une bénévole, que l'enfant surnomme d'après la couleur de sa blouse, vient le voir.",
+      "Elle lui conseille d'écrire à Dieu et de vivre chaque jour comme s'il durait dix ans.",
+      "Auteur franco-belge de théâtre et de romans ; ce livre appartient à son « Cycle de l'invisible »."
+    ]
+  },
+  {
+    "id": "nos-etoiles-contraires",
+    "titre": "Nos étoiles contraires",
+    "auteur": "John Green",
+    "pays": "États-Unis",
+    "annee": 2012,
+    "format": "roman",
+    "genre": "Roman pour adolescents",
+    "categorie": "roman",
+    "lieu": "Des États-Unis à Amsterdam",
+    "pitch": "Hazel et Augustus, deux adolescents malades, tombent amoureux ; leur histoire les mène jusqu'à Amsterdam.",
+    "indices": [
+      "Un roman pour adolescents, traduit de l'anglais et adapté au cinéma en 2014.",
+      "Deux jeunes se rencontrent dans un groupe de soutien pour malades du cancer.",
+      "L'héroïne se déplace avec une bouteille d'oxygène ; elle s'appelle Hazel.",
+      "Un voyage à Amsterdam, pour rencontrer un écrivain, occupe une place centrale.",
+      "Le titre vient d'une pièce de Shakespeare ; l'auteur est américain et publie aussi des vidéos en ligne."
+    ]
+  },
+  {
+    "id": "naissance-clinique",
+    "titre": "Naissance de la clinique",
+    "auteur": "Michel Foucault",
+    "pays": "France",
+    "annee": 1963,
+    "format": "recit",
+    "genre": "Essai d'histoire et de philosophie",
+    "categorie": null,
+    "lieu": "L'hôpital et la médecine du XVIIIᵉ siècle",
+    "pitch": "Foucault étudie comment la médecine moderne s'est construite à la fin du XVIIIᵉ siècle, et comment elle a appris à regarder le corps du malade.",
+    "indices": [
+      "Un essai savant, publié en 1963.",
+      "Il s'intéresse à la médecine de la fin du XVIIIᵉ siècle.",
+      "Il parle d'un « regard » nouveau, posé sur le corps du patient.",
+      "Le sous-titre annonce une « archéologie ».",
+      "Son auteur est un philosophe français, aussi connu pour « Surveiller et punir »."
+    ]
+  },
+  {
+    "id": "fossoyeurs",
+    "titre": "Les Fossoyeurs",
+    "auteur": "Victor Castanet",
+    "pays": "France",
+    "annee": 2022,
+    "format": "recit",
+    "genre": "Enquête journalistique",
+    "categorie": "essai",
+    "lieu": "Des maisons de retraite médicalisées privées",
+    "pitch": "Un journaliste enquête sur un grand groupe de maisons de retraite privées et sur le sort réservé à ses résidents ; le livre a déclenché un débat national.",
+    "indices": [
+      "Une enquête publiée début 2022, qui a fait la une de l'actualité en France.",
+      "Elle porte sur la prise en charge des personnes âgées dépendantes.",
+      "Elle vise un grand groupe privé gestionnaire de maisons de retraite médicalisées.",
+      "Le livre a entraîné une prise de conscience nationale et des débats politiques.",
+      "L'auteur est un journaliste indépendant, qui a travaillé plusieurs années sur son sujet."
+    ]
+  },
+  {
+    "id": "annee-pensee-magique",
+    "titre": "L'Année de la pensée magique",
+    "auteur": "Joan Didion",
+    "pays": "États-Unis",
+    "annee": 2005,
+    "format": "recit",
+    "genre": "Récit intime",
+    "categorie": "temoignage",
+    "lieu": "New York",
+    "pitch": "Joan Didion raconte comment elle a traversé les mois qui ont suivi la mort de son mari, alors que sa fille était gravement malade.",
+    "indices": [
+      "Un récit intime d'une autrice américaine, publié en 2005.",
+      "Elle y raconte les mois qui suivent la mort soudaine de son mari.",
+      "Dans le même temps, sa fille est gravement malade.",
+      "Elle y observe, presque comme une enquêtrice, ce que le deuil fait à l'esprit.",
+      "Le livre a reçu le National Book Award ; l'autrice était aussi journaliste et scénariste."
+    ]
+  },
+  {
+    "id": "changer-eau-fleurs",
+    "titre": "Changer l'eau des fleurs",
+    "auteur": "Valérie Perrin",
+    "pays": "France",
+    "annee": 2018,
+    "format": "roman",
+    "genre": "Roman contemporain",
+    "categorie": "roman",
+    "lieu": "Un cimetière de petite ville",
+    "pitch": "Violette Toussaint, gardienne de cimetière, accueille les visiteurs et leurs confidences ; peu à peu, son propre passé remonte à la surface.",
+    "indices": [
+      "Un roman français devenu un très grand succès de librairie, publié en 2018.",
+      "L'héroïne exerce un métier peu courant : elle s'occupe d'un cimetière.",
+      "Elle se prénomme Violette.",
+      "Des visiteurs lui confient leurs histoires, et des secrets enfouis se révèlent.",
+      "L'autrice a aussi été photographe et scénariste ; elle publie chez Albin Michel."
+    ]
+  },
+  {
+    "id": "alors-voila",
+    "titre": "Alors voilà : Les 1001 vies des urgences",
+    "auteur": "Baptiste Beaulieu",
+    "pays": "France",
+    "annee": 2013,
+    "format": "recit",
+    "genre": "Récit de médecin",
+    "categorie": "temoignage",
+    "lieu": "Un service d'accueil hospitalier",
+    "pitch": "Un médecin raconte, en tranches de vie, les patients et les situations rencontrés dans son service.",
+    "indices": [
+      "Un récit né sur un blog, publié en livre en 2013.",
+      "L'auteur est médecin et raconte ses rencontres avec des patients.",
+      "Le lieu est un service où l'on arrive sans rendez-vous, de jour comme de nuit.",
+      "Le livre alterne scènes drôles et scènes graves, toujours racontées avec humanité.",
+      "Le sous-titre annonce un nombre précis, supérieur à mille, de destins."
+    ]
+  },
+  {
+    "id": "faiseuse-etoiles",
+    "titre": "La Faiseuse d'étoiles",
+    "auteur": "Mélissa Da Costa",
+    "genre": "Roman contemporain",
+    "categorie": "roman",
+    "pitch": "Une mère, dont l'enfant de cinq ans est gravement malade, lui invente des jeux et un monde imaginaire pour affronter l'épreuve."
+  },
+  {
+    "id": "coeur-ouvert",
+    "titre": "À cœur ouvert",
+    "auteur": "Ingrid Chauvin",
+    "genre": "Témoignage",
+    "categorie": "temoignage",
+    "pitch": "Ingrid Chauvin, comédienne, raconte la mort de sa fille et la façon dont elle a cherché à se reconstruire ensuite."
+  },
+  {
+    "id": "yeux-ouverts",
+    "titre": "Les Yeux ouverts",
+    "auteur": "Marie de Hennezel",
+    "genre": "Témoignage sur les soins palliatifs",
+    "categorie": "temoignage",
+    "pitch": "Une psychologue qui a accompagné des personnes en fin de vie raconte ce que ces rencontres lui ont appris sur la mort et sur la vie."
+  },
+  {
+    "id": "mort-soin",
+    "titre": "La Mort et Le Soin",
+    "auteur": "Jean-Philippe Pierron",
+    "genre": "Philosophie et éthique",
+    "categorie": "philo",
+    "pitch": "Un philosophe s'interroge sur ce que veut dire soigner quelqu'un qui va mourir, et sur la place de la fragilité dans le soin."
+  },
+  {
+    "id": "plus-belle-maniere",
+    "titre": "La plus belle manière de vivre — Journal d'un artisan philosophe",
+    "auteur": "Bertrand Vergely",
+    "genre": "Philosophie",
+    "categorie": "philo",
+    "pitch": "Un philosophe tient le journal de ses réflexions sur les choses simples, l'émerveillement et le travail bien fait."
+  },
+  {
+    "id": "consolation",
+    "titre": "Consolation",
+    "auteur": "Anne-Dauphine Julliand",
+    "genre": "Récit intime",
+    "categorie": "temoignage",
+    "pitch": "Anne-Dauphine Julliand, qui a connu plusieurs deuils, réfléchit à ce que l'on peut offrir à quelqu'un qui souffre : présence, écoute, gestes simples."
+  }
+]
