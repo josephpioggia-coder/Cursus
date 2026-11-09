@@ -2789,13 +2789,16 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
             <div style={{
               padding: "8px 16px", borderBottom: "0.5px solid #e5e5e5",
               display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+              // 09/11/2026 (retour de Joseph, GSM) : le groupe de droite (Incorporer, Importer, Questionnaire…) sortait de l'écran sans défilement
+              // possible → la barre passe à la ligne ; chaque groupe peut aussi se couper sur plusieurs lignes.
+              flexWrap: "wrap",
               background: "#fafafa",
             }}>
               {/* ── Groupe gauche : export ── Ordre validé sur maquette de
                   Joseph (28/07) : le bouton rouge D'ABORD, tout à gauche,
                   puis les cases de zones (boîte teintée rose pour signer
                   l'appartenance au même groupe), puis le format. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0, maxWidth: "100%" }}>
               <button
                 onClick={async () => {
                   setExportEnCours(true);
@@ -2888,7 +2891,7 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
               </div>
 
               {/* ── Groupe droit : entrées de contenu + suppression ── */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
               <button
                 onClick={() => setIncorporerOuvert(true)}
                 style={{
