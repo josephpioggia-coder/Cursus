@@ -53,7 +53,7 @@
  * choisie.
  */
 
-const IDENTITE_EDITEUR = {
+export const IDENTITE_EDITEUR = {
   raisonSociale: "HMS-i SA",
   adresse: "Rue de la Houillère 17, 4041 Vottem, Belgique",
   numéroEntreprise: "0500.956.401 (BCE)",
