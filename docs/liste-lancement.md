@@ -83,7 +83,8 @@ L'offre gratuite d'un mois n'a pas besoin de la phase 1 pour démarrer.
 - ✅ Dossier « Lire pour traverser » (15 livres) et jeu du même nom
 - ✅ Vitrine des auteurs partenaires : structure prête, **vide**, une fiche n'apparaît qu'avec une date de consentement
 - ⬜ Ajouter les fiches des auteurs, une par une, dès réception de leur accord (fiche remplie, couverture, date)
-- ⬜ Dépôt de fiche par les auteurs eux-mêmes, validation dans Administration, code promo créé à la validation
+- ✅ Fiche à remplir en ligne ou à télécharger (Word) : elle part par e-mail, rien n'est envoyé par le site
+- ⬜ Dépôt de fiche directement sur le site (table Supabase + validation dans Administration), code promo créé à la validation
 - ⬜ Liste par thèmes quand il y a assez de fiches
 - ⬜ Autres dossiers thématiques
 - ⬜ Nouvelle présentation en néerlandais et en anglais (l'accueil est en français seulement)

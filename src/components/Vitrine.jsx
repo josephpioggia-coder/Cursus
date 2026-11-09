@@ -10,6 +10,7 @@
 import { useState, useEffect } from "react";
 import { IDENTITE_EDITEUR } from "./PagesLegales.jsx";
 import { chargerLectures } from "../lib/jeuLectures.js";
+import FicheAuteur from "./FicheAuteur.jsx";
 
 /** Offre de lancement (décision de Joseph, 09/11/2026) : un mois d'accès Initié en bêta, 30 places. Mettre à false pour masquer l'encadré. */
 export const OFFRE_ACTIVE = true;
@@ -141,7 +142,7 @@ function EncadreAuteurs() {
     <section style={{ marginTop: 44, background: "#EEEDFE", border: "1px solid " + MAUVE + "55", borderRadius: 16, padding: "26px 22px" }}>
       <h2 style={{ fontSize: 22, fontWeight: 600, color: ENCRE, margin: "0 0 8px" }}>Vous avez publié un livre ?</h2>
       <p style={{ fontSize: 15, lineHeight: 1.65, color: "#333", margin: "0 0 12px", maxWidth: 720 }}>
-        Nous préparons une vitrine qui présente des livres par thèmes. Présentez le vôtre : une fiche avec sa couverture, son accroche et le lien pour l'acheter.
+        Nous préparons une vitrine qui présente des livres par thèmes. Présentez le vôtre : une fiche avec sa couverture, son accroche et le lien pour l'acheter. Remplissez-la en ligne ou téléchargez-la.
       </p>
       {OFFRE_ACTIVE && (
         <p style={{ fontSize: 15, lineHeight: 1.65, color: "#333", margin: "0 0 16px", maxWidth: 720 }}>
@@ -149,7 +150,10 @@ function EncadreAuteurs() {
           (une offre par adresse e-mail, pour un compte qui n'a encore jamais eu d'abonnement).
         </p>
       )}
-      <a href={`mailto:${contact}?subject=${sujet}`} style={bouton()}>Nous écrire</a>
+      <FicheAuteur contact={contact} />
+      <p style={{ fontSize: 14, color: "#444", margin: "18px 0 0", lineHeight: 1.6 }}>
+        Une question avant de commencer ? <a href={`mailto:${contact}?subject=${sujet}`} style={{ color: MAUVE }}>Écrivez-nous</a>.
+      </p>
     </section>
   );
 }
