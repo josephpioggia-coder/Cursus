@@ -2,7 +2,7 @@
  * CURSUS — « Au palmarès » (05/10/2026) : jeu de comparaison sur le Top 200 hebdomadaire des ventes de livres (Edistat, semaine 39,
  * 21–27 septembre 2026), et onglet « Le classement » (les 20 premiers). 10 manches : deux livres, une question (mieux classé,
  * dans le Top 200 depuis le plus longtemps, paru en premier, plus cher) ; la réponse révèle les valeurs des deux livres.
- * Données : public/jeux/palmares.json. Moteur : src/lib/jeuPalmares.js. Aucun appel IA.
+ * Données : scripts/donnees/palmares-semaine-39-2026.json (HORS de public/ depuis le 09/11/2026 : jeu caché, non servi). Moteur : src/lib/jeuPalmares.js. Aucun appel IA.
  */
 import { useState } from "react";
 import { preparerManches, QUESTIONS, mention, fmtDate } from "../../lib/jeuPalmares.js";

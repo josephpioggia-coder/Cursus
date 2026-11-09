@@ -1,7 +1,7 @@
-// Vérifie public/jeux/palmares.json (Top 200 hebdomadaire saisi à la main à partir du tableau d'Edistat) : 200 lignes, rangs
+// Vérifie scripts/donnees/palmares-semaine-39-2026.json (Top 200 hebdomadaire saisi à la main à partir du tableau d'Edistat) : 200 lignes, rangs
 // croissants (ex æquo permis), champs présents, dates ISO, prix > 0. Usage : node scripts/verifier-palmares.mjs
 import fs from "node:fs";
-const p = JSON.parse(fs.readFileSync("public/jeux/palmares.json", "utf8"));
+const p = JSON.parse(fs.readFileSync("scripts/donnees/palmares-semaine-39-2026.json", "utf8"));
 const pb = []; let prec = 0;
 if (p.livres.length !== 200) pb.push(`${p.livres.length} lignes au lieu de 200`);
 p.livres.forEach((l, i) => {
