@@ -13,6 +13,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase.js";
 import { MentionsLegales, CGV, PolitiqueConfidentialite } from "../components/PagesLegales.jsx";
+import { OFFRE_ACTIVE, PLACES_OFFRE } from "../components/Vitrine.jsx";
 import ModeEmploi from "../components/ModeEmploi.jsx";
 import PlumeAnimee from "../components/PlumeAnimee.jsx";
 
@@ -244,6 +245,13 @@ export function PageConnexion({ onDossier = null } = {}) {
               <img src="/aencre-icone.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, boxShadow: "0 2px 6px rgba(127,119,221,0.35)" }} />
               <span><b>Lire pour traverser</b> — dossier thématique, livres d'auteurs partenaires, offre pour les auteurs</span>
             </button>
+          )}
+          {/* L'offre de lancement doit se voir SANS ouvrir le dossier (retour de Joseph, 09/11/2026). */}
+          {onDossier && OFFRE_ACTIVE && (
+            <div style={{ marginTop: 8, background: "#EEEDFE", border: "1px solid #7F77DD55", borderRadius: 12, padding: "10px 12px", fontSize: 12, lineHeight: 1.55, color: "#333", textAlign: "left" }}>
+              <b>Auteur ? Un mois d'accès Initié offert</b> (bêta) aux {PLACES_OFFRE} premiers nouveaux auteurs dont le livre est présenté sur Cursus.{" "}
+              <button onClick={onDossier} style={{ background: "none", border: "none", padding: 0, color: "#7F77DD", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", cursor: "pointer" }}>En savoir plus</button>
+            </div>
           )}
           {/* 24/09/2026, suite — cette page tient entièrement dans l'écran
               (contrairement au Mode d'emploi, bien plus long, où Æncre

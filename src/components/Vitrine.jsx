@@ -9,8 +9,8 @@ import { useState, useEffect } from "react";
 import { IDENTITE_EDITEUR } from "./PagesLegales.jsx";
 
 /** Offre de lancement (décision de Joseph, 09/11/2026) : un mois d'accès Initié en bêta, 30 places. Mettre à false pour masquer l'encadré. */
-const OFFRE_ACTIVE = true;
-const PLACES_OFFRE = 30;
+export const OFFRE_ACTIVE = true;
+export const PLACES_OFFRE = 30;
 
 const MAUVE = "#7F77DD", VERT = "#1D9E75", ENCRE = "#1a1a1a", GRIS = "#555", FOND = "#f8f8f8";
 const police = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
