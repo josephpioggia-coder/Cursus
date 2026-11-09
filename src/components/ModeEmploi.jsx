@@ -72,6 +72,9 @@ function P({ children }) {
 function Ul({ children }) {
   return <ul style={{ margin: "0 0 12px", paddingLeft: 20 }}>{children}</ul>;
 }
+function Ol({ children }) {
+  return <ol style={{ margin: "0 0 12px", paddingLeft: 22 }}>{children}</ol>;
+}
 function Encadré({ children, couleur = "#7F77DD" }) {
   return (
     <div style={{ background: `${couleur}0d`, border: `0.5px solid ${couleur}40`, borderRadius: 8, padding: "10px 14px", margin: "12px 0", fontSize: 13 }}>
@@ -96,13 +99,50 @@ function Table({ lignes }) {
 
 export default function ModeEmploi({ onRetour }) {
   return (
-    <Page titre="Mode d'emploi" misÀJour="24 septembre 2026" onRetour={onRetour}>
+    <Page titre="Mode d'emploi" misÀJour="9 novembre 2026" onRetour={onRetour}>
       <P>
         Ce guide explique ce que fait <strong>réellement</strong> Cursus aujourd'hui — pas ce qui est prévu.
         Cursus s'articule autour de trois espaces, débloqués progressivement selon votre palier d'abonnement :{" "}
         <strong>CursEdit</strong> (écrire), <strong>CursAudit</strong> (auditer un texte déjà écrit) et{" "}
         <strong>CursDecision</strong> (pas encore construit — page de présentation seulement).
       </P>
+
+      <H2>Démarrer en 5 minutes</H2>
+      <P>Vous découvrez Cursus ? Voici le chemin le plus court pour écrire votre première page.</P>
+      <Ol>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Créez votre compte.</strong> Sur <code>cursus.pro</code>, onglet « Créer un compte » : adresse e-mail et mot de passe.
+          Un e-mail de confirmation arrive : cliquez sur le lien (regardez aussi les courriers indésirables). Si rien n'arrive ou si le lien ne
+          s'ouvre pas, revenez sur cursus.pro : le lien « Renvoyer l'e-mail de confirmation » apparaît quand il sert.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Choisissez votre espace.</strong> Pour écrire, c'est <strong>CursEdit</strong>.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Activez votre accès.</strong> CursEdit demande un abonnement ou un <strong>code promotionnel</strong> (ou code cadeau). Sur la
+          page d'accès, saisissez le code dans la case « Code promotionnel » <em>avant</em> de cliquer sur « Choisir ». Avec un code à 100 %, il n'y a rien à payer.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Créez votre projet.</strong> Menu « Mes projets », puis « + Nouveau projet ». Un questionnaire de démarrage peut s'ouvrir
+          (une dizaine de questions sur votre livre) : y répondre aide le Co-pilote ; « Plus tard » le ferme sans rien perdre.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Ajoutez une partie, puis un chapitre, et écrivez.</strong> Votre texte est enregistré automatiquement. Le témoin à côté du titre
+          du chapitre affiche « Sauvegardé » quand l'enregistrement est confirmé. S'il affiche « NON ENREGISTRÉ » en rouge, ne rechargez pas la page.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Demandez un coup de main.</strong> Le Co-pilote (panneau de droite) donne des avis ; « Aide-moi à avancer » est toujours disponible.
+          Pour une simple question, <strong>Ctrl+K</strong> (ou le bouton « Aide ») ouvre la Question rapide.
+        </li>
+        <li style={{ marginBottom: 8 }}>
+          <strong>Un doute ?</strong> Le bouton « Aide » répond ; sur la page de connexion, Æncre propose aussi ce mode d'emploi.
+        </li>
+      </Ol>
+      <Encadré couleur="#1D9E75">
+        Trois choses à savoir dès le départ : (1) les assistants IA relisent, signalent et conseillent, ils n'ont pas pour vocation d'écrire à votre place ;
+        (2) une IA peut se tromper : vérifiez toujours un fait ou une référence avant de les utiliser ; (3) Cursus n'utilise pas vos contenus pour entraîner
+        des modèles d'IA (voir la Politique de confidentialité).
+      </Encadré>
 
       <H2>1. Premiers pas</H2>
 
@@ -121,7 +161,7 @@ export default function ModeEmploi({ onRetour }) {
 
       <H3>S'abonner</H3>
       <P>
-        CursEdit nécessite un abonnement payant ("Tarification" dans le menu de gauche une fois dans l'espace
+        CursEdit nécessite un abonnement payant ou un code promotionnel ("Tarification" dans le menu de gauche une fois dans l'espace
         CursEdit) — cinq paliers cumulatifs. CursAudit se débloque à partir du palier Essentiel, puis se facture{" "}
         <strong>en plus</strong>, à l'acte, par audit réalisé — ce n'est pas inclus dans l'abonnement CursEdit.
       </P>
@@ -147,12 +187,12 @@ export default function ModeEmploi({ onRetour }) {
       <H3>Structurer un projet</H3>
       <P>
         Un projet se compose de <strong>parties</strong> et de <strong>chapitres</strong>, organisés dans la colonne
-        de gauche. Chaque chapitre a son propre texte, sauvegardé automatiquement toutes les 30 secondes.
+        de gauche. Chaque chapitre a son propre texte, enregistré automatiquement.
       </P>
 
       <H3>Mettre en forme le texte</H3>
       <Ul>
-        <li>Titres (H1 à H6), gras, italique, souligné</li>
+        <li>Styles (Normal, Titres 1 à 6, Citation), police, taille, interligne, gras, italique, souligné, barré</li>
         <li><strong>Couleur du texte</strong> — bouton "A" à barre colorée : 5 teintes + retour par défaut</li>
         <li><strong>Surlignage</strong> — bouton crayon 🖍️ : 5 teintes + retrait</li>
         <li><strong>Surligneur pour analyses</strong> — bouton loupe 🔍, <em>distinct</em> du surlignage ci-dessus : marque un passage d'une couleur grise dédiée pour le Co-pilote (voir plus bas)</li>
@@ -249,9 +289,8 @@ export default function ModeEmploi({ onRetour }) {
         <li>Mode "2 IA" : un second modèle (GPT) relit et signale ses désaccords, limité aux parties conclusives pour un coût maîtrisé</li>
       </Ul>
       <Encadré couleur="#BA7517">
-        ⚠️ <strong>CursAudit ne voit aucune image.</strong> Le texte est segmenté en unités brutes avant analyse —
-        contrairement au Co-pilote de CursEdit, aucune image n'est transmise à l'IA ici. Pour une analyse qui tient
-        compte d'images, utilisez le Co-pilote dans CursEdit.
+        ℹ️ <strong>Les images dans CursAudit.</strong> Pour un fichier Word importé, les images intégrées au document sont lues avec le texte de
+        l'unité analysée (jusqu'à 3 par unité). Pour un texte collé, aucune image n'est possible.
       </Encadré>
 
       <H2>5. Abonnement et accès</H2>
@@ -264,6 +303,61 @@ export default function ModeEmploi({ onRetour }) {
         en <strong>lecture seule pendant 3 mois</strong> — aucune modification, import ni création sans
         réabonnement. Passé ce délai, l'accès est totalement suspendu.
       </P>
+
+      <H2>6. Fonctions utiles à connaître</H2>
+      <P style={{ fontSize: 12, color: "#999" }}>
+        Ces fonctions ont été ajoutées après la première version de ce guide. Les menus et boutons peuvent évoluer : en cas d'écart, le bouton « Aide » est là.
+      </P>
+
+      <H3>Écrire et mettre en forme (bureau)</H3>
+      <Ul>
+        <li><strong>Ruban à onglets</strong> (Accueil, Insertion, Mise en page, Références, Révision, Affichage, Aide) : le 📌 d'un bouton l'épingle sur l'Accueil ; les fonctions grisées arrivent plus tard.</li>
+        <li><strong>🎨 Styles</strong> : régler une fois la police, la taille et l'interligne de « Normal » ou « Titre 1 » pour tout le livre (repris à l'export Word).</li>
+        <li><strong>📄 Vue page et règle</strong> : la feuille avec ses marges ; glisser les bords de la règle pour les marges, les repères pour les retraits, la première ligne et les taquets de tabulation (touche Tab).</li>
+        <li><strong>Saut de page</strong> (Ctrl+Entrée) et <strong>en-têtes et numéros de page</strong> (ruban Mise en page) : appliqués à l'export Word.</li>
+        <li><strong>Statistiques</strong> (ruban Révision) : mots, caractères, phrases, temps de lecture, sur la sélection, le chapitre ou le livre.</li>
+      </Ul>
+
+      <H3>Retrouver et remplacer</H3>
+      <Ul>
+        <li><strong>Rechercher / remplacer</strong> (Ctrl+F, Ctrl+H) : dans le chapitre ou « Tout le livre », titres et notes de bas de page compris. « Plus &gt;&gt; » : mot entier, début ou fin de mot, mise en forme, ignorer la ponctuation ou les espaces, caractères spéciaux (« Spécial ▾ »). Les pages indiquées sont des estimations.</li>
+        <li><strong>Atteindre</strong> (Ctrl+G) : un chapitre, un intertitre, une ligne, un paragraphe, une page, une note ou une image.</li>
+        <li>Chaque chapitre modifié par « Tout remplacer » est d'abord sauvegardé dans l'historique, sauf les titres (pas d'historique pour eux).</li>
+      </Ul>
+
+      <H3>Ne rien perdre</H3>
+      <Ul>
+        <li><strong>↺ Historique</strong> : des instantanés réguliers du chapitre ; « Restaurer » garde d'abord le texte actuel.</li>
+        <li>Une copie de sécurité du chapitre est aussi gardée sur l'appareil : si la page est rechargée avant l'enregistrement, Cursus propose de la récupérer.</li>
+        <li>Si un chapitre est modifié depuis un autre appareil ou onglet, Cursus n'écrase plus rien : il charge la version la plus récente ou vous laisse choisir entre les deux versions.</li>
+        <li>Les résultats du Co-pilote et des fenêtres IA sont conservés quand on change de chapitre ou qu'on ferme la fenêtre.</li>
+      </Ul>
+
+      <H3>Les assistants IA</H3>
+      <Ul>
+        <li><strong>💬 Question rapide</strong> (Ctrl+K ou « Aide ») : une question sans quitter le texte ; choix du modèle, de l'effort et du style ; « De mémoire » (à vérifier) ou « Avec sources ». Le chapitre n'est pas envoyé, seulement la sélection si vous le cochez.</li>
+        <li><strong>✨ Correction rapide</strong> : fautes seulement, ou fautes et fluidité légère ; revue carte par carte, un seul Ctrl+Z pour tout annuler ; un bilan de relecture signale sans trancher.</li>
+        <li><strong>🔎 Vérifier le fond</strong> : un avis de lecture (« est-ce que ça tient la route ? »), qui ne modifie jamais le texte ; <strong>Vérifier les faits</strong> : recherche web, sources et calculs refaits (« confirmé » veut dire qu'une source réelle existe, à lire vous-même).</li>
+        <li><strong>📊 Profil de lisibilité</strong> : lecture seule ; en dessous de 5 paragraphes, pas d'orientation.</li>
+        <li><strong>🧭 Guide directif</strong> (Co-pilote) : une directive visible et modifiable avant envoi. Le Co-pilote reçoit aussi le plan du livre, peut recevoir le chapitre précédent, cite les numéros de ligne et tient compte du passage marqué en gris.</li>
+        <li><strong>« + » du Co-pilote</strong> : joindre une image (JPG, PNG, WebP, GIF, ou collée avec Ctrl+V) ou un texte (.txt, .md, .csv, .docx) à une question : 3 images et 2 textes au plus ; la pièce ne vaut que pour ce message.</li>
+        <li><strong>📷 Lire une photo</strong> : photographier une page papier ; la transcription est fidèle (rien n'est corrigé) et à relire avant insertion ; la photo n'est pas conservée.</li>
+        <li><strong>Dictée vocale</strong> et <strong>lecture à voix haute</strong> (voix et vitesse au choix) : la lecture a un quota mensuel de caractères selon le palier, dont le solde est affiché.</li>
+        <li>Sur une scène intime, l'IA conseille sans moraliser ; si elle décline d'écrire une scène explicite, un bandeau le signale : demandez plutôt un avis qu'une réécriture.</li>
+      </Ul>
+
+      <H3>Sur téléphone</H3>
+      <P>
+        L'en-tête tient sur une ligne, le menu « ⋯ » regroupe les actions, la barre d'outils est réduite avec un bouton « Plus ▾ », et le Co-pilote
+        s'ouvre en plein écran par le bouton flottant. Le bouton « Installer Cursus » (écran de choix d'espace) ajoute l'application à l'écran d'accueil.
+      </P>
+
+      <H3>Détente et découverte</H3>
+      <Ul>
+        <li><strong>Jeux de mots</strong> (menu de gauche) : Scrabble (solveur, outils, partie contre l'ordinateur), Motus, Pendu, Boggle, mots croisés, fléchés et codés, mots en cercle, échelle de mots, mots mêlés, « Devine le livre », « Quel lecteur es-tu ? » et « Lire pour traverser ».</li>
+        <li><strong>🧘 Pauses bien-être</strong> : un rappel discret après un long moment d'écriture ; réglable et désactivable ; des mouvements doux, sans valeur d'avis médical.</li>
+        <li><strong>Dossier thématique et auteurs partenaires</strong> : sur la page de connexion, le dossier « Lire pour traverser » (lectures sur la maladie, la fin de vie et le deuil) et un encadré pour les auteurs qui ont publié un livre : un mois d'accès Initié offert en bêta aux 30 premiers nouveaux auteurs dont le livre est présenté.</li>
+      </Ul>
 
       <H2>Besoin d'aide ?</H2>
       <P>

@@ -92,8 +92,8 @@ L'offre gratuite d'un mois n'a pas besoin de la phase 1 pour démarrer.
 
 ## Phase 5 — Documentation
 
-- ⬜ 🤖 Réécrire « Démarrer en 5 minutes » pour une débutante (Annie et les prochains arrivants)
-- ⬜ 🤖 Intégrer au mode d'emploi les nouveautés en attente (`docs/a-integrer-au-mode-emploi.md`) : « + » du Co-pilote, dossier, offre aux auteurs, jeu « Lire pour traverser »…
+- ✅ 🤖 « Démarrer en 5 minutes » pour une débutante (début du mode d'emploi, 09/11/2026)
+- ✅ 🤖 Nouveautés intégrées au mode d'emploi (section 6) ; ⬜ 👤 relire le mode d'emploi dans l'appli et me dire ce qui sonne faux (chaque fonction est à revérifier : voir `docs/a-integrer-au-mode-emploi.md`)
 
 ---
 
