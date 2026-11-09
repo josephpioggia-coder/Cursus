@@ -66,7 +66,7 @@ function traduireErreurAuth(brut) {
   return t;
 }
 
-export function PageConnexion({ onRetourAccueil = null } = {}) {
+export function PageConnexion({ onDossier = null } = {}) {
   const [email, setEmail]       = useState(() => {
     try {
       return localStorage.getItem(CLÉ_DERNIER_EMAIL) || "";
@@ -171,9 +171,6 @@ export function PageConnexion({ onRetourAccueil = null } = {}) {
         borderRadius: 16, padding: "40px 48px", width: 380,
         position: "relative", zIndex: 1,
       }}>
-        {onRetourAccueil && (
-          <button onClick={onRetourAccueil} style={{ background: "none", border: "none", color: "#7F77DD", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 14 }}>← Découvrir Cursus</button>
-        )}
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           {/* 06/09/2026 — logo agrandi de 48 à 98px : trop petit comparé aux
@@ -234,6 +231,20 @@ export function PageConnexion({ onRetourAccueil = null } = {}) {
             }} />
             <span><b>Æncre</b> vous guide — mode d'emploi, premiers pas</span>
           </button>
+          {/* 09/11/2026 — accès complémentaire (décision de Joseph : la présentation de cette page suffit, on y AJOUTE l'accès) : dossier
+              thématique « Lire pour traverser », livres d'auteurs partenaires + offre de lancement pour les auteurs (src/components/Vitrine.jsx). */}
+          {onDossier && (
+            <button onClick={onDossier} className="bouton-aencre"
+              style={{
+                marginTop: 8, width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "7px 14px 7px 7px", borderRadius: 30, textAlign: "left",
+                border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
+                fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+              }}>
+              <img src="/aencre-icone.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, boxShadow: "0 2px 6px rgba(127,119,221,0.35)" }} />
+              <span><b>Lire pour traverser</b> — dossier thématique, livres d'auteurs partenaires, offre pour les auteurs</span>
+            </button>
+          )}
           {/* 24/09/2026, suite — cette page tient entièrement dans l'écran
               (contrairement au Mode d'emploi, bien plus long, où Æncre
               accompagne le scroll — voir AencreGuide.jsx) : inutile de la
