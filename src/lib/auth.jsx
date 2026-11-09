@@ -219,59 +219,21 @@ export function PageConnexion({ onDossier = null } = {}) {
               fournie). Léger mouvement continu (flottement) + réaction au
               survol, pour donner un peu de vie plutôt qu'un simple bouton
               texte. */}
-          <button onClick={() => setPageLégale("mode-emploi")} className="bouton-aencre"
-            style={{
-              marginTop: 14, width: "100%", display: "flex", alignItems: "center", gap: 10,
-              padding: "7px 14px 7px 7px", borderRadius: 30, textAlign: "left",
-              border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
-              fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-            }}>
-            <img src="/aencre-icone.png" alt="Æncre" className="aencre-avatar" style={{
-              width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-              boxShadow: "0 2px 6px rgba(127,119,221,0.35)",
-            }} />
-            <span><b>Æncre</b> vous guide — mode d'emploi, premiers pas</span>
-          </button>
-          {/* 09/11/2026 — accès complémentaire (décision de Joseph : la présentation de cette page suffit, on y AJOUTE l'accès) : dossier
-              thématique « Lire pour traverser », livres d'auteurs partenaires + offre de lancement pour les auteurs (src/components/Vitrine.jsx). */}
+          {/* 09/11/2026 — accès au dossier thématique + offre pour les auteurs, en UNE carte sobre (retour de Joseph : deux cartouches Æncre
+              l'une sous l'autre n'étaient ni esthétiques ni claires). L'aide Æncre (mode d'emploi) est sous le formulaire. */}
           {onDossier && (
-            <button onClick={onDossier} className="bouton-aencre"
-              style={{
-                marginTop: 8, width: "100%", display: "flex", alignItems: "center", gap: 10,
-                padding: "7px 14px 7px 7px", borderRadius: 30, textAlign: "left",
-                border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
-                fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
-              }}>
-              <img src="/aencre-icone.png" alt="" style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, boxShadow: "0 2px 6px rgba(127,119,221,0.35)" }} />
-              <span><b>Lire pour traverser</b> — dossier thématique, livres d'auteurs partenaires, offre pour les auteurs</span>
-            </button>
-          )}
-          {/* L'offre de lancement doit se voir SANS ouvrir le dossier (retour de Joseph, 09/11/2026). */}
-          {onDossier && OFFRE_ACTIVE && (
-            <div style={{ marginTop: 8, background: "#EEEDFE", border: "1px solid #7F77DD55", borderRadius: 12, padding: "10px 12px", fontSize: 12, lineHeight: 1.55, color: "#333", textAlign: "left" }}>
-              <b>Auteur ? Un mois d'accès Initié offert</b> (bêta) aux {PLACES_OFFRE} premiers nouveaux auteurs dont le livre est présenté sur Cursus.{" "}
-              <button onClick={onDossier} style={{ background: "none", border: "none", padding: 0, color: "#7F77DD", fontSize: 12, fontFamily: "inherit", textDecoration: "underline", cursor: "pointer" }}>En savoir plus</button>
+            <div style={{ marginTop: 16, border: "0.5px solid #e5e5e5", borderLeft: "3px solid #7F77DD", borderRadius: 10, padding: "10px 12px", background: "#fafafa", textAlign: "left" }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#1D9E75", letterSpacing: "0.06em", textTransform: "uppercase" }}>Dossier thématique</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#333", marginTop: 2 }}>Lire pour traverser</div>
+              <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5, marginTop: 2 }}>La maladie, la fin de vie et le deuil, à travers les livres d'auteurs partenaires.</div>
+              {OFFRE_ACTIVE && (
+                <div style={{ fontSize: 12, color: "#333", lineHeight: 1.5, marginTop: 6 }}>
+                  <b>Auteur ? Un mois d'accès Initié offert</b> (bêta) aux {PLACES_OFFRE} premiers nouveaux auteurs dont le livre est présenté.
+                </div>
+              )}
+              <button onClick={onDossier} style={{ background: "none", border: "none", padding: 0, marginTop: 6, color: "#7F77DD", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", textDecoration: "underline" }}>Découvrir le dossier{OFFRE_ACTIVE ? " et l'offre" : ""} →</button>
             </div>
           )}
-          {/* 24/09/2026, suite — cette page tient entièrement dans l'écran
-              (contrairement au Mode d'emploi, bien plus long, où Æncre
-              accompagne le scroll — voir AencreGuide.jsx) : inutile de la
-              faire voyager ici, seulement un mouvement sur place, comme
-              soulevée par un souffle d'air — plus organique que le simple
-              va-et-vient précédent (léger balancement horizontal en plus
-              de la bascule verticale, easing asymétrique). */}
-          <style>{`
-            @keyframes aencre-flotte {
-              0%   { transform: translate(0, 0) rotate(-3deg); }
-              30%  { transform: translate(1px, -3px) rotate(2deg); }
-              55%  { transform: translate(-1px, -1px) rotate(-1deg); }
-              80%  { transform: translate(1px, -4px) rotate(3deg); }
-              100% { transform: translate(0, 0) rotate(-3deg); }
-            }
-            .aencre-avatar { animation: aencre-flotte 4.2s ease-in-out infinite; }
-            .bouton-aencre:hover .aencre-avatar { animation-play-state: paused; transform: scale(1.12) rotate(-6deg); }
-            .bouton-aencre:hover { border-color: #7F77DD80; }
-          `}</style>
         </div>
 
         {/* Onglets */}
@@ -344,6 +306,40 @@ export function PageConnexion({ onDossier = null } = {}) {
               Renvoyer l'e-mail de confirmation
             </button>
           )}
+
+          {/* L'aide Æncre (mode d'emploi, premiers pas) est maintenant SOUS la connexion : retour de Joseph, 09/11/2026. */}
+          <button onClick={() => setPageLégale("mode-emploi")} className="bouton-aencre"
+            style={{
+              marginTop: 22, width: "100%", display: "flex", alignItems: "center", gap: 10,
+              padding: "7px 14px 7px 7px", borderRadius: 30, textAlign: "left",
+              border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD",
+              fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit",
+            }}>
+            <img src="/aencre-icone.png" alt="Æncre" className="aencre-avatar" style={{
+              width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+              boxShadow: "0 2px 6px rgba(127,119,221,0.35)",
+            }} />
+            <span><b>Æncre</b> vous guide — mode d'emploi, premiers pas</span>
+          </button>
+          {/* 24/09/2026, suite — cette page tient entièrement dans l'écran
+              (contrairement au Mode d'emploi, bien plus long, où Æncre
+              accompagne le scroll — voir AencreGuide.jsx) : inutile de la
+              faire voyager ici, seulement un mouvement sur place, comme
+              soulevée par un souffle d'air — plus organique que le simple
+              va-et-vient précédent (léger balancement horizontal en plus
+              de la bascule verticale, easing asymétrique). */}
+          <style>{`
+            @keyframes aencre-flotte {
+              0%   { transform: translate(0, 0) rotate(-3deg); }
+              30%  { transform: translate(1px, -3px) rotate(2deg); }
+              55%  { transform: translate(-1px, -1px) rotate(-1deg); }
+              80%  { transform: translate(1px, -4px) rotate(3deg); }
+              100% { transform: translate(0, 0) rotate(-3deg); }
+            }
+            .aencre-avatar { animation: aencre-flotte 4.2s ease-in-out infinite; }
+            .bouton-aencre:hover .aencre-avatar { animation-play-state: paused; transform: scale(1.12) rotate(-6deg); }
+            .bouton-aencre:hover { border-color: #7F77DD80; }
+          `}</style>
         </div>
 
         <p style={{ fontSize: 11, color: "#bbb", textAlign: "center", marginTop: 24, lineHeight: 1.6 }}>
