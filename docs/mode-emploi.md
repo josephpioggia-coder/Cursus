@@ -16,7 +16,7 @@ Vous découvrez Cursus ? Voici le chemin le plus court pour écrire votre premi�
 2. **Choisissez votre espace.** Pour écrire, c'est **CursEdit**.
 3. **Activez votre accès.** CursEdit demande un abonnement ou un **code promotionnel** (ou code cadeau). Sur la page d'accès, saisissez le code dans la case « Code promotionnel » *avant* de cliquer sur « Choisir ». Avec un code à 100 %, il n'y a rien à payer.
 4. **Créez votre projet.** Menu « Mes projets », puis « + Nouveau projet ». Un questionnaire de démarrage peut s'ouvrir (une dizaine de questions sur votre livre) : y répondre aide le Co-pilote ; « Plus tard » le ferme sans rien perdre.
-5. **Ajoutez une partie, puis un chapitre, et écrivez.** Votre texte est enregistré automatiquement. Le témoin à côté du titre du chapitre affiche « Sauvegardé » quand l'enregistrement est confirmé. S'il affiche « NON ENREGISTRÉ » en rouge, ne rechargez pas la page.
+5. **Ajoutez une partie, puis un chapitre, et écrivez.** Votre texte s'enregistre tout seul. À côté du titre, **✓ Sauvegardé** (en vert) veut dire que tout est en sécurité. Si vous voyez **NON ENREGISTRÉ** en rouge, ne fermez pas et ne rechargez pas la page : attendez que le vert revienne.
 6. **Demandez un coup de main.** Le Co-pilote (panneau de droite) donne des avis ; « Aide-moi à avancer » est toujours disponible. Pour une simple question, **Ctrl+K** (ou le bouton « Aide ») ouvre la Question rapide.
 7. **Un doute ?** Le bouton « Aide » répond ; sur la page de connexion, Æncre propose aussi ce mode d'emploi.
 
