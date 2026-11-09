@@ -10,6 +10,13 @@ Format : **Titre** — *où le trouver* — ce que ça fait, en une à trois phr
 
 ## À intégrer
 
+*(vide : tout est repris ci-dessous)*
+
+## Déjà intégré
+
+*Intégré au mode d'emploi le 09/11/2026 (section « Démarrer en 5 minutes » et section 6, `docs/mode-emploi.md` et `src/components/ModeEmploi.jsx`). Les entrées détaillées ci-dessous restent la référence ; **chaque fonction est encore à revérifier dans l'appli avant de la présenter comme acquise** (le texte publié reste volontairement court).*
+
+
 ### Entrer dans Cursus
 - **Installer Cursus sur l'écran d'accueil** (31/10/2026) — *écran de choix d'espace, tiroir ☰ en bas* — bouton « 📲 Installer Cursus ». Chrome / Edge / Samsung : installation en un clic. Firefox Android : menu ⋮ → « Installer » ou « Ajouter à l'écran d'accueil » (peut créer un simple raccourci si Android bloque l'installation). iPhone : Partager → Sur l'écran d'accueil. Firefox sur ordinateur ne sait pas installer une appli web : marque-page ou onglet épinglé.
 - **Écran de choix à chaque nouvelle visite** (04/10/2026) — un nouvel onglet ou un clic sur cursus.pro ramène à l'écran de choix CursEdit / CursAudit ; un rechargement (F5) garde l'espace et le chapitre ouverts.
@@ -46,9 +53,7 @@ Format : **Titre** — *où le trouver* — ce que ça fait, en une à trois phr
 - **Jeux de mots** (menu) — Scrabble (solveur, outils, partie contre l'ordinateur au doigt), Motus, Pendu, Boggle, Mots croisés/fléchés/codés, Mots en cercle, Échelle, Mots mêlés, Devine le livre, Quel lecteur es-tu ?, Au palmarès.
 - **🧘 Pauses bien-être** — rappel discret après un long moment d'écriture (réglable, désactivable) ; mouvements doux, pas un avis médical.
 
-## Déjà intégré
 
-*(rien pour l'instant)*
 
 ## Exporter le questionnaire de démarrage (01/11/2026)
 Où : 🧭 Questionnaire de démarrage → écran « Le questionnaire de base est enregistré » → carte « 📄 Exporter mes réponses ». Trois sorties : Word (.docx, questions + réponses par série, personnes en puces), copie du texte, sauvegarde .json. Les séries non commencées sont omises. Le document peut servir de pièce jointe pour CursAudit (pas d'import automatique).
