@@ -14,12 +14,13 @@ export function FicheLivre({ livre }) {
       <div style={{ ...discret, marginBottom: 6 }}>{livre.auteur} · {livre.annee} · {livre.pays}</div>
       <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 6 }}>{livre.pitch}</div>
       <div style={discret}>{livre.genre} — {livre.lieu}</div>
-      <div style={{ ...discret, marginTop: 6, fontStyle: "italic" }}>{livre.palmares}</div>
+      {livre.palmares && <div style={{ ...discret, marginTop: 6, fontStyle: "italic" }}>{livre.palmares}</div>}
     </div>
   );
 }
 
-export default function DevineLeLivre({ donnees }) {
+// Réutilisable pour une sélection thématique (09/11/2026) : `titre`, `sous`, `cleStats` et `mentionFn` remplacent les textes par défaut.
+export default function DevineLeLivre({ donnees, titre = "Devine le livre", sous = "Cinq indices dévoilés un par un : plus tu devines tôt, plus tu marques de points. Les fiches sont écrites pour Cursus, à partir de livres qui se sont bien vendus en France et en Belgique.", cleStats = "livres", mentionFn = mention }) {
   const [manches, setManches] = useState(null);
   const [i, setI] = useState(0);
   const [nbIndices, setNbIndices] = useState(1);
@@ -27,7 +28,7 @@ export default function DevineLeLivre({ donnees }) {
   const [issue, setIssue] = useState(null); // null | { gagne, points }
   const [resultats, setResultats] = useState([]); // [{ livre, gagne, points }]
   const [fini, setFini] = useState(false);
-  const [stats, setStats] = useState(() => lireStats("livres"));
+  const [stats, setStats] = useState(() => lireStats(cleStats));
 
   const commencer = () => { setManches(preparerManches(donnees.livres)); setI(0); setNbIndices(1); setFaux([]); setIssue(null); setResultats([]); setFini(false); };
   const manche = manches?.[i];
@@ -35,7 +36,7 @@ export default function DevineLeLivre({ donnees }) {
   const terminer = (res) => {
     setFini(true);
     const total = res.reduce((s, r) => s + r.points, 0), trouves = res.filter((r) => r.gagne).length;
-    setStats(noterPartie("livres", { gagne: trouves >= Math.ceil(res.length / 2), score: total }));
+    setStats(noterPartie(cleStats, { gagne: trouves >= Math.ceil(res.length / 2), score: total }));
   };
 
   const choisir = (livre) => {
@@ -54,7 +55,7 @@ export default function DevineLeLivre({ donnees }) {
 
   return (
     <div>
-      <EnTete titre="Devine le livre" sous="Cinq indices dévoilés un par un : plus tu devines tôt, plus tu marques de points. Les fiches sont écrites pour Cursus, à partir de livres qui se sont bien vendus en France et en Belgique." />
+      <EnTete titre={titre} sous={sous} />
       {!manches ? (
         <div style={carte}>
           <button style={bouton()} onClick={commencer}>▶ Jouer ({Math.min(NB_MANCHES, donnees.livres.length)} livres)</button>
@@ -65,7 +66,7 @@ export default function DevineLeLivre({ donnees }) {
           <div style={carte}>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{score} points sur {resultats.length * 5}</div>
             <div style={{ fontSize: 13, marginBottom: 4 }}>{resultats.filter((r) => r.gagne).length} livre{resultats.filter((r) => r.gagne).length > 1 ? "s" : ""} trouvé{resultats.filter((r) => r.gagne).length > 1 ? "s" : ""} sur {resultats.length}.</div>
-            <div style={{ ...discret, marginBottom: 10 }}>{mention(score, resultats.length)}</div>
+            <div style={{ ...discret, marginBottom: 10 }}>{mentionFn(score, resultats.length)}</div>
             <button style={bouton()} onClick={commencer}>Rejouer</button>
           </div>
           {resultats.map((r) => (

@@ -18,6 +18,7 @@ import Motus from "./jeux/Motus.jsx";
 import Pendu from "./jeux/Pendu.jsx";
 import Boggle from "./jeux/Boggle.jsx";
 import MotLePlusLong from "./jeux/MotLePlusLong.jsx";
+import LireTraverser from "./jeux/LireTraverser.jsx";
 import EchelleDeMots from "./jeux/EchelleDeMots.jsx";
 import MotsMeles from "./jeux/MotsMeles.jsx";
 import MotsCroises from "./jeux/MotsCroises.jsx";
@@ -47,6 +48,7 @@ const JEUX = [
   { id: "codes", icone: "🔢", titre: "Mots codés", resume: "Chaque numéro cache une lettre : déchiffre la grille.", Composant: MotsCodes },
   { id: "livre", icone: "📚", titre: "Devine le livre", resume: "Cinq indices, un best-seller de France ou de Belgique : trouve-le le plus vite possible.", Composant: DevineLeLivre, leger: true },
   { id: "palmares", icone: "📊", titre: "Au palmarès", resume: "Les vrais chiffres du Top 200 des ventes de livres : devine qui est devant.", Composant: AuPalmares, leger: true },
+  { id: "deuil", icone: "🕊️", titre: "Lire pour traverser", resume: "Des livres sur la maladie, la fin de vie et le deuil : devine-les, retrouve leurs auteurs.", Composant: LireTraverser, leger: true },
   { id: "lecteur", icone: "🔖", titre: "Quel lecteur es-tu ?", resume: "Huit questions sur tes goûts, trois livres faits pour toi.", Composant: QuelLecteur, leger: true },
 ];
 
