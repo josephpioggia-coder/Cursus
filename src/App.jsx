@@ -29,7 +29,8 @@
 import InstallerCursus from "./components/InstallerCursus.jsx";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth, PageConnexion } from "./lib/auth.jsx";
+import { useAuth } from "./lib/auth.jsx";
+import EntreePublique from "./components/Accueil.jsx";
 import { projetsAPI, nœudsAPI, abonnementsAPI, stylesProjetAPI } from "./lib/api.js";
 import { supabase } from "./lib/supabase.js";
 import { journaliserErreur } from "./lib/journalErreurs.js";
@@ -1773,7 +1774,7 @@ export default function App() {
       {t("chargement")}
     </div>
   );
-  if (!user) return <PageConnexion />;
+  if (!user) return <EntreePublique />;
   // 07/09/2026 — "Rejoindre l'offre de lancement" ouvre désormais
   // PageLancement depuis EcranChoixEspace elle-même (autonome, comme
   // CursDecisionPage) — plus besoin de vueInitiale ici pour y accéder via

@@ -66,7 +66,7 @@ function traduireErreurAuth(brut) {
   return t;
 }
 
-export function PageConnexion() {
+export function PageConnexion({ onRetourAccueil = null } = {}) {
   const [email, setEmail]       = useState(() => {
     try {
       return localStorage.getItem(CLÉ_DERNIER_EMAIL) || "";
@@ -171,6 +171,9 @@ export function PageConnexion() {
         borderRadius: 16, padding: "40px 48px", width: 380,
         position: "relative", zIndex: 1,
       }}>
+        {onRetourAccueil && (
+          <button onClick={onRetourAccueil} style={{ background: "none", border: "none", color: "#7F77DD", fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 14 }}>← Découvrir Cursus</button>
+        )}
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           {/* 06/09/2026 — logo agrandi de 48 à 98px : trop petit comparé aux
