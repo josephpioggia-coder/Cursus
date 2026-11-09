@@ -1,15 +1,17 @@
 /**
- * CURSUS — Entrée publique (09/11/2026). La page de connexion SERT d'accueil (présentation de CursEdit, CursAudit, CursDecision, bouton Æncre) :
- * décision de Joseph, après essai d'une page d'accueil séparée qui faisait double emploi. Cette entrée y ajoute l'accès complémentaire au
- * dossier thématique « Lire pour traverser » (livres d'auteurs partenaires + offre pour les auteurs) : src/components/Vitrine.jsx.
+ * CURSUS — Entrée publique (09/11/2026). La page de connexion SERT d'accueil (présentation de CursEdit, CursAudit, CursDecision, aide Æncre) :
+ * décision de Joseph. Elle propose deux accès INDÉPENDANTS, ouverts ici (src/components/Vitrine.jsx) :
+ *  - le dossier thématique général « Lire pour traverser » (cartouche) ;
+ *  - la vitrine des auteurs partenaires + l'offre de lancement (encadré).
  */
 import { useState } from "react";
 import { PageConnexion } from "../lib/auth.jsx";
-import { DOSSIERS, PageDossier, Cadre } from "./Vitrine.jsx";
+import { DOSSIERS, PageDossier, PagePartenaires, Cadre } from "./Vitrine.jsx";
 
 export default function EntreePublique() {
-  const [dossier, setDossier] = useState(null);
-  const d = DOSSIERS.find((x) => x.id === dossier);
-  if (d) return <Cadre onRetour={() => setDossier(null)}><PageDossier dossier={d} onRetour={() => setDossier(null)} /></Cadre>;
-  return <PageConnexion onDossier={DOSSIERS[0] ? () => setDossier(DOSSIERS[0].id) : null} />;
+  const [page, setPage] = useState(null); // null | "dossier" | "partenaires"
+  const retour = () => setPage(null);
+  if (page === "dossier") return <Cadre onRetour={retour}><PageDossier dossier={DOSSIERS[0]} onRetour={retour} onPartenaires={() => setPage("partenaires")} /></Cadre>;
+  if (page === "partenaires") return <Cadre onRetour={retour}><PagePartenaires onRetour={retour} /></Cadre>;
+  return <PageConnexion onDossier={() => setPage("dossier")} onPartenaires={() => setPage("partenaires")} />;
 }

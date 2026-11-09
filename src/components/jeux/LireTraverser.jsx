@@ -2,7 +2,7 @@
  * CURSUS — « Lire pour traverser » (09/11/2026) : jeux autour de livres sur la maladie, la fin de vie et le deuil.
  * Idée de Joseph, à partir d'une sélection éditoriale lue en ligne : seuls les FAITS (titre, auteur, genre) sont repris,
  * les résumés et indices sont réécrits pour Cursus. Deux jeux : « Devine le livre » (7 fiches à 5 indices, réutilise
- * DevineLeLivre) et « Auteurs et genres » (13 livres). Sujet sensible : avertissement, aucun chronomètre, on peut passer.
+ * DevineLeLivre) et « Auteurs et genres » (15 livres). Sujet sensible : avertissement, aucun chronomètre, on peut passer.
  * Moteur : src/lib/jeuLectures.js ; données : public/jeux/lectures-deuil.json.
  */
 import { useState, useEffect } from "react";
@@ -34,7 +34,7 @@ function AuteursEtGenres({ livres }) {
 
   return (
     <div>
-      <EnTete titre="Auteurs et genres" sous="Qui a écrit quoi, et dans quelle catégorie ranger chaque livre ? Treize ouvrages sur la maladie, la fin de vie et le deuil." />
+      <EnTete titre="Auteurs et genres" sous={`Qui a écrit quoi, et dans quelle catégorie ranger chaque livre ? ${livres.length} ouvrages sur la maladie, la fin de vie et le deuil.`} />
       {!qs ? (
         <div style={carte}>
           <button style={bouton()} onClick={commencer}>▶ Jouer ({Math.min(NB_QUESTIONS, livres.length)} questions)</button>
@@ -98,7 +98,7 @@ export default function LireTraverser() {
       <div>
         <button onClick={() => setMode(null)} style={{ background: "transparent", border: "none", color: "#1D9E75", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 10 }}>← Lire pour traverser</button>
         {mode === "devine"
-          ? <DevineLeLivre donnees={{ livres: avecIndices(livres) }} titre="Devine le livre — lectures de la maladie et du deuil" sous="Cinq indices dévoilés un par un : plus tu devines tôt, plus tu marques de points. Sept livres, romans, récits et enquêtes." cleStats={CLE} mentionFn={mention} />
+          ? <DevineLeLivre donnees={{ livres: avecIndices(livres) }} titre="Devine le livre — lectures de la maladie et du deuil" sous={`Cinq indices dévoilés un par un : plus tu devines tôt, plus tu marques de points. ${avecIndices(livres).length} livres, romans, récits et enquêtes.`} cleStats={CLE} mentionFn={mention} />
           : <AuteursEtGenres livres={livres} />}
       </div>
     );
@@ -112,7 +112,7 @@ export default function LireTraverser() {
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 240px), 1fr))" }}>
         <button style={{ ...carte, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "var(--color-text-primary)", margin: 0 }} onClick={() => setMode("devine")}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>🔎 Devine le livre</div>
-          <div style={discret}>Cinq indices, sept livres à retrouver.</div>
+          <div style={discret}>Cinq indices, {avecIndices(livres).length} livres à retrouver.</div>
         </button>
         <button style={{ ...carte, cursor: "pointer", textAlign: "left", fontFamily: "inherit", color: "var(--color-text-primary)", margin: 0 }} onClick={() => setMode("quiz")}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>✍️ Auteurs et genres</div>
