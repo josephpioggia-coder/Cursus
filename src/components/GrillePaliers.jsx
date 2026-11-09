@@ -62,9 +62,13 @@ export default function GrillePaliers() {
           value={codePromo}
           onChange={(e) => setCodePromo(e.target.value)}
           placeholder="Code promotionnel (optionnel)"
+          autoComplete="off" autoCorrect="off" autoCapitalize="characters" spellCheck={false}
+          aria-label="Code promotionnel"
           style={{
-            padding: "9px 14px", borderRadius: 8, border: `1px solid ${COULEURS.bordeaux}30`,
-            fontFamily: "inherit", fontSize: 13, width: 260, textAlign: "center",
+            // 09/11/2026 : le champ de 260 px coupait les codes longs (ex. « PRENOM-100%-ABCD ») ; pleine largeur jusqu'à 460 px, 16 px de
+            // corps de texte (en dessous, le navigateur mobile zoome la page à la saisie), correction automatique coupée (accents, %).
+            padding: "10px 14px", borderRadius: 8, border: `1px solid ${COULEURS.bordeaux}30`,
+            fontFamily: "inherit", fontSize: 16, width: "100%", maxWidth: 460, boxSizing: "border-box", textAlign: "center",
             textTransform: "uppercase", letterSpacing: 0.5,
           }}
         />
