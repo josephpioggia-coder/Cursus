@@ -179,5 +179,43 @@
     "genre": "Récit intime",
     "categorie": "temoignage",
     "pitch": "Anne-Dauphine Julliand, qui a connu plusieurs deuils, réfléchit à ce que l'on peut offrir à quelqu'un qui souffre : présence, écoute, gestes simples."
+  },
+  {
+    "id": "vivre-vite",
+    "titre": "Vivre vite",
+    "auteur": "Brigitte Giraud",
+    "pays": "France",
+    "annee": 2022,
+    "format": "roman",
+    "genre": "Récit littéraire",
+    "categorie": "temoignage",
+    "lieu": "Lyon, 1999",
+    "pitch": "Une femme remonte le temps pour comprendre comment un simple achat de maison a pu mener à un accident mortel. Un texte court, dense, sur le deuil et les « si ».",
+    "indices": [
+      "Un court roman français couronné par le Goncourt en 2022.",
+      "Il se passe à la fin des années 1990 dans une grande ville française.",
+      "Un couple cherche à acheter une maison.",
+      "Un accident de moto change tout.",
+      "Autrice : B. G. ; le titre parle d'aller trop fort."
+    ]
+  },
+  {
+    "id": "tout-le-bleu-du-ciel",
+    "titre": "Tout le bleu du ciel",
+    "auteur": "Mélissa Da Costa",
+    "pays": "France",
+    "annee": 2019,
+    "format": "roman",
+    "genre": "Roman feel-good, road-trip",
+    "categorie": "roman",
+    "lieu": "France, de la montagne à la mer",
+    "pitch": "Un jeune homme atteint d'une maladie qui efface la mémoire part sur les routes avec une femme rencontrée par annonce. Un roman émouvant, solaire, sur la vie qu'on choisit.",
+    "indices": [
+      "Un roman français devenu un grand succès de librairie à partir de 2019.",
+      "L'histoire est un voyage à travers la France.",
+      "Le héros n'a que vingt-six ans et sait que sa maladie va progresser.",
+      "Il passe une annonce pour trouver quelqu'un qui partira avec lui.",
+      "Autrice : M. D. C. ; le titre parle d'un ciel clair."
+    ]
   }
 ]

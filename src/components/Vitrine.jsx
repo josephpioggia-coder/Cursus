@@ -1,12 +1,15 @@
 /**
  * CURSUS — Dossiers thématiques et vitrine des auteurs partenaires (09/11/2026).
- * Ouvert depuis le bouton « Æncre » de la page de connexion (qui sert d'accueil, présentation comprise : décision de Joseph) ; une page par
- * dossier, qui ne liste QUE les livres d'auteurs partenaires de public/vitrine/livres.json (vide tant qu'aucun accord écrit n'est reçu),
- * puis l'encadré d'offre pour les auteurs. Une fiche sans date de consentement n'est jamais affichée.
+ * DEUX éléments INDÉPENDANTS, ouverts depuis la page de connexion (qui sert d'accueil) — décision de Joseph, 09/11/2026 :
+ *  1. le DOSSIER THÉMATIQUE GÉNÉRAL (« Lire pour traverser », cartouche) : sélection éditoriale ouverte à tous, tirée de
+ *     public/jeux/lectures-deuil.json (aussi utilisé par le jeu du même nom) ; ne dépend d'AUCUN partenaire ;
+ *  2. la VITRINE DES AUTEURS PARTENAIRES (encadré d'offre) : livres de public/vitrine/livres.json (vide tant qu'aucun accord écrit n'est
+ *     reçu) + offre de lancement. Une fiche sans date de consentement n'est jamais affichée.
  * Couleurs explicites (pas de var(--color-*)) : le mode sombre forcé des navigateurs mobiles inverse les textes.
  */
 import { useState, useEffect } from "react";
 import { IDENTITE_EDITEUR } from "./PagesLegales.jsx";
+import { chargerLectures } from "../lib/jeuLectures.js";
 
 /** Offre de lancement (décision de Joseph, 09/11/2026) : un mois d'accès Initié en bêta, 30 places. Mettre à false pour masquer l'encadré. */
 export const OFFRE_ACTIVE = true;
@@ -22,14 +25,21 @@ const bouton = (plein = true) => ({
 const carte = { background: "#fff", border: "0.5px solid #e5e5e5", borderRadius: 14, padding: "18px 18px", minWidth: 0 };
 const grille = { display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 250px), 1fr))" };
 
-/** Dossiers thématiques de la vitrine : chacun s'affiche comme un bouton d'accès et s'ouvre sur les livres d'auteurs partenaires qui le portent. */
-const DOSSIERS = [
+/** Dossiers thématiques généraux (cartouche de la page de connexion). Ajouter un dossier = une entrée (et ses données). */
+export const DOSSIERS = [
   {
     id: "deuil",
     titre: "Lire pour traverser",
-    sous: "Dossier thématique : la maladie, la fin de vie et le deuil, à travers les livres d'auteurs partenaires.",
-    intro: "Des livres écrits par des auteurs partenaires de Cursus, sur la maladie, la fin de vie et le deuil : romans, témoignages, essais. Chaque fiche est publiée avec l'accord de son auteur.",
+    sous: "La maladie, la fin de vie et le deuil",
+    intro: "Certains livres aident à traverser une maladie, un accompagnement ou un deuil, chacun à sa manière : en racontant, en expliquant, en consolant ou en faisant réfléchir. Voici une sélection de lectures, classées par genre. Les présentations ont été rédigées pour Cursus.",
   },
+];
+
+const GROUPES = [
+  { id: "roman", titre: "Romans" },
+  { id: "temoignage", titre: "Témoignages et récits intimes" },
+  { id: "essai", titre: "Essais et enquêtes" },
+  { id: "philo", titre: "Philosophie et éthique" },
 ];
 
 const MODES_CREATION = {
@@ -38,29 +48,64 @@ const MODES_CREATION = {
 };
 
 /** Une fiche n'est affichée que si l'auteur a donné son accord (`consentement` renseigné) et si elle appartient au dossier. */
-const fichesDuDossier = (livres, dossierId) =>
-  (Array.isArray(livres) ? livres : []).filter((l) => l && l.titre && l.auteur && l.consentement && Array.isArray(l.dossiers) && l.dossiers.includes(dossierId));
+const fichesPartenaires = (livres) =>
+  (Array.isArray(livres) ? livres : []).filter((l) => l && l.titre && l.auteur && l.consentement);
 const lienSur = (u) => (typeof u === "string" && /^https:\/\//i.test(u) ? u : null);
 
 const srcCouverture = (c) => (typeof c === "string" && (c.startsWith("/vitrine/couvertures/") || /^https:\/\//i.test(c)) ? c : null);
 
-function PageDossier({ dossier, onRetour }) {
+function PageDossier({ dossier, onRetour, onPartenaires }) {
+  const [livres, setLivres] = useState(null);
+  const [erreur, setErreur] = useState(false);
+  useEffect(() => { chargerLectures().then(setLivres).catch(() => setErreur(true)); }, []);
+  return (
+    <main style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 56px" }}>
+      <button onClick={onRetour} style={{ background: "none", border: "none", color: MAUVE, fontSize: 14, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 18 }}>← Retour</button>
+      <div style={{ fontSize: 12, fontWeight: 600, color: VERT, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>Dossier thématique</div>
+      <h1 style={{ fontSize: 26, fontWeight: 600, color: ENCRE, margin: "0 0 10px", lineHeight: 1.25 }}>{dossier.titre} : {dossier.sous.charAt(0).toLowerCase() + dossier.sous.slice(1)}</h1>
+      <p style={{ fontSize: 15, lineHeight: 1.65, color: GRIS, maxWidth: 720, margin: "0 0 22px" }}>{dossier.intro}</p>
+      {erreur ? null : !livres ? <div style={{ fontSize: 13, color: "#999" }}>Chargement…</div> : GROUPES.map((g) => {
+        const liste = livres.filter((l) => (l.categorie || "essai") === g.id);
+        if (!liste.length) return null;
+        return (
+          <div key={g.id} style={{ marginBottom: 22 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: ENCRE, margin: "0 0 10px" }}>{g.titre}</h2>
+            <div style={grille}>
+              {liste.map((l) => (
+                <article key={l.id} style={carte}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: ENCRE, lineHeight: 1.3 }}>{l.titre}</div>
+                  <div style={{ fontSize: 12.5, color: "#777", margin: "2px 0 8px" }}>{l.auteur}{l.annee ? ` · ${l.annee}` : ""}</div>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "#333", margin: 0 }}>{l.pitch}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ marginTop: 26 }}>
+        <button onClick={onPartenaires} style={bouton(false)}>Vous êtes auteur ? Découvrir l'offre et nos auteurs partenaires</button>
+      </div>
+    </main>
+  );
+}
+
+function PagePartenaires({ onRetour }) {
   const [livres, setLivres] = useState(null);
   useEffect(() => {
     fetch("/vitrine/livres.json").then((r) => (r.ok ? r.json() : [])).then(setLivres).catch(() => setLivres([]));
   }, []);
-  const fiches = livres ? fichesDuDossier(livres, dossier.id) : null;
+  const fiches = livres ? fichesPartenaires(livres) : null;
   return (
     <main style={{ maxWidth: 980, margin: "0 auto", padding: "24px 16px 56px" }}>
       <button onClick={onRetour} style={{ background: "none", border: "none", color: MAUVE, fontSize: 14, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 18 }}>← Retour</button>
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
         <img src="/aencre-icone.png" alt="Æncre" style={{ width: 56, height: 56, borderRadius: "50%", flexShrink: 0 }} />
-        <h1 style={{ fontSize: 26, fontWeight: 600, color: ENCRE, margin: 0, lineHeight: 1.25 }}>{dossier.titre}</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 600, color: ENCRE, margin: 0, lineHeight: 1.25 }}>Nos auteurs partenaires</h1>
       </div>
-      <p style={{ fontSize: 15, lineHeight: 1.65, color: GRIS, maxWidth: 720, margin: "0 0 22px" }}>{dossier.intro}</p>
+      <p style={{ fontSize: 15, lineHeight: 1.65, color: GRIS, maxWidth: 720, margin: "0 0 22px" }}>Des livres écrits par des auteurs partenaires de Cursus. Chaque fiche est publiée avec l'accord de son auteur.</p>
       {!fiches ? <div style={{ fontSize: 13, color: "#999" }}>Chargement…</div> : fiches.length === 0 ? (
         <div style={{ ...carte, fontSize: 14.5, lineHeight: 1.65, color: "#444" }}>
-          Les premières fiches arrivent bientôt. Vous êtes auteur et votre livre parle de ce thème ? Présentez-le ici : voir l'encadré ci-dessous.
+          Les premières fiches arrivent bientôt. Vous êtes auteur ? Présentez votre livre ici : voir l'encadré ci-dessous.
         </div>
       ) : (
         <div style={grille}>
@@ -124,4 +169,4 @@ function Cadre({ onRetour, children }) {
   );
 }
 
-export { DOSSIERS, PageDossier, Cadre };
+export { PageDossier, PagePartenaires, EncadreAuteurs, Cadre };

@@ -7,6 +7,9 @@ import { useState } from "react";
 import { preparerManches, pointsPour, mention, NB_MANCHES } from "../../lib/jeuLivres.js";
 import { carte, bouton, boutonClair, discret, EnTete, lireStats, noterPartie } from "./commun.jsx";
 
+/** Le rang du Top 200 (semaine 39) n'est plus à jour : masqué tant que le palmarès n'est pas actualisé (09/11/2026). */
+const AFFICHER_PALMARES = false;
+
 export function FicheLivre({ livre }) {
   return (
     <div style={carte}>
@@ -14,7 +17,7 @@ export function FicheLivre({ livre }) {
       <div style={{ ...discret, marginBottom: 6 }}>{livre.auteur} · {livre.annee} · {livre.pays}</div>
       <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 6 }}>{livre.pitch}</div>
       <div style={discret}>{livre.genre} — {livre.lieu}</div>
-      {livre.palmares && <div style={{ ...discret, marginTop: 6, fontStyle: "italic" }}>{livre.palmares}</div>}
+      {AFFICHER_PALMARES && livre.palmares && <div style={{ ...discret, marginTop: 6, fontStyle: "italic" }}>{livre.palmares}</div>}
     </div>
   );
 }

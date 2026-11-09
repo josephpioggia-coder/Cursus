@@ -67,7 +67,7 @@ function traduireErreurAuth(brut) {
   return t;
 }
 
-export function PageConnexion({ onDossier = null } = {}) {
+export function PageConnexion({ onDossier = null, onPartenaires = null } = {}) {
   const [email, setEmail]       = useState(() => {
     try {
       return localStorage.getItem(CLÉ_DERNIER_EMAIL) || "";
@@ -219,19 +219,29 @@ export function PageConnexion({ onDossier = null } = {}) {
               fournie). Léger mouvement continu (flottement) + réaction au
               survol, pour donner un peu de vie plutôt qu'un simple bouton
               texte. */}
-          {/* 09/11/2026 — accès au dossier thématique + offre pour les auteurs, en UNE carte sobre (retour de Joseph : deux cartouches Æncre
-              l'une sous l'autre n'étaient ni esthétiques ni claires). L'aide Æncre (mode d'emploi) est sous le formulaire. */}
+          {/* 09/11/2026 — DEUX accès indépendants (décision de Joseph) : (1) le dossier thématique général, en cartouche SANS logo ;
+              (2) un encadré lisible qui s'adresse aux auteurs : offre de lancement + accès à la vitrine des auteurs partenaires.
+              L'aide Æncre (mode d'emploi) est sous le formulaire. Pages : src/components/Vitrine.jsx. */}
           {onDossier && (
-            <div style={{ marginTop: 16, border: "0.5px solid #e5e5e5", borderLeft: "3px solid #7F77DD", borderRadius: 10, padding: "10px 12px", background: "#fafafa", textAlign: "left" }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "#1D9E75", letterSpacing: "0.06em", textTransform: "uppercase" }}>Dossier thématique</div>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "#333", marginTop: 2 }}>Lire pour traverser</div>
-              <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5, marginTop: 2 }}>La maladie, la fin de vie et le deuil, à travers les livres d'auteurs partenaires.</div>
-              {OFFRE_ACTIVE && (
-                <div style={{ fontSize: 12, color: "#333", lineHeight: 1.5, marginTop: 6 }}>
-                  <b>Auteur ? Un mois d'accès Initié offert</b> (bêta) aux {PLACES_OFFRE} premiers nouveaux auteurs dont le livre est présenté.
-                </div>
-              )}
-              <button onClick={onDossier} style={{ background: "none", border: "none", padding: 0, marginTop: 6, color: "#7F77DD", fontSize: 12.5, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", textDecoration: "underline" }}>Découvrir le dossier{OFFRE_ACTIVE ? " et l'offre" : ""} →</button>
+            <button onClick={onDossier} style={{
+              marginTop: 16, width: "100%", display: "block", padding: "10px 16px", borderRadius: 30, textAlign: "left",
+              border: "0.5px solid #7F77DD40", background: "#F5F4FD", color: "#7F77DD", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.45,
+            }}>
+              <span style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "#1D9E75", fontWeight: 600, display: "block" }}>Dossier thématique</span>
+              <b>Lire pour traverser</b> — la maladie, la fin de vie et le deuil
+            </button>
+          )}
+          {onPartenaires && (
+            <div style={{ marginTop: 10, background: "#EEEDFE", border: "1px solid #7F77DD55", borderRadius: 14, padding: "14px 14px 12px", textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>Vous avez publié un livre ?</div>
+              <div style={{ fontSize: 13, lineHeight: 1.55, color: "#333", marginBottom: 10 }}>
+                {OFFRE_ACTIVE
+                  ? <>Présentez-le sur Cursus et recevez <b>un mois d'accès Initié offert</b> (bêta) : offre réservée aux {PLACES_OFFRE} premiers nouveaux auteurs.</>
+                  : <>Présentez-le sur Cursus, dans notre vitrine des auteurs partenaires.</>}
+              </div>
+              <button onClick={onPartenaires} style={{ background: "#7F77DD", color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12.5, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                Découvrir l'offre et nos auteurs partenaires
+              </button>
             </div>
           )}
         </div>

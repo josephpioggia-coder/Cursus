@@ -47,7 +47,7 @@ const JEUX = [
   { id: "fleches", icone: "➡️", titre: "Mots fléchés", resume: "Les définitions sont dans la grille, les flèches montrent le sens.", Composant: MotsFleches },
   { id: "codes", icone: "🔢", titre: "Mots codés", resume: "Chaque numéro cache une lettre : déchiffre la grille.", Composant: MotsCodes },
   { id: "livre", icone: "📚", titre: "Devine le livre", resume: "Cinq indices, un best-seller de France ou de Belgique : trouve-le le plus vite possible.", Composant: DevineLeLivre, leger: true },
-  { id: "palmares", icone: "📊", titre: "Au palmarès", resume: "Les vrais chiffres du Top 200 des ventes de livres : devine qui est devant.", Composant: AuPalmares, leger: true },
+  { id: "palmares", icone: "📊", titre: "Au palmarès", resume: "Les vrais chiffres du Top 200 des ventes de livres : devine qui est devant.", Composant: AuPalmares, leger: true, cache: true }, // caché le 09/11/2026 : données de la semaine 39 non mises à jour (retirer `cache` quand un flux de ventes à jour existe)
   { id: "deuil", icone: "🕊️", titre: "Lire pour traverser", resume: "Des livres sur la maladie, la fin de vie et le deuil : devine-les, retrouve leurs auteurs.", Composant: LireTraverser, leger: true },
   { id: "lecteur", icone: "🔖", titre: "Quel lecteur es-tu ?", resume: "Huit questions sur tes goûts, trois livres faits pour toi.", Composant: QuelLecteur, leger: true },
 ];
@@ -70,9 +70,9 @@ export default function SalleDesJeux({ jeuInitial = null }) {
 
   const ouvrir = async (j) => {
     if (j.leger) {
-      if (livres) { setJeu(j.id); return; }
+      if (livres && (j.id !== "palmares" || livres.palmares)) { setJeu(j.id); return; }
       setEtat("chargement");
-      try { const [lv, pa] = await Promise.all([chargerLivres(), chargerPalmares()]); setLivres({ livres: lv, palmares: pa }); setEtat(""); setJeu(j.id); } catch (e) { setEtat(e.message || String(e)); }
+      try { const [lv, pa] = await Promise.all([chargerLivres(), j.id === "palmares" ? chargerPalmares() : null]); setLivres({ livres: lv, palmares: pa }); setEtat(""); setJeu(j.id); } catch (e) { setEtat(e.message || String(e)); }
       return;
     }
     if (j.propre || donnees) { setJeu(j.id); return; }
@@ -80,9 +80,9 @@ export default function SalleDesJeux({ jeuInitial = null }) {
     try { setDonnees(await chargerDonnees()); setEtat(""); setJeu(j.id); }
     catch (e) { setEtat(e.message || String(e)); }
   };
-  const courant = JEUX.find((j) => j.id === jeu);
+  const courant = JEUX.find((j) => j.id === jeu && !j.cache);
   // Lien direct (« ?jeu=croises ») : ouvre ce jeu dès l'arrivée ; un id inconnu ou « salle » laisse la liste.
-  useEffect(() => { const j = JEUX.find((x) => x.id === jeuInitial); if (j) ouvrir(j); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { const j = JEUX.find((x) => x.id === jeuInitial && !x.cache); if (j) ouvrir(j); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (courant?.propre) {
     return (
@@ -117,7 +117,7 @@ export default function SalleDesJeux({ jeuInitial = null }) {
         {etat === "chargement" && <div style={{ fontSize: 13, color: "#BA7517", marginBottom: 10 }}>⏳ Chargement des dictionnaires (quelques secondes la première fois)…</div>}
         {etat && etat !== "chargement" && <div style={{ fontSize: 13, color: "#c0392b", marginBottom: 10 }}>{etat}</div>}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 12 }}>
-          {JEUX.map((j) => (
+          {JEUX.filter((j) => !j.cache).map((j) => (
             <button key={j.id} onClick={() => ouvrir(j)} disabled={etat === "chargement"} style={carte}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>{j.icone}</div>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{j.titre}</div>
