@@ -26,6 +26,8 @@ for (const brut of fs.readFileSync(entree, "utf8").split(/\r?\n/)) {
     else if (!accentuees[m]) accentuees[m] = brut;
   }
 }
+// Mots de 2 lettres de l'ODS absents de Dicollecte (ajout 10/11/2026) ; GI et GU sont volontairement exclus (refusés par l'ODS).
+for (const m of fs.readFileSync("scripts/donnees/mots-ods-2-lettres.txt", "utf8").split("\n")) if (m.trim()) mots.add(m.trim());
 const liste = [...mots].sort();
 fs.writeFileSync(sortie, liste.join("\n"));
 for (const m of brutsSansAccent) delete accentuees[m];
