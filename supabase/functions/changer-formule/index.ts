@@ -12,8 +12,9 @@
  * Règles :
  *  - L'appelant est identifié par son jeton (jamais par une valeur du corps) ; l'abonnement modifié est celui de CE compte.
  *  - Seul un changement vers une formule PLUS CHÈRE (rang supérieur) est accepté ; redescendre = pas encore (voir CLAUDE.md).
- *  - Même périodicité (annuel → annuel) : la date anniversaire est CONSERVÉE, le client paie la différence au prorata.
- *    Périodicité différente (mensuel ↔ annuel) : nouvelle période à partir d'aujourd'hui (crédit du temps restant déduit).
+ *  - TOUJOURS une nouvelle période à partir d'aujourd'hui, au PRIX PLEIN de la nouvelle formule, moins le crédit du temps non
+ *    utilisé de l'ancienne (modèle de Joseph, 15/11/2026 : formule à 29 € dont 9 € non utilisés → vers une formule à 49 € :
+ *    il paie 49 − 9 = 40 €, et la nouvelle période repart de ce jour). `billing_cycle_anchor: "now"` + `always_invoice`.
  *  - `payment_behavior: error_if_incomplete` : si le paiement échoue, RIEN n'est modifié.
  *  - Le webhook `customer.subscription.updated` (déjà en place) met la table `abonnements` à jour : pas d'écriture ici.
  *
@@ -79,7 +80,6 @@ Deno.serve(async (req) => {
         : "Le passage à une formule inférieure (ou à un autre rythme de même niveau) n'est pas encore possible en ligne : écrivez-nous, il prendra effet à votre prochaine échéance." }, 400);
     }
 
-    const memePeriode = cible.periode === actuel.periode;
     const maintenant = Math.floor(Date.now() / 1000);
     // La date de calcul de l'aperçu est réutilisée à la confirmation (mêmes montants), mais pas plus vieille que 15 min.
     let dateCalcul = maintenant;
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
       subscription_items: [{ id: item.id, price: nouveauPrix }],
       subscription_proration_behavior: "always_invoice" as const,
       subscription_proration_date: dateCalcul,
-      ...(memePeriode ? {} : { subscription_billing_cycle_anchor: "now" as const }),
+      subscription_billing_cycle_anchor: "now" as const,
     };
 
     if (action === "apercu") {
@@ -107,8 +107,7 @@ Deno.serve(async (req) => {
       return rep({
         ok: true, de: actuel.palier, vers: cible.palier, date_calcul: dateCalcul,
         a_payer_centimes: total, lignes: lignesAff,
-        prochaine_echeance: memePeriode ? sub.current_period_end : null,
-        date_anniversaire_conservee: memePeriode,
+        periode: cible.periode,
       });
     }
 
@@ -119,7 +118,7 @@ Deno.serve(async (req) => {
         proration_behavior: "always_invoice",
         proration_date: dateCalcul,
         payment_behavior: "error_if_incomplete",
-        ...(memePeriode ? {} : { billing_cycle_anchor: "now" }),
+        billing_cycle_anchor: "now",
       });
     } catch (e) {
       console.error("changer-formule : échec de la mise à jour", e.message);
