@@ -1569,3 +1569,6 @@ Demande de Joseph : ajouter aux trois cartes « accès à ce prix maintenu une f
 
 ### Logo CursDecision grisé (15/11/2026)
 Demande de Joseph : « griser le logo cursdecision » (espace pas encore opérationnel). `filter: grayscale(1)` + opacité 0,55 sur le logo de l'écran de choix d'espace (`EcranChoixEspace.jsx`) et sur sa pastille dans les cartes de tarification (`GrillePaliers.jsx`). À retirer quand CursDecision sera opérationnel. Le texte et le lien de la carte restent inchangés. Vérifié : `vite build` seulement.
+
+### CursDecision : logo en couleur sur l'écran de choix, mention « en phase de lancement » (15/11/2026)
+Précision de Joseph : sur la page de garde (écran de choix d'espace) le logo CursDecision reste en couleur — on ne peut pas le lancer de là ; on y découvre qu'il est en phase de lancement. Le grisage reste sur la pastille des cartes de tarification seulement. Encadré vert « En phase de lancement » ajouté en tête de `CursDecisionPage.jsx` (à retirer à l'ouverture). Vérifié : `vite build` seulement.

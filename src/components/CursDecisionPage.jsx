@@ -53,6 +53,10 @@ export default function CursDecisionPage({ onRetour }) {
           </div>
         </div>
 
+        <div style={{ background: "#E1F5EE", border: "0.5px solid #0E725655", borderRadius: 10, padding: "10px 14px", marginBottom: 24, fontSize: 13.5, color: "#0E7256", lineHeight: 1.5 }}>
+          <b>En phase de lancement.</b> CursDecision n'est pas encore ouvert : cette page présente ce qu'il apportera. Les abonnés Initié, Auteur et Studio y auront accès dès son ouverture.
+        </div>
+
         <p style={{ ...p, fontSize: 14.5, marginBottom: 40 }}>
           CursDecision vous aide à passer d'une situation confuse — problème professionnel, choix
           stratégique, tension d'équipe, projet incertain, arbitrage personnel ou organisationnel —
