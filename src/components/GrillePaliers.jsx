@@ -16,9 +16,14 @@
 import { useState } from "react";
 import { PRIX_STRIPE, ORDRE_PALIERS } from "../lib/prix-stripe-config.mjs";
 import { COULEURS, CONTENU_PALIERS, LOGOS_ESPACES, demarrerCheckout } from "../lib/contenuPaliers.js";
+import ChangerFormule from "./ChangerFormule.jsx";
 
-export default function GrillePaliers() {
+// `formuleActuelle` (nom du palier, ex. « Essentiel ») : si le compte a déjà un abonnement actif, les boutons deviennent
+// « Passer à … » (changement au prorata, voir ChangerFormule.jsx) au lieu d'un nouveau paiement.
+export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee = null }) {
   const [periode, setPeriode] = useState("mensuel");
+  const [changement, setChangement] = useState(null); // { priceId, nom }
+  const rangActuel = formuleActuelle ? ORDRE_PALIERS.findIndex((c) => PRIX_STRIPE[c].nom === formuleActuelle) : -1;
   const [codePromo, setCodePromo] = useState("");
 
   return (
@@ -136,6 +141,23 @@ export default function GrillePaliers() {
                 </div>
               )}
 
+              {rangActuel >= 0 ? (
+                ORDRE_PALIERS.indexOf(cle) === rangActuel ? (
+                  <div style={{ padding: "10px", textAlign: "center", fontSize: 13, color: COULEURS.texteClair, border: `1px dashed ${COULEURS.bordeaux}40`, borderRadius: 8 }}>✔ Votre formule actuelle</div>
+                ) : ORDRE_PALIERS.indexOf(cle) > rangActuel ? (
+                  <button
+                    onClick={() => setChangement({ priceId: priceIdActuel, nom: palier.nom })}
+                    style={{
+                      padding: "10px", borderRadius: 8, border: "none", background: COULEURS.bordeaux, color: "#fff",
+                      fontFamily: "inherit", fontSize: 13, fontWeight: 500, cursor: "pointer",
+                    }}
+                  >
+                    Passer à {palier.nom}
+                  </button>
+                ) : (
+                  <div style={{ padding: "6px 4px", textAlign: "center", fontSize: 11.5, color: COULEURS.texteClair, lineHeight: 1.4 }}>Pour redescendre, écrivez-nous : le changement prend effet à votre prochaine échéance.</div>
+                )
+              ) : (
               <button
                 onClick={() => demarrerCheckout(priceIdActuel, cle, codePromo)}
                 style={{
@@ -148,6 +170,7 @@ export default function GrillePaliers() {
               >
                 Choisir {palier.nom}
               </button>
+              )}
             </div>
           );
         })}
@@ -167,6 +190,10 @@ export default function GrillePaliers() {
       <p style={{ textAlign: "center", fontSize: 11, color: COULEURS.texteClair, marginTop: 8 }}>
         Tous les prix sont indiqués hors TVA. Résiliable à tout moment (hors engagement Découverte).
       </p>
+      {changement && (
+        <ChangerFormule priceId={changement.priceId} nomCible={changement.nom}
+          onFermer={() => setChangement(null)} onChange={() => onFormuleChangee?.()} />
+      )}
     </div>
   );
 }
