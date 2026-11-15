@@ -32,7 +32,7 @@ export default function ChangerFormule({ priceId, nomCible, onFermer, onChange }
         {(etat.phase === "apercu" || etat.phase === "envoi") && r && (
           <>
             <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: "0 0 10px" }}>
-              Vous passez de <b>{r.de}</b> à <b>{r.vers}</b> tout de suite. Le temps déjà payé de votre formule actuelle est déduit : vous ne payez que la différence, en un seul paiement.
+              Vous passez de <b>{r.de}</b> à <b>{r.vers}</b> tout de suite. Une nouvelle période {r.periode === "annuel" ? "d'un an" : "d'un mois"} commence aujourd'hui au prix de {r.vers} ; la part non utilisée de votre formule actuelle, déjà payée, est déduite : un seul paiement.
             </p>
             <div style={{ border: "1px solid #e5ddd3", borderRadius: 10, padding: "8px 12px", marginBottom: 10 }}>
               {r.lignes.map((l, i) => (
@@ -45,9 +45,6 @@ export default function ChangerFormule({ priceId, nomCible, onFermer, onChange }
               </div>
             </div>
             <p style={{ fontSize: 12, color: COULEURS.texteClair, lineHeight: 1.5, margin: "0 0 14px" }}>
-              {r.date_anniversaire_conservee
-                ? `Votre date de renouvellement ne change pas${r.prochaine_echeance ? " (" + new Date(r.prochaine_echeance * 1000).toLocaleDateString("fr-BE") + ")" : ""}.`
-                : "Votre nouvelle période commence aujourd'hui."}{" "}
               Montants calculés par notre prestataire de paiement. Si le paiement échoue, rien n'est modifié.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
