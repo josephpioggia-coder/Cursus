@@ -7,6 +7,7 @@ import { apercuChangement, confirmerChangement, euros } from "../lib/changerForm
 import { COULEURS } from "../lib/contenuPaliers.js";
 
 export default function ChangerFormule({ priceId, nomCible, onFermer, onChange }) {
+  const [accord, setAccord] = useState(false);
   const [etat, setEtat] = useState({ phase: "calcul" }); // calcul | apercu | envoi | fini | erreur
   useEffect(() => {
     let vivant = true;
@@ -47,8 +48,15 @@ export default function ChangerFormule({ priceId, nomCible, onFermer, onChange }
             <p style={{ fontSize: 12, color: COULEURS.texteClair, lineHeight: 1.5, margin: "0 0 14px" }}>
               Montants calculés par notre prestataire de paiement. Si le paiement échoue, rien n'est modifié.
             </p>
+            <p style={{ fontSize: 12, lineHeight: 1.5, margin: "0 0 8px", padding: "8px 10px", background: "#F7F4EF", borderRadius: 8 }}>
+              <b>Ce changement est définitif :</b> pas de retour à une formule inférieure en cours de période, ni de remboursement. À l'échéance, vous pouvez changer librement.
+            </p>
+            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, lineHeight: 1.45, margin: "0 0 14px", cursor: "pointer" }}>
+              <input type="checkbox" checked={accord} onChange={(e) => setAccord(e.target.checked)} disabled={etat.phase === "envoi"} style={{ marginTop: 2, flexShrink: 0 }} />
+              <span>Je demande l'exécution immédiate du service et je reconnais perdre mon droit de rétractation pour ce changement de formule.</span>
+            </label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button onClick={confirmer} disabled={etat.phase === "envoi"} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: COULEURS.bordeaux, color: "#fff", fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>
+              <button onClick={confirmer} disabled={etat.phase === "envoi" || !accord} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: COULEURS.bordeaux, color: "#fff", fontFamily: "inherit", fontSize: 14, cursor: accord ? "pointer" : "not-allowed", opacity: accord ? 1 : 0.5 }}>
                 {etat.phase === "envoi" ? "Paiement en cours…" : `Confirmer et payer ${euros(r.a_payer_centimes)}`}
               </button>
               <button onClick={onFermer} disabled={etat.phase === "envoi"} style={{ padding: "10px 16px", borderRadius: 8, border: `1px solid ${COULEURS.bordeaux}`, background: "transparent", color: COULEURS.bordeaux, fontFamily: "inherit", fontSize: 14, cursor: "pointer" }}>Annuler</button>

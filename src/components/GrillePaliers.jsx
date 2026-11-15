@@ -155,7 +155,7 @@ export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee
                     Passer à {palier.nom}
                   </button>
                 ) : (
-                  <div style={{ padding: "6px 4px", textAlign: "center", fontSize: 11.5, color: COULEURS.texteClair, lineHeight: 1.4 }}>Pour redescendre, écrivez-nous : le changement prend effet à votre prochaine échéance.</div>
+                  <div style={{ padding: "6px 4px", textAlign: "center", fontSize: 11.5, color: COULEURS.texteClair, lineHeight: 1.4 }}>Le passage à une formule supérieure est définitif : pas de retour à une formule inférieure en cours de période, ni de remboursement. À l'échéance, vous pouvez changer librement, au moment de la nouvelle somme échue, en choisissant la version qui vous convient.</div>
                 )
               ) : (
               <button

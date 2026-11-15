@@ -226,7 +226,7 @@ export function PolitiqueConfidentialite({ onRetour, onNaviguer }) {
 export function CGV({ onRetour, onNaviguer }) {
   const id = IDENTITE_EDITEUR;
   return (
-    <Page titre="Conditions générales de vente" misÀJour="15 septembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
+    <Page titre="Conditions générales de vente" misÀJour="15 novembre 2026" onRetour={onRetour} onNaviguer={onNaviguer}>
       <H2>1. Objet</H2>
       <P>
         Les présentes conditions générales de vente ("CGV") régissent la vente des services proposés par{" "}
@@ -275,6 +275,15 @@ export function CGV({ onRetour, onNaviguer }) {
         création de contenu n'est possible sans réabonnement. Cette limite existe pour que Cursus reste un service
         payant d'assistance à l'écriture, et non un simple espace de stockage de texte gratuit une fois
         l'abonnement arrêté.
+      </P>
+
+      <P>
+        <strong>Changement de formule.</strong> Un abonné peut passer à une formule supérieure à tout moment : une nouvelle
+        période débute le jour du changement, au prix de la nouvelle formule, dont est déduite la part non utilisée de
+        la période déjà payée de l'ancienne formule. Ce passage est définitif : il n'est pas possible de revenir à une
+        formule inférieure en cours de période, et aucun remboursement n'est effectué. À l'échéance, l'abonné choisit
+        librement la formule qui lui convient. Le client demande l'exécution immédiate du changement et reconnaît, en
+        cochant la case prévue à cet effet, perdre son droit de rétractation pour ce changement.
       </P>
 
       <H2>7. Nature du service — limites de l'intelligence artificielle</H2>
