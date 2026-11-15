@@ -18,6 +18,7 @@ function quantile(tri, q) {
 
 export default function UsageIA() {
   const [jours, setJours] = useState(60);
+  const [quotas, setQuotas] = useState({ erreur: null, lignes: null });
   const [etat, setEtat] = useState({ chargement: true, erreur: null, lignes: [] });
 
   const charger = useCallback(async () => {
@@ -39,6 +40,9 @@ export default function UsageIA() {
   }, [jours]);
 
   useEffect(() => { charger(); }, [charger]);
+  useEffect(() => {
+    supabase.from("quotas_paliers").select("*").then(({ data, error }) => setQuotas({ erreur: error?.message || null, lignes: data || [] }));
+  }, []);
 
   const groupes = {};
   etat.lignes.forEach((l) => { (groupes[l.modele || "(inconnu)"] ||= []).push(l); });
@@ -73,6 +77,17 @@ export default function UsageIA() {
       {etat.chargement && <p style={{ color: C.clair }}>Chargement…</p>}
       {etat.erreur && <p style={{ color: "#a00" }}>Lecture impossible : {etat.erreur}</p>}
       {!etat.chargement && !etat.erreur && !rows.length && <p style={{ color: C.clair }}>Aucune ligne sur cette période.</p>}
+      <h2 style={{ fontSize: 16, fontWeight: 500, color: C.texte, margin: "4px 0 8px" }}>Quotas des formules (table quotas_paliers)</h2>
+      {quotas.erreur && <p style={{ color: "#a00" }}>Lecture impossible : {quotas.erreur}</p>}
+      {quotas.lignes && !quotas.erreur && !quotas.lignes.length && <p style={{ color: C.clair }}>Table vide ou illisible (règles d'accès).</p>}
+      {quotas.lignes?.length > 0 && (
+        <div style={{ overflowX: "auto", marginBottom: 18 }}>
+          <table style={{ borderCollapse: "collapse", minWidth: 360 }}>
+            <thead><tr>{Object.keys(quotas.lignes[0]).map((k) => <th key={k} style={th}>{k}</th>)}</tr></thead>
+            <tbody>{quotas.lignes.map((l, i) => <tr key={i}>{Object.keys(quotas.lignes[0]).map((k) => <td key={k} style={td}>{String(l[k] ?? "")}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      )}
       {rows.length > 0 && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", minWidth: 560 }}>
