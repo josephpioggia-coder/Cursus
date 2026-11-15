@@ -18,3 +18,11 @@ Coût moyen d'un appel : 0,032 $ (relevé 1) à 0,023 $ (relevé 2). Calcul ci-d
 
 Quota consommé à 100 % : cas défavorable. Seuil où la marge s'annule : Auteur ≈ 1 460 analyses/mois, Studio ≈ 2 390.
 Risque principal : les formules « illimitées ». Écart connu : 407 appels (écran) contre 122 (SQL) sur des fenêtres différentes, non expliqué.
+
+## Mise à jour — quotas réels (même jour)
+Table `quotas_paliers` lue dans l'écran « Usage IA » : Découverte 100 000, Essentiel 500 000, Initié 1 500 000, Auteur 4 000 000,
+Studio 10 000 000 tokens/mois. Une analyse moyenne = 11 666 tokens (518 appels) → analyses réellement possibles : ≈ 9, 43, 129,
+343, 857, contre 150 / 200 / 250 promises sur les cartes pour les trois premières formules.
+Décision de Joseph : relever les quotas (script `2026-11-15-quotas-tokens-paliers.sql`) : Découverte 1 750 000, Essentiel
+2 330 000, Initié 2 920 000. Marge si consommé en entier : ≈ 4,89 / 9,94 / 15,83 €. Auteur et Studio inchangés (marges 72 % / 61 %).
+Les textes de `contenuPaliers.js` ne changent pas : ils sont désormais cohérents avec les quotas.
