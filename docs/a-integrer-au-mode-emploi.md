@@ -150,3 +150,6 @@ Après « Créer le compte », un e-mail de confirmation est envoyé : cliquez s
 ## Mode Auto du Co-pilote et quota de voix (15/11/2026)
 - Interrupteur « Auto » du Co-pilote : analyse l'onglet ouvert maintenant, puis toutes les 10 min, SEULEMENT si le texte a changé ; la bannière indique la prochaine analyse. Chaque analyse consomme le quota d'analyses IA.
 - Le plafond « lecture à voix haute » des paliers (en minutes d'écoute) ne limite ni l'écriture ni la taille d'un livre audité : il ne compte que les textes lus à voix haute.
+
+## Tarifs Initié / Auteur / Studio : prix maintenu (15/11/2026)
+Les cartes des trois paliers précisent : prix maintenu une fois CursDecision opérationnel ; les nouveaux abonnés paieront alors 12 € de plus par mois.
