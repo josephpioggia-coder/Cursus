@@ -1566,3 +1566,6 @@ Question de Joseph : « Mode auto-analyse (10 min) ? ». Défaut probable (lectu
 
 ### Mention « prix maintenu » sur Initié, Auteur, Studio (15/11/2026)
 Demande de Joseph : ajouter aux trois cartes « accès à ce prix maintenu une fois CursDecision opérationnel (les nouveaux arrivés devront ajouter 12 € à ce prix) » (`contenuPaliers.js`). Texte seulement : AUCUN mécanisme de prix n'est construit (Stripe, grille réservée aux abonnés existants) ; la date de bascule et ce qui définit un « ancien » abonné restent à décider avant l'application. Vérifié : `vite build` seulement.
+
+### Logo CursDecision grisé (15/11/2026)
+Demande de Joseph : « griser le logo cursdecision » (espace pas encore opérationnel). `filter: grayscale(1)` + opacité 0,55 sur le logo de l'écran de choix d'espace (`EcranChoixEspace.jsx`) et sur sa pastille dans les cartes de tarification (`GrillePaliers.jsx`). À retirer quand CursDecision sera opérationnel. Le texte et le lien de la carte restent inchangés. Vérifié : `vite build` seulement.
