@@ -1,27 +1,25 @@
-/**
- * CURSUS — Edge Function : changer-formule (15/11/2026)
- * =====================================================
- * Passage d'un abonnement CursEdit à une formule SUPÉRIEURE, au prorata, en UNE écriture et UN paiement
- * (décision de Joseph : pas de note de crédit + facture au prix plein + remboursement, plus lourd et plus confus).
- * Stripe déduit le temps non utilisé de l'ancienne formule et facture la différence, sur une seule facture.
- *
- * Deux actions (corps JSON) :
- *  - { action: "apercu",    price_id }                      → montants calculés par STRIPE (facture à venir), rien n'est modifié ;
- *  - { action: "confirmer", price_id, date_calcul }         → applique le changement avec la MÊME date de calcul que l'aperçu.
- *
- * Règles :
- *  - L'appelant est identifié par son jeton (jamais par une valeur du corps) ; l'abonnement modifié est celui de CE compte.
- *  - Seul un changement vers une formule PLUS CHÈRE (rang supérieur) est accepté ; redescendre = pas encore (voir CLAUDE.md).
- *  - TOUJOURS une nouvelle période à partir d'aujourd'hui, au PRIX PLEIN de la nouvelle formule, moins le crédit du temps non
- *    utilisé de l'ancienne (modèle de Joseph, 15/11/2026 : formule à 29 € dont 9 € non utilisés → vers une formule à 49 € :
- *    il paie 49 − 9 = 40 €, et la nouvelle période repart de ce jour). `billing_cycle_anchor: "now"` + `always_invoice`.
- *  - `payment_behavior: error_if_incomplete` : si le paiement échoue, RIEN n'est modifié.
- *  - Le webhook `customer.subscription.updated` (déjà en place) met la table `abonnements` à jour : pas d'écriture ici.
- *
- * SECRETS : STRIPE_SECRET_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà utilisés par stripe-webhook).
- * TABLE price_id → rang : À GARDER SYNCHRONISÉE avec src/lib/prix-stripe-config.mjs et PALIERS de stripe-webhook.
- * NON TESTÉ contre Stripe (déploiement et clés hors de portée de l'environnement de développement).
- */
+// CURSUS — Edge Function : changer-formule (15/11/2026)
+// =====================================================
+// Passage d'un abonnement CursEdit à une formule SUPÉRIEURE, au prorata, en UNE écriture et UN paiement
+// (décision de Joseph : pas de note de crédit + facture au prix plein + remboursement, plus lourd et plus confus).
+// Stripe déduit le temps non utilisé de l'ancienne formule et facture la différence, sur une seule facture.
+//
+// Deux actions (corps JSON) :
+//  - { action: "apercu",    price_id }                      → montants calculés par STRIPE (facture à venir), rien n'est modifié ;
+//  - { action: "confirmer", price_id, date_calcul }         → applique le changement avec la MÊME date de calcul que l'aperçu.
+//
+// Règles :
+//  - L'appelant est identifié par son jeton (jamais par une valeur du corps) ; l'abonnement modifié est celui de CE compte.
+//  - Seul un changement vers une formule PLUS CHÈRE (rang supérieur) est accepté ; redescendre = pas encore (voir CLAUDE.md).
+//  - TOUJOURS une nouvelle période à partir d'aujourd'hui, au PRIX PLEIN de la nouvelle formule, moins le crédit du temps non
+//    utilisé de l'ancienne (modèle de Joseph, 15/11/2026 : formule à 29 € dont 9 € non utilisés → vers une formule à 49 € :
+//    il paie 49 − 9 = 40 €, et la nouvelle période repart de ce jour). `billing_cycle_anchor: "now"` + `always_invoice`.
+//  - `payment_behavior: error_if_incomplete` : si le paiement échoue, RIEN n'est modifié.
+//  - Le webhook `customer.subscription.updated` (déjà en place) met la table `abonnements` à jour : pas d'écriture ici.
+//
+// SECRETS : STRIPE_SECRET_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà utilisés par stripe-webhook).
+// TABLE price_id → rang : À GARDER SYNCHRONISÉE avec src/lib/prix-stripe-config.mjs et PALIERS de stripe-webhook.
+// NON TESTÉ contre Stripe (déploiement et clés hors de portée de l'environnement de développement).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "https://esm.sh/stripe@14.0.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
