@@ -153,3 +153,6 @@ Après « Créer le compte », un e-mail de confirmation est envoyé : cliquez s
 
 ## Tarifs Initié / Auteur / Studio : prix maintenu (15/11/2026)
 Les cartes des trois paliers précisent : prix maintenu une fois CursDecision opérationnel ; les nouveaux abonnés paieront alors 12 € de plus par mois.
+
+## Changer de formule (15/11/2026)
+Dans « Tarification » (compte déjà abonné) : la formule actuelle est marquée, les formules supérieures proposent « Passer à … ». Une fenêtre montre le montant exact (temps déjà payé déduit, un seul paiement) ; la date de renouvellement ne change pas si on reste au même rythme (annuel → annuel). Choisir « Annuel » avant de cliquer si l'abonnement est annuel. Redescendre : écrire au support (effet à l'échéance).

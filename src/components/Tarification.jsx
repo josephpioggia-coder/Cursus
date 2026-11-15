@@ -13,10 +13,18 @@
  * logique de paiement réel (Stripe Checkout) à deux endroits.
  */
 
+import { useEffect, useState } from "react";
 import { COULEURS } from "../lib/contenuPaliers.js";
+import { formuleActive } from "../lib/changerFormule.js";
 import GrillePaliers from "./GrillePaliers.jsx";
 
 export default function Tarification() {
+  // Compte déjà abonné : la grille propose « Passer à … » (changement au prorata) plutôt qu'un second abonnement.
+  const [formule, setFormule] = useState(null);
+  const recharger = () => formuleActive().then(setFormule).catch(() => {});
+  useEffect(() => { recharger(); }, []);
+  // Le webhook Stripe met la table à jour avec un léger délai après un changement : on relit quelques secondes plus tard.
+  const apresChangement = () => { setTimeout(recharger, 3000); setTimeout(recharger, 8000); };
   return (
     <div style={{ background: COULEURS.fond, padding: "60px 24px", fontFamily: "Inter, sans-serif" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -31,7 +39,7 @@ export default function Tarification() {
           </p>
         </div>
 
-        <GrillePaliers />
+        <GrillePaliers formuleActuelle={formule} onFormuleChangee={apresChangement} />
       </div>
     </div>
   );
