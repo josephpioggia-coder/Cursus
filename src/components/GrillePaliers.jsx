@@ -117,12 +117,12 @@ export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee
                   {periode === "mensuel" ? " /mois" : " /an"}
                 </span>
               </div>
-              {contenu.engagement && (
+              {/* L'engagement de 3 mois ne vaut que pour la formule MENSUELLE : l'annuel est déjà payé pour l'année. */}
+              {contenu.engagement && periode === "mensuel" ? (
                 <p style={{ fontSize: 10, color: COULEURS.or, fontWeight: 500, margin: "0 0 16px" }}>
                   {contenu.engagement}
                 </p>
-              )}
-              {!contenu.engagement && <div style={{ marginBottom: 16 }} />}
+              ) : <div style={{ marginBottom: 16 }} />}
 
               <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px", flex: 1 }}>
                 {contenu.fonctionnalites.map((f, i) => (
@@ -188,7 +188,7 @@ export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee
       </p>
 
       <p style={{ textAlign: "center", fontSize: 11, color: COULEURS.texteClair, marginTop: 8 }}>
-        Tous les prix sont indiqués hors TVA. Résiliable à tout moment (hors engagement Découverte).
+        Tous les prix sont indiqués TVA comprise (21 %). Vous pouvez annuler à tout moment : l'annulation prend effet à la fin de la période déjà payée, sans remboursement. Seule la formule Découverte mensuelle comporte un engagement de 3 mois.
       </p>
       {changement && (
         <ChangerFormule priceId={changement.priceId} nomCible={changement.nom}
