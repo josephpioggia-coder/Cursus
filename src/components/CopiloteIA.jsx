@@ -776,6 +776,37 @@ function BoutonCopier({ texte, couleur = "#888" }) {
   );
 }
 
+// ─── Actions sur une réponse du Co-pilote : copier / insérer dans le texte (15/11/2026) ───────────────────────────
+// Retour de Joseph : plus de bouton pour reprendre un texte proposé dans la colonne de droite, source d'erreurs de copier-coller à la main.
+// « Copier » = presse-papiers ; « Insérer dans le texte » = ajouté après la sélection / au curseur du chapitre ouvert (Ctrl+Z annule).
+function ActionsReponse({ texte }) {
+  const [copié, setCopié] = useState(false);
+  const [inséré, setInséré] = useState(null); // null | true | false
+  const brut = String(texte || "").trim();
+  if (!brut) return null;
+  // Retire les repères de ligne éventuels « [L12] » recopiés par erreur.
+  const propre = brut.replace(/\[L\d+\]\s?/g, "");
+  const style = (actif) => ({ fontSize: 10.5, padding: "2px 9px", marginRight: 6, background: "#fff", color: actif ? "#1D9E75" : "#4C6FE7", border: `0.5px solid ${actif ? "#1D9E75" : "#4C6FE7"}60`, borderRadius: 14, cursor: "pointer", fontFamily: "inherit" });
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button type="button" style={style(copié)} onClick={() => { navigator.clipboard?.writeText(propre); setCopié(true); setTimeout(() => setCopié(false), 2000); }}>
+        {copié ? "✓ Copié" : "📋 Copier"}
+      </button>
+      <button type="button" style={style(inséré === true)}
+        title="Ajoute cette réponse dans le chapitre ouvert, après la sélection ou au curseur. Ctrl+Z annule."
+        onClick={() => {
+          const détail = { texte: propre, ok: false };
+          window.dispatchEvent(new CustomEvent("cursus-inserer-texte", { detail: détail }));
+          setInséré(!!détail.ok);
+          setTimeout(() => setInséré(null), 3500);
+        }}>
+        {inséré === true ? "✓ Inséré (Ctrl+Z pour annuler)" : "↪ Insérer dans le texte"}
+      </button>
+      {inséré === false && <span style={{ fontSize: 10.5, color: "#A32D2D" }}>Rien inséré : ouvrez un chapitre modifiable.</span>}
+    </div>
+  );
+}
+
 // ─── Fil de dialogue par carte ─────────────────────────────────────────────────
 // Ajouté le 10/08/2026, à la demande de Joseph : une analyse à sens unique ne
 // permet ni de demander une précision, ni de challenger un point, ni de
@@ -1082,6 +1113,7 @@ export function FilDialogue({ dialogue, onEnvoyer, couleur, langueProjet, onMém
               retaper "continue !" à la main. Bouton dédié sur le DERNIER
               message seulement — voir tronqué côté appelClaude/
               envoyerQuestionDialogue. */}
+          {m.role === "copilote" && !dialogue.enCours && <ActionsReponse texte={m.contenu} />}
           {m.role === "copilote" && detecterRefus(m.contenu) && (
             <div style={{ marginTop: 6, fontSize: 11.5, color: "#8a5a00", background: "#FFF6E0", border: "0.5px solid #E8C770", borderRadius: 8, padding: "6px 8px", lineHeight: 1.45 }}>
               ⚠ {MESSAGE_REFUS}
