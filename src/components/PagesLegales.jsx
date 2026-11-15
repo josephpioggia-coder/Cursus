@@ -264,8 +264,8 @@ export function CGV({ onRetour, onNaviguer }) {
 
       <H2>6. Annulation d'un abonnement</H2>
       <P>
-        La résiliation d'un abonnement CursEdit se fait actuellement sur simple demande écrite à {id.email}. Un
-        outil de gestion autonome de l'abonnement sera proposé directement dans l'application à terme.
+        L'abonné peut annuler son abonnement CursEdit à tout moment, directement dans l'application (page « Tarification », bloc « Mon abonnement »)
+        ou sur simple demande écrite à {id.email}. L'annulation prend effet à la fin de la période déjà payée.
       </P>
       <P>
         Après annulation, l'accès aux fonctionnalités d'intelligence artificielle (co-pilote, suggestions, audits)

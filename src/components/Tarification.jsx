@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { COULEURS } from "../lib/contenuPaliers.js";
 import { formuleActive } from "../lib/changerFormule.js";
 import GrillePaliers from "./GrillePaliers.jsx";
+import GererAbonnement from "./GererAbonnement.jsx";
 
 export default function Tarification() {
   // Compte déjà abonné : la grille propose « Passer à … » (changement au prorata) plutôt qu'un second abonnement.
@@ -38,6 +39,8 @@ export default function Tarification() {
             Adoptez votre rythme. Cursus s'occupe du reste.
           </p>
         </div>
+
+        <GererAbonnement />
 
         <GrillePaliers formuleActuelle={formule} onFormuleChangee={apresChangement} />
       </div>

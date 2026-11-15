@@ -6,11 +6,10 @@ import { supabase } from "./supabase.js";
 
 export const euros = (centimes) => (centimes / 100).toFixed(2).replace(".", ",") + " €";
 
-async function appeler(corps) {
+export async function appelerFonction(nom, corps) {
   const { data: { session } } = await supabase.auth.getSession();
-  const url = import.meta.env.VITE_SUPABASE_URL
-    ? import.meta.env.VITE_SUPABASE_URL + "/functions/v1/changer-formule"
-    : "https://ssnowhvkwqfpournmyut.supabase.co/functions/v1/changer-formule";
+  const base = import.meta.env.VITE_SUPABASE_URL || "https://ssnowhvkwqfpournmyut.supabase.co";
+  const url = base + "/functions/v1/" + nom;
   const cleAnon = import.meta.env.VITE_SUPABASE_ANON_KEY;
   try {
     const r = await fetch(url, {
@@ -26,8 +25,8 @@ async function appeler(corps) {
   }
 }
 
-export const apercuChangement = (price_id) => appeler({ action: "apercu", price_id });
-export const confirmerChangement = (price_id, date_calcul) => appeler({ action: "confirmer", price_id, date_calcul });
+export const apercuChangement = (price_id) => appelerFonction("changer-formule", { action: "apercu", price_id });
+export const confirmerChangement = (price_id, date_calcul) => appelerFonction("changer-formule", { action: "confirmer", price_id, date_calcul });
 
 /** Formule active du compte connecté (nom du palier) ou null. */
 export async function formuleActive() {

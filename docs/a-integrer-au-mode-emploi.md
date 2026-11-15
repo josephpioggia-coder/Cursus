@@ -162,3 +162,6 @@ Sous chaque réponse du Co-pilote (fil de discussion) : « 📋 Copier » et « 
 
 ## Prix hors TVA et rappel de renouvellement (15/11/2026)
 Les prix affichés sont hors TVA ; la TVA de votre pays est calculée à la commande d'après votre adresse de facturation (que Stripe demande). Les abonnements annuels sont reconduits tacitement : un e-mail de rappel est envoyé 30 jours avant l'échéance, avec le montant ; pour annuler, écrire à l'adresse de contact (effet à la fin de la période payée).
+
+## Annuler mon abonnement (15/11/2026)
+Page « Tarification », bloc « Mon abonnement » : « Annuler mon abonnement » puis « Confirmer l'annulation ». Vous gardez l'accès complet jusqu'à la fin de la période déjà payée (pas de remboursement) ; un abonnement Découverte mensuel s'arrête au plus tôt à la fin de ses 3 mois d'engagement. « Reprendre mon abonnement » annule l'annulation tant que l'abonnement n'est pas terminé.
