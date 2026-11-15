@@ -1829,6 +1829,13 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const abortRef = useRef({});
   const signalPour = (clé) => { abortRef.current[clé]?.abort(); abortRef.current[clé] = new AbortController(); return abortRef.current[clé].signal; };
   const intervalRef = useRef(null);
+  const tickAutoRef = useRef(null);
+  const analyserRef = useRef(null);
+  const texteAutoRef = useRef(texteActif);
+  const dernierTexteAutoRef = useRef(null);
+  const prochaineAutoRef = useRef(0);
+  const [minutesAvantAuto, setMinutesAvantAuto] = useState(10);
+  texteAutoRef.current = texteActif;
 
   // ── Dialogue par carte — voir note au-dessus de DIALOGUE_MAX_TOKENS ──
   // Clé = `${onglet}:${index}` — les fils de dialogue appartiennent à une
@@ -2722,6 +2729,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     setGuideMessage({ ok: true, texte: "Directive enregistrée supprimée ; texte d'origine rétabli." });
   }, [projetId]);
 
+  analyserRef.current = analyser;
+
   useEffect(() => {
     // "vérification" exclu du mode Auto : protocole 60805-06 conçu comme une
     // action délibérée sur un passage choisi, jamais un cycle automatique
@@ -2729,14 +2738,30 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     // protocole — un déclenchement toutes les 10 min irait à l'encontre de
     // ce principe, en plus de consommer le quota sans que l'auteur·e l'ait
     // demandé).
+    // Correctif 15/11/2026 : `analyser` change à chaque frappe (il dépend du texte) ;
+    // le minuteur ne dépend donc plus de lui — il lit la dernière version via
+    // `analyserRef` / `texteAutoRef` — et ne se relance plus qu'au changement de mode ou d'onglet.
     if (modeAuto && onglet !== "vérification") {
-      analyser(onglet);
-      intervalRef.current = setInterval(() => analyser(onglet), 600000);
+      analyserRef.current?.(onglet);
+      dernierTexteAutoRef.current = texteAutoRef.current;
+      const DELAI = 600000;
+      prochaineAutoRef.current = Date.now() + DELAI;
+      setMinutesAvantAuto(10);
+      intervalRef.current = setInterval(() => {
+        prochaineAutoRef.current = Date.now() + DELAI;
+        // Texte inchangé depuis la dernière analyse automatique : on ne paie pas deux fois la même.
+        if (texteAutoRef.current === dernierTexteAutoRef.current) return;
+        dernierTexteAutoRef.current = texteAutoRef.current;
+        analyserRef.current?.(onglet);
+      }, DELAI);
+      tickAutoRef.current = setInterval(() => {
+        setMinutesAvantAuto(Math.max(1, Math.ceil((prochaineAutoRef.current - Date.now()) / 60000)));
+      }, 15000);
     } else {
       clearInterval(intervalRef.current);
     }
-    return () => clearInterval(intervalRef.current);
-  }, [modeAuto, onglet, analyser]);
+    return () => { clearInterval(intervalRef.current); clearInterval(tickAutoRef.current); };
+  }, [modeAuto, onglet]);
 
   const onglets = [
     { id: "suggestions", label: t("onglets.suggestions") },
@@ -2800,7 +2825,7 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
         {modeAuto && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, background: `${couleurProjet}12`, border: `0.5px solid ${couleurProjet}30`, borderRadius: 6, padding: "5px 8px", marginBottom: 8, fontSize: 10.5, color: couleurProjet, lineHeight: 1.4 }}>
             <span>🔄</span>
-            <span>{t("modeAuto.banniere")}</span>
+            <span>{t("modeAuto.banniere")} Prochaine analyse dans ~{minutesAvantAuto} min, seulement si le texte a changé.</span>
           </div>
         )}
 
