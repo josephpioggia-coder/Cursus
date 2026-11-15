@@ -249,7 +249,7 @@ export function CGV({ onRetour, onNaviguer }) {
 
       <H2>4. Prix et paiement</H2>
       <P>
-        Les prix sont indiqués en euros, toutes taxes comprises (TVA belge à 21 % incluse), sauf mention contraire.
+        Les prix sont indiqués en euros, hors TVA. La TVA applicable (en Belgique, 21 %) s'ajoute au prix indiqué.
         Le paiement est traité de façon sécurisée par notre prestataire Stripe. Aucune donnée bancaire n'est
         conservée par {id.raisonSociale}.
       </P>

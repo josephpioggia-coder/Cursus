@@ -188,7 +188,7 @@ export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee
       </p>
 
       <p style={{ textAlign: "center", fontSize: 11, color: COULEURS.texteClair, marginTop: 8 }}>
-        Tous les prix sont indiqués TVA comprise (21 %). Vous pouvez annuler à tout moment : l'annulation prend effet à la fin de la période déjà payée, sans remboursement. Seule la formule Découverte mensuelle comporte un engagement de 3 mois.
+        Tous les prix sont indiqués hors TVA. Le renouvellement de l'abonnement annuel est tacite 30 jours avant l'échéance. Mais vous pouvez annuler à tout moment : l'annulation prend effet à la fin de la période déjà payée. Seule la formule Découverte mensuelle comporte un engagement de 3 mois minimum.
       </p>
       {changement && (
         <ChangerFormule priceId={changement.priceId} nomCible={changement.nom}
