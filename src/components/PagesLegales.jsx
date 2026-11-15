@@ -249,7 +249,7 @@ export function CGV({ onRetour, onNaviguer }) {
 
       <H2>4. Prix et paiement</H2>
       <P>
-        Les prix sont indiqués en euros, hors TVA. La TVA applicable (en Belgique, 21 %) s'ajoute au prix indiqué.
+        Les prix sont indiqués en euros, hors TVA. La TVA applicable, qui dépend du pays du client (21 % en Belgique), est calculée d'après l'adresse de facturation et s'ajoute au prix indiqué au moment de la commande.
         Le paiement est traité de façon sécurisée par notre prestataire Stripe. Aucune donnée bancaire n'est
         conservée par {id.raisonSociale}.
       </P>
@@ -286,7 +286,13 @@ export function CGV({ onRetour, onNaviguer }) {
         cochant la case prévue à cet effet, perdre son droit de rétractation pour ce changement.
       </P>
 
-      <H2>7. Nature du service — limites de l'intelligence artificielle</H2>
+            <P>
+        <strong>Renouvellement des abonnements annuels.</strong> Un abonnement annuel est reconduit tacitement pour une nouvelle année.
+        Un rappel est envoyé par e-mail 30 jours avant l'échéance, avec la date et le montant du renouvellement. L'abonné peut annuler à
+        tout moment ; l'annulation prend effet à la fin de la période déjà payée.
+      </P>
+
+<H2>7. Nature du service — limites de l'intelligence artificielle</H2>
       <P>
         Les analyses, suggestions et audits produits par Cursus reposent sur des modèles d'intelligence artificielle
         (Claude d'Anthropic, GPT-4o d'OpenAI). Ces analyses constituent une aide à la décision éditoriale, jamais un

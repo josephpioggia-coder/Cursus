@@ -46,7 +46,7 @@ export default function ChangerFormule({ priceId, nomCible, onFermer, onChange }
               </div>
             </div>
             <p style={{ fontSize: 12, color: COULEURS.texteClair, lineHeight: 1.5, margin: "0 0 14px" }}>
-              Montants calculés par notre prestataire de paiement. Si le paiement échoue, rien n'est modifié.
+              Montants hors TVA, calculés par notre prestataire de paiement ; la TVA de votre pays s'ajoute. Si le paiement échoue, rien n'est modifié.
             </p>
             <p style={{ fontSize: 12, lineHeight: 1.5, margin: "0 0 8px", padding: "8px 10px", background: "#F7F4EF", borderRadius: 8 }}>
               <b>Ce changement est définitif :</b> pas de retour à une formule inférieure en cours de période, ni de remboursement. À l'échéance, vous pouvez changer librement.

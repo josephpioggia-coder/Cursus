@@ -159,3 +159,6 @@ Dans « Tarification » (compte déjà abonné) : la formule actuelle est marqu�
 
 ## Co-pilote : copier ou insérer une réponse (15/11/2026)
 Sous chaque réponse du Co-pilote (fil de discussion) : « 📋 Copier » et « ↪ Insérer dans le texte ». L'insertion ajoute la réponse après la sélection ou au curseur du chapitre ouvert, sans rien remplacer ; Ctrl+Z annule. Impossible en lecture seule.
+
+## Prix hors TVA et rappel de renouvellement (15/11/2026)
+Les prix affichés sont hors TVA ; la TVA de votre pays est calculée à la commande d'après votre adresse de facturation (que Stripe demande). Les abonnements annuels sont reconduits tacitement : un e-mail de rappel est envoyé 30 jours avant l'échéance, avec le montant ; pour annuler, écrire à l'adresse de contact (effet à la fin de la période payée).

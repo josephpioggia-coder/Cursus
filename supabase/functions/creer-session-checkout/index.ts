@@ -344,6 +344,8 @@ Deno.serve(async (req) => {
               price_data: {
                 currency: "eur",
                 unit_amount: montantCentimesFacture,
+                // Prix saisis HORS TVA (décision de Joseph, 15/11/2026) : la TVA du pays du client s'ajoute (Stripe Tax).
+                tax_behavior: "exclusive",
                 product_data: { name: nomProduit || "Audit CursAudit" },
               },
               quantity: 1,
@@ -351,6 +353,15 @@ Deno.serve(async (req) => {
           : { price: priceId, quantity: 1 },
       ],
       ...(discounts ? { discounts } : {}),
+      // TVA par pays (15/11/2026) : la TVA dépend du pays du client, donc calculée à la commande par Stripe Tax à partir de l'adresse de
+      // facturation (guichet unique européen pour l'UE). N'est activée que si le secret STRIPE_TAX_ACTIF = "oui" : Stripe Tax doit d'abord
+      // être configuré dans le tableau de bord (adresse de l'entreprise, enregistrements fiscaux, comportement par défaut « hors taxe »),
+      // sinon la création de session échoue et TOUS les paiements s'arrêtent.
+      ...(Deno.env.get("STRIPE_TAX_ACTIF") === "oui" ? {
+        automatic_tax: { enabled: true },
+        billing_address_collection: "required",
+        tax_id_collection: { enabled: true }, // entreprises : n° de TVA saisi → autoliquidation si applicable
+      } : {}),
       // 06/11/2026 — l'adresse de la page de paiement est VERROUILLÉE sur celle du compte connecté et l'identifiant du compte est
       // transmis au webhook : avant, rien n'empêchait (ni Stripe Link qui préremplit une autre adresse) de payer avec une adresse
       // différente, et l'abonnement partait sur un autre compte (ou nulle part, « Utilisateur introuvable »).
