@@ -422,7 +422,7 @@ export default function EcranChoixEspace({ onChoisir, onDéconnecter }) {
                 donc un cadre visuellement plus petit. Nom du produit
                 réintroduit ici en vrai texte HTML, jamais dépendant de la
                 longueur du mot. */}
-            <img src={e.logo} alt={e.nom} style={{ width: 110, height: 110, objectFit: "contain", display: "block", margin: "0 auto 10px" }} />
+            <img src={e.logo} alt={e.nom} style={{ width: 110, height: 110, objectFit: "contain", display: "block", margin: "0 auto 10px", ...(e.id === "cursdecision" ? { filter: "grayscale(1)", opacity: 0.55 } : null) }} />
             <div style={{ fontSize: 16, fontWeight: 700, color: e.couleur, textAlign: "center", marginBottom: 10 }}>{e.nom}</div>
             <div style={{ fontSize: 12.5, color: "#666", lineHeight: 1.6, marginBottom: e.description ? 6 : 18, flex: e.description ? "none" : 1 }}>{e.accroche}</div>
             {e.description && (
