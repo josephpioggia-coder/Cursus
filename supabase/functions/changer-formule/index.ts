@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     if (cible.rang <= actuel.rang) {
       return rep({ error: "pas_une_montee", message: cible.rang === actuel.rang && cible.periode === actuel.periode
         ? "C'est déjà votre formule."
-        : "Le passage à une formule inférieure (ou à un autre rythme de même niveau) n'est pas encore possible en ligne : écrivez-nous, il prendra effet à votre prochaine échéance." }, 400);
+        : "Le passage à une formule inférieure (ou à un autre rythme de même niveau) est impossible en cours de période. À la fin de votre abonnement, vous pourrez choisir librement la formule qui vous convient." }, 400);
     }
 
     const maintenant = Math.floor(Date.now() / 1000);
