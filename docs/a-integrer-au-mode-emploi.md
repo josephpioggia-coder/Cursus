@@ -156,3 +156,6 @@ Les cartes des trois paliers précisent : prix maintenu une fois CursDecision op
 
 ## Changer de formule (15/11/2026)
 Dans « Tarification » (compte déjà abonné) : la formule actuelle est marquée, les formules supérieures proposent « Passer à … ». Une fenêtre montre le montant exact (nouvelle période au prix de la nouvelle formule, part non utilisée de l'ancienne déduite, un seul paiement) ; la nouvelle période commence le jour du changement. Choisir « Annuel » avant de cliquer si l'abonnement est annuel. Redescendre : écrire au support (effet à l'échéance).
+
+## Co-pilote : copier ou insérer une réponse (15/11/2026)
+Sous chaque réponse du Co-pilote (fil de discussion) : « 📋 Copier » et « ↪ Insérer dans le texte ». L'insertion ajoute la réponse après la sélection ou au curseur du chapitre ouvert, sans rien remplacer ; Ctrl+Z annule. Impossible en lecture seule.

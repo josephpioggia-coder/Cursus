@@ -1938,6 +1938,23 @@ export default function Editeur({
     editor?.setEditable(!lectureSeule);
   }, [editor, lectureSeule]);
 
+  // Insertion d'un texte du Co-pilote dans le chapitre (15/11/2026) : événement `cursus-inserer-texte` { texte, ok } émis par le bouton
+  // « Insérer dans le texte » des réponses du Co-pilote. Le texte est ajouté APRÈS la sélection / au curseur (jamais à la place d'un passage),
+  // en paragraphes ; Ctrl+Z annule. Refusé en lecture seule. `detail.ok` est mis à true si l'insertion a eu lieu.
+  useEffect(() => {
+    if (!editor) return;
+    const insérer = (e) => {
+      const texte = String(e.detail?.texte || "").trim();
+      if (!texte || lectureSeule || !editor.isEditable) return;
+      const échapper = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const html = texte.split(/\n{2,}/).map((bloc) => "<p>" + échapper(bloc).replace(/\n/g, "<br>") + "</p>").join("");
+      editor.chain().focus().insertContentAt(editor.state.selection.to, html).run();
+      if (e.detail) e.detail.ok = true;
+    };
+    window.addEventListener("cursus-inserer-texte", insérer);
+    return () => window.removeEventListener("cursus-inserer-texte", insérer);
+  }, [editor, lectureSeule]);
+
   useEffect(() => {
     const timer = setTimeout(recalculerNumérosDeLigne, 60);
     return () => clearTimeout(timer);
