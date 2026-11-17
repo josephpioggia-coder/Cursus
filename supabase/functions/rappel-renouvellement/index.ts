@@ -1,5 +1,5 @@
 // CURSUS — Edge Function : rappel-renouvellement (15/11/2026)
-// Envoie, 30 jours avant l'échéance, un e-mail de rappel aux abonnés ANNUELS dont l'abonnement se renouvelle tacitement.
+// Envoie, environ 45 jours avant l'échéance (17/11/2026 : avant la date limite de non-renouvellement, 30 jours avant l'échéance), un e-mail de rappel aux abonnés ANNUELS dont l'abonnement se renouvelle tacitement.
 // À lancer UNE FOIS PAR JOUR (planification Supabase) ; chaque abonnement ne reçoit qu'un rappel par période (table rappels_renouvellement).
 //
 // SECRETS : STRIPE_SECRET_KEY, SUPABASE_URL, SERVICE_ROLE_KEY (déjà en place) + nouveaux :
@@ -8,7 +8,7 @@
 //   EXPEDITEUR      = facultatif, ex. « Cursus <bonjour@cursus.pro> »
 //   CONTACT         = facultatif, adresse où écrire pour annuler (défaut : infocursus.proia@gmail.com)
 // Le montant annoncé vient de la prochaine facture calculée par STRIPE (TVA du pays incluse si Stripe Tax est actif).
-// Fenêtre : de 31 à 25 jours avant l'échéance (rattrape un jour manqué). NON TESTÉ contre Stripe ni Resend.
+// Fenêtre : de 46 à 40 jours avant l'échéance (rattrape un jour manqué). NON TESTÉ contre Stripe ni Resend.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Stripe from "https://esm.sh/stripe@14.0.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2?target=deno";
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const prix = sub.items.data[0]?.price;
     if (prix?.recurring?.interval !== "year" || sub.cancel_at_period_end) continue;
     const jours = (sub.current_period_end - maintenant) / 86400;
-    if (jours > 31 || jours < 25) continue;
+    if (jours > 46 || jours < 40) continue;
     bilan.examinés++;
     const periodeFin = new Date(sub.current_period_end * 1000).toISOString();
     // Réserve le rappel AVANT l'envoi (pas de doublon si deux exécutions se chevauchent) ; libéré si l'envoi échoue.
@@ -53,8 +53,9 @@ Deno.serve(async (req) => {
       const taxe = (facture.total_tax_amounts || []).reduce((s, t) => s + t.amount, 0);
       const montant = taxe > 0 ? `${eur(facture.total)} TVA comprise (${eur(facture.total - taxe)} hors TVA)` : `${eur(facture.total)} hors TVA (la TVA de votre pays s'ajoute si elle est due)`;
       const date = dateFr(sub.current_period_end);
+      const limite = dateFr(sub.current_period_end - 30 * 86400);
       const texte = `Bonjour,\n\nVotre abonnement annuel Cursus (formule ${formule}) se renouvelle tacitement le ${date}, pour ${montant}.\n\n` +
-        `Vous pouvez l'annuler à tout moment : l'annulation prend effet à la fin de la période déjà payée. Pour cela, écrivez-nous à ${contact}.\n\n` +
+        `Pour ne pas le renouveler, annulez-le au plus tard le ${limite} (30 jours avant l'échéance) : dans Cursus, page « Tarification », bloc « Mon abonnement » (ou en écrivant à ${contact}). L'annulation prend effet à la fin de la période déjà payée, sans remboursement.\n\n` +
         `Si vous souhaitez continuer, vous n'avez rien à faire.\n\nL'équipe Cursus`;
       const r = await fetch("https://api.resend.com/emails", {
         method: "POST", headers: { Authorization: `Bearer ${cleResend}`, "Content-Type": "application/json" },

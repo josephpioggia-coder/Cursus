@@ -2,6 +2,8 @@
 // Annulation en libre-service d'un abonnement CursEdit, et reprise tant qu'il n'est pas terminé.
 // Corps JSON : { action: "etat" | "annuler" | "reactiver" }. Identité = jeton de l'appelant ; seul l'abonnement actif DE CE COMPTE est touché.
 // Règles (CGV art. 5-6) : l'annulation prend effet à la FIN DE LA PÉRIODE DÉJÀ PAYÉE, sans remboursement ; l'accès reste complet jusque-là.
+// PRÉAVIS (17/11/2026, convention de partenariat Studio) : un abonnement ANNUEL ne peut être annulé (= non renouvelé) qu'au plus tard
+// PREAVIS_ANNUEL_JOURS jours avant l'échéance, mais à tout moment avant cette limite ; passé ce délai il est renouvelé. Mensuel : à tout moment.
 // Exception : Découverte MENSUEL = engagement de 3 mois minimum → la fin est repoussée à la fin du 3e mois si l'abonné est dans ses 3 premiers mois.
 // Le webhook `customer.subscription.deleted` (existant) passe l'abonnement à « annulé » au moment de la fin. NON testé contre Stripe.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -20,6 +22,7 @@ const NOMS: Record<string, { palier: string; periode: "mensuel" | "annuel" }> = 
   "price_1To0aTPCr5y81hQuT6bvFYQ5": { palier: "Auteur", periode: "mensuel" }, "price_1To0aUPCr5y81hQuwLZvpRyv": { palier: "Auteur", periode: "annuel" },
   "price_1To0aUPCr5y81hQu8UUHJP8R": { palier: "Studio", periode: "mensuel" }, "price_1To0aVPCr5y81hQuZSSPcn6U": { palier: "Studio", periode: "annuel" },
 };
+const PREAVIS_ANNUEL_JOURS = 30;
 const DECOUVERTE_MENSUEL = "price_1To0aPPCr5y81hQucKMajz8H";
 
 function plusTroisMois(t: number): number { const d = new Date(t * 1000); d.setUTCMonth(d.getUTCMonth() + 3); return Math.floor(d.getTime() / 1000); }
@@ -40,8 +43,11 @@ Deno.serve(async (req) => {
     const prixId = sub.items.data[0]?.price?.id;
     const infos = NOMS[prixId] || { palier: "Cursus", periode: "mensuel" };
 
+    const limiteAnnulation = infos.periode === "annuel" ? sub.current_period_end - PREAVIS_ANNUEL_JOURS * 86400 : null;
+    const maintenant = Math.floor(Date.now() / 1000);
     if (action === "annuler" && sub.status === "active") {
       if (sub.cancel_at_period_end || sub.cancel_at) return rep({ error: "deja_programmee", message: "L'annulation est déjà programmée." }, 409);
+      if (limiteAnnulation !== null && maintenant > limiteAnnulation) return rep({ error: "preavis_depasse", message: `Le délai pour ne pas renouveler (${PREAVIS_ANNUEL_JOURS} jours avant l'échéance) est dépassé : l'abonnement sera renouvelé.`, limite_annulation: limiteAnnulation, prochain_renouvellement: sub.current_period_end }, 409);
       const finEngagement = prixId === DECOUVERTE_MENSUEL ? plusTroisMois(sub.start_date) : 0;
       if (finEngagement && sub.current_period_end < finEngagement - 86400) {
         sub = await stripe.subscriptions.update(id, { cancel_at: finEngagement });
@@ -58,6 +64,9 @@ Deno.serve(async (req) => {
       annulation_programmee: annulation,
       fin_acces: annulation ? (sub.cancel_at || sub.current_period_end) : null,
       prochain_renouvellement: annulation ? null : sub.current_period_end,
+      limite_annulation: limiteAnnulation,
+      annulation_possible: limiteAnnulation === null || maintenant <= limiteAnnulation,
+      preavis_jours: limiteAnnulation === null ? null : PREAVIS_ANNUEL_JOURS,
       engagement_en_cours: prixId === DECOUVERTE_MENSUEL && sub.current_period_end < plusTroisMois(sub.start_date) - 86400,
     });
   } catch (err) {

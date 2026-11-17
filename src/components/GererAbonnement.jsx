@@ -36,7 +36,12 @@ export default function GererAbonnement() {
       ) : (
         <>
           <div>Prochain renouvellement : <b>{dateFr(etat.prochain_renouvellement)}</b>.</div>
-          {!confirme ? (
+          {etat.limite_annulation && etat.annulation_possible && (
+            <div style={{ fontSize: 12.5, color: COULEURS.texteClair }}>Pour ne pas le renouveler, annulez au plus tard le <b>{dateFr(etat.limite_annulation)}</b> ({etat.preavis_jours} jours avant l'échéance).</div>
+          )}
+          {etat.annulation_possible === false ? (
+            <div style={{ marginTop: 8, fontSize: 12.5, color: COULEURS.texteClair }}>Le délai pour ne pas renouveler (jusqu'au {dateFr(etat.limite_annulation)}) est dépassé : l'abonnement sera renouvelé. Pour toute question, écrivez-nous.</div>
+          ) : !confirme ? (
             <div style={{ marginTop: 10 }}><button style={bouton(false)} onClick={() => setConfirme(true)}>Annuler mon abonnement</button></div>
           ) : (
             <div style={{ marginTop: 10, background: "#F7F4EF", borderRadius: 8, padding: "10px 12px" }}>

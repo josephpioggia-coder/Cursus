@@ -264,8 +264,8 @@ export function CGV({ onRetour, onNaviguer }) {
 
       <H2>6. Annulation d'un abonnement</H2>
       <P>
-        L'abonné peut annuler son abonnement CursEdit à tout moment, directement dans l'application (page « Tarification », bloc « Mon abonnement »)
-        ou sur simple demande écrite à {id.email}. L'annulation prend effet à la fin de la période déjà payée.
+        L'abonné peut annuler son abonnement CursEdit directement dans l'application (page « Tarification », bloc « Mon abonnement »)
+        ou sur simple demande écrite à {id.email}. L'annulation prend effet à la fin de la période déjà payée. Pour un abonnement annuel, l'annulation doit intervenir au plus tard 30 jours avant l'échéance (voir « Renouvellement des abonnements annuels » ci-dessous) ; pour un abonnement mensuel, elle peut intervenir à tout moment.
       </P>
       <P>
         Après annulation, l'accès aux fonctionnalités d'intelligence artificielle (co-pilote, suggestions, audits)
@@ -288,8 +288,9 @@ export function CGV({ onRetour, onNaviguer }) {
 
             <P>
         <strong>Renouvellement des abonnements annuels.</strong> Un abonnement annuel est reconduit tacitement pour une nouvelle année.
-        Un rappel est envoyé par e-mail 30 jours avant l'échéance, avec la date et le montant du renouvellement. L'abonné peut annuler à
-        tout moment ; l'annulation prend effet à la fin de la période déjà payée.
+        Un rappel est envoyé par e-mail environ 45 jours avant l'échéance, avec la date et le montant du renouvellement. Pour ne pas renouveler, l'abonné annule
+        au plus tard 30 jours avant l'échéance, mais à tout moment avant cette date ; l'abonnement se poursuit jusqu'à la fin de la période déjà payée, sans remboursement.
+        Passé ce délai, l'abonnement est renouvelé pour une nouvelle année.
       </P>
 
 <H2>7. Nature du service — limites de l'intelligence artificielle</H2>
