@@ -171,6 +171,10 @@ export default function GrillePaliers({ formuleActuelle = null, onFormuleChangee
                 Choisir {palier.nom}
               </button>
               )}
+
+              {contenu.note && (
+                <p style={{ fontSize: 10.5, color: COULEURS.texteClair, lineHeight: 1.45, margin: "14px 0 0", paddingTop: 10, borderTop: `1px solid ${COULEURS.bordeaux}20` }}>{contenu.note}</p>
+              )}
             </div>
           );
         })}

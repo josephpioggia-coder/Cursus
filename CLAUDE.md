@@ -1614,3 +1614,6 @@ Complément : l'écran « Usage IA » affiche aussi la table `quotas_paliers` (t
 
 ### Quotas de tokens relevés (15/11/2026)
 `2026-11-15-quotas-tokens-paliers.sql` (**à exécuter par Joseph**) : Découverte 1 750 000, Essentiel 2 330 000, Initié 2 920 000 tokens/mois, pour que « 150 / 200 / 250 analyses » (cartes) soient vraies (une analyse moyenne = 11 666 tokens, mesuré). Avant : 100 000 / 500 000 / 1 500 000 (≈ 9 / 43 / 129 analyses). Calcul et marges : `docs/pricing/marge-abonnements-2026-11-15.md`. Si on change un quota : modifier AUSSI le texte de `contenuPaliers.js`.
+
+### « Illimité » retiré d'Auteur et Studio + définition d'une analyse (17/11/2026)
+Décision de Joseph : Auteur = 500 analyses/mois (2 × Initié), Studio = 750 ; texte `contenuPaliers.js` (« Analyses IA illimitées » supprimé), note de bas de carte de Découverte définissant une analyse (`note`, rendue par `GrillePaliers.jsx`, astérisque sur « 5 analyses IA / jour* »). `2026-11-17-quotas-auteur-studio.sql` (**à exécuter par Joseph**) : Auteur 5 830 000, Studio 8 750 000 tokens (Studio BAISSE de 10 M ; marges ≈ 62 % / 66 %). Studio « 2 utilisateurs inclus » : le quota est par COMPTE, non vérifié que les deux utilisateurs le partagent.
