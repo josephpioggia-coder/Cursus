@@ -30,7 +30,8 @@ Les scripts sont à la racine du dépôt. Tous sont répétables sans risque.
 
 ### 0.2 Fonctions Supabase à redéployer
 - ⬜ `stripe-webhook` et `creer-session-checkout` (pause d'abonnement, 17/11/2026) ; à TESTER en mode test Stripe : mettre un abonnement mensuel en pause, attendre/forcer l'échéance, reprendre
-- ⬜ `gerer-abonnement` (préavis annuel + PAUSE) et `rappel-renouvellement` (17/11/2026 : préavis de 30 jours pour ne pas renouveler un abonnement ANNUEL, rappel envoyé ~45 jours avant l'échéance) ; planification du rappel : fenêtre de 46 à 40 jours
+- 🟡 `rappel-renouvellement` (17/11/2026) : fonction déployée ; table `rappels_renouvellement` à confirmer ; secrets `CRON_SECRET` (mot de passe) et `RESEND_API_KEY` (clé Resend `re_…`, domaine cursus.pro déjà vérifié chez Resend) à confirmer ; ESSAI MANUEL encore en « Non autorisé » (en-tête `x-cron-secret`) ; programmation quotidienne (Supabase › Integrations › Cron) PAS FAITE. **NON BLOQUANT pour le lancement** : ne sert qu'à partir du premier abonnement annuel réel (rappel 40-46 jours avant l'échéance) ; à reprendre calmement plus tard.
+- ✅ `gerer-abonnement` (préavis annuel + PAUSE, déployé le 17/11/2026) et ⬜ `rappel-renouvellement` (voir ligne précédente) (17/11/2026 : préavis de 30 jours pour ne pas renouveler un abonnement ANNUEL, rappel envoyé ~45 jours avant l'échéance) ; planification du rappel : fenêtre de 46 à 40 jours
 - ⬜ Stripe : régler les relances de paiement automatiques pour qu'elles se terminent en 15 jours (convention Studio, art. 6.6)
 - ❓ `creer-session-checkout` et `stripe-webhook` (paiement : adresse verrouillée sur le compte, codes à 100 %)
 - ❓ `claude-prox` (quota pondéré par modèle, secours de modèle)
