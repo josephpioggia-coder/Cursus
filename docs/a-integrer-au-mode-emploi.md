@@ -169,3 +169,5 @@ Page « Tarification », bloc « Mon abonnement » : « Annuler mon abonnement �
 - **Usage IA** (réservé au propriétaire, menu « Usage IA ») : tokens réellement consommés par modèle, pour calculer le coût réel des analyses. Pas destiné aux clients.
 
 - **Annuler un abonnement annuel** (Tarification › Mon abonnement) : possible jusqu'à 30 jours avant l'échéance (la date limite est affichée) ; passé ce délai l'abonnement est renouvelé. Rappel envoyé par e-mail environ 45 jours avant. Abonnement mensuel : annulation à tout moment. L'abonnement va toujours jusqu'à la fin de la période payée, sans remboursement.
+
+- **Pause d'abonnement** (Tarification › Mon abonnement, abonnements MENSUELS) : 1 à 3 mois, une fois par 12 mois, pas pendant l'engagement de Découverte. Elle commence à la fin de la période déjà payée ; pendant la pause : rien n'est facturé, lecture seule (textes lisibles et exportables, pas d'IA ni de modification), formule et prix conservés ; reprise automatique, ou « Reprendre maintenant » (nouvelle période payée tout de suite). On peut annuler la pause programmée, ou annuler l'abonnement pendant la pause.

@@ -788,6 +788,10 @@ export const abonnementsAPI = {
     if (erreurActif) return { data: null, error: erreurActif };
     if (actif) return { data: { peutÉcrire: true, peutLire: true, motif: "actif" }, error: null };
 
+    // PAUSE (17/11/2026) : abonnement en pause = lecture seule, jusqu'à la reprise (pas de limite de 3 mois, la pause a sa propre durée max).
+    const { data: enPause } = await supabase.from("abonnements").select("id").eq("user_id", uid).eq("statut", "pause").limit(1).maybeSingle();
+    if (enPause) return { data: { peutÉcrire: false, peutLire: true, motif: "en_pause" }, error: null };
+
     const { data: dernier, error: erreurDernier } = await supabase
       .from("abonnements")
       .select("updated_at")

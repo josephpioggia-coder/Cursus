@@ -29,7 +29,8 @@ Les scripts sont à la racine du dépôt. Tous sont répétables sans risque.
 - ⏰ **`2026-11-17-quotas-auteur-studio.sql`** : Auteur 5 830 000 et Studio 11 670 000 tokens (cartes : 500 et 1 000 analyses). **À faire sur ton PC** ; contrôle : la requête finale affiche ces deux valeurs. Rappel à te faire à chaque ouverture de session.
 
 ### 0.2 Fonctions Supabase à redéployer
-- ⬜ `gerer-abonnement` et `rappel-renouvellement` (17/11/2026 : préavis de 30 jours pour ne pas renouveler un abonnement ANNUEL, rappel envoyé ~45 jours avant l'échéance) ; planification du rappel : fenêtre de 46 à 40 jours
+- ⬜ `stripe-webhook` et `creer-session-checkout` (pause d'abonnement, 17/11/2026) ; à TESTER en mode test Stripe : mettre un abonnement mensuel en pause, attendre/forcer l'échéance, reprendre
+- ⬜ `gerer-abonnement` (préavis annuel + PAUSE) et `rappel-renouvellement` (17/11/2026 : préavis de 30 jours pour ne pas renouveler un abonnement ANNUEL, rappel envoyé ~45 jours avant l'échéance) ; planification du rappel : fenêtre de 46 à 40 jours
 - ⬜ Stripe : régler les relances de paiement automatiques pour qu'elles se terminent en 15 jours (convention Studio, art. 6.6)
 - ❓ `creer-session-checkout` et `stripe-webhook` (paiement : adresse verrouillée sur le compte, codes à 100 %)
 - ❓ `claude-prox` (quota pondéré par modèle, secours de modèle)

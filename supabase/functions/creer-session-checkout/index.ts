@@ -222,13 +222,13 @@ Deno.serve(async (req) => {
         .from("abonnements")
         .select("id, palier")
         .eq("user_id", utilisateurAppelant.id)
-        .eq("statut", "actif")
+        .in("statut", ["actif", "pause"])
         .limit(1)
         .maybeSingle();
       if (abonnementExistant) {
         return new Response(JSON.stringify({
           error: "abonnement_deja_actif",
-          message: `Un abonnement "${abonnementExistant.palier}" est déjà actif sur ce compte — gère-le avant d'en souscrire un nouveau plutôt que d'en cumuler plusieurs.`,
+          message: `Un abonnement "${abonnementExistant.palier}" est déjà actif (ou en pause) sur ce compte — gère-le avant d'en souscrire un nouveau plutôt que d'en cumuler plusieurs.`,
         }), { status: 409, headers: { "Content-Type": "application/json", ...CORS } });
       }
     }
