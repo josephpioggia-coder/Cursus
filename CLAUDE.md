@@ -1617,3 +1617,6 @@ Complément : l'écran « Usage IA » affiche aussi la table `quotas_paliers` (t
 
 ### « Illimité » retiré d'Auteur et Studio + définition d'une analyse (17/11/2026)
 Décision de Joseph : Auteur = 500 analyses/mois (2 × Initié), Studio = 1 000 (quota PARTAGÉ entre ses utilisateurs, décision du 17/11 : 2 × Auteur) ; texte `contenuPaliers.js` (« Analyses IA illimitées » supprimé), note de bas de carte de Découverte définissant une analyse (`note`, rendue par `GrillePaliers.jsx`, astérisque sur « 5 analyses IA / jour* »). `2026-11-17-quotas-auteur-studio.sql` (**à exécuter par Joseph**) : Auteur 5 830 000, Studio 11 670 000 tokens (marges si consommé en entier ≈ 62 % / 55 %). Utilisateur supplémentaire Studio, au choix : +12 €/mois pour +250 analyses (coût max ≈ 8,3 €) ou +24 €/mois pour +500 (≈ 16,5 €), marge ≈ 31 % hors frais Stripe. **TEXTE SEULEMENT** : aucun prix Stripe ni mécanisme n'ajoute ces utilisateurs ni leur quota ; le quota partagé du compte reste 11 670 000.
+
+### Note pour l'avocat : revente de places Studio (17/11/2026)
+`docs/note-avocat-revente-studio-2026-11-17.md` (+ .docx) : modèle de revente (utilisateurs supplémentaires +12 €/+250 analyses ou +24 €/+500), 9 questions (contrat, RGPD, TVA, responsabilité). Rien de construit côté code ; à envoyer par Joseph.
