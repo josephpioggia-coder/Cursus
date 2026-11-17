@@ -101,9 +101,9 @@ export const CONTENU_PALIERS = {
     engagement: null,
     fonctionnalites: [
       "Tout Auteur, plus :",
-      "750 analyses IA / mois",
+      "1 000 analyses IA / mois, partagées entre les utilisateurs",
       "2 utilisateurs inclus",
-      "+12€/mois par utilisateur supplémentaire",
+      "Utilisateur supplémentaire, au choix : +12 €/mois (+250 analyses) ou +24 €/mois (+500 analyses)",
       "Tableau de bord partagé",
       "Onboarding personnalisé",
       "Prix maintenu une fois CursDecision opérationnel (les nouveaux abonnés paieront alors 12 € de plus par mois)",
