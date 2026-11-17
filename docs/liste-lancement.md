@@ -122,3 +122,7 @@ L'offre gratuite d'un mois n'a pas besoin de la phase 1 pour démarrer.
 - **Mentions « mode de création »** des auteurs : déclarées par eux, Cursus ne les vérifie pas.
 - **Non testé en conditions réelles** (ce que je ne peux pas faire d'ici) : application complète avec ton vrai Supabase, téléphone réel, appels d'IA réels pour la plupart des outils récents, paiement Stripe réel.
 - **Cause non confirmée** : le lien de confirmation d'Annie qui « ne s'ouvrait pas » (probablement l'adresse du site dans Supabase, voir 0.3).
+
+
+### Passage obligé 0.0 — Anthropic vérifié (17/11/2026)
+Console platform.claude.com, organisation HMS-i : clé active `ANTHROPIC_KEY` (créée 30/08/2026, 1,78 $ consommés), ancienne clé expirée le 29/09/2026. **Contrôle des données : conservation ACTIVÉE, 30 jours, par défaut pour toute l'organisation** (consultable par Anthropic pour sûreté et sécurité). Politique de confidentialité corrigée en conséquence. Option possible : demander la « rétention zéro » au support Anthropic (hors modèles Fable). Reste : solde de crédits API (Dépenses et utilisation) et OpenAI (Data controls).
