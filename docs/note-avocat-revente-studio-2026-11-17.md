@@ -29,6 +29,10 @@ Il existe des CGV, des mentions légales et une politique de confidentialité (�
 **TVA et facturation**
 7. Facturation de Cursus au revendeur (B2B, autoliquidation hors Belgique ?) et du revendeur à ses clients : quelles mentions, quel rôle de Stripe Tax, et quid du guichet unique (OSS) ?
 
+**Compléments (convention v1.1)**
+10. Plafond de responsabilité (art. 12.4) : douze mois de paiements du Partenaire ; faut-il un montant plancher ?
+11. Préavis de 30 jours pour ne pas renouveler un abonnement annuel : valable envers des consommateurs (bouton d'annulation appliqué à tous les abonnés annuels) ? Texte actuel des CGV, art. 6.
+
 **Responsabilité**
 8. Limitation de responsabilité (erreurs de l'IA, perte de données, indisponibilité) et partage du support entre Cursus et le revendeur.
 9. Usage de la marque Cursus par le revendeur (marque blanche ou non).

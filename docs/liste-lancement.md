@@ -11,6 +11,9 @@ Les phases peuvent avancer en parallèle, sauf indication « bloque ».
 
 À faire avant toute annonce publique.
 
+### ⛔ 0.0 PASSAGE OBLIGÉ avant toute annonce, tout paiement réel et toute signature de convention (👤)
+**Vérifier dans les comptes Anthropic ET OpenAI de Cursus les réglages de conservation et d'entraînement**, puis noter la date de la vérification ici et garder une capture. Pourquoi : la politique de confidentialité et l'article 9.7 de la convention Studio affirment que Cursus n'entraîne pas de modèle avec les contenus des utilisateurs, et ne promettent rien à la place des fournisseurs ; il faut que la réalité de ces comptes corresponde à ce qu'on écrit. ⬜ Anthropic : ______ (date) · ⬜ OpenAI : ______ (date). **Rappel à te faire à chaque ouverture de session tant que ce n'est pas coché. Rien du lancement ne doit être déclaré « prêt » tant que ce point est ouvert.**
+
 ### 0.1 Base de données Supabase (éditeur SQL)
 Les scripts sont à la racine du dépôt. Tous sont répétables sans risque.
 
@@ -26,6 +29,8 @@ Les scripts sont à la racine du dépôt. Tous sont répétables sans risque.
 - ⏰ **`2026-11-17-quotas-auteur-studio.sql`** : Auteur 5 830 000 et Studio 11 670 000 tokens (cartes : 500 et 1 000 analyses). **À faire sur ton PC** ; contrôle : la requête finale affiche ces deux valeurs. Rappel à te faire à chaque ouverture de session.
 
 ### 0.2 Fonctions Supabase à redéployer
+- ⬜ `gerer-abonnement` et `rappel-renouvellement` (17/11/2026 : préavis de 30 jours pour ne pas renouveler un abonnement ANNUEL, rappel envoyé ~45 jours avant l'échéance) ; planification du rappel : fenêtre de 46 à 40 jours
+- ⬜ Stripe : régler les relances de paiement automatiques pour qu'elles se terminent en 15 jours (convention Studio, art. 6.6)
 - ❓ `creer-session-checkout` et `stripe-webhook` (paiement : adresse verrouillée sur le compte, codes à 100 %)
 - ❓ `claude-prox` (quota pondéré par modèle, secours de modèle)
 - ❓ `lire-texte` et `transcrire-audio` (quota voix, dictée)

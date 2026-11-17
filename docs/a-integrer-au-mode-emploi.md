@@ -167,3 +167,5 @@ Les prix affichés sont hors TVA ; la TVA de votre pays est calculée à la comm
 Page « Tarification », bloc « Mon abonnement » : « Annuler mon abonnement » puis « Confirmer l'annulation ». Vous gardez l'accès complet jusqu'à la fin de la période déjà payée (pas de remboursement) ; un abonnement Découverte mensuel s'arrête au plus tôt à la fin de ses 3 mois d'engagement. « Reprendre mon abonnement » annule l'annulation tant que l'abonnement n'est pas terminé.
 
 - **Usage IA** (réservé au propriétaire, menu « Usage IA ») : tokens réellement consommés par modèle, pour calculer le coût réel des analyses. Pas destiné aux clients.
+
+- **Annuler un abonnement annuel** (Tarification › Mon abonnement) : possible jusqu'à 30 jours avant l'échéance (la date limite est affichée) ; passé ce délai l'abonnement est renouvelé. Rappel envoyé par e-mail environ 45 jours avant. Abonnement mensuel : annulation à tout moment. L'abonnement va toujours jusqu'à la fin de la période payée, sans remboursement.
