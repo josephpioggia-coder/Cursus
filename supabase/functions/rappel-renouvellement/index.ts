@@ -25,7 +25,13 @@ const dateFr = (t: number) => new Date(t * 1000).toLocaleDateString("fr-BE", { d
 const échapper = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 Deno.serve(async (req) => {
-  if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET") || !Deno.env.get("CRON_SECRET")) return new Response("Non autorisé", { status: 401 });
+  // Mot de passe comparé SANS les espaces de début / fin. En cas de refus, la réponse donne seulement des LONGUEURS (jamais le contenu) pour diagnostiquer :
+  // longueur_attendue = 0 → le secret CRON_SECRET n'est pas lu par la fonction ; longueur différente → l'ancienne valeur ou une erreur de copie.
+  const attendu = (Deno.env.get("CRON_SECRET") || "").trim();
+  const recu = (req.headers.get("x-cron-secret") || "").trim();
+  if (!attendu || recu !== attendu) {
+    return new Response(JSON.stringify({ error: "Non autorisé", secret_lu_par_la_fonction: attendu.length > 0, longueur_attendue: attendu.length, longueur_recue: recu.length }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
   const cleResend = Deno.env.get("RESEND_API_KEY");
   if (!cleResend) return new Response(JSON.stringify({ error: "RESEND_API_KEY manquant : aucun e-mail envoyé." }), { status: 500 });
   const expéditeur = Deno.env.get("EXPEDITEUR") || "Cursus <bonjour@cursus.pro>";
