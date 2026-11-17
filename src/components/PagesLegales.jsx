@@ -293,6 +293,14 @@ export function CGV({ onRetour, onNaviguer }) {
         Passé ce délai, l'abonnement est renouvelé pour une nouvelle année.
       </P>
 
+<P>
+        <strong>Pause.</strong> L'abonné titulaire d'un abonnement <strong>mensuel</strong> peut le mettre en pause pour 1 à 3 mois, une fois par période de 12 mois,
+        sauf pendant l'engagement initial de 3 mois de la formule Découverte. La pause commence à la fin de la période déjà payée ; pendant la pause, aucune somme n'est facturée,
+        l'accès est en lecture seule (consultation et export des textes, sans fonctionnalité d'intelligence artificielle ni modification), et la formule et le prix
+        applicables sont conservés. L'abonnement reprend automatiquement à l'issue de la pause (ou plus tôt, à la demande de l'abonné, par le début d'une nouvelle période payée).
+        La pause n'est pas disponible pour les abonnements annuels.
+      </P>
+
 <H2>7. Nature du service — limites de l'intelligence artificielle</H2>
       <P>
         Les analyses, suggestions et audits produits par Cursus reposent sur des modèles d'intelligence artificielle

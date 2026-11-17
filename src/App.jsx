@@ -3001,13 +3001,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 background: "#FBE9E9", borderBottom: "0.5px solid var(--border)",
                 padding: "8px 20px", fontSize: 12.5, color: "#A32D2D", flexShrink: 0,
               }}>
-                <span>Abonnement annulé — lecture seule (aucune modification possible) pendant 3 mois à compter de l'annulation.</span>
+                <span>{accèsCursEdit.motif === "en_pause" ? "Abonnement en pause — lecture seule jusqu'à la reprise (rien n'est facturé pendant la pause)." : "Abonnement annulé — lecture seule (aucune modification possible) pendant 3 mois à compter de l'annulation."}</span>
                 <button onClick={() => setVue("tarification")} style={{
                   flexShrink: 0, fontSize: 12, color: "#A32D2D", background: "none",
                   border: "0.5px solid #A32D2D", borderRadius: 6, padding: "4px 10px",
                   cursor: "pointer", fontFamily: "inherit",
                 }}>
-                  Se réabonner
+                  {accèsCursEdit.motif === "en_pause" ? "Gérer ma pause" : "Se réabonner"}
                 </button>
               </div>
             )}

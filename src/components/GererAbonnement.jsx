@@ -14,12 +14,16 @@ export default function GererAbonnement() {
   const [confirme, setConfirme] = useState(false);
   const [occupe, setOccupe] = useState(false);
   const [message, setMessage] = useState(null);
+  const [pauseOuverte, setPauseOuverte] = useState(false);
+  const [moisPause, setMoisPause] = useState(1);
 
-  const agir = async (action) => {
+  const agir = async (action, extra = {}) => {
     setOccupe(true); setMessage(null);
-    const r = await appelerFonction("gerer-abonnement", { action });
+    const r = await appelerFonction("gerer-abonnement", { action, ...extra });
     setOccupe(false);
-    if (r?.ok) { setEtat(r); setConfirme(false); if (action === "annuler") setMessage("Votre annulation est enregistrée. Vous gardez l'accès jusqu'à la date indiquée."); if (action === "reactiver") setMessage("Votre abonnement continue normalement."); }
+    if (r?.ok) { setEtat(r); setConfirme(false); if (action === "annuler") setMessage("Votre annulation est enregistrée. Vous gardez l'accès jusqu'à la date indiquée."); if (action === "reactiver") setMessage("Votre abonnement continue normalement.");
+      if (action === "pauser") { setPauseOuverte(false); setMessage("Votre pause est programmée : elle commence à la fin de la période déjà payée."); }
+      if (action === "reprendre") setMessage("Votre abonnement reprend. Le webhook met l'accès à jour dans quelques secondes (rechargez la page si besoin)."); }
     else setMessage(r?.message || "L'opération n'a pas abouti.");
   };
   useEffect(() => { let vivant = true; appelerFonction("gerer-abonnement", { action: "etat" }).then((r) => { if (vivant && r?.ok) setEtat(r); }); return () => { vivant = false; }; }, []);
@@ -28,7 +32,20 @@ export default function GererAbonnement() {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto 28px", background: "#fff", border: `1px solid ${COULEURS.bordeaux}30`, borderRadius: 12, padding: "14px 18px", color: COULEURS.texte, fontSize: 13.5, lineHeight: 1.55 }}>
       <div style={{ fontWeight: 600, marginBottom: 4 }}>Mon abonnement : {etat.palier} ({etat.periode})</div>
-      {etat.annulation_programmee ? (
+      {etat.en_pause ? (
+        <>
+          <div>Abonnement <b>en pause</b> jusqu'au <b>{dateFr(etat.pause_fin)}</b> : lecture seule, rien n'est facturé. La reprise est automatique ; vous pouvez aussi reprendre tout de suite (une nouvelle période payée commence alors immédiatement).</div>
+          <div style={{ marginTop: 10 }}>
+            <button style={bouton(true)} disabled={occupe} onClick={() => agir("reprendre")}>{occupe ? "…" : "Reprendre maintenant"}</button>{" "}
+            <button style={bouton(false)} disabled={occupe} onClick={() => agir("annuler")}>Annuler mon abonnement</button>
+          </div>
+        </>
+      ) : etat.pause_programmee ? (
+        <>
+          <div>Pause programmée : elle commence le <b>{dateFr(etat.pause_debut)}</b> (fin de la période déjà payée), avec reprise automatique le <b>{dateFr(etat.pause_fin)}</b>. Vous gardez l'accès complet jusqu'au début de la pause.</div>
+          <div style={{ marginTop: 10 }}><button style={bouton(false)} disabled={occupe} onClick={() => agir("reprendre")}>{occupe ? "…" : "Annuler la pause"}</button></div>
+        </>
+      ) : etat.annulation_programmee ? (
         <>
           <div>Annulation programmée : vous gardez l'accès complet jusqu'au <b>{dateFr(etat.fin_acces)}</b>, puis l'abonnement s'arrête.</div>
           <div style={{ marginTop: 10 }}><button style={bouton(true)} disabled={occupe} onClick={() => agir("reactiver")}>{occupe ? "…" : "Reprendre mon abonnement"}</button></div>
@@ -54,6 +71,30 @@ export default function GererAbonnement() {
             </div>
           )}
         </>
+      )}
+      {!etat.en_pause && !etat.pause_programmee && !etat.annulation_programmee && etat.periode === "mensuel" && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${COULEURS.bordeaux}20` }}>
+          {etat.pause_possible ? (
+            !pauseOuverte ? (
+              <button style={bouton(false)} onClick={() => setPauseOuverte(true)}>Mettre en pause (jusqu'à {etat.pause_max_mois} mois)</button>
+            ) : (
+              <div style={{ background: "#F7F4EF", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ marginBottom: 8 }}>
+                  La pause <b>commence à la fin de la période déjà payée</b> ({dateFr(etat.prochain_renouvellement)}) : vous gardez l'accès complet jusque-là. Pendant la pause, <b>rien n'est facturé</b> et l'accès est en <b>lecture seule</b> (vous relisez et exportez vos textes, sans IA ni modification). Votre formule, votre prix et vos projets sont conservés ; la reprise est automatique. Une seule pause par période de 12 mois.
+                </div>
+                <label style={{ fontSize: 13 }}>Durée :{" "}
+                  <select value={moisPause} onChange={(e) => setMoisPause(Number(e.target.value))} style={{ fontSize: 13, padding: "4px 6px" }}>
+                    {Array.from({ length: etat.pause_max_mois }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} mois</option>)}
+                  </select>
+                </label>{" "}
+                <button style={bouton(true)} disabled={occupe} onClick={() => agir("pauser", { mois: moisPause })}>{occupe ? "…" : "Confirmer la pause"}</button>{" "}
+                <button style={bouton(false)} disabled={occupe} onClick={() => setPauseOuverte(false)}>Fermer</button>
+              </div>
+            )
+          ) : (
+            <div style={{ fontSize: 12.5, color: COULEURS.texteClair }}>Pause indisponible : {etat.pause_raison}</div>
+          )}
+        </div>
       )}
       {message && <div style={{ marginTop: 8, fontSize: 12.5, color: COULEURS.texteClair }}>{message}</div>}
     </div>

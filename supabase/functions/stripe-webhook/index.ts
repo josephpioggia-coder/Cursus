@@ -214,7 +214,11 @@ Deno.serve(async (req) => {
       const subscription = event.data.object as Stripe.Subscription;
       const priceId = subscription.items.data[0]?.price.id;
       const palier = PALIERS[priceId] || "Inconnu";
-      const statut = subscription.status === "active" ? "actif" : subscription.status;
+      // PAUSE (17/11/2026) : l'abonnement Stripe reste « active » pendant une pause de facturation ; la pause COMMENCE à la fin de la période
+      // déjà payée (métadonnée `pause_debut`, posée par gerer-abonnement). Dès qu'elle a commencé → statut « pause » (lecture seule, IA coupée).
+      const pauseDebut = Number(subscription.metadata?.pause_debut || 0);
+      const enPause = !!subscription.pause_collection && pauseDebut > 0 && Math.floor(Date.now() / 1000) >= pauseDebut - 3600;
+      const statut = enPause ? "pause" : (subscription.status === "active" ? "actif" : subscription.status);
 
       await supabase.from("abonnements")
         .update({ palier, statut, updated_at: new Date().toISOString() })
