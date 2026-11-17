@@ -126,3 +126,6 @@ L'offre gratuite d'un mois n'a pas besoin de la phase 1 pour démarrer.
 
 ### Passage obligé 0.0 — Anthropic vérifié (17/11/2026)
 Console platform.claude.com, organisation HMS-i : clé active `ANTHROPIC_KEY` (créée 30/08/2026, 1,78 $ consommés), ancienne clé expirée le 29/09/2026. **Contrôle des données : conservation ACTIVÉE, 30 jours, par défaut pour toute l'organisation** (consultable par Anthropic pour sûreté et sécurité). Politique de confidentialité corrigée en conséquence. Option possible : demander la « rétention zéro » au support Anthropic (hors modèles Fable). Reste : solde de crédits API (Dépenses et utilisation) et OpenAI (Data controls).
+
+### Passage obligé 0.0 — solde Anthropic (17/11/2026)
+Console, Dépenses et utilisation : dépenses du mois 1,78 $ (1 % de la limite de 100 $), **solde de crédits 2,99 $, recharge automatique DÉSACTIVÉE**. ⏰ À FAIRE AVANT TOUT CLIENT RÉEL : activer la recharge automatique (ex. recharger 25 $ sous 10 $) ; à zéro, tout Cursus cesse de répondre. Reste : OpenAI (Data controls + solde).
