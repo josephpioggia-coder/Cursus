@@ -109,3 +109,8 @@ export function reglageRecommande(modeles) {
 }
 
 export const directiveStyle = (styleId) => (STYLES.find((s) => s.id === styleId) || STYLES[1]).directive;
+
+// Modèles « couverts » par la politique d'Anthropic (page Covered Models, vérifiée le 17/11/2026) : prompts et réponses conservés AU MOINS 30 jours,
+// sans option « zéro conservation » en espace de travail. Les autres modèles utilisés par Cursus (Sonnet, Opus 5.5, Haiku) ne le sont pas.
+// À revérifier à chaque nouveau modèle : https://support.claude.com/en/articles/15425695-covered-models
+export const MODELES_CONSERVATION_30J = ["claude-fable-5", "claude-fable-5-1", "claude-fable-5-2"];

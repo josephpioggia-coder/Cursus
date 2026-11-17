@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detecterRefus, MESSAGE_REFUS } from "../lib/scenesIntimes.js";
 import { poserQuestion } from "../lib/questionRapide.js";
-import { EFFORTS, PROFILS, STYLES, chargerModeles, consoRelative, ecrireChoix, lireChoix, modeleDuProfil, reglageRecommande, MODELES_PAR_DEFAUT } from "../lib/modelesIA.js";
+import { EFFORTS, PROFILS, STYLES, chargerModeles, consoRelative, ecrireChoix, lireChoix, modeleDuProfil, reglageRecommande, MODELES_PAR_DEFAUT, MODELES_CONSERVATION_30J } from "../lib/modelesIA.js";
 import { preferencesIAAPI } from "../lib/api.js";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { marquerDebut, marquerFin, sauverResultat, lireResultat, effacerResultat, estEnCours, nouveauSignal } from "../lib/copiloteConserve.js";
@@ -130,12 +130,12 @@ export default function QuestionRapide({ editor, noeudId: noeudIdProp, couleur =
       {menu && (
         <div role="menu" style={{ position: "absolute", top: 46, right: 10, width: 300, maxWidth: "calc(100% - 20px)", background: "#fff", border: "0.5px solid #ddd", borderRadius: 12, boxShadow: "0 6px 24px rgba(0,0,0,0.2)", zIndex: 5, padding: "6px 0" }}>
           {menu === "principal" && (<>
-            {modeles.map((m) => ligneMenu(m.id === modele, () => choisirModele(m.id), (<>{m.libelle}{m.recommande && <span style={pastille}>Recommandé</span>}{m.credits_requis && <span style={pastille}>Nécessite des crédits</span>}</>), m.id === modele ? "✓" : `×${m.poids}`))}
+            {modeles.map((m) => ligneMenu(m.id === modele, () => choisirModele(m.id), (<>{m.libelle}{m.recommande && <span style={pastille}>Recommandé</span>}{m.credits_requis && <span style={pastille}>Nécessite des crédits</span>}{MODELES_CONSERVATION_30J.includes(m.id) && <span style={pastille}>Conservé 30 j par le fournisseur</span>}</>), m.id === modele ? "✓" : `×${m.poids}`))}
             <div style={{ borderTop: "0.5px solid #eee", margin: "4px 0" }} />
             {ligneMenu(false, () => setMenu("effort"), <>Effort</>, <span style={{ color: "#666", fontSize: 13 }}>{effortChoisi.libelle} ›</span>)}
             {ligneMenu(false, () => setMenu("style"), <>Style</>, <span style={{ color: "#666", fontSize: 13 }}>{styleChoisi.libelle} ›</span>)}
             {ligneMenu(false, () => setMenu("profils"), <>Profils</>, <span style={{ color: "#666", fontSize: 13 }}>{(PROFILS.find((p) => p.id === reglage.profil) || {}).libelle || "Personnalisé"} ›</span>)}
-            <div style={{ fontSize: 11, color: "#888", padding: "4px 12px 6px", lineHeight: 1.4 }}>{modeleChoisi?.description}</div>
+            <div style={{ fontSize: 11, color: "#888", padding: "4px 12px 6px", lineHeight: 1.4 }}>{modeleChoisi?.description}{MODELES_CONSERVATION_30J.includes(modeleChoisi?.id) && " Ce modèle avancé est soumis à une conservation de vos requêtes d'au moins 30 jours chez le fournisseur."}</div>
           </>)}
           {menu === "effort" && (<>
             <div style={{ fontSize: 12, color: "#777", padding: "4px 12px 8px", lineHeight: 1.45 }}>Un effort plus élevé signifie des réponses plus approfondies, mais prend plus de temps et consomme votre quota plus rapidement.</div>
