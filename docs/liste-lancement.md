@@ -26,7 +26,7 @@ Les scripts sont à la racine du dépôt. Tous sont répétables sans risque.
 - ❓ `2026-10-28-TOUT-EN-UN.sql` : styles du projet, registre des modèles d'IA, réglage de l'assistant (regroupe 3 scripts)
 - ❓ `2026-10-28-aide-faq.sql` : liste d'aide validée
 - ✅ (fait le 17/11/2026, valeurs vérifiées) **`2026-11-15-quotas-tokens-paliers.sql`** : relève les quotas de tokens de Découverte, Essentiel et Initié pour que « 150 / 200 / 250 analyses » soient vraies (aujourd'hui ≈ 9 / 43 / 129). **À faire sur ton PC** ; contrôle : la requête finale doit afficher 1 750 000 / 2 330 000 / 2 920 000.
-- ⏰ **`2026-11-17-quotas-auteur-studio.sql`** : Auteur 5 830 000 et Studio 11 670 000 tokens (cartes : 500 et 1 000 analyses). **À faire sur ton PC** ; contrôle : la requête finale affiche ces deux valeurs. Rappel à te faire à chaque ouverture de session.
+- ✅ **`2026-11-17-quotas-auteur-studio.sql`** exécuté et vérifié le 18/11/2026 : Découverte 1 750 000, Essentiel 2 330 000, Initié 2 920 000, Auteur 5 830 000, Studio 11 670 000 tokens (cartes : 150 / 200 / 250 / 500 / 1 000 analyses) ; voix 10 000 / 30 000 / 60 000 / 150 000 / 150 000 caractères.
 
 ### 0.2 Fonctions Supabase à redéployer
 - ⬜ `stripe-webhook` et `creer-session-checkout` (pause d'abonnement, 17/11/2026) ; à TESTER en mode test Stripe : mettre un abonnement mensuel en pause, attendre/forcer l'échéance, reprendre
