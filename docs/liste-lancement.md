@@ -129,3 +129,8 @@ Console platform.claude.com, organisation HMS-i : clé active `ANTHROPIC_KEY` (c
 
 ### Passage obligé 0.0 — solde Anthropic (17/11/2026)
 Console, Dépenses et utilisation : dépenses du mois 1,78 $ (1 % de la limite de 100 $), **solde de crédits 2,99 $, recharge automatique DÉSACTIVÉE**. ⏰ À FAIRE AVANT TOUT CLIENT RÉEL : activer la recharge automatique (ex. recharger 25 $ sous 10 $) ; à zéro, tout Cursus cesse de répondre. Reste : OpenAI (Data controls + solde).
+
+### Passage obligé 0.0 — suite du 18/11/2026
+- ✅ Anthropic : recharge automatique activée par Joseph (18/11/2026).
+- OpenAI, relevé par Joseph le 18/11/2026 d'après une capture que Claude n'a PAS vue (lecture transmise par un autre assistant) : API call logging « Enabled per call », audit logging non activé, solde 10,75 $. Conservation effective chez OpenAI : à confirmer ; clôture du passage obligé : EN ATTENTE (décision de Joseph : passer API call logging à « Disabled » ?).
+- Vérifié dans le code par Claude (18/11/2026) : Cursus n'appelle QUE `chat/completions`, `audio/speech` et `audio/transcriptions` d'OpenAI — jamais l'API Responses — et n'envoie aucun paramètre `store` (8 fonctions Edge). Le point « `store=false` » ne s'applique donc pas à l'API Responses ; pour Chat Completions, `store` est faux par défaut d'après la documentation d'OpenAI (à reconfirmer sur la page officielle).
