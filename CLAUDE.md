@@ -1632,3 +1632,6 @@ Lecture de https://support.claude.com/en/articles/15425695-covered-models : « m
 
 ### Convention Studio v1.2 (18/11/2026)
 `docs/convention-partenariat-studio-v1.2-2026-11-18.md/.docx` remplace la v1.1 (conservée) : CURSUS = HMS-i SA provisoire (adresse et BCE de `IDENTITE_EDITEUR`), changement de formule (2.8), TVA selon le pays (6.3), conservation 30 jours chez Anthropic (9.7), rappel de renouvellement ~45 j (13.2), pause mensuelle (13.2 bis), sous-traitants provisoires (annexe 2 D), état du passage obligé (Anthropic vérifié le 17/11, OpenAI à faire). Non validé par un avocat ; passages à valider marqués entre crochets. Vérifié : génération du .docx (pandoc) seulement.
+
+### Convention Studio v1.3 (18/11/2026)
+`docs/convention-partenariat-studio-v1.3-2026-11-18.md/.docx` = v1.2 + rédactions de remplacement fournies par Joseph pour les articles 2.8 (changement de formule, sans la clause de renonciation à la rétractation), 9.7 (fournisseurs d'IA : formulation générale), 13.1 (durée) et l'ajout à 13.2 bis (pause vs engagements envers les clients finaux). Les durées de conservation concrètes (Anthropic 30 jours…) sont déplacées dans l'annexe 2 D ; sous-traitants en annexe 2 E. Non validé par un avocat. Vérifié : génération du .docx (pandoc) seulement.
