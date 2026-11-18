@@ -11,7 +11,7 @@ Les phases peuvent avancer en parallèle, sauf indication « bloque ».
 
 À faire avant toute annonce publique.
 
-### ⛔ 0.0 PASSAGE OBLIGÉ avant toute annonce, tout paiement réel et toute signature de convention (👤)
+### ✅ 0.0 PASSAGE OBLIGÉ — CLOS le 18/11/2026 (Anthropic et OpenAI vérifiés ; à refaire à chaque nouveau modèle ou fournisseur ajouté) — avant toute annonce, tout paiement réel et toute signature de convention (👤)
 **Vérifier dans les comptes Anthropic ET OpenAI de Cursus les réglages de conservation et d'entraînement**, puis noter la date de la vérification ici et garder une capture. Pourquoi : la politique de confidentialité et l'article 9.7 de la convention Studio affirment que Cursus n'entraîne pas de modèle avec les contenus des utilisateurs, et ne promettent rien à la place des fournisseurs ; il faut que la réalité de ces comptes corresponde à ce qu'on écrit. ⬜ Anthropic : ______ (date) · ⬜ OpenAI : ______ (date). **Fait par Claude le 17/11/2026 (lecture des pages officielles) : Anthropic — seuls les modèles « Fable » (5, 5.1, 5.2) et « Mythos » sont « couverts » (conservation ≥ 30 jours, pas de zéro-conservation en espace de travail) ; Sonnet 5 / 5.5, Opus 5.5, Haiku ne le sont pas ; Cursus propose Fable 5.1 (crédits requis) : mention ajoutée dans le menu et la politique de confidentialité. OpenAI — pas d'entraînement par défaut, journaux d'abus jusqu'à 30 jours (texte), transcription audio sans conservation indiquée. RESTE pour toi : regarder les RÉGLAGES de tes deux comptes (aucun partage de données activé) et noter les dates.** **Rappel à te faire à chaque ouverture de session tant que ce n'est pas coché. Rien du lancement ne doit être déclaré « prêt » tant que ce point est ouvert.**
 
 ### 0.1 Base de données Supabase (éditeur SQL)
@@ -134,3 +134,8 @@ Console, Dépenses et utilisation : dépenses du mois 1,78 $ (1 % de la limite d
 - ✅ Anthropic : recharge automatique activée par Joseph (18/11/2026).
 - OpenAI, relevé par Joseph le 18/11/2026 d'après une capture que Claude n'a PAS vue (lecture transmise par un autre assistant) : API call logging « Enabled per call », audit logging non activé, solde 10,75 $. Conservation effective chez OpenAI : à confirmer ; clôture du passage obligé : EN ATTENTE (décision de Joseph : passer API call logging à « Disabled » ?).
 - Vérifié dans le code par Claude (18/11/2026) : Cursus n'appelle QUE `chat/completions`, `audio/speech` et `audio/transcriptions` d'OpenAI — jamais l'API Responses — et n'envoie aucun paramètre `store` (8 fonctions Edge). Le point « `store=false` » ne s'applique donc pas à l'API Responses ; pour Chat Completions, `store` est faux par défaut d'après la documentation d'OpenAI (à reconfirmer sur la page officielle).
+
+### Passage obligé 0.0 — CLOS (18/11/2026)
+- Anthropic (17/11/2026) : conservation 30 jours par défaut pour l'organisation, recharge automatique activée, clé active vérifiée.
+- OpenAI (18/11/2026, capture vue par Claude) : API call logging passé de « Enabled per call » à **« Disabled »** par Joseph ; audit logging non activé (volontairement : irréversible sans OpenAI) ; solde 10,75 $. Cursus n'envoie aucun `store`. OpenAI peut garder ses propres journaux de sécurité (jusqu'à 30 jours d'après sa documentation) : déjà dit dans la politique de confidentialité.
+- À REFAIRE : à chaque nouveau modèle ou fournisseur d'IA (voir `MODELES_CONSERVATION_30J`), et si une des deux consoles change ses réglages.
