@@ -535,6 +535,14 @@ const extensionAudio = (type = "") =>
 
 function BoutonDictee({ editor }) {
   const [ouvert, setOuvert] = useState(false);
+  // Boîte en position: fixed ancrée sur le bouton (18/11/2026) : la barre d'outils défile horizontalement depuis le 02/11/2026
+  // (overflow) et rognait la boîte « absolute » dans une bande de 41 px, illisible — comme déjà corrigé pour les palettes.
+  const ancreRef = useRef(null);
+  const [posBoîte, setPosBoîte] = useState({ top: 0, left: 0 });
+  const placerBoîte = () => {
+    const r = ancreRef.current?.getBoundingClientRect();
+    if (r) setPosBoîte({ top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 332)) });
+  };
   const [statut, setStatut] = useState("idle"); // idle | enregistrement | transcription | relecture | erreur
   const [texte, setTexte] = useState("");
   const [erreur, setErreur] = useState(null);
@@ -635,19 +643,19 @@ function BoutonDictee({ editor }) {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={ancreRef} style={{ position: "relative" }}>
       <BoutonOutil
         actif={ouvert}
         titre="Dicter un texte (micro)"
-        onClick={() => (ouvert ? fermer() : (setOuvert(true), démarrer()))}
+        onClick={() => (ouvert ? fermer() : (placerBoîte(), setOuvert(true), démarrer()))}
       >
         🎙
       </BoutonOutil>
       {ouvert && (
         <div style={{
-          position: "absolute", top: "120%", left: 0, zIndex: 60,
+          position: "fixed", top: posBoîte.top, left: posBoîte.left, zIndex: 200,
           background: "#fff", border: "0.5px solid #ddd", borderRadius: 8,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 12, width: 320,
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 12, width: 320, maxWidth: "calc(100vw - 8px)",
         }}>
           {statut === "enregistrement" && (
             <div>
