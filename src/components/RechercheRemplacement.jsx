@@ -17,6 +17,8 @@ const compterMots = (html) => (html || "").replace(/<[^>]*>/g, " ").split(/\s+/)
 
 export default function RechercheRemplacement({ editor, couleur = "#7F77DD", lectureSeule = false, mobile = false, requeteInitiale = "", porteeInitiale = "chapitre", onAtteindreLigne, ligneDePos, nbLignes = 0, noeudId, noeuds = [], onOuvrirNoeud, onEcrireNoeud, onRenommerNoeud, sauvegarderAvant, onFermer }) {
   const [requete, setRequete] = useState(requeteInitiale);
+  // Panneau déjà ouvert et nouvelle demande venue d'ailleurs (« voir dans le texte » d'un relevé « Interroger le livre ») : la requête suit.
+  useEffect(() => { if (requeteInitiale) setRequete(requeteInitiale); }, [requeteInitiale]);
   const [remplacement, setRemplacement] = useState("");
   const [casse, setCasse] = useState(false);
   const [motEntier, setMotEntier] = useState(false);

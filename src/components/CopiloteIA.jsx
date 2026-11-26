@@ -34,6 +34,7 @@ import { supabase } from "../lib/supabase.js";
 import { mémoireNarrativeAPI, dialoguesCopiloteAPI, analysesCopiloteAPI, directivesCopiloteAPI } from "../lib/api.js";
 import { lirePieceJointe, ajouterPiece, imagesPourAppel, blocPiecesJointes, resumePieces, mentionHistorique, TYPES_IMAGE, TYPES_TEXTE, MAX_IMAGES, MAX_TEXTES } from "../lib/piecesJointes.js";
 import CompteurUsageIA from "./CompteurUsageIA.jsx";
+import InterrogerLivre from "./InterrogerLivre.jsx";
 import { journaliserErreur } from "../lib/journalErreurs.js";
 import { noterUsageIA } from "../lib/usageIA.js";
 import { marquerDebut, marquerFin, clesEnCours, sauverResultat, lireResultat, retenirEnMemoire, lireMemoire } from "../lib/copiloteConserve.js";
@@ -1684,7 +1685,7 @@ function CarteBlocage({
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "", planDuLivre = null, chapitrePrécédent = null, lecteurLignes = null }) {
+export default function CopiloteIA({ texteActif = "", texteSélectionné = "", typeProjet = "non-fiction", couleurProjet = "#7F77DD", projetTitre = "", titreNœud = "", typeNœud = "chapitre", titresEnfants = [], titrePartieParente = null, titresChapitresVoisins = [], langueProjet = "fr", projetId = null, nœudId = null, onDemanderUpgrade = null, noteDeCadrage = "", descriptionProjet = "", planDuLivre = null, chapitrePrécédent = null, lecteurLignes = null, structureProjet = [], onOuvrirPassage = null }) {
   const { t } = useTranslation("copilote");
   const [contexteADNBrut, setContexteADNBrut] = useState(null);
   // Réf. 60816-01, suite, 30/08/2026 — demande explicite de l'auteur du
@@ -1779,6 +1780,8 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
     return () => { annulé = true; };
   }, [projetId]);
   const [onglet, setOnglet] = useState("suggestions");
+  // « Interroger le livre » (26/11/2026) : panneau qui remplace le Co-pilote dans la colonne ; l'état du Co-pilote est conservé (le composant reste monté).
+  const [livreOuvert, setLivreOuvert] = useState(false);
   // Chapitre actuellement affiché : un appel lancé sur le chapitre A qui se termine alors qu'on est sur B ne doit ni s'afficher chez B ni être perdu
   // (03/11/2026) — il est enregistré pour A (mémoire + base) et retrouvé en revenant sur A.
   const nœudIdRef = useRef(nœudId);
@@ -2820,6 +2823,10 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
   const { texte: sourceActuelleNettoyée } = extraireTexte(obtenirSourceHTML());
   const texteTropVolumineux = sourceActuelleNettoyée.length > SEUIL_AVERTISSEMENT;
 
+  if (livreOuvert) {
+    return <InterrogerLivre structureProjet={structureProjet} projetId={projetId} projetTitre={projetTitre} couleur={couleurProjet} onOuvrirPassage={onOuvrirPassage} onRetour={() => setLivreOuvert(false)} />;
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", background: "#fafafa" }}>
 
@@ -2904,6 +2911,12 @@ export default function CopiloteIA({ texteActif = "", texteSélectionné = "", t
             🧭 Guide directif
           </button>
         </div>
+        <button type="button" onClick={() => setLivreOuvert(true)}
+          title="Poser une question à tous les chapitres du livre : relevé classé, citations vérifiées, coût annoncé avant de lancer."
+          style={{ width: "100%", marginTop: 6, padding: "7px", background: "#fff", color: couleurProjet, border: `0.5px solid ${couleurProjet}40`, borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+          📖 Interroger le livre
+        </button>
+
 
         {dialogues[cléCarteGuide] && !dialogues[cléCarteGuide].ouvert && (dialogues[cléCarteGuide].messages || []).length > 0 && (
           <button onClick={() => ouvrirDialogue(cléCarteGuide)}
