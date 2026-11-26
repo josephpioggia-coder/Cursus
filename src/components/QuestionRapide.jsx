@@ -24,7 +24,7 @@ export default function QuestionRapide({ editor, noeudId: noeudIdProp, couleur =
   const [menu, setMenu] = useState(null); // null | "principal" | "effort" | "style" | "profils"
   const { modele, effort, style } = reglage;
   const [question, setQuestion] = useState("");
-  const [avecSources, setAvecSources] = useState(() => { try { return localStorage.getItem(CLE_MODE) === "sources"; } catch { return false; } });
+  const [avecSources, setAvecSources] = useState(() => { try { const v = localStorage.getItem(CLE_MODE); return v ? v === "sources" : true; } catch { return true; } });
   const [joindre, setJoindre] = useState(false);
   const noeudId = noeudIdProp || "global";
   const [enCours, setEnCours] = useState(() => estEnCours(noeudId, CLE));
@@ -177,7 +177,7 @@ export default function QuestionRapide({ editor, noeudId: noeudIdProp, couleur =
           style={{ width: "100%", boxSizing: "border-box", fontSize: 13.5, padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontFamily: "inherit", resize: "vertical", background: "#fff", color: "#222" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div role="group" aria-label="Mode" style={{ display: "inline-flex", border: "0.5px solid #ccc", borderRadius: 14, overflow: "hidden" }}>
-            {[[false, "De mémoire"], [true, "Avec sources"]].map(([val, lib]) => (
+            {[[true, "🌐 Recherche web"], [false, "De mémoire"]].map(([val, lib]) => (
               <button key={lib} type="button" aria-pressed={avecSources === val} onClick={() => basculerMode(val)}
                 title={val ? "Recherche web, avec les liens réellement trouvés (plus lent, un peu plus cher)" : "Réponse rapide de mémoire : à vérifier avant publication"}
                 style={{ fontSize: 12, padding: "4px 10px", border: "none", cursor: "pointer", fontFamily: "inherit", background: avecSources === val ? couleur : "#fff", color: avecSources === val ? "#fff" : "#555" }}>{lib}</button>
