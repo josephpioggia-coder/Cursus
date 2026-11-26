@@ -566,6 +566,7 @@ function BoutonDictee({ editor }) {
   const aEnvoyéRef = useRef(false);     // au moins un morceau audible a été envoyé dans cette boîte
   const texteRef = useRef("");
   texteRef.current = texte;
+  const paroleRef = useRef(0);          // durée de parole (ms) du morceau en cours, mesurée par la détection de silences
   const zoneRef = useRef(null);
   const recoRef = useRef(null);
   const enregActifRef = useRef(false);
@@ -618,7 +619,13 @@ function BoutonDictee({ editor }) {
 
   const transcrireMorceau = useCallback(async (blob, id, apercuMorceau, génération) => {
     const retirer = () => setEnAttente((l) => l.filter((m) => m.id !== id));
-    const ajouter = (t) => { if (t) setTexte((x) => (x.trim() ? `${x.replace(/\s+$/, "")} ` : "") + t); };
+    // Mis à jour tout de suite (pas au prochain rendu) : le morceau suivant s'en sert comme contexte.
+    const ajouter = (t) => {
+      if (!t) return;
+      const suite = (texteRef.current.trim() ? `${texteRef.current.replace(/\s+$/, "")} ` : "") + t;
+      texteRef.current = suite;
+      setTexte(suite);
+    };
     try {
       let envoi = blob;
       try { envoi = await versWav16k(blob); }
@@ -626,6 +633,10 @@ function BoutonDictee({ editor }) {
       const formulaire = new FormData();
       formulaire.append("audio", envoi, `dictee.${extensionAudio(envoi.type)}`);
       formulaire.append("langue", "fr");
+      // Fin du texte déjà obtenu : donnée à l'API comme « ce qui précède » (champ `prompt` côté serveur) pour que le morceau
+      // se raccorde (majuscule seulement si une phrase commence vraiment, orthographe des noms déjà vus, ponctuation).
+      const contexte = texteRef.current.trim().slice(-300);
+      if (contexte) formulaire.append("contexte", contexte);
       const { data, error } = await supabase.functions.invoke("transcrire-audio", { body: formulaire });
       if (error) {
         // « Edge Function returned a non-2xx status code » ne dit rien : le vrai
@@ -671,7 +682,10 @@ function BoutonDictee({ editor }) {
       if (abandonRef.current) return;
       const blob = new Blob(morceaux, { type: enregistreur.mimeType || "audio/webm" });
       const apercuMorceau = enregistreur.apercuMorceau || "";
-      if (blob.size < 3000 && !aEnvoyéRef.current && enregistreur.dernier && !texteRef.current.trim()) {
+      // Un morceau presque sans parole (souffle, bruit de fond, queue de silence) fait « halluciner » le modèle : il invente
+      // alors une phrase (ex. « Out of the books », « Merci. »). Moins de 0,4 s de voix mesurée : on ne l'envoie pas.
+      const sansParole = enregistreur.paroleMs !== undefined && enregistreur.paroleMs < 400;
+      if ((blob.size < 3000 || sansParole) && !aEnvoyéRef.current && enregistreur.dernier && !texteRef.current.trim()) {
         setErreur(
           "Aucun son détecté (enregistrement quasi vide). Vérifie le micro " +
           "sélectionné dans les réglages système/navigateur (pas un " +
@@ -679,7 +693,7 @@ function BoutonDictee({ editor }) {
           "en parlant dès le début."
         );
       }
-      envoyerMorceau(blob, apercuMorceau);
+      if (!sansParole) envoyerMorceau(blob, apercuMorceau);
     };
     enregistreur.start();
     enregistreurRef.current = enregistreur;
@@ -690,6 +704,8 @@ function BoutonDictee({ editor }) {
     const actuel = enregistreurRef.current;
     if (!actuel || actuel.state !== "recording" || !fluxRef.current) return;
     actuel.apercuMorceau = prendreApercu();
+    actuel.paroleMs = paroleRef.current;
+    paroleRef.current = 0;
     actuel.stop();
     lancerEnregistreur(fluxRef.current);
   };
@@ -713,7 +729,7 @@ function BoutonDictee({ editor }) {
         for (let i = 0; i < tampon.length; i++) somme += tampon[i] * tampon[i];
         const niveau = Math.sqrt(somme / tampon.length);
         duréeMs += 100;
-        if (niveau > 0.012) { paroleMs += 100; silenceMs = 0; } else silenceMs += 100;
+        if (niveau > 0.012) { paroleMs += 100; paroleRef.current += 100; silenceMs = 0; } else silenceMs += 100;
         const phraseFinie = paroleMs >= 2000 && silenceMs >= 900;       // une phrase dite, puis un souffle
         const tropLong = duréeMs >= 28000 && paroleMs > 0 && silenceMs >= 250; // jamais plus d'une trentaine de secondes
         const limiteDure = duréeMs >= 45000 && paroleMs > 0;
@@ -751,6 +767,7 @@ function BoutonDictee({ editor }) {
         return;
       }
       aEnvoyéRef.current = false;
+      paroleRef.current = 0;
       apercuTotalRef.current = "";
       apercuCourantRef.current = "";
       apercuCoupeRef.current = 0;
@@ -773,6 +790,7 @@ function BoutonDictee({ editor }) {
     const actuel = enregistreurRef.current;
     if (actuel && actuel.state === "recording") {
       actuel.apercuMorceau = prendreApercu();
+      actuel.paroleMs = paroleRef.current;
       actuel.dernier = true;
       actuel.stop();
     }

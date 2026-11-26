@@ -78,6 +78,10 @@ Deno.serve(async (req) => {
     }
 
     const langue = String(formulaireEntrant.get("langue") || "fr");
+    // 26/11/2026 — dictée découpée en morceaux : le client envoie la fin du texte déjà obtenu (« contexte »), transmise à
+    // OpenAI comme `prompt` (usage prévu : « continuer un segment audio précédent »). Aide au raccord des phrases, à la
+    // ponctuation et à l'orthographe des noms. Facultatif, plafonné : sans lui, comportement d'avant.
+    const contexte = String(formulaireEntrant.get("contexte") || "").trim().slice(-300);
 
     // 24/10/2026 — « Audio file might be corrupted or unsupported » : le nom de
     // fichier doit refléter le VRAI format (le client envoie désormais du WAV,
@@ -90,6 +94,7 @@ Deno.serve(async (req) => {
       f.append("file", fichierAudio, nomFichier);
       f.append("model", modele);
       f.append("language", langue);
+      if (contexte) f.append("prompt", contexte);
       const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
         method: "POST",
         headers: { "Authorization": `Bearer ${OPENAI_API_KEY}` },
