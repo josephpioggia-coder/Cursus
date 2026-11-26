@@ -13,6 +13,9 @@
  */
 import { blocsDeHtml, NOTE, OBJET } from "./rechercheTexte.js";
 
+// Estimation de page (Cursus n'a pas de pagination réelle avant l'export Word) : approximative, à ± quelques pages.
+const CARACTERES_PAR_PAGE = 1800;
+
 // ─── 1. Passages ─────────────────────────────────────────────────────────────
 
 /**
@@ -22,6 +25,7 @@ import { blocsDeHtml, NOTE, OBJET } from "./rechercheTexte.js";
  */
 export function passagesDuLivre(nœuds, { horsCorps = false, blocs = blocsDeHtml } = {}) {
   const sortie = [];
+  let cumul = 0; // caractères depuis le début du livre : sert à ESTIMER la page (≈ 1 800 car. par page, comme l'éditeur)
   for (const n of nœuds || []) {
     if (!horsCorps && (n.zone || "corps") !== "corps") continue;
     let rang = 0;
@@ -29,7 +33,9 @@ export function passagesDuLivre(nœuds, { horsCorps = false, blocs = blocsDeHtml
       const texte = String(b.texte || "").replace(new RegExp(`[${NOTE}${OBJET}]`, "g"), " ").replace(/\s+/g, " ").trim();
       if (!/\p{L}/u.test(texte)) continue;
       rang += 1;
-      sortie.push({ cle: `${n.id}#${rang}`, nœudId: n.id, titreNœud: n.titre || "(sans titre)", rang, ordre: sortie.length, texte });
+      const page = Math.floor(cumul / CARACTERES_PAR_PAGE) + 1;
+      cumul += texte.length;
+      sortie.push({ cle: `${n.id}#${rang}`, nœudId: n.id, titreNœud: n.titre || "(sans titre)", rang, page, ordre: sortie.length, texte });
     }
   }
   return sortie;
@@ -219,9 +225,9 @@ export async function lancerRelevé({ question, catégories, candidats, appel, s
     for (const l of lignes) {
       const p = lot[l.n - 1]; if (!p || vus.has(l.n)) continue; vus.add(l.n);
       if (l.horsSujet) { horsSujet += 1; continue; }
-      if (!citationPrésente(l.citation, p.texte)) { écartées.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, citation: l.citation }); continue; }
+      if (!citationPrésente(l.citation, p.texte)) { écartées.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, page: p.page, citation: l.citation }); continue; }
       const cats = l.catégories.map((c) => noms.find((x) => clé(x.nom) === clé(c) || clé(c).startsWith(clé(x.nom)))?.nom || "Autres (hors liste)");
-      items.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, ordre: p.ordre, catégories: [...new Set(cats)], nature: l.nature, citation: l.citation.trim(), voix: l.voix });
+      items.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, page: p.page, ordre: p.ordre, catégories: [...new Set(cats)], nature: l.nature, citation: l.citation.trim(), voix: l.voix });
     }
     lot.forEach((p, i) => { if (!vus.has(i + 1)) nonTraités.push(p.cle); });
   };
@@ -256,7 +262,7 @@ export function versMarkdown({ titreProjet = "", question, termes, relevé, date
   for (const c of relevé.parCatégorie) {
     L.push(`\n## ${c.nom} — ${c.n} citation${c.n > 1 ? "s" : ""}`);
     if (c.description) L.push(`*${c.description}*`);
-    for (const i of c.items) L.push(`- **${i.titreNœud}**, § ${i.rang}${i.voix !== "AUTEUR" ? ` — *${i.voix}*` : ""} (${i.nature.toLowerCase()}) : « ${i.citation} »`);
+    for (const i of c.items) L.push(`- **${i.titreNœud}**, page ≈ ${i.page}, § ${i.rang}${i.voix !== "AUTEUR" ? ` — *${i.voix}*` : ""} (${i.nature.toLowerCase()}) : « ${i.citation} »`);
   }
   return L.join("\n");
 }

@@ -191,7 +191,7 @@ export default function InterrogerLivre({ structureProjet = [], projetId = null,
                     <div key={k} style={{ margin: "5px 0 5px 14px", fontSize: 11.5, lineHeight: 1.45 }}>
                       <span style={{ fontStyle: "italic" }}>« {i.citation} »</span>
                       <div style={{ fontSize: 10.5, color: "#777", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                        <span>{i.titreNœud}, § {i.rang}</span>
+                        <span title="Page estimée (≈ 1 800 caractères par page) : approximative. « voir dans le texte » est le repère exact.">{i.titreNœud}, page ≈ {i.page}, § {i.rang}</span>
                         <span style={{ background: i.nature === "NOMMÉ" ? "#E6F4EC" : "#F1EFE8", borderRadius: 8, padding: "0 6px" }}>{i.nature.toLowerCase()}</span>
                         {i.voix !== "AUTEUR" && <span style={{ background: "#FAEEDA", color: "#854F0B", borderRadius: 8, padding: "0 6px" }}>voix : {i.voix}</span>}
                         {onOuvrirPassage && <button type="button" onClick={() => onOuvrirPassage(i.nœudId, extrait(i.citation))} style={{ background: "none", border: "none", color: couleur, cursor: "pointer", fontFamily: "inherit", fontSize: 10.5, padding: 0, textDecoration: "underline" }}>voir dans le texte</button>}
