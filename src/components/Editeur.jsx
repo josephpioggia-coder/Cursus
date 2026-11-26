@@ -72,6 +72,7 @@ import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI, nœudsAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
+import { appliquerCodesVocaux, joindre as joindreDictée, CODES_VOCAUX } from "../lib/codesVocaux.js";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -567,6 +568,12 @@ function BoutonDictee({ editor }) {
   const texteRef = useRef("");
   texteRef.current = texte;
   const paroleRef = useRef(0);          // durée de parole (ms) du morceau en cours, mesurée par la détection de silences
+  // Codes vocaux (« virgule », « point », « à la ligne »… → le signe) : activés par défaut, réglage mémorisé sur l'appareil.
+  const [codes, setCodes] = useState(() => { try { return localStorage.getItem("cursus-dictee-codes") !== "0"; } catch { return true; } });
+  const codesRef = useRef(codes);
+  codesRef.current = codes;
+  const changerCodes = (v) => { setCodes(v); try { localStorage.setItem("cursus-dictee-codes", v ? "1" : "0"); } catch { /* stockage indisponible */ } };
+  const [aideCodes, setAideCodes] = useState(false);
   const zoneRef = useRef(null);
   const recoRef = useRef(null);
   const enregActifRef = useRef(false);
@@ -622,7 +629,8 @@ function BoutonDictee({ editor }) {
     // Mis à jour tout de suite (pas au prochain rendu) : le morceau suivant s'en sert comme contexte.
     const ajouter = (t) => {
       if (!t) return;
-      const suite = (texteRef.current.trim() ? `${texteRef.current.replace(/\s+$/, "")} ` : "") + t;
+      const propre = codesRef.current ? appliquerCodesVocaux(t, texteRef.current) : t;
+      const suite = joindreDictée(texteRef.current, propre);
       texteRef.current = suite;
       setTexte(suite);
     };
@@ -825,7 +833,16 @@ function BoutonDictee({ editor }) {
 
   const insérer = () => {
     const t = texte.trim();
-    if (t) editor.chain().focus().insertContent(`${t} `).scrollIntoView().run();
+    if (t) {
+      // Texte posé à l'endroit du curseur (comme une frappe) ; chaque « à la ligne » dicté coupe le paragraphe à cet endroit.
+      const lignes = t.split(/\n+/).filter(Boolean);
+      editor.commands.focus();
+      lignes.forEach((l, i) => {
+        if (i > 0) editor.commands.splitBlock();
+        editor.commands.insertContent({ type: "text", text: i === lignes.length - 1 ? `${l} ` : l });
+      });
+      editor.commands.scrollIntoView();
+    }
     fermer();
   };
 
@@ -852,7 +869,8 @@ function BoutonDictee({ editor }) {
   const durée = `${Math.floor(secondes / 60)}:${String(secondes % 60).padStart(2, "0")}`;
   const nbAttente = enAttente.length;
   const aperçuEnAttente = enAttente.map((m) => m.apercu).filter(Boolean).join(" ");
-  const grisTotal = `${aperçuEnAttente} ${apercu}`.trim(); // ce qui est dit mais pas encore définitif
+  const grisBrut = `${aperçuEnAttente} ${apercu}`.trim(); // ce qui est dit mais pas encore définitif
+  const grisTotal = codes ? appliquerCodesVocaux(grisBrut, texte) : grisBrut;
   const libellé = {
     idle: "Ouverture du micro…",
     enregistrement: `Enregistrement en cours · ${durée}`,
@@ -917,6 +935,25 @@ function BoutonDictee({ editor }) {
           {statut === "enregistrement" && grisTotal && (
             <div style={{ fontSize: 10.5, color: "#999", marginTop: 4 }}>
               En gris : pas encore définitif (aperçu approximatif). Le texte définitif, plus précis, le remplace tout seul.
+            </div>
+          )}
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, fontSize: 11, color: "#666" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+              <input type="checkbox" checked={codes} onChange={(e) => changerCodes(e.target.checked)} />
+              Codes vocaux (dis « code virgule », « code point »…)
+            </label>
+            <button onClick={() => setAideCodes((v) => !v)} aria-expanded={aideCodes}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#534AB7", fontSize: 11, fontFamily: "inherit", padding: 0 }}>
+              {aideCodes ? "Masquer la liste" : "Liste des codes"}
+            </button>
+          </div>
+          {aideCodes && (
+            <div style={{ fontSize: 11, color: "#444", background: "#F7F6FE", borderRadius: 6, padding: "6px 8px", marginTop: 4, lineHeight: 1.6 }}>
+              {CODES_VOCAUX.map((c) => (
+                <div key={c.dit}><b>{c.dit}</b> → {c.signe}</div>
+              ))}
+              <div style={{ color: "#777", marginTop: 4 }}>Sans le mot « code », rien ne change : « un point de vue », « la virgule » restent des mots. Une consigne en phrase (« entre guillemets pour… ») n'est pas un code : elle est écrite telle quelle.</div>
             </div>
           )}
 
