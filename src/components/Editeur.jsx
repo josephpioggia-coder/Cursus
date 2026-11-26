@@ -2276,6 +2276,17 @@ export default function Editeur({
     return () => window.removeEventListener("cursus-inserer-texte", insérer);
   }, [editor, lectureSeule]);
 
+  // Demande venue d'ailleurs de chercher un extrait dans CE chapitre (« voir dans le texte » d'un relevé « Interroger le livre »).
+  useEffect(() => {
+    const chercher = (e) => {
+      const requete = String(e.detail?.requete || "").trim();
+      if (!requete || !editor) return;
+      setRequeteRecherche(requete); setPorteeRecherche("chapitre"); setRechercheOuverte(true);
+    };
+    window.addEventListener("cursus-chercher", chercher);
+    return () => window.removeEventListener("cursus-chercher", chercher);
+  }, [editor]);
+
   useEffect(() => {
     const timer = setTimeout(recalculerNumérosDeLigne, 60);
     return () => clearTimeout(timer);

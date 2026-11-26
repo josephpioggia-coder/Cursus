@@ -2204,6 +2204,13 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
   const ouvrirProjet = (id) => { setProjetActifId(id); setVue("projet"); };
 
+  // « Voir dans le texte » depuis un relevé de « Interroger le livre » (26/11/2026) : ouvre le chapitre puis demande à l'éditeur de chercher l'extrait.
+  // L'éditeur peut se remonter après le changement de chapitre : l'événement est donc envoyé deux fois (l'ouverture du panneau est idempotente).
+  const ouvrirPassage = (nœudId, requete) => {
+    setNœudActifId(nœudId);
+    for (const délai of [350, 1300]) setTimeout(() => window.dispatchEvent(new CustomEvent("cursus-chercher", { detail: { requete } })), délai);
+  };
+
   const ouvrirÉditeur = (projetId, nœudId, depuisAuditId) => {
     setProjetActifId(projetId);
     setNœudActifId(nœudId);
@@ -3096,6 +3103,8 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
                 titresChapitresVoisins={contexteHiérarchiqueActif.titresChapitresVoisins}
                 planDuLivre={planDuLivreActif.plan}
                 chapitrePrécédent={planDuLivreActif.précédent}
+                structureProjet={projetActif.structure}
+                onOuvrirPassage={ouvrirPassage}
                 langueProjet={projetActif.langue || "fr"}
                 projetId={projetActif.id}
                 nœudId={nœudActif.id}
