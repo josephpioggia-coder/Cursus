@@ -185,3 +185,6 @@ Dictée (🎙) › « Liste des codes » : « code apostrophe » écrit ’ coll
 
 ### Bouton « Aide » : page blanche corrigée (26/11/2026)
 Le bouton Aide (barre du haut, éditeur, ruban) ouvre à nouveau la fenêtre « Question rapide » ; si une fenêtre plante un jour, un message avec « Fermer » s'affiche au lieu d'une page blanche.
+
+### Aide / Question rapide : recherche web par défaut (26/11/2026)
+Le mode par défaut est « 🌐 Recherche web » (citations, faits, sources avec liens). « De mémoire » reste disponible (plus rapide, moins cher) mais ne doit pas servir pour une citation. Le choix est mémorisé sur l'appareil.
