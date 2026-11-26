@@ -1659,3 +1659,6 @@ Retour de Joseph : le raccourci épinglé « cursus.pro » l'amenait sur `https:
 
 #### Dictée : parenthèses imbriquées (26/11/2026)
 `codesVocaux.js` : formes explicites « code ouvrez / fermez N parenthèses (crochets, guillemets) », N = un…cinq ou chiffres (`repeat`). L'alternance « code parenthèse » reste à un seul niveau. Vérifié : moteur (node, l'exemple de Joseph reproduit exactement) ; NON testé dans le navigateur ni avec la transcription réelle d'OpenAI.
+
+### Bouton « Aide » = page blanche (26/11/2026, retour de Joseph)
+Cause (lecture du code) : dans `QuestionRapide.jsx`, `useState(() => estEnCours(noeudId, CLE))` utilisait `noeudId` AVANT sa déclaration (`const noeudId` plus bas, ajoutée le 03/11 avec la reprise des demandes) → « Cannot access 'noeudId' before initialization » à chaque ouverture, donc page blanche (Ctrl+K aussi). Corrigé en déclarant `noeudId` en premier. Ajouté `BarriereErreur.jsx` autour de la Question rapide et du Centre d'aide (`App.jsx`) : un plantage affiche un message + « Fermer » et est journalisé (`BarriereErreur:<nom>`). Même piège à surveiller ailleurs : variable utilisée dans un initialiseur `useState` avant sa déclaration (le build ne le détecte pas). Vérifié : `vite build` SEULEMENT ; NON testé dans le navigateur. Il n'y a toujours pas de barrière d'erreur globale autour de toute l'application.

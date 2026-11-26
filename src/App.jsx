@@ -61,6 +61,7 @@ import QuestionnaireIntention from "./components/QuestionnaireIntention.jsx";
 import { estComplet as estCompletQuestionnaire } from "./lib/questionnaireDemarrage.js";
 import AideFAQ from "./components/AideFAQ.jsx";
 import QuestionRapide from "./components/QuestionRapide.jsx";
+import BarriereErreur from "./components/BarriereErreur.jsx";
 import { exporterProjetWord, FORMATS_PAGE } from "./lib/exportWord.js";
 import { exporterDossierCreation } from "./lib/exportDossierWord.js";
 import { construirePlan } from "./lib/planDuLivre.js";
@@ -3123,14 +3124,18 @@ function AppConnectée({ user, déconnecter, espaceActif, onChangerEspace }) {
 
       {/* Centre d'aide — accessible depuis n'importe quel écran */}
       {aideOuverte && (
-        <QuestionRapide mobile={estMobile} onFermer={() => setAideOuverte(false)} onAide={() => { setAideOuverte(false); setCentreAideOuvert(true); }} />
+        <BarriereErreur nom="QuestionRapide" onFermer={() => setAideOuverte(false)}>
+          <QuestionRapide mobile={estMobile} onFermer={() => setAideOuverte(false)} onAide={() => { setAideOuverte(false); setCentreAideOuvert(true); }} />
+        </BarriereErreur>
       )}
       {centreAideOuvert && (
-        <AideFAQ
-          estAdmin={user?.email === "joseph.pioggia@gmail.com"}
-          onFermer={() => setCentreAideOuvert(false)}
-          onVoirModeEmploi={() => { setCentreAideOuvert(false); setVue("mode-emploi"); }}
-        />
+        <BarriereErreur nom="AideFAQ" onFermer={() => setCentreAideOuvert(false)}>
+          <AideFAQ
+            estAdmin={user?.email === "joseph.pioggia@gmail.com"}
+            onFermer={() => setCentreAideOuvert(false)}
+            onVoirModeEmploi={() => { setCentreAideOuvert(false); setVue("mode-emploi"); }}
+          />
+        </BarriereErreur>
       )}
 
       {/* Modal import Word */}

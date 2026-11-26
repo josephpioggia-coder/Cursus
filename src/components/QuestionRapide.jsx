@@ -26,11 +26,11 @@ export default function QuestionRapide({ editor, noeudId: noeudIdProp, couleur =
   const [question, setQuestion] = useState("");
   const [avecSources, setAvecSources] = useState(() => { try { return localStorage.getItem(CLE_MODE) === "sources"; } catch { return false; } });
   const [joindre, setJoindre] = useState(false);
+  const noeudId = noeudIdProp || "global";
   const [enCours, setEnCours] = useState(() => estEnCours(noeudId, CLE));
   const [erreur, setErreur] = useState(null);
   // Échanges conservés (03/11/2026) : fermer la fenêtre ne perd plus une réponse déjà payée et n'interrompt plus la question en cours.
   // Par chapitre (ou « global » hors éditeur). Voir src/lib/copiloteConserve.js.
-  const noeudId = noeudIdProp || "global";
   const [echanges, setEchanges] = useState(() => lireResultat(noeudId, CLE)?.echanges || []);
   const [copie, setCopie] = useState(null);
   useReprise(noeudId, CLE, {

@@ -182,3 +182,6 @@ Dictée (🎙) › « Liste des codes » : « code apostrophe » écrit ’ coll
 
 ### Dictée : parenthèses imbriquées (26/11/2026)
 « code ouvrez trois parenthèses » → (((, « code fermez deux parenthèses » → )) ; idem crochets et guillemets. Exemple : « code ouvrez trois parenthèses kkk code ouvrez la parenthèse dlmlsd code fermez la parenthèse et qms code ouvrez la parenthèse qsdf code fermez deux parenthèses code virgule lfkdj code fermez la parenthèse » → (((kkk (dlmlsd) et qms (qsdf)), lfkdj). Nombres : un à cinq ou en chiffres.
+
+### Bouton « Aide » : page blanche corrigée (26/11/2026)
+Le bouton Aide (barre du haut, éditeur, ruban) ouvre à nouveau la fenêtre « Question rapide » ; si une fenêtre plante un jour, un message avec « Fermer » s'affiche au lieu d'une page blanche.
