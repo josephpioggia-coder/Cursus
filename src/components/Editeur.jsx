@@ -541,15 +541,64 @@ function BoutonDictee({ editor }) {
   const [posBoîte, setPosBoîte] = useState({ top: 0, left: 0 });
   const placerBoîte = () => {
     const r = ancreRef.current?.getBoundingClientRect();
-    if (r) setPosBoîte({ top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 332)) });
+    if (r) setPosBoîte({ top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 392)) });
   };
-  const [statut, setStatut] = useState("idle"); // idle | enregistrement | transcription | relecture | erreur
-  const [texte, setTexte] = useState("");
+  // Refonte du 26/11/2026 (retour de Joseph : « je ne vois rien pendant que je parle, je ne sais pas où ça démarre, et je
+  // voudrais pouvoir reprendre l'enregistrement après une pause ») : la boîte s'ouvre dès le clic sur le micro et montre
+  // le texte déjà dicté + un APERÇU EN DIRECT (reconnaissance vocale du navigateur, quand elle existe) ; « Pause » transcrit
+  // le passage avec OpenAI (texte définitif, ajouté à la suite) ; « Reprendre l'enregistrement » ajoute un nouveau passage ;
+  // « Insérer dans le texte » ne se fait qu'à la fin. L'aperçu n'est qu'un confort : il n'est JAMAIS inséré tel quel.
+  const [statut, setStatut] = useState("idle"); // idle (micro en cours d'ouverture) | enregistrement | transcription | pause
+  const [texte, setTexte] = useState("");      // texte définitif déjà transcrit (modifiable en pause)
+  const [direct, setDirect] = useState("");    // aperçu en direct du passage en cours (approximatif)
+  const [secondes, setSecondes] = useState(0);
   const [erreur, setErreur] = useState(null);
   const enregistreurRef = useRef(null);
+  const fluxRef = useRef(null);
   const morceauxRef = useRef([]);
+  const abandonRef = useRef(false);     // fermeture pendant un enregistrement : ne rien transcrire
+  const générationRef = useRef(0);      // une transcription qui finit après fermeture est ignorée
+  const zoneRef = useRef(null);
+  const recoRef = useRef(null);
+  const enregActifRef = useRef(false);
+  const recoStopRef = useRef(false);
+  const directBaseRef = useRef("");
+  const directCourantRef = useRef("");
+  const APIReco = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+
+  const lancerReco = useCallback(() => {
+    if (!APIReco) return;
+    try {
+      const reco = new APIReco();
+      reco.lang = "fr-FR";
+      reco.continuous = true;
+      reco.interimResults = true;
+      reco.onresult = (e) => {
+        let t = "";
+        for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+        directCourantRef.current = t;
+        setDirect(`${directBaseRef.current} ${t}`.trim());
+      };
+      // Une erreur de l'aperçu ne coupe JAMAIS l'enregistrement ; seules les erreurs durables arrêtent les relances.
+      reco.onerror = (e) => { if (e?.error && e.error !== "no-speech" && e.error !== "aborted") recoStopRef.current = true; };
+      reco.onend = () => {
+        if (!enregActifRef.current || recoStopRef.current) return;
+        directBaseRef.current = `${directBaseRef.current} ${directCourantRef.current}`.trim();
+        directCourantRef.current = "";
+        setTimeout(() => { if (enregActifRef.current && !recoStopRef.current) lancerReco(); }, 250);
+      };
+      recoRef.current = reco;
+      reco.start();
+    } catch { /* aperçu indisponible : l'enregistrement continue sans lui */ }
+  }, [APIReco]);
+
+  const arrêterReco = () => {
+    enregActifRef.current = false;
+    try { recoRef.current?.stop(); } catch { /* déjà arrêtée */ }
+  };
 
   const transcrire = useCallback(async (blob) => {
+    const génération = générationRef.current;
     // Garde-fou (18/09/2026) — un blob quasi vide (micro coupé, mauvais
     // périphérique d'entrée sélectionné côté système) produit un
     // enregistrement quasi silencieux : les modèles de transcription de
@@ -564,10 +613,11 @@ function BoutonDictee({ editor }) {
       setErreur(
         "Aucun son détecté (enregistrement quasi vide). Vérifie le micro " +
         "sélectionné dans les réglages système/navigateur (pas un " +
-        "périphérique débranché ou coupé), puis réessaie en parlant dès le " +
-        "début de l'enregistrement."
+        "périphérique débranché ou coupé), puis reprends l'enregistrement " +
+        "en parlant dès le début."
       );
-      setStatut("erreur");
+      setDirect("");
+      setStatut("pause");
       return;
     }
     setStatut("transcription");
@@ -588,18 +638,29 @@ function BoutonDictee({ editor }) {
         throw new Error(message);
       }
       if (data?.error) throw new Error(data.error);
-      setTexte(data?.texte || "");
-      setStatut("relecture");
+      if (génération !== générationRef.current) return; // boîte fermée entre-temps
+      const nouveau = (data?.texte || "").trim();
+      // Le passage s'ajoute À LA SUITE du texte déjà dicté (et déjà corrigé à la main s'il y a eu une pause).
+      if (nouveau) setTexte((t) => (t.trim() ? `${t.replace(/\s+$/, "")} ` : "") + nouveau);
+      setDirect("");
+      setStatut("pause");
     } catch (err) {
-      setErreur(err.message || "Échec de la transcription.");
-      setStatut("erreur");
+      if (génération !== générationRef.current) return;
+      // L'aperçu en direct est conservé dans le texte pour ne rien perdre de ce qui a été dit.
+      setErreur((err.message || "Échec de la transcription.") + " Ton passage n'a pas été transcrit : tu peux le redire en reprenant l'enregistrement.");
+      setDirect("");
+      setStatut("pause");
     }
   }, []);
 
   const démarrer = async () => {
     setErreur(null);
+    setDirect("");
+    setSecondes(0);
+    abandonRef.current = false;
     try {
       const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+      fluxRef.current = flux;
       // Détecte tôt un périphérique sélectionné mais coupé/débranché côté
       // système (18/09/2026) — sans ça, l'enregistrement se déroule
       // normalement à l'écran pendant que le flux audio est en réalité
@@ -607,8 +668,9 @@ function BoutonDictee({ editor }) {
       const pisteAudio = flux.getAudioTracks()[0];
       if (pisteAudio?.muted) {
         flux.getTracks().forEach((piste) => piste.stop());
+        fluxRef.current = null;
         setErreur("Le micro sélectionné ne capte aucun son (coupé ou débranché côté système). Vérifie le périphérique d'entrée dans les réglages du navigateur/système.");
-        setStatut("erreur");
+        setStatut("pause");
         return;
       }
       const enregistreur = new MediaRecorder(flux);
@@ -616,90 +678,155 @@ function BoutonDictee({ editor }) {
       enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceauxRef.current.push(e.data); };
       enregistreur.onstop = () => {
         flux.getTracks().forEach((piste) => piste.stop());
+        fluxRef.current = null;
+        if (abandonRef.current) return;
         transcrire(new Blob(morceauxRef.current, { type: enregistreur.mimeType || "audio/webm" }));
       };
       enregistreur.start();
       enregistreurRef.current = enregistreur;
+      directBaseRef.current = "";
+      directCourantRef.current = "";
+      recoStopRef.current = false;
+      enregActifRef.current = true;
+      lancerReco();
       setStatut("enregistrement");
     } catch (err) {
       setErreur("Micro inaccessible : " + (err.message || "permission refusée."));
-      setStatut("erreur");
+      setStatut("pause");
     }
   };
 
-  const arrêter = () => enregistreurRef.current?.stop();
+  // « Pause » : arrête la prise, transcrit le passage (texte définitif) et rend la main pour relire / corriger.
+  const mettreEnPause = () => {
+    arrêterReco();
+    setStatut("transcription");
+    enregistreurRef.current?.stop();
+  };
 
   const fermer = () => {
-    enregistreurRef.current?.state === "recording" && enregistreurRef.current.stop();
+    abandonRef.current = true;
+    générationRef.current += 1;
+    arrêterReco();
+    try { recoRef.current?.abort?.(); } catch { /* déjà arrêtée */ }
+    if (enregistreurRef.current?.state === "recording") enregistreurRef.current.stop();
+    fluxRef.current?.getTracks().forEach((piste) => piste.stop());
+    fluxRef.current = null;
     setOuvert(false);
     setStatut("idle");
     setTexte("");
+    setDirect("");
+    setSecondes(0);
     setErreur(null);
   };
 
-  const insérer = () => {
-    if (texte.trim()) editor.chain().focus().insertContent(`${texte.trim()} `).run();
+  // Ne jamais perdre du texte dicté sur un clic involontaire (micro ou ✕) : confirmation s'il y a quelque chose.
+  const annuler = () => {
+    if ((texte.trim() || direct.trim()) && !window.confirm("Abandonner le texte dicté ? Il n'a pas encore été inséré dans le chapitre.")) return;
     fermer();
   };
+
+  const insérer = () => {
+    const t = texte.trim();
+    if (t) editor.chain().focus().insertContent(`${t} `).scrollIntoView().run();
+    fermer();
+  };
+
+  useEffect(() => {
+    if (statut !== "enregistrement") return undefined;
+    const minuteur = setInterval(() => setSecondes((s) => s + 1), 1000);
+    return () => clearInterval(minuteur);
+  }, [statut]);
+
+  // Pendant la prise, la zone suit le texte qui s'allonge.
+  useEffect(() => {
+    if (statut !== "pause" && zoneRef.current) zoneRef.current.scrollTop = zoneRef.current.scrollHeight;
+  }, [texte, direct, statut]);
+
+  useEffect(() => () => {
+    abandonRef.current = true;
+    enregActifRef.current = false;
+    try { recoRef.current?.abort?.(); } catch { /* déjà arrêtée */ }
+    fluxRef.current?.getTracks().forEach((piste) => piste.stop());
+  }, []);
+
+  const durée = `${Math.floor(secondes / 60)}:${String(secondes % 60).padStart(2, "0")}`;
+  const libellé = {
+    idle: "Ouverture du micro…",
+    enregistrement: `Enregistrement en cours · ${durée}`,
+    transcription: "Transcription du passage en cours…",
+    pause: "En pause — relis, corrige, puis reprends ou insère",
+  }[statut];
+  const bouton = { padding: "7px 10px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: "none" };
 
   return (
     <div ref={ancreRef} style={{ position: "relative" }}>
       <BoutonOutil
         actif={ouvert}
         titre="Dicter un texte (micro)"
-        onClick={() => (ouvert ? fermer() : (placerBoîte(), setOuvert(true), démarrer()))}
+        onClick={() => (ouvert ? annuler() : (placerBoîte(), setOuvert(true), démarrer()))}
       >
         🎙
       </BoutonOutil>
       {ouvert && (
         <div style={{
           position: "fixed", top: posBoîte.top, left: posBoîte.left, zIndex: 200,
-          background: "#fff", border: "0.5px solid #ddd", borderRadius: 8,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 12, width: 320, maxWidth: "calc(100vw - 8px)",
+          background: "#fff", border: "0.5px solid #ddd", borderRadius: 8, color: "#1a1a1a",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.15)", padding: 12, width: 380, maxWidth: "calc(100vw - 8px)", boxSizing: "border-box",
         }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: statut === "enregistrement" ? "#E24B4A" : "#555" }}>
+              {statut === "enregistrement" && <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#E24B4A", flexShrink: 0 }} />}
+              {libellé}
+            </div>
+            <button onClick={annuler} aria-label="Fermer la dictée" title="Fermer"
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#888", padding: "0 2px", fontFamily: "inherit" }}>✕</button>
+          </div>
+
+          {statut === "pause" ? (
+            <textarea
+              value={texte}
+              onChange={(e) => setTexte(e.target.value)}
+              rows={7}
+              placeholder="Rien n'est encore transcrit. Clique sur « Reprendre l'enregistrement »."
+              style={{ width: "100%", fontSize: 13, color: "#1a1a1a", background: "#fff", fontFamily: "inherit", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 6, padding: 8, resize: "vertical" }}
+            />
+          ) : (
+            <div ref={zoneRef} style={{ height: 150, overflowY: "auto", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, color: "#1a1a1a", background: "#fafafa", border: "0.5px solid #ddd", borderRadius: 6, padding: 8 }}>
+              {texte}
+              {texte && direct ? " " : ""}
+              <span style={{ color: "#8a8a8a", fontStyle: "italic" }}>{direct}</span>
+              {!texte && !direct && statut === "enregistrement" && (
+                <span style={{ color: "#aaa" }}>
+                  {APIReco
+                    ? "Parle : ce que tu dis s'affichera ici en direct…"
+                    : "Aperçu en direct indisponible sur ce navigateur : le texte apparaîtra quand tu cliqueras sur Pause."}
+                </span>
+              )}
+            </div>
+          )}
+          {statut === "enregistrement" && direct && (
+            <div style={{ fontSize: 10.5, color: "#999", marginTop: 4 }}>
+              En gris : aperçu en direct, approximatif. Au clic sur Pause, le texte définitif (plus précis) le remplace.
+            </div>
+          )}
+
+          {erreur && (
+            <div style={{ fontSize: 11.5, color: "#A32D2D", background: "#FCEBEB", borderRadius: 6, padding: "6px 8px", marginTop: 8, lineHeight: 1.45 }}>{erreur}</div>
+          )}
+
           {statut === "enregistrement" && (
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#E24B4A", marginBottom: 8 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#E24B4A" }} />
-                Enregistrement en cours…
-              </div>
-              <button onClick={arrêter}
-                style={{ width: "100%", padding: "6px", fontSize: 12, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>
-                Arrêter et transcrire
+            <button onClick={mettreEnPause} style={{ ...bouton, width: "100%", marginTop: 8, color: "#fff", background: "#7F77DD" }}>
+              ⏸ Pause — transcrire ce passage
+            </button>
+          )}
+          {statut === "pause" && (
+            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+              <button onClick={démarrer} style={{ ...bouton, flex: 1, color: "#534AB7", background: "#EEEDFE" }}>
+                🎙 Reprendre l'enregistrement
               </button>
-            </div>
-          )}
-          {statut === "transcription" && (
-            <div style={{ fontSize: 12, color: "#999" }}>Transcription en cours…</div>
-          )}
-          {statut === "relecture" && (
-            <div>
-              <div style={{ fontSize: 11, color: "#999", marginBottom: 6 }}>Relis et corrige avant d'insérer :</div>
-              <textarea
-                autoFocus
-                value={texte}
-                onChange={(e) => setTexte(e.target.value)}
-                rows={6}
-                style={{ width: "100%", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", border: "0.5px solid #ddd", borderRadius: 6, padding: 6, resize: "vertical" }}
-              />
-              <div style={{ display: "flex", gap: 6, marginTop: 6, justifyContent: "space-between" }}>
-                <button onClick={fermer}
-                  style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                  Annuler
-                </button>
-                <button onClick={insérer}
-                  style={{ fontSize: 11, color: "#fff", background: "#7F77DD", border: "none", borderRadius: 5, padding: "3px 12px", cursor: "pointer", fontFamily: "inherit" }}>
-                  Insérer dans le texte
-                </button>
-              </div>
-            </div>
-          )}
-          {statut === "erreur" && (
-            <div>
-              <div style={{ fontSize: 12, color: "#E24B4A", marginBottom: 8 }}>{erreur}</div>
-              <button onClick={fermer}
-                style={{ width: "100%", padding: "6px", fontSize: 12, color: "#555", background: "#f5f5f5", border: "none", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>
-                Fermer
+              <button onClick={insérer} disabled={!texte.trim()}
+                style={{ ...bouton, flex: 1, color: "#fff", background: texte.trim() ? "#7F77DD" : "#c9c6ee", cursor: texte.trim() ? "pointer" : "default" }}>
+                Insérer dans le texte
               </button>
             </div>
           )}
