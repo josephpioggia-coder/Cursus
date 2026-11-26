@@ -179,3 +179,6 @@ Page « Tarification », bloc « Mon abonnement » : « Annuler mon abonnement �
 
 ### Dictée : « code apostrophe » et codes personnels (26/11/2026)
 Dictée (🎙) › « Liste des codes » : « code apostrophe » écrit ’ collée aux mots (« l code apostrophe arbre » → « l’arbre »). Sous « Ajouter un code » : on crée ses propres codes (ex. « émoji coeur » → ❤️ ; case « Coller aux mots voisins »), supprimables par ✕. Mémorisés sur l'appareil. Il faut toujours dire « code » avant.
+
+### Dictée : parenthèses imbriquées (26/11/2026)
+« code ouvrez trois parenthèses » → (((, « code fermez deux parenthèses » → )) ; idem crochets et guillemets. Exemple : « code ouvrez trois parenthèses kkk code ouvrez la parenthèse dlmlsd code fermez la parenthèse et qms code ouvrez la parenthèse qsdf code fermez deux parenthèses code virgule lfkdj code fermez la parenthèse » → (((kkk (dlmlsd) et qms (qsdf)), lfkdj). Nombres : un à cinq ou en chiffres.
