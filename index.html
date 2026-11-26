@@ -3,6 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 26/11/2026 — GARDE-FOU : l'adresse technique cursus-seven.vercel.app ne doit jamais être celle où l'on travaille.
+         Le navigateur garde la session SÉPARÉMENT pour chaque adresse : sur celle-ci on arrive « déconnecté », sur un
+         Cursus qui a l'air vierge (cas de Joseph, 26/11/2026). Toute arrivée ici est renvoyée vers l'adresse réelle,
+         avec le même chemin, les mêmes paramètres ET le même « # » (les liens de confirmation e-mail de Supabase y
+         portent la connexion). Anti-boucle : si on est renvoyé ici dans la minute qui suit, on ne redirige plus (le site
+         reste utilisable, comme avant). Ne vise que CETTE adresse : les aperçus de déploiement (autres noms en
+         vercel.app) ne sont pas touchés. -->
+    <script>
+      (function () {
+        try {
+          if (location.hostname !== "cursus-seven.vercel.app") return;
+          var cle = "cursus-redirection-vercel";
+          var avant = Number(sessionStorage.getItem(cle) || 0);
+          if (avant && Date.now() - avant < 60000) return;
+          sessionStorage.setItem(cle, String(Date.now()));
+          location.replace("https://www.cursus.pro" + location.pathname + location.search + location.hash);
+        } catch (e) { /* stockage indisponible : pas de redirection, le site reste utilisable */ }
+      })();
+    </script>
     <title>Cursus — CursEdit & CursAudit</title>
     <meta name="description" content="Cursus est une suite d'écriture et d'audit assistée par IA, pour les auteurs, essayistes et rédacteurs de documents longs : CursEdit pour écrire et structurer un manuscrit, CursAudit pour auditer un texte déjà écrit, CursDecision pour préparer une décision claire et argumentée." />
     <meta name="google-site-verification" content="GOyURiQ48DhWzG8Op13hPivN3eq_NhKf3pQfrwNBR74" />
