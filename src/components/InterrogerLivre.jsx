@@ -190,6 +190,7 @@ export default function InterrogerLivre({ structureProjet = [], projetId = null,
                   {ouvert && c.items.map((i, k) => (
                     <div key={k} style={{ margin: "5px 0 5px 14px", fontSize: 11.5, lineHeight: 1.45 }}>
                       <span style={{ fontStyle: "italic" }}>« {i.citation} »</span>
+                      {i.contexte && <div style={{ fontSize: 10.5, color: "#555", margin: "2px 0" }}>mot « <b>{i.mot}</b> » dans le passage : {i.contexte}</div>}
                       <div style={{ fontSize: 10.5, color: "#777", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                         <span title="Page estimée (≈ 1 800 caractères par page) : approximative. « voir dans le texte » est le repère exact.">{i.titreNœud}, page ≈ {i.page}, § {i.rang}</span>
                         <span style={{ background: i.nature === "NOMMÉ" ? "#E6F4EC" : "#F1EFE8", borderRadius: 8, padding: "0 6px" }}>{i.nature.toLowerCase()}</span>

@@ -64,7 +64,30 @@ export function analyserTermes(saisie) {
   return termes;
 }
 
-/** → { candidats: passages + `termes` (libellés trouvés), parTerme: { brut: n }, total } */
+/**
+ * Extrait du passage CENTRÉ sur le premier mot cherché trouvé (≈ `largeur` caractères, coupé aux espaces, « … » aux bouts coupés).
+ * Sert à montrer POURQUOI un passage est repéré : le mot doit être visible (retour de Joseph, 26/11/2026 : un aperçu qui
+ * commence au début du paragraphe ne montre pas le mot, donc « ne sert à rien »).
+ * @returns { extrait, mot } — `mot` = le fragment du texte original qui correspond au terme ; extrait vide si introuvable.
+ */
+export function extraitAutourDuTerme(texte, motifs, largeur = 150) {
+  const t = String(texte || "");
+  const pl = sansAccents(t);
+  if (pl.length !== t.length) return { extrait: t.length > largeur ? `${t.slice(0, largeur).replace(/\s+\S*$/, "")}…` : t, mot: "" };
+  let m = null;
+  for (const re of motifs) { const r = re.exec(pl); if (r && (!m || r.index < m.index)) m = r; }
+  if (!m) return { extrait: "", mot: "" };
+  const mot = t.slice(m.index, m.index + m[0].length);
+  if (t.length <= largeur) return { extrait: t, mot };
+  let a = Math.max(0, m.index - Math.floor((largeur - m[0].length) / 2));
+  let b = Math.min(t.length, a + largeur);
+  a = Math.max(0, b - largeur);
+  if (a > 0) { const e = t.indexOf(" ", a); if (e !== -1 && e < m.index) a = e + 1; }
+  if (b < t.length) { const e = t.lastIndexOf(" ", b); if (e > m.index + m[0].length) b = e; }
+  return { extrait: `${a > 0 ? "…" : ""}${t.slice(a, b).trim()}${b < t.length ? "…" : ""}`, mot };
+}
+
+/** → { candidats: passages + `termes` (libellés trouvés) + `extrait` (autour du mot) + `mot`, parTerme: { brut: n }, total } */
 export function repérer(passages, termes) {
   const parTerme = Object.fromEntries(termes.map((t) => [t.brut, 0]));
   const candidats = [];
@@ -73,7 +96,8 @@ export function repérer(passages, termes) {
     const trouvés = termes.filter((x) => x.motif.test(t)).map((x) => x.brut);
     if (!trouvés.length) continue;
     for (const b of trouvés) parTerme[b] += 1;
-    candidats.push({ ...p, termes: trouvés });
+    const { extrait, mot } = extraitAutourDuTerme(p.texte, termes.filter((x) => trouvés.includes(x.brut)).map((x) => x.motif));
+    candidats.push({ ...p, termes: trouvés, extrait, mot });
   }
   return { candidats, parTerme, total: passages.length };
 }
@@ -227,7 +251,9 @@ export async function lancerRelevé({ question, catégories, candidats, appel, s
       if (l.horsSujet) { horsSujet += 1; continue; }
       if (!citationPrésente(l.citation, p.texte)) { écartées.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, page: p.page, citation: l.citation }); continue; }
       const cats = l.catégories.map((c) => noms.find((x) => clé(x.nom) === clé(c) || clé(c).startsWith(clé(x.nom)))?.nom || "Autres (hors liste)");
-      items.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, page: p.page, ordre: p.ordre, catégories: [...new Set(cats)], nature: l.nature, citation: l.citation.trim(), voix: l.voix });
+      // La citation choisie par l'IA doit montrer le mot cherché ; sinon on joint l'extrait du passage centré sur ce mot (mot pour mot).
+      const sansMot = p.mot && !sansAccents(l.citation).includes(sansAccents(p.mot));
+      items.push({ cle: p.cle, nœudId: p.nœudId, titreNœud: p.titreNœud, rang: p.rang, page: p.page, ordre: p.ordre, catégories: [...new Set(cats)], nature: l.nature, citation: l.citation.trim(), voix: l.voix, ...(sansMot && p.extrait ? { contexte: p.extrait, mot: p.mot } : {}) });
     }
     lot.forEach((p, i) => { if (!vus.has(i + 1)) nonTraités.push(p.cle); });
   };
@@ -262,7 +288,7 @@ export function versMarkdown({ titreProjet = "", question, termes, relevé, date
   for (const c of relevé.parCatégorie) {
     L.push(`\n## ${c.nom} — ${c.n} citation${c.n > 1 ? "s" : ""}`);
     if (c.description) L.push(`*${c.description}*`);
-    for (const i of c.items) L.push(`- **${i.titreNœud}**, page ≈ ${i.page}, § ${i.rang}${i.voix !== "AUTEUR" ? ` — *${i.voix}*` : ""} (${i.nature.toLowerCase()}) : « ${i.citation} »`);
+    for (const i of c.items) L.push(`- **${i.titreNœud}**, page ≈ ${i.page}, § ${i.rang}${i.voix !== "AUTEUR" ? ` — *${i.voix}*` : ""} (${i.nature.toLowerCase()}) : « ${i.citation} »${i.contexte ? `\n  - mot « ${i.mot} » dans le passage : ${i.contexte}` : ""}`);
   }
   return L.join("\n");
 }
