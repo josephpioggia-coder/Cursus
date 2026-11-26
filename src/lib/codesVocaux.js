@@ -38,14 +38,41 @@ export const CODES_PAIRES = [
   { dit: "code crochets (ou brackets)", mot: "(?:crochets?|brackets?|braquettes?)", ouvrant: "[", fermant: "]", o: "[", f: "]" },
 ];
 
+// Signes COLLÉS aux mots voisins (aucune espace de part et d'autre) : « l code apostrophe arbre » → « l’arbre ».
+export const CODES_COLLES = [
+  { dit: "code apostrophe", mot: "apostrophes?", signe: "’" },
+];
+
 export const CODES_VOCAUX = [
+  ...CODES_COLLES.map((c) => ({ dit: c.dit, signe: `${c.signe} (collée aux mots)` })),
   ...CODES_SIMPLES.map((c) => ({ dit: c.dit, signe: c.signe === "\n" ? "nouvelle ligne" : c.signe })),
   ...CODES_PAIRES.map((c) => ({ dit: `${c.dit} (ouvre, puis ferme)`, signe: `${c.o} … ${c.f}` })),
 ];
 
 const compter = (texte, car) => (texte.match(new RegExp(`\\${car}`, "g")) || []).length;
 
-export function appliquerCodesVocaux(brut, avant = "") {
+const echapper = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Mot(s) dit(s) → motif : espaces et tirets interchangeables (« émoji coeur » = « émoji-coeur »).
+const motifMot = (dit) => String(dit).trim().split(/[\s-]+/).filter(Boolean).map(echapper).join("[ \\t-]+");
+
+/** Garde seulement les codes personnels valides : { dit, texte, colle? } (dit sans « code », 1 à 40 car.). */
+export function nettoyerCodesPerso(liste) {
+  if (!Array.isArray(liste)) return [];
+  const vus = new Set();
+  const sortie = [];
+  for (const c of liste) {
+    const dit = String(c?.dit || "").replace(/^\s*code[\s,:;-]+/i, "").trim().slice(0, 40);
+    const texte = String(c?.texte ?? "").slice(0, 40);
+    if (!dit || !texte || !/[\p{L}\p{N}]/u.test(dit)) continue;
+    const cle = dit.toLowerCase();
+    if (vus.has(cle)) continue;
+    vus.add(cle);
+    sortie.push({ dit, texte, colle: !!c?.colle });
+  }
+  return sortie;
+}
+
+export function appliquerCodesVocaux(brut, avant = "", perso = []) {
   let s = String(brut || "");
   if (!s) return s;
 
@@ -72,6 +99,14 @@ export function appliquerCodesVocaux(brut, avant = "") {
       ouvert = !ouvert;
       return r;
     });
+  }
+  // 3) signes collés (apostrophe), puis codes personnels (le plus long d'abord : « émoji coeur » avant « émoji »).
+  const collee = new RegExp(`[ \\t]*${DEBUT}${PREFIXE}(?:${CODES_COLLES[0].mot})${FIN}[ \\t]*`, "giu");
+  s = s.replace(collee, () => CODES_COLLES[0].signe);
+  const mesCodes = nettoyerCodesPerso(perso).sort((a, b) => b.dit.length - a.dit.length);
+  for (const c of mesCodes) {
+    const re = new RegExp(`[ \\t]*[,;.]?[ \\t]*${DEBUT}${PREFIXE}(?:${motifMot(c.dit)})${FIN}[ \\t]*[,;.]?`, "giu");
+    s = s.replace(re, () => (c.colle ? c.texte : ` ${c.texte} `));
   }
   return nettoyer(s);
 }

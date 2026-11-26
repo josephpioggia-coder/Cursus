@@ -72,7 +72,7 @@ import GalerieStyles from "./GalerieStyles.jsx";
 import { stylesProjetAPI, nœudsAPI } from "../lib/api.js";
 import { cssDesStyles, margesReglees, nettoyerStyles } from "../lib/stylesProjet.js";
 import IconeLoupe from "./IconeLoupe.jsx";
-import { appliquerCodesVocaux, joindre as joindreDictée, CODES_VOCAUX } from "../lib/codesVocaux.js";
+import { appliquerCodesVocaux, joindre as joindreDictée, CODES_VOCAUX, nettoyerCodesPerso } from "../lib/codesVocaux.js";
 import { lire, arrêterLecture, basculerPause, soldeVoix, voixDisponible, VOIX_DISPONIBLES, VITESSES_DISPONIBLES } from "../lib/lectureVoix.js";
 
 // ─── Utilitaires ────────────────────────────────────────────────────────────────
@@ -574,6 +574,16 @@ function BoutonDictee({ editor }) {
   codesRef.current = codes;
   const changerCodes = (v) => { setCodes(v); try { localStorage.setItem("cursus-dictee-codes", v ? "1" : "0"); } catch { /* stockage indisponible */ } };
   const [aideCodes, setAideCodes] = useState(false);
+  // Codes personnels (« code émoji coeur » → ❤️) : propres à l'appareil.
+  const [codesPerso, setCodesPerso] = useState(() => {
+    try { return nettoyerCodesPerso(JSON.parse(localStorage.getItem("cursus-dictee-codes-perso") || "[]")); } catch { return []; }
+  });
+  const codesPersoRef = useRef(codesPerso);
+  codesPersoRef.current = codesPerso;
+  const changerCodesPerso = (l) => { const n = nettoyerCodesPerso(l); setCodesPerso(n); try { localStorage.setItem("cursus-dictee-codes-perso", JSON.stringify(n)); } catch { /* stockage indisponible */ } };
+  const [nouveauDit, setNouveauDit] = useState("");
+  const [nouveauTexte, setNouveauTexte] = useState("");
+  const [nouveauColle, setNouveauColle] = useState(false);
   const zoneRef = useRef(null);
   const recoRef = useRef(null);
   const enregActifRef = useRef(false);
@@ -629,7 +639,7 @@ function BoutonDictee({ editor }) {
     // Mis à jour tout de suite (pas au prochain rendu) : le morceau suivant s'en sert comme contexte.
     const ajouter = (t) => {
       if (!t) return;
-      const propre = codesRef.current ? appliquerCodesVocaux(t, texteRef.current) : t;
+      const propre = codesRef.current ? appliquerCodesVocaux(t, texteRef.current, codesPersoRef.current) : t;
       const suite = joindreDictée(texteRef.current, propre);
       texteRef.current = suite;
       setTexte(suite);
@@ -870,7 +880,7 @@ function BoutonDictee({ editor }) {
   const nbAttente = enAttente.length;
   const aperçuEnAttente = enAttente.map((m) => m.apercu).filter(Boolean).join(" ");
   const grisBrut = `${aperçuEnAttente} ${apercu}`.trim(); // ce qui est dit mais pas encore définitif
-  const grisTotal = codes ? appliquerCodesVocaux(grisBrut, texte) : grisBrut;
+  const grisTotal = codes ? appliquerCodesVocaux(grisBrut, texte, codesPerso) : grisBrut;
   const libellé = {
     idle: "Ouverture du micro…",
     enregistrement: `Enregistrement en cours · ${durée}`,
@@ -953,6 +963,34 @@ function BoutonDictee({ editor }) {
               {CODES_VOCAUX.map((c) => (
                 <div key={c.dit}><b>{c.dit}</b> → {c.signe}</div>
               ))}
+              {codesPerso.length > 0 && <div style={{ marginTop: 6, fontWeight: 600 }}>Mes codes</div>}
+              {codesPerso.map((c) => (
+                <div key={c.dit} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <span style={{ flex: 1, minWidth: 0 }}><b>code {c.dit}</b> → {c.texte}{c.colle ? " (collé aux mots)" : ""}</span>
+                  <button onClick={() => changerCodesPerso(codesPerso.filter((x) => x.dit !== c.dit))} aria-label={`Supprimer le code ${c.dit}`}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#A32D2D", fontSize: 13, padding: 0 }}>✕</button>
+                </div>
+              ))}
+              <div style={{ marginTop: 6, fontWeight: 600 }}>Ajouter un code</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", marginTop: 2 }}>
+                <span>code</span>
+                <input value={nouveauDit} onChange={(e) => setNouveauDit(e.target.value)} placeholder="émoji coeur" aria-label="Mot à dire après « code »"
+                  style={{ flex: "1 1 90px", minWidth: 0, fontSize: 16, padding: "3px 5px", border: "1px solid #ccc", borderRadius: 4 }} />
+                <span>→</span>
+                <input value={nouveauTexte} onChange={(e) => setNouveauTexte(e.target.value)} placeholder="❤️" aria-label="Texte ou émoji à écrire"
+                  style={{ flex: "1 1 60px", minWidth: 0, fontSize: 16, padding: "3px 5px", border: "1px solid #ccc", borderRadius: 4 }} />
+              </div>
+              <label style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 3 }}>
+                <input type="checkbox" checked={nouveauColle} onChange={(e) => setNouveauColle(e.target.checked)} /> Coller aux mots voisins (sans espace)
+              </label>
+              <button onClick={() => {
+                const l = nettoyerCodesPerso([{ dit: nouveauDit, texte: nouveauTexte, colle: nouveauColle }]);
+                if (!l.length) return;
+                changerCodesPerso([...codesPerso.filter((x) => x.dit.toLowerCase() !== l[0].dit.toLowerCase()), l[0]]);
+                setNouveauDit(""); setNouveauTexte(""); setNouveauColle(false);
+              }} style={{ marginTop: 4, padding: "3px 10px", fontSize: 12, border: "1px solid #7F77DD", background: "#fff", color: "#534AB7", borderRadius: 4, cursor: "pointer", fontFamily: "inherit" }}>
+                + Ajouter ce code
+              </button>
               <div style={{ color: "#777", marginTop: 4 }}>Sans le mot « code », rien ne change : « un point de vue », « la virgule » restent des mots. Une consigne en phrase (« entre guillemets pour… ») n'est pas un code : elle est écrite telle quelle.</div>
             </div>
           )}
