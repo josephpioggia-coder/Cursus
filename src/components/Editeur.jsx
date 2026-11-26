@@ -543,27 +543,36 @@ function BoutonDictee({ editor }) {
     const r = ancreRef.current?.getBoundingClientRect();
     if (r) setPosBoîte({ top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 392)) });
   };
-  // Refonte du 26/11/2026 (retour de Joseph : « je ne vois rien pendant que je parle, je ne sais pas où ça démarre, et je
-  // voudrais pouvoir reprendre l'enregistrement après une pause ») : la boîte s'ouvre dès le clic sur le micro et montre
-  // le texte déjà dicté + un APERÇU EN DIRECT (reconnaissance vocale du navigateur, quand elle existe) ; « Pause » transcrit
-  // le passage avec OpenAI (texte définitif, ajouté à la suite) ; « Reprendre l'enregistrement » ajoute un nouveau passage ;
-  // « Insérer dans le texte » ne se fait qu'à la fin. L'aperçu n'est qu'un confort : il n'est JAMAIS inséré tel quel.
-  const [statut, setStatut] = useState("idle"); // idle (micro en cours d'ouverture) | enregistrement | transcription | pause
-  const [texte, setTexte] = useState("");      // texte définitif déjà transcrit (modifiable en pause)
-  const [direct, setDirect] = useState("");    // aperçu en direct du passage en cours (approximatif)
+  // Refonte du 26/11/2026, 2e version (retour de Joseph : « ça fonctionne mais très lentement, impossible d'enregistrer à
+  // ce rythme, on perd le fil des pensées ») : plus AUCUNE attente. La prise est découpée automatiquement aux silences
+  // (≈ une phrase, jamais au milieu d'un mot) et chaque morceau est transcrit EN ARRIÈRE-PLAN pendant qu'on continue de
+  // parler : le texte définitif apparaît quelques secondes après chaque phrase. « Pause » n'attend rien : on peut reprendre
+  // tout de suite, le dernier morceau arrive pendant ce temps. Les transcriptions partent une à une, dans l'ordre.
+  // Aperçu en gris = reconnaissance vocale du navigateur quand elle existe (confort seulement, jamais inséré tel quel).
+  const [statut, setStatut] = useState("idle"); // idle (micro en cours d'ouverture) | enregistrement | pause
+  const [texte, setTexte] = useState("");        // texte DÉFINITIF déjà transcrit (modifiable en pause)
+  const [apercu, setApercu] = useState("");      // aperçu en gris du passage en cours (approximatif)
+  const [enAttente, setEnAttente] = useState([]); // morceaux envoyés, pas encore revenus : [{ id, apercu }]
   const [secondes, setSecondes] = useState(0);
   const [erreur, setErreur] = useState(null);
   const enregistreurRef = useRef(null);
   const fluxRef = useRef(null);
-  const morceauxRef = useRef([]);
-  const abandonRef = useRef(false);     // fermeture pendant un enregistrement : ne rien transcrire
-  const générationRef = useRef(0);      // une transcription qui finit après fermeture est ignorée
+  const ctxAudioRef = useRef(null);
+  const vadRef = useRef(null);
+  const abandonRef = useRef(false);     // fermeture : ne plus rien transcrire ni ajouter
+  const générationRef = useRef(0);      // un résultat qui revient après fermeture est ignoré
+  const fileRef = useRef(Promise.resolve()); // transcriptions en file : une à la fois, dans l'ordre
+  const idRef = useRef(0);
+  const aEnvoyéRef = useRef(false);     // au moins un morceau audible a été envoyé dans cette boîte
+  const texteRef = useRef("");
+  texteRef.current = texte;
   const zoneRef = useRef(null);
   const recoRef = useRef(null);
   const enregActifRef = useRef(false);
   const recoStopRef = useRef(false);
-  const directBaseRef = useRef("");
-  const directCourantRef = useRef("");
+  const apercuTotalRef = useRef("");    // aperçu cumulé de toute la prise
+  const apercuCourantRef = useRef("");  // dernier résultat de la session de reconnaissance en cours
+  const apercuCoupeRef = useRef(0);     // longueur de l'aperçu déjà attribuée à des morceaux envoyés
   const APIReco = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
   const lancerReco = useCallback(() => {
@@ -576,15 +585,16 @@ function BoutonDictee({ editor }) {
       reco.onresult = (e) => {
         let t = "";
         for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-        directCourantRef.current = t;
-        setDirect(`${directBaseRef.current} ${t}`.trim());
+        apercuCourantRef.current = t;
+        const total = `${apercuTotalRef.current} ${t}`.trim();
+        setApercu(total.slice(Math.min(apercuCoupeRef.current, total.length)).trim());
       };
       // Une erreur de l'aperçu ne coupe JAMAIS l'enregistrement ; seules les erreurs durables arrêtent les relances.
       reco.onerror = (e) => { if (e?.error && e.error !== "no-speech" && e.error !== "aborted") recoStopRef.current = true; };
       reco.onend = () => {
         if (!enregActifRef.current || recoStopRef.current) return;
-        directBaseRef.current = `${directBaseRef.current} ${directCourantRef.current}`.trim();
-        directCourantRef.current = "";
+        apercuTotalRef.current = `${apercuTotalRef.current} ${apercuCourantRef.current}`.trim();
+        apercuCourantRef.current = "";
         setTimeout(() => { if (enregActifRef.current && !recoStopRef.current) lancerReco(); }, 250);
       };
       recoRef.current = reco;
@@ -597,30 +607,18 @@ function BoutonDictee({ editor }) {
     try { recoRef.current?.stop(); } catch { /* déjà arrêtée */ }
   };
 
-  const transcrire = useCallback(async (blob) => {
-    const génération = générationRef.current;
-    // Garde-fou (18/09/2026) — un blob quasi vide (micro coupé, mauvais
-    // périphérique d'entrée sélectionné côté système) produit un
-    // enregistrement quasi silencieux : les modèles de transcription de
-    // type Whisper "hallucinent" alors un texte de complaisance ("you",
-    // "Merci.", etc.) au lieu de renvoyer une erreur — c'est ce
-    // qu'a rencontré Joseph (18/09/2026, "toujours le you qui s'inscrit").
-    // Un enregistrement réel, même de 2-3 secondes, pèse largement plus
-    // que ce seuil en webm/opus ; en dessous, mieux vaut prévenir plutôt
-    // que d'envoyer un appel payant pour un résultat inutilisable.
-    console.info("[dictée] taille du blob audio :", blob.size, "octets");
-    if (blob.size < 3000) {
-      setErreur(
-        "Aucun son détecté (enregistrement quasi vide). Vérifie le micro " +
-        "sélectionné dans les réglages système/navigateur (pas un " +
-        "périphérique débranché ou coupé), puis reprends l'enregistrement " +
-        "en parlant dès le début."
-      );
-      setDirect("");
-      setStatut("pause");
-      return;
-    }
-    setStatut("transcription");
+  // Aperçu attribué au morceau qui part : tout ce qui a été reconnu depuis le morceau précédent.
+  const prendreApercu = () => {
+    const total = `${apercuTotalRef.current} ${apercuCourantRef.current}`.trim();
+    const part = total.slice(Math.min(apercuCoupeRef.current, total.length)).trim();
+    apercuCoupeRef.current = total.length;
+    setApercu("");
+    return part;
+  };
+
+  const transcrireMorceau = useCallback(async (blob, id, apercuMorceau, génération) => {
+    const retirer = () => setEnAttente((l) => l.filter((m) => m.id !== id));
+    const ajouter = (t) => { if (t) setTexte((x) => (x.trim() ? `${x.replace(/\s+$/, "")} ` : "") + t); };
     try {
       let envoi = blob;
       try { envoi = await versWav16k(blob); }
@@ -639,23 +637,102 @@ function BoutonDictee({ editor }) {
       }
       if (data?.error) throw new Error(data.error);
       if (génération !== générationRef.current) return; // boîte fermée entre-temps
-      const nouveau = (data?.texte || "").trim();
-      // Le passage s'ajoute À LA SUITE du texte déjà dicté (et déjà corrigé à la main s'il y a eu une pause).
-      if (nouveau) setTexte((t) => (t.trim() ? `${t.replace(/\s+$/, "")} ` : "") + nouveau);
-      setDirect("");
-      setStatut("pause");
+      ajouter((data?.texte || "").trim());
+      retirer();
     } catch (err) {
       if (génération !== générationRef.current) return;
-      // L'aperçu en direct est conservé dans le texte pour ne rien perdre de ce qui a été dit.
-      setErreur((err.message || "Échec de la transcription.") + " Ton passage n'a pas été transcrit : tu peux le redire en reprenant l'enregistrement.");
-      setDirect("");
-      setStatut("pause");
+      // Rien ne doit se perdre : l'aperçu de ce passage (non vérifié) est gardé, et l'erreur est dite.
+      ajouter(apercuMorceau ? `${apercuMorceau}` : "");
+      setErreur(`Un passage n'a pas pu être transcrit (${err.message || "erreur inconnue"}).` + (apercuMorceau ? " Son aperçu approximatif a été conservé : relis-le." : " Tu peux le redire en reprenant l'enregistrement."));
+      retirer();
     }
   }, []);
 
+  // Envoie un morceau terminé, en arrière-plan. Un morceau quasi vide est ignoré sans bruit (silence).
+  const envoyerMorceau = (blob, apercuMorceau) => {
+    console.info("[dictée] taille du morceau audio :", blob.size, "octets");
+    // Garde-fou (18/09/2026) — un blob quasi vide (micro coupé, mauvais périphérique d'entrée) pousse les modèles de type
+    // Whisper à « halluciner » un texte de complaisance (« you », « Merci. ») : on n'envoie pas, et on ne paie pas.
+    if (blob.size < 3000) return;
+    aEnvoyéRef.current = true;
+    const id = ++idRef.current;
+    const génération = générationRef.current;
+    setEnAttente((l) => [...l, { id, apercu: apercuMorceau }]);
+    fileRef.current = fileRef.current.then(() => transcrireMorceau(blob, id, apercuMorceau, génération)).catch(() => {});
+  };
+
+  // Un enregistreur par morceau (un fichier découpé au milieu d'un flux ne se décode pas) : le suivant démarre
+  // aussitôt sur le MÊME flux, au moment d'un silence — la coupure ne mange aucun mot.
+  const lancerEnregistreur = (flux) => {
+    const enregistreur = new MediaRecorder(flux);
+    const morceaux = [];
+    enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceaux.push(e.data); };
+    enregistreur.onstop = () => {
+      if (abandonRef.current) return;
+      const blob = new Blob(morceaux, { type: enregistreur.mimeType || "audio/webm" });
+      const apercuMorceau = enregistreur.apercuMorceau || "";
+      if (blob.size < 3000 && !aEnvoyéRef.current && enregistreur.dernier && !texteRef.current.trim()) {
+        setErreur(
+          "Aucun son détecté (enregistrement quasi vide). Vérifie le micro " +
+          "sélectionné dans les réglages système/navigateur (pas un " +
+          "périphérique débranché ou coupé), puis reprends l'enregistrement " +
+          "en parlant dès le début."
+        );
+      }
+      envoyerMorceau(blob, apercuMorceau);
+    };
+    enregistreur.start();
+    enregistreurRef.current = enregistreur;
+    return enregistreur;
+  };
+
+  const couperMorceau = () => {
+    const actuel = enregistreurRef.current;
+    if (!actuel || actuel.state !== "recording" || !fluxRef.current) return;
+    actuel.apercuMorceau = prendreApercu();
+    actuel.stop();
+    lancerEnregistreur(fluxRef.current);
+  };
+
+  // Détecte les silences (niveau sonore toutes les 100 ms) pour couper entre deux phrases.
+  const surveillerSilences = (flux) => {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      ctx.resume?.();
+      const analyseur = ctx.createAnalyser();
+      analyseur.fftSize = 1024;
+      ctx.createMediaStreamSource(flux).connect(analyseur);
+      ctxAudioRef.current = ctx;
+      const tampon = new Float32Array(analyseur.fftSize);
+      let duréeMs = 0, paroleMs = 0, silenceMs = 0;
+      vadRef.current = setInterval(() => {
+        analyseur.getFloatTimeDomainData(tampon);
+        let somme = 0;
+        for (let i = 0; i < tampon.length; i++) somme += tampon[i] * tampon[i];
+        const niveau = Math.sqrt(somme / tampon.length);
+        duréeMs += 100;
+        if (niveau > 0.012) { paroleMs += 100; silenceMs = 0; } else silenceMs += 100;
+        const phraseFinie = paroleMs >= 2000 && silenceMs >= 900;       // une phrase dite, puis un souffle
+        const tropLong = duréeMs >= 28000 && paroleMs > 0 && silenceMs >= 250; // jamais plus d'une trentaine de secondes
+        const limiteDure = duréeMs >= 45000 && paroleMs > 0;
+        if (phraseFinie || tropLong || limiteDure) { duréeMs = 0; paroleMs = 0; silenceMs = 0; couperMorceau(); }
+        else if (paroleMs === 0 && duréeMs >= 20000) { duréeMs = 0; silenceMs = 0; } // silence prolongé : on ne coupe pas
+      }, 100);
+    } catch { /* sans détection de silence : un seul morceau jusqu'à « Pause » */ }
+  };
+
+  const arrêterSurveillance = () => {
+    clearInterval(vadRef.current);
+    vadRef.current = null;
+    try { ctxAudioRef.current?.close?.(); } catch { /* déjà fermé */ }
+    ctxAudioRef.current = null;
+  };
+
   const démarrer = async () => {
     setErreur(null);
-    setDirect("");
+    setApercu("");
     setSecondes(0);
     abandonRef.current = false;
     try {
@@ -673,21 +750,14 @@ function BoutonDictee({ editor }) {
         setStatut("pause");
         return;
       }
-      const enregistreur = new MediaRecorder(flux);
-      morceauxRef.current = [];
-      enregistreur.ondataavailable = (e) => { if (e.data.size > 0) morceauxRef.current.push(e.data); };
-      enregistreur.onstop = () => {
-        flux.getTracks().forEach((piste) => piste.stop());
-        fluxRef.current = null;
-        if (abandonRef.current) return;
-        transcrire(new Blob(morceauxRef.current, { type: enregistreur.mimeType || "audio/webm" }));
-      };
-      enregistreur.start();
-      enregistreurRef.current = enregistreur;
-      directBaseRef.current = "";
-      directCourantRef.current = "";
+      aEnvoyéRef.current = false;
+      apercuTotalRef.current = "";
+      apercuCourantRef.current = "";
+      apercuCoupeRef.current = 0;
       recoStopRef.current = false;
       enregActifRef.current = true;
+      lancerEnregistreur(flux);
+      surveillerSilences(flux);
       lancerReco();
       setStatut("enregistrement");
     } catch (err) {
@@ -696,17 +766,26 @@ function BoutonDictee({ editor }) {
     }
   };
 
-  // « Pause » : arrête la prise, transcrit le passage (texte définitif) et rend la main pour relire / corriger.
+  // « Pause » : n'attend RIEN. Le dernier morceau part en arrière-plan ; on peut relire, corriger ou reprendre aussitôt.
   const mettreEnPause = () => {
     arrêterReco();
-    setStatut("transcription");
-    enregistreurRef.current?.stop();
+    arrêterSurveillance();
+    const actuel = enregistreurRef.current;
+    if (actuel && actuel.state === "recording") {
+      actuel.apercuMorceau = prendreApercu();
+      actuel.dernier = true;
+      actuel.stop();
+    }
+    fluxRef.current?.getTracks().forEach((piste) => piste.stop());
+    fluxRef.current = null;
+    setStatut("pause");
   };
 
   const fermer = () => {
     abandonRef.current = true;
     générationRef.current += 1;
     arrêterReco();
+    arrêterSurveillance();
     try { recoRef.current?.abort?.(); } catch { /* déjà arrêtée */ }
     if (enregistreurRef.current?.state === "recording") enregistreurRef.current.stop();
     fluxRef.current?.getTracks().forEach((piste) => piste.stop());
@@ -714,14 +793,15 @@ function BoutonDictee({ editor }) {
     setOuvert(false);
     setStatut("idle");
     setTexte("");
-    setDirect("");
+    setApercu("");
+    setEnAttente([]);
     setSecondes(0);
     setErreur(null);
   };
 
   // Ne jamais perdre du texte dicté sur un clic involontaire (micro ou ✕) : confirmation s'il y a quelque chose.
   const annuler = () => {
-    if ((texte.trim() || direct.trim()) && !window.confirm("Abandonner le texte dicté ? Il n'a pas encore été inséré dans le chapitre.")) return;
+    if ((texte.trim() || apercu.trim() || enAttente.length) && !window.confirm("Abandonner le texte dicté ? Il n'a pas encore été inséré dans le chapitre.")) return;
     fermer();
   };
 
@@ -740,21 +820,25 @@ function BoutonDictee({ editor }) {
   // Pendant la prise, la zone suit le texte qui s'allonge.
   useEffect(() => {
     if (statut !== "pause" && zoneRef.current) zoneRef.current.scrollTop = zoneRef.current.scrollHeight;
-  }, [texte, direct, statut]);
+  }, [texte, apercu, enAttente, statut]);
 
   useEffect(() => () => {
     abandonRef.current = true;
     enregActifRef.current = false;
+    clearInterval(vadRef.current);
+    try { ctxAudioRef.current?.close?.(); } catch { /* déjà fermé */ }
     try { recoRef.current?.abort?.(); } catch { /* déjà arrêtée */ }
     fluxRef.current?.getTracks().forEach((piste) => piste.stop());
   }, []);
 
   const durée = `${Math.floor(secondes / 60)}:${String(secondes % 60).padStart(2, "0")}`;
+  const nbAttente = enAttente.length;
+  const aperçuEnAttente = enAttente.map((m) => m.apercu).filter(Boolean).join(" ");
+  const grisTotal = `${aperçuEnAttente} ${apercu}`.trim(); // ce qui est dit mais pas encore définitif
   const libellé = {
     idle: "Ouverture du micro…",
     enregistrement: `Enregistrement en cours · ${durée}`,
-    transcription: "Transcription du passage en cours…",
-    pause: "En pause — relis, corrige, puis reprends ou insère",
+    pause: nbAttente ? "En pause — le dernier passage arrive…" : "En pause — relis, corrige, puis reprends ou insère",
   }[statut];
   const bouton = { padding: "7px 10px", fontSize: 12, borderRadius: 6, cursor: "pointer", fontFamily: "inherit", border: "none" };
 
@@ -793,20 +877,28 @@ function BoutonDictee({ editor }) {
           ) : (
             <div ref={zoneRef} style={{ height: 150, overflowY: "auto", whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, color: "#1a1a1a", background: "#fafafa", border: "0.5px solid #ddd", borderRadius: 6, padding: 8 }}>
               {texte}
-              {texte && direct ? " " : ""}
-              <span style={{ color: "#8a8a8a", fontStyle: "italic" }}>{direct}</span>
-              {!texte && !direct && statut === "enregistrement" && (
+              {texte && grisTotal ? " " : ""}
+              <span style={{ color: "#8a8a8a", fontStyle: "italic" }}>{grisTotal}</span>
+              {!texte && !grisTotal && statut === "enregistrement" && (
                 <span style={{ color: "#aaa" }}>
                   {APIReco
-                    ? "Parle : ce que tu dis s'affichera ici en direct…"
-                    : "Aperçu en direct indisponible sur ce navigateur : le texte apparaîtra quand tu cliqueras sur Pause."}
+                    ? "Parle : ce que tu dis s'affichera ici, puis sera mis au propre phrase après phrase…"
+                    : "Parle : ton texte s'affichera ici, mis au propre quelques secondes après chaque phrase."}
                 </span>
               )}
             </div>
           )}
-          {statut === "enregistrement" && direct && (
+          {statut === "pause" && aperçuEnAttente && (
+            <div style={{ fontSize: 11, color: "#8a8a8a", fontStyle: "italic", marginTop: 4 }}>⏳ Arrive : {aperçuEnAttente}</div>
+          )}
+          {nbAttente > 0 && !(statut === "pause" && aperçuEnAttente) && (
             <div style={{ fontSize: 10.5, color: "#999", marginTop: 4 }}>
-              En gris : aperçu en direct, approximatif. Au clic sur Pause, le texte définitif (plus précis) le remplace.
+              ⏳ {nbAttente} passage{nbAttente > 1 ? "s" : ""} en cours de mise au propre — tu peux continuer à parler.
+            </div>
+          )}
+          {statut === "enregistrement" && grisTotal && (
+            <div style={{ fontSize: 10.5, color: "#999", marginTop: 4 }}>
+              En gris : pas encore définitif (aperçu approximatif). Le texte définitif, plus précis, le remplace tout seul.
             </div>
           )}
 
@@ -816,7 +908,7 @@ function BoutonDictee({ editor }) {
 
           {statut === "enregistrement" && (
             <button onClick={mettreEnPause} style={{ ...bouton, width: "100%", marginTop: 8, color: "#fff", background: "#7F77DD" }}>
-              ⏸ Pause — transcrire ce passage
+              ⏸ Pause
             </button>
           )}
           {statut === "pause" && (
@@ -824,9 +916,9 @@ function BoutonDictee({ editor }) {
               <button onClick={démarrer} style={{ ...bouton, flex: 1, color: "#534AB7", background: "#EEEDFE" }}>
                 🎙 Reprendre l'enregistrement
               </button>
-              <button onClick={insérer} disabled={!texte.trim()}
-                style={{ ...bouton, flex: 1, color: "#fff", background: texte.trim() ? "#7F77DD" : "#c9c6ee", cursor: texte.trim() ? "pointer" : "default" }}>
-                Insérer dans le texte
+              <button onClick={insérer} disabled={!texte.trim() || nbAttente > 0}
+                style={{ ...bouton, flex: 1, color: "#fff", background: texte.trim() && !nbAttente ? "#7F77DD" : "#c9c6ee", cursor: texte.trim() && !nbAttente ? "pointer" : "default" }}>
+                {nbAttente ? "Un instant…" : "Insérer dans le texte"}
               </button>
             </div>
           )}
