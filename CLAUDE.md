@@ -1656,3 +1656,6 @@ Retour de Joseph : le raccourci épinglé « cursus.pro » l'amenait sur `https:
 
 #### Dictée : « code apostrophe » + codes personnels (26/11/2026, demande de Joseph : « code émoji coeur »)
 `codesVocaux.js` : `CODES_COLLES` (apostrophe ’ collée), `nettoyerCodesPerso`, 3e paramètre `perso` de `appliquerCodesVocaux` (`{ dit, texte, colle }`, le plus long d'abord, appliqués APRÈS les codes intégrés). `BoutonDictee` : formulaire « Ajouter un code » + « Mes codes » dans la liste, `localStorage` `cursus-dictee-codes-perso` (par appareil, pas en base). Vérifié : moteur (node) ; `vite build`. NON testé dans le navigateur ; comme pour les autres codes, la façon dont OpenAI transcrit « émoji » n'est pas confirmée.
+
+#### Dictée : parenthèses imbriquées (26/11/2026)
+`codesVocaux.js` : formes explicites « code ouvrez / fermez N parenthèses (crochets, guillemets) », N = un…cinq ou chiffres (`repeat`). L'alternance « code parenthèse » reste à un seul niveau. Vérifié : moteur (node, l'exemple de Joseph reproduit exactement) ; NON testé dans le navigateur ni avec la transcription réelle d'OpenAI.

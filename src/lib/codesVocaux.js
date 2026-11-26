@@ -85,14 +85,17 @@ export function appliquerCodesVocaux(brut, avant = "", perso = []) {
   // 2) signes par paires : ouvre puis ferme à tour de rôle, en tenant compte de ce qui est déjà ouvert avant.
   for (const paire of CODES_PAIRES) {
     let ouvert = compter(String(avant || ""), paire.o) > compter(String(avant || ""), paire.f);
+    // Formes explicites, avec nombre facultatif : « code ouvrez trois parenthèses » → ((( ; « code fermez deux parenthèses » → )).
+    const NB = "(un|une|deux|trois|quatre|cinq|\\d+)";
+    const nombre = (m) => { const v = { un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5 }[String(m || "").toLowerCase()]; return v || parseInt(m, 10) || 1; };
     const explicite = (sens) => new RegExp(
       sens === "ouvre"
-        ? `[ \\t]*${DEBUT}${PREFIXE}(?:(?:ouvrez|ouvrir|ouvre) (?:les |le |la |un |une )?${paire.mot}|${paire.mot} (?:ouvrants?|ouvertes?|ouverts?))${FIN}[ \\t]*`
-        : `[ \\t]*${DEBUT}${PREFIXE}(?:(?:fermez|fermer|ferme) (?:les |le |la |un |une )?${paire.mot}|${paire.mot} (?:fermants?|fermées?|fermés?))${FIN}[ \\t]*`,
+        ? `[ \\t]*${DEBUT}${PREFIXE}(?:(?:ouvrez|ouvrir|ouvre) (?:${NB} )?(?:les |le |la |un |une )?${paire.mot}|${paire.mot} (?:ouvrants?|ouvertes?|ouverts?))${FIN}[ \\t]*`
+        : `[ \\t]*${DEBUT}${PREFIXE}(?:(?:fermez|fermer|ferme) (?:${NB} )?(?:les |le |la |un |une )?${paire.mot}|${paire.mot} (?:fermants?|fermées?|fermés?))${FIN}[ \\t]*`,
       "giu");
     // Formes explicites d'abord : elles imposent l'état.
-    s = s.replace(explicite("ouvre"), () => { ouvert = true; return ` ${paire.ouvrant}`; });
-    s = s.replace(explicite("ferme"), () => { ouvert = false; return paire.fermant; });
+    s = s.replace(explicite("ouvre"), (m, n) => { ouvert = true; return ` ${paire.ouvrant.repeat(nombre(n))}`; });
+    s = s.replace(explicite("ferme"), (m, n) => { ouvert = false; return paire.fermant.repeat(nombre(n)); });
     const alternee = new RegExp(`[ \\t]*${DEBUT}${PREFIXE}${paire.mot}${FIN}[ \\t]*`, "giu");
     s = s.replace(alternee, () => {
       const r = ouvert ? paire.fermant : ` ${paire.ouvrant}`;

@@ -963,6 +963,7 @@ function BoutonDictee({ editor }) {
               {CODES_VOCAUX.map((c) => (
                 <div key={c.dit}><b>{c.dit}</b> → {c.signe}</div>
               ))}
+              <div style={{ color: "#777", marginTop: 4 }}>Parenthèses ou crochets imbriqués : « code ouvrez trois parenthèses », « code fermez deux parenthèses » (ou « code ouvrez la parenthèse » / « code fermez la parenthèse » une à une). « code parenthèse » seul ouvre puis ferme à tour de rôle (un seul niveau).</div>
               {codesPerso.length > 0 && <div style={{ marginTop: 6, fontWeight: 600 }}>Mes codes</div>}
               {codesPerso.map((c) => (
                 <div key={c.dit} style={{ display: "flex", gap: 6, alignItems: "center" }}>
